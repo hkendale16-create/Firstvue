@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/business_submission_service.dart';
-import '../services/rentals_store.dart';
+import '../widgets/admin_gate.dart';
 
 class AdminBusinessSubmissionsScreen extends StatefulWidget {
   const AdminBusinessSubmissionsScreen({super.key});
@@ -38,26 +38,11 @@ class _AdminBusinessSubmissionsScreenState
         surfaceTintColor: Colors.transparent,
         title: const Text('BUSINESS APPROVALS'),
       ),
-      body: FutureBuilder<bool>(
-        future: RentalsStore.isCurrentUserAdmin(),
-        builder: (context, adminSnapshot) {
-          if (!adminSnapshot.hasData) {
-            return const Center(
-              child: CircularProgressIndicator(color: Color(0xFFD8B56A)),
-            );
-          }
-          if (!adminSnapshot.data!) {
-            return const Center(
-              child: Text(
-                'This area is restricted to FirstVue administrators.',
-                style: TextStyle(color: Colors.white54),
-              ),
-            );
-          }
-          return FutureBuilder<List<PendingBusinessSubmission>>(
-            future: _submissionsFuture,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
+      body: AdminGate(
+        child: FutureBuilder<List<PendingBusinessSubmission>>(
+          future: _submissionsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
                 return Center(
                   child: TextButton(
                     onPressed: _refresh,
@@ -91,8 +76,7 @@ class _AdminBusinessSubmissionsScreenState
                 ),
               );
             },
-          );
-        },
+          ),
       ),
     );
   }

@@ -1,6 +1,8 @@
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'admin_auth_service.dart';
+
 class RentalMedia {
   final String mediaType;
   final String signedUrl;
@@ -127,16 +129,7 @@ class RentalsStore {
         .asyncMap(_attachMedia);
   }
 
-  static Future<bool> isCurrentUserAdmin() async {
-    final user = _client.auth.currentUser;
-    if (user == null) return false;
-    final profile = await _client
-        .from('profiles')
-        .select('account_type')
-        .eq('id', user.id)
-        .maybeSingle();
-    return profile?['account_type'] == 'admin';
-  }
+  static Future<bool> isCurrentUserAdmin() => AdminAuthService.isAdmin();
 
   static Future<void> setRentalStatus({
     required String rentalId,

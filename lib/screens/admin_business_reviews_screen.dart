@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/business_reviews_service.dart';
-import '../services/rentals_store.dart';
+import '../widgets/admin_gate.dart';
 
 class AdminBusinessReviewsScreen extends StatefulWidget {
   const AdminBusinessReviewsScreen({super.key});
@@ -29,30 +29,11 @@ class _AdminBusinessReviewsScreenState
       surfaceTintColor: Colors.transparent,
       title: const Text('REVIEW APPROVALS'),
     ),
-    body: FutureBuilder<bool>(
-      future: RentalsStore.isCurrentUserAdmin(),
-      builder: (context, adminSnapshot) {
-        if (!adminSnapshot.hasData) {
-          return const Center(
-            child: CircularProgressIndicator(color: Color(0xFFD8B56A)),
-          );
-        }
-        if (!adminSnapshot.data!) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(28),
-              child: Text(
-                'This area is restricted to FirstVue administrators.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white54),
-              ),
-            ),
-          );
-        }
-        return FutureBuilder<List<PendingBusinessReview>>(
-          future: _reviews,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
+    body: AdminGate(
+      child: FutureBuilder<List<PendingBusinessReview>>(
+        future: _reviews,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
               return Center(
                 child: TextButton(
                   onPressed: _refresh,
@@ -92,8 +73,7 @@ class _AdminBusinessReviewsScreenState
               ),
             );
           },
-        );
-      },
+        ),
     ),
   );
 }

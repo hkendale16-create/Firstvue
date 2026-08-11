@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/rentals_store.dart';
+import '../widgets/admin_gate.dart';
 
 class AdminRentalsScreen extends StatelessWidget {
   const AdminRentalsScreen({super.key});
@@ -14,28 +15,8 @@ class AdminRentalsScreen extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         title: const Text('RENTAL APPROVALS'),
       ),
-      body: FutureBuilder<bool>(
-        future: RentalsStore.isCurrentUserAdmin(),
-        builder: (context, adminSnapshot) {
-          if (!adminSnapshot.hasData) {
-            return const Center(
-              child: CircularProgressIndicator(color: Color(0xFFD8B56A)),
-            );
-          }
-          if (!adminSnapshot.data!) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(28),
-                child: Text(
-                  'This area is restricted to authorized FirstVue administrators.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white54, height: 1.45),
-                ),
-              ),
-            );
-          }
-          return const _PendingRentalsList();
-        },
+      body: AdminGate(
+        child: const _PendingRentalsList(),
       ),
     );
   }

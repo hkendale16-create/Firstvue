@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'admin_auth_service.dart';
+
 enum ProfessionalType {
   barber('barber', 'Barber'),
   stylist('stylist', 'Stylist'),
@@ -145,16 +147,7 @@ class ProfessionalProfilesService {
     }, onConflict: 'profile_id');
   }
 
-  static Future<bool> isAdmin() async {
-    final user = _client.auth.currentUser;
-    if (user == null) return false;
-    final row = await _client
-        .from('profiles')
-        .select('account_type')
-        .eq('id', user.id)
-        .maybeSingle();
-    return row?['account_type'] == 'admin';
-  }
+  static Future<bool> isAdmin() => AdminAuthService.isAdmin();
 
   static Future<List<ProfessionalProfile>> fetchPending() async {
     final rows = await _client

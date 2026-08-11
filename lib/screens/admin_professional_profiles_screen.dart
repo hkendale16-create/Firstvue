@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/professional_profiles_service.dart';
+import '../widgets/admin_gate.dart';
 
 class AdminProfessionalProfilesScreen extends StatefulWidget {
   const AdminProfessionalProfilesScreen({super.key});
@@ -12,20 +13,14 @@ class AdminProfessionalProfilesScreen extends StatefulWidget {
 
 class _AdminProfessionalProfilesScreenState
     extends State<AdminProfessionalProfilesScreen> {
-  late Future<_AdminProfessionalData> _data = _load();
-
-  Future<_AdminProfessionalData> _load() async {
-    final isAdmin = await ProfessionalProfilesService.isAdmin();
-    if (!isAdmin) {
-      return const _AdminProfessionalData(isAdmin: false, profiles: []);
-    }
-    final profiles = await ProfessionalProfilesService.fetchPending();
-    return _AdminProfessionalData(isAdmin: true, profiles: profiles);
-  }
+  late Future<List<ProfessionalProfile>> _profiles =
+      ProfessionalProfilesService.fetchPending();
 
   Future<void> _refresh() async {
-    setState(() => _data = _load());
-    await _data;
+    setState(
+      () => _profiles = ProfessionalProfilesService.fetchPending(),
+    );
+    await _profiles;
   }
 
   Future<void> _moderate(ProfessionalProfile profile, String status) async {
@@ -55,40 +50,35 @@ class _AdminProfessionalProfilesScreenState
           IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
         ],
       ),
-      body: FutureBuilder<_AdminProfessionalData>(
-        future: _data,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return _AdminMessage(
-              icon: Icons.cloud_off_outlined,
-              message: 'Unable to load professional submissions.',
-              action: _refresh,
-            );
-          }
+      body: AdminGate(
+        child: FutureBuilder<List<ProfessionalProfile>>(
+          future: _profiles,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return _AdminMessage(
+                icon: Icons.cloud_off_outlined,
+                message: 'Unable to load professional submissions.',
+                action: _refresh,
+              );
+            }
 
-          final data = snapshot.data!;
-          if (!data.isAdmin) {
-            return const _AdminMessage(
-              icon: Icons.lock_outline,
-              message: 'This area is restricted to FIRSTVUE administrators.',
-            );
-          }
-          if (data.profiles.isEmpty) {
-            return _AdminMessage(
-              icon: Icons.task_alt,
-              message: 'No professional profiles are waiting for review.',
-              action: _refresh,
-            );
-          }
+            final profiles = snapshot.data ?? const [];
+            if (profiles.isEmpty) {
+              return _AdminMessage(
+                icon: Icons.task_alt,
+                message: 'No professional profiles are waiting for review.',
+                action: _refresh,
+              );
+            }
 
           return RefreshIndicator(
             onRefresh: _refresh,
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 30),
-              itemCount: data.profiles.length + 1,
+              itemCount: profiles.length + 1,
               separatorBuilder: (_, _) => const SizedBox(height: 14),
               itemBuilder: (context, index) {
                 if (index == 0) {
@@ -97,7 +87,7 @@ class _AdminProfessionalProfilesScreenState
                     style: TextStyle(color: Colors.white54, height: 1.45),
                   );
                 }
-                final profile = data.profiles[index - 1];
+                final profile = profiles[index - 1];
                 return _ProfessionalApprovalCard(
                   profile: profile,
                   onApprove: () => _moderate(profile, 'approved'),
@@ -107,6 +97,7 @@ class _AdminProfessionalProfilesScreenState
             ),
           );
         },
+      ),
       ),
     );
   }
@@ -251,11 +242,4 @@ class _AdminMessage extends StatelessWidget {
       ),
     );
   }
-}
-
-class _AdminProfessionalData {
-  final bool isAdmin;
-  final List<ProfessionalProfile> profiles;
-
-  const _AdminProfessionalData({required this.isAdmin, required this.profiles});
 }

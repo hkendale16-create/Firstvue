@@ -8,11 +8,13 @@ import 'admin_professional_profiles_screen.dart';
 import 'auth_screen.dart';
 import 'business_owner_start_screen.dart';
 import 'business_growth_screen.dart';
+import 'legal_policy_screen.dart';
 import 'rental_inquiries_screen.dart';
 import 'rentals_screen.dart';
 import 'my_businesses_screen.dart';
 import 'messages_inbox_screen.dart';
 import 'professional_profile_editor_screen.dart';
+import '../services/admin_auth_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -22,6 +24,24 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  bool _isAdmin = false;
+  bool _adminLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAdminAccess();
+  }
+
+  Future<void> _loadAdminAccess() async {
+    final isAdmin = await AdminAuthService.isAdmin();
+    if (!mounted) return;
+    setState(() {
+      _isAdmin = isAdmin;
+      _adminLoaded = true;
+    });
+  }
+
   Future<void> _handleAccountTap(User? user) async {
     if (user == null) {
       await Navigator.push(
@@ -34,6 +54,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (mounted) {
       setState(() {});
+      await _loadAdminAccess();
     }
   }
 
@@ -186,48 +207,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
           ),
           const SizedBox(height: 10),
-          _ProfileRow(
-            icon: Icons.how_to_reg_outlined,
-            title: 'Professional approvals',
-            subtitle: 'FIRSTVUE administrator access only',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const AdminProfessionalProfilesScreen(),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 10),
-          _ProfileRow(
-            icon: Icons.verified_outlined,
-            title: 'Business approvals',
-            subtitle: 'FirstVue administrator access only',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const AdminBusinessSubmissionsScreen(),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 10),
-          _ProfileRow(
-            icon: Icons.reviews_outlined,
-            title: 'Review approvals',
-            subtitle: 'FirstVue administrator access only',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const AdminBusinessReviewsScreen(),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 10),
+          if (_adminLoaded && _isAdmin) ...[
+            _ProfileRow(
+              icon: Icons.how_to_reg_outlined,
+              title: 'Professional approvals',
+              subtitle: 'FIRSTVUE administrator access only',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AdminProfessionalProfilesScreen(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+            _ProfileRow(
+              icon: Icons.verified_outlined,
+              title: 'Business approvals',
+              subtitle: 'FirstVue administrator access only',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AdminBusinessSubmissionsScreen(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+            _ProfileRow(
+              icon: Icons.reviews_outlined,
+              title: 'Review approvals',
+              subtitle: 'FirstVue administrator access only',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AdminBusinessReviewsScreen(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+            _ProfileRow(
+              icon: Icons.admin_panel_settings_outlined,
+              title: 'Rental approvals',
+              subtitle: 'FirstVue administrator access only',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AdminRentalsScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
           _ProfileRow(
             icon: Icons.mark_email_unread_outlined,
             title: 'Rental inquiries',
@@ -244,18 +279,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     );
                   },
-          ),
-          const SizedBox(height: 10),
-          _ProfileRow(
-            icon: Icons.admin_panel_settings_outlined,
-            title: 'Rental approvals',
-            subtitle: 'FirstVue administrator access only',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AdminRentalsScreen()),
-              );
-            },
           ),
           const SizedBox(height: 10),
           _ProfileRow(
@@ -294,6 +317,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               );
             },
+          ),
+          const SizedBox(height: 26),
+          const Text(
+            'LEGAL',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _ProfileRow(
+            icon: Icons.privacy_tip_outlined,
+            title: 'Privacy policy',
+            subtitle: 'How FirstVue handles your data',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const LegalPolicyScreen(
+                  type: LegalPolicyType.privacy,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          _ProfileRow(
+            icon: Icons.description_outlined,
+            title: 'Terms of service',
+            subtitle: 'Rules for using FirstVue',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const LegalPolicyScreen(
+                  type: LegalPolicyType.terms,
+                ),
+              ),
+            ),
           ),
         ],
       ),

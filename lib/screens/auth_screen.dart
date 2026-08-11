@@ -24,11 +24,11 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _submit() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-    if (email.isEmpty || password.length < 6) {
+    if (email.isEmpty || password.length < 8) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Enter an email and a password of at least 6 characters.',
+            'Enter an email and a password of at least 8 characters.',
           ),
         ),
       );
@@ -87,10 +87,53 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _ensureProfile(User? user) async {
     if (user == null) return;
-    await Supabase.instance.client.from('profiles').upsert({
-      'id': user.id,
-      'display_name': user.email?.split('@').first,
-    });
+    final displayName = user.email?.split('@').first;
+    try {
+      await Supabase.instance.client.rpc(
+        'ensure_user_profile',
+        params: {'display_name': displayName},
+      );
+    } catch (_) {
+      final existing = await Supabase.instance.client
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .maybeSingle();
+      if (existing == null) {
+        await Supabase.instance.client.from('profiles').insert({
+          'id': user.id,
+          'display_name': displayName,
+        });
+      }
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter your email to reset your password.')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password reset email sent. Check your inbox.'),
+        ),
+      );
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -159,6 +202,13 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
             ),
             const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _isLoading ? null : _resetPassword,
+                child: const Text('Forgot password?'),
+              ),
+            ),
             TextButton(
               onPressed: _isLoading
                   ? null
