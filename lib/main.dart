@@ -472,6 +472,7 @@ class _HomeProfileAvatar extends StatelessWidget {
   String? _avatarUrl(User? user) {
     if (user == null) return null;
     final metadata = user.userMetadata;
+    if (metadata == null) return null;
     return metadata['avatar_url'] as String? ??
         metadata['picture'] as String? ??
         metadata['avatar'] as String?;
