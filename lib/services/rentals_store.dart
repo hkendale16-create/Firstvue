@@ -1,7 +1,9 @@
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/media_config.dart';
 import 'admin_auth_service.dart';
+import 'media_storage_service.dart';
 
 class RentalMedia {
   final String mediaType;
@@ -93,7 +95,6 @@ class RentalListing {
 class RentalsStore {
   RentalsStore._();
 
-  static const _bucket = 'rental-media';
   static const _maxMediaBytes = 50 * 1024 * 1024;
   static final _client = Supabase.instance.client;
 
@@ -196,10 +197,16 @@ class RentalsStore {
     for (final row in rows) {
       final data = row;
       final path = data['storage_path'] as String;
-      final signedUrl = await _client.storage
-          .from(_bucket)
-          .createSignedUrl(path, 3600);
+      final provider = MediaStorageProvider.parse(
+        data['storage_provider'] as String?,
+      );
       final rentalId = data['rental_id'] as String;
+      final signedUrl = await MediaStorageService.createReadUrl(
+        bucket: MediaBucket.rental,
+        path: path,
+        provider: provider,
+        context: {'rental_id': rentalId},
+      );
       mediaByRental
           .putIfAbsent(rentalId, () => [])
           .add(
@@ -261,7 +268,7 @@ class RentalsStore {
         .single();
 
     final rentalId = rental['id'] as String;
-    final uploadedPaths = <String>[];
+    final uploadedObjects = <MediaUploadResult>[];
     try {
       for (var index = 0; index < mediaFiles.length; index++) {
         final file = mediaFiles[index];
@@ -273,29 +280,31 @@ class RentalsStore {
         }
 
         final mediaType = _mediaTypeFor(file);
-        final path =
-            '${user.id}/${DateTime.now().microsecondsSinceEpoch}_${index}_${_safeFileName(file.name)}';
-        await _client.storage
-            .from(_bucket)
-            .uploadBinary(
-              path,
-              bytes,
-              fileOptions: FileOptions(
-                contentType: _mimeTypeFor(file, mediaType),
-                upsert: false,
-              ),
-            );
-        uploadedPaths.add(path);
+        final upload = await MediaStorageService.uploadBytes(
+          bucket: MediaBucket.rental,
+          bytes: bytes,
+          contentType: _mimeTypeFor(file, mediaType),
+          fileName: file.name,
+          index: index,
+          context: {'rental_id': rentalId},
+        );
+        uploadedObjects.add(upload);
         await _client.from('rental_media').insert({
           'rental_id': rentalId,
-          'storage_path': path,
+          'storage_path': upload.path,
+          'storage_provider': upload.provider.value,
           'media_type': mediaType,
           'sort_order': index,
         });
       }
     } catch (_) {
-      for (final path in uploadedPaths) {
-        await _client.storage.from(_bucket).remove([path]);
+      for (final upload in uploadedObjects) {
+        await MediaStorageService.deleteObject(
+          bucket: MediaBucket.rental,
+          path: upload.path,
+          provider: upload.provider,
+          context: {'rental_id': rentalId},
+        );
       }
       await _client.from('rentals').delete().eq('id', rentalId);
       rethrow;
@@ -339,9 +348,6 @@ class RentalsStore {
       _ => mediaType == 'video' ? 'video/mp4' : 'image/jpeg',
     };
   }
-
-  static String _safeFileName(String name) =>
-      name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
 
   static int? _priceToCents(String? price) {
     if (price == null || price.trim().isEmpty) return null;

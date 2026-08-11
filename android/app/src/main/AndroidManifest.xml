@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <application
-        android:label="firstvue"
+        android:label="FIRSTVUE"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -26,6 +26,13 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="firstvue.app"/>
+                <data android:scheme="firstvue"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

@@ -1,22 +1,26 @@
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/media_config.dart';
+import 'media_storage_service.dart';
+
 class ProfessionalMediaItem {
   final String id;
   final String storagePath;
   final String signedUrl;
+  final MediaStorageProvider storageProvider;
 
   const ProfessionalMediaItem({
     required this.id,
     required this.storagePath,
     required this.signedUrl,
+    required this.storageProvider,
   });
 }
 
 class ProfessionalMediaService {
   ProfessionalMediaService._();
 
-  static const _bucket = 'professional-media';
   static const _maxImageBytes = 50 * 1024 * 1024;
   static final _client = Supabase.instance.client;
 
@@ -25,7 +29,7 @@ class ProfessionalMediaService {
   ) async {
     final rows = await _client
         .from('professional_media')
-        .select('id, storage_path')
+        .select('id, storage_path, storage_provider')
         .eq('professional_profile_id', professionalProfileId)
         .order('sort_order')
         .order('created_at');
@@ -33,12 +37,19 @@ class ProfessionalMediaService {
     return Future.wait(
       rows.map((row) async {
         final path = row['storage_path'] as String;
+        final provider = MediaStorageProvider.parse(
+          row['storage_provider'] as String?,
+        );
         return ProfessionalMediaItem(
           id: row['id'] as String,
           storagePath: path,
-          signedUrl: await _client.storage
-              .from(_bucket)
-              .createSignedUrl(path, 3600),
+          storageProvider: provider,
+          signedUrl: await MediaStorageService.createReadUrl(
+            bucket: MediaBucket.professional,
+            path: path,
+            provider: provider,
+            context: {'professional_profile_id': professionalProfileId},
+          ),
         );
       }),
     );
@@ -72,33 +83,39 @@ class ProfessionalMediaService {
         );
       }
 
-      final path =
-          '${user.id}/${DateTime.now().microsecondsSinceEpoch}_${index}_${_safeFileName(image.name)}';
-      await _client.storage
-          .from(_bucket)
-          .uploadBinary(
-            path,
-            bytes,
-            fileOptions: FileOptions(
-              contentType: _contentTypeFor(image),
-              upsert: false,
-            ),
-          );
+      final upload = await MediaStorageService.uploadBytes(
+        bucket: MediaBucket.professional,
+        bytes: bytes,
+        contentType: _contentTypeFor(image),
+        fileName: image.name,
+        index: index,
+        context: {'professional_profile_id': professionalProfileId},
+      );
       try {
         await _client.from('professional_media').insert({
           'professional_profile_id': professionalProfileId,
-          'storage_path': path,
+          'storage_path': upload.path,
+          'storage_provider': upload.provider.value,
           'sort_order': firstSortOrder + index,
         });
       } catch (_) {
-        await _client.storage.from(_bucket).remove([path]);
+        await MediaStorageService.deleteObject(
+          bucket: MediaBucket.professional,
+          path: upload.path,
+          provider: upload.provider,
+          context: {'professional_profile_id': professionalProfileId},
+        );
         rethrow;
       }
     }
   }
 
   static Future<void> deleteMedia(ProfessionalMediaItem media) async {
-    await _client.storage.from(_bucket).remove([media.storagePath]);
+    await MediaStorageService.deleteObject(
+      bucket: MediaBucket.professional,
+      path: media.storagePath,
+      provider: media.storageProvider,
+    );
     await _client.from('professional_media').delete().eq('id', media.id);
   }
 
@@ -117,7 +134,4 @@ class ProfessionalMediaService {
       ),
     };
   }
-
-  static String _safeFileName(String name) =>
-      name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
 }

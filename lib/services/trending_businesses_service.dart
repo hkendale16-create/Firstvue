@@ -1,6 +1,9 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/media_config.dart';
+import 'media_storage_service.dart';
+
 import 'location_service.dart';
 
 class TrendingBusiness {
@@ -111,7 +114,7 @@ class TrendingBusinessesService {
 
     final mediaRow = await _client
         .from('business_media')
-        .select('storage_path, thumbnail_path')
+        .select('storage_path, thumbnail_path, storage_provider')
         .eq('business_id', businessId)
         .order('created_at', ascending: false)
         .limit(1)
@@ -122,9 +125,15 @@ class TrendingBusinessesService {
       final displayPath =
           (mediaRow['thumbnail_path'] as String?) ??
           mediaRow['storage_path'] as String;
-      imageUrl = await _client.storage
-          .from('business-media')
-          .createSignedUrl(displayPath, 3600);
+      final provider = MediaStorageProvider.parse(
+        mediaRow['storage_provider'] as String?,
+      );
+      imageUrl = await MediaStorageService.createReadUrl(
+        bucket: MediaBucket.business,
+        path: displayPath,
+        provider: provider,
+        context: {'business_id': businessId},
+      );
     }
 
     final locations = (row['business_locations'] as List?) ?? const [];

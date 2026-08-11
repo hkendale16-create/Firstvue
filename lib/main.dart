@@ -10,6 +10,7 @@ import 'screens/profile_screen.dart';
 import 'screens/saved_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/firstvue_business_profile_screen.dart';
+import 'services/deep_link_service.dart';
 import 'services/trending_businesses_service.dart';
 import 'theme/firstvue_theme.dart';
 import 'widgets/firstvue_bottom_nav.dart';
@@ -77,10 +78,29 @@ class _FirstVueHomeState extends State<FirstVueHome> {
     super.initState();
     _loadTrending();
     _openInitialBusinessLink();
+    _listenForDeepLinks();
     _showBillingResultIfNeeded();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) showFirstLaunchExperience(context);
     });
+  }
+
+  @override
+  void dispose() {
+    DeepLinkService.dispose();
+    super.dispose();
+  }
+
+  void _listenForDeepLinks() {
+    DeepLinkService.listen(_openBusinessProfile);
+  }
+
+  void _openBusinessProfile(String businessId) {
+    _rootNavigatorKey.currentState?.push(
+      MaterialPageRoute(
+        builder: (_) => FirstVueBusinessProfileScreen(businessId: businessId),
+      ),
+    );
   }
 
   void _showBillingResultIfNeeded() {
@@ -125,15 +145,13 @@ class _FirstVueHomeState extends State<FirstVueHome> {
     }
   }
 
-  void _openInitialBusinessLink() {
-    final businessId = AppConfig.initialBusinessIdFromUri();
+  Future<void> _openInitialBusinessLink() async {
+    final businessId =
+        AppConfig.initialBusinessIdFromUri() ??
+        await DeepLinkService.initialBusinessId();
     if (businessId == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _rootNavigatorKey.currentState?.push(
-        MaterialPageRoute(
-          builder: (_) => FirstVueBusinessProfileScreen(businessId: businessId),
-        ),
-      );
+      _openBusinessProfile(businessId);
     });
   }
 

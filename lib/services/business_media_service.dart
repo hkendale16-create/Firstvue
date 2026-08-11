@@ -1,29 +1,33 @@
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/media_config.dart';
+import 'media_storage_service.dart';
+
 class BusinessMediaItem {
   final String id;
   final String storagePath;
   final String signedUrl;
+  final MediaStorageProvider storageProvider;
 
   const BusinessMediaItem({
     required this.id,
     required this.storagePath,
     required this.signedUrl,
+    required this.storageProvider,
   });
 }
 
 class BusinessMediaService {
   BusinessMediaService._();
 
-  static const _bucket = 'business-media';
   static const _maxImageBytes = 50 * 1024 * 1024;
   static final _client = Supabase.instance.client;
 
   static Future<List<BusinessMediaItem>> fetchMedia(String businessId) async {
     final rows = await _client
         .from('business_media')
-        .select('id, storage_path')
+        .select('id, storage_path, storage_provider')
         .eq('business_id', businessId)
         .order('sort_order')
         .order('created_at');
@@ -31,12 +35,19 @@ class BusinessMediaService {
     return Future.wait(
       rows.map((row) async {
         final path = row['storage_path'] as String;
+        final provider = MediaStorageProvider.parse(
+          row['storage_provider'] as String?,
+        );
         return BusinessMediaItem(
           id: row['id'] as String,
           storagePath: path,
-          signedUrl: await _client.storage
-              .from(_bucket)
-              .createSignedUrl(path, 3600),
+          storageProvider: provider,
+          signedUrl: await MediaStorageService.createReadUrl(
+            bucket: MediaBucket.business,
+            path: path,
+            provider: provider,
+            context: {'business_id': businessId},
+          ),
         );
       }),
     );
@@ -71,30 +82,39 @@ class BusinessMediaService {
       }
 
       final contentType = _contentTypeFor(image);
-      final path =
-          '${user.id}/${DateTime.now().microsecondsSinceEpoch}_${index}_${_safeFileName(image.name)}';
-      await _client.storage
-          .from(_bucket)
-          .uploadBinary(
-            path,
-            bytes,
-            fileOptions: FileOptions(contentType: contentType, upsert: false),
-          );
+      final upload = await MediaStorageService.uploadBytes(
+        bucket: MediaBucket.business,
+        bytes: bytes,
+        contentType: contentType,
+        fileName: image.name,
+        index: index,
+        context: {'business_id': businessId},
+      );
       try {
         await _client.from('business_media').insert({
           'business_id': businessId,
-          'storage_path': path,
+          'storage_path': upload.path,
+          'storage_provider': upload.provider.value,
           'sort_order': firstSortOrder + index,
         });
       } catch (_) {
-        await _client.storage.from(_bucket).remove([path]);
+        await MediaStorageService.deleteObject(
+          bucket: MediaBucket.business,
+          path: upload.path,
+          provider: upload.provider,
+          context: {'business_id': businessId},
+        );
         rethrow;
       }
     }
   }
 
   static Future<void> deleteMedia(BusinessMediaItem media) async {
-    await _client.storage.from(_bucket).remove([media.storagePath]);
+    await MediaStorageService.deleteObject(
+      bucket: MediaBucket.business,
+      path: media.storagePath,
+      provider: media.storageProvider,
+    );
     await _client.from('business_media').delete().eq('id', media.id);
   }
 
@@ -113,7 +133,4 @@ class BusinessMediaService {
       ),
     };
   }
-
-  static String _safeFileName(String name) =>
-      name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
 }

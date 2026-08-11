@@ -1,5 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/media_config.dart';
+import 'media_storage_service.dart';
+
 class DiscoveryFeedItem {
   final String mediaId;
   final String businessId;
@@ -41,7 +44,7 @@ class DiscoveryFeedService {
     final rows = await _client
         .from('business_media')
         .select(
-          'id, storage_path, thumbnail_path, media_type, caption, businesses!inner(id, name, business_type, created_by, verification_status, average_rating, services, status, popularity_score, demand_score)',
+          'id, storage_path, storage_provider, thumbnail_path, media_type, caption, businesses!inner(id, name, business_type, created_by, verification_status, average_rating, services, status, popularity_score, demand_score)',
         )
         .eq('businesses.status', 'approved')
         .order('created_at', ascending: false)
@@ -75,13 +78,19 @@ class DiscoveryFeedService {
     return Future.wait(
       rows.map((row) async {
         final business = row['businesses'] as Map<String, dynamic>;
+        final businessId = business['id'] as String;
         final mediaType = (row['media_type'] as String?) ?? 'image';
         final displayPath =
             (row['thumbnail_path'] as String?) ?? row['storage_path'] as String;
-        final mediaUrl = await _client.storage
-            .from('business-media')
-            .createSignedUrl(displayPath, 3600);
-        final businessId = business['id'] as String;
+        final provider = MediaStorageProvider.parse(
+          row['storage_provider'] as String?,
+        );
+        final mediaUrl = await MediaStorageService.createReadUrl(
+          bucket: MediaBucket.business,
+          path: displayPath,
+          provider: provider,
+          context: {'business_id': businessId},
+        );
         final ownerId = (business['created_by'] as String?) ?? '';
         return DiscoveryFeedItem(
           mediaId: row['id'] as String,
