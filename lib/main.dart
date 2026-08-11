@@ -77,8 +77,30 @@ class _FirstVueHomeState extends State<FirstVueHome> {
     super.initState();
     _loadTrending();
     _openInitialBusinessLink();
+    _showBillingResultIfNeeded();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) showFirstLaunchExperience(context);
+    });
+  }
+
+  void _showBillingResultIfNeeded() {
+    final billing = AppConfig.billingResultFromUri();
+    if (billing == null) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final plan = AppConfig.billingPlanFromUri();
+      final message = switch (billing) {
+        'success' =>
+          'Subscription activated${plan != null ? ' ($plan plan)' : ''}. Thank you!',
+        'cancel' => 'Checkout canceled. No charge was made.',
+        _ => null,
+      };
+      if (message != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
     });
   }
 

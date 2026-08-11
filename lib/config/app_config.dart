@@ -25,4 +25,14 @@ class AppConfig {
     if (id == null || id.trim().isEmpty) return null;
     return id.trim();
   }
+
+  static String? billingResultFromUri() {
+    if (!kIsWeb) return null;
+    return Uri.base.queryParameters['billing'];
+  }
+
+  static String? billingPlanFromUri() {
+    if (!kIsWeb) return null;
+    return Uri.base.queryParameters['plan'];
+  }
 }
