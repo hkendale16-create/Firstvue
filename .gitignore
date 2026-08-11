@@ -44,6 +44,9 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Supabase CLI local state (created by supabase link)
+supabase/.temp/
+
 # Design mockups (local reference only — not shipped in app)
 assets/images/firstvue_theme_*.png
 assets/images/firstvue_theme_option_*.png
