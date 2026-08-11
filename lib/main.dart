@@ -4,9 +4,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config/app_config.dart';
 import 'config/supabase_config.dart';
 import 'screens/barber_results_screen.dart';
-import 'screens/ai_search_screen.dart';
+import 'screens/beauty_discovery_screen.dart';
 import 'screens/discovery_feed_screen.dart';
+import 'screens/other_services_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/rentals_screen.dart';
 import 'screens/saved_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/firstvue_business_profile_screen.dart';
@@ -158,93 +160,64 @@ class _FirstVueHomeState extends State<FirstVueHome> {
   List<_ExploreCategory> _exploreCategories(BuildContext context) {
     return [
       _ExploreCategory(
-        title: 'BARBERS',
-        subtitle: 'Top-tier talent',
-        imagePath: 'assets/images/explore_barbers.jpg',
-        accent: FirstVueColors.teal,
-        icon: Icons.content_cut,
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => BarberResultsScreen()),
-          );
-        },
-      ),
-      _ExploreCategory(
-        title: 'BARBERSHOPS',
-        subtitle: 'Premium spaces',
-        imagePath: 'assets/images/explore_barbershops.jpg',
-        accent: FirstVueColors.coral,
-        icon: Icons.storefront_rounded,
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const BarberResultsScreen(
-                category: DiscoveryCategory.barbershops,
-              ),
-            ),
-          );
-        },
-      ),
-      _ExploreCategory(
-        title: 'BEAUTY SALONS',
-        subtitle: 'Elevate your look',
-        imagePath: 'assets/images/explore_salons.jpg',
-        accent: FirstVueColors.teal,
-        icon: Icons.chair_alt_rounded,
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) =>
-                  const BarberResultsScreen(category: DiscoveryCategory.salons),
-            ),
-          );
-        },
-      ),
-      _ExploreCategory(
-        title: 'STYLISTS',
-        subtitle: 'Style. Slay. Repeat.',
-        imagePath: 'assets/images/explore_stylists.jpg',
-        accent: FirstVueColors.coral,
-        icon: Icons.face_retouching_natural_rounded,
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const BarberResultsScreen(
-                category: DiscoveryCategory.stylists,
-              ),
-            ),
-          );
-        },
-      ),
-      _ExploreCategory(
-        title: 'THINGS TO DO',
-        subtitle: 'Experiences await',
-        imagePath: 'assets/images/explore_things_to_do.jpg',
-        accent: FirstVueColors.teal,
-        icon: Icons.local_activity_rounded,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const AiSearchScreen(
-              initialPrompt: 'Things to do near me tonight',
-            ),
-          ),
-        ),
-      ),
-      _ExploreCategory(
-        title: 'ALL SERVICES',
-        subtitle: 'All in one place',
+        title: 'BEAUTY',
+        subtitle: 'Barbers, salons & stylists',
         imagePath: 'assets/images/explore_beauty.jpg',
         accent: FirstVueColors.coral,
-        icon: Icons.apps_rounded,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SearchScreen()),
-        ),
+        icon: Icons.auto_awesome_rounded,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const BeautyDiscoveryScreen(),
+            ),
+          );
+        },
+      ),
+      _ExploreCategory(
+        title: 'AVAILABLE RENTS',
+        subtitle: 'Booths & suite spaces',
+        imagePath: 'assets/images/explore_rentals.jpg',
+        accent: FirstVueColors.teal,
+        icon: Icons.key_outlined,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const RentalsScreen()),
+          );
+        },
+      ),
+      _ExploreCategory(
+        title: 'RESTAURANTS',
+        subtitle: 'Dine & discover',
+        imagePath: 'assets/images/explore_things_to_do.jpg',
+        accent: FirstVueColors.gold,
+        icon: Icons.restaurant_rounded,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const BarberResultsScreen(
+                category: DiscoveryCategory.restaurants,
+              ),
+            ),
+          );
+        },
+      ),
+      _ExploreCategory(
+        title: 'OTHER SERVICES',
+        subtitle: 'Home, auto & more',
+        imagePath: 'assets/images/explore_things_to_do.jpg',
+        accent: FirstVueColors.teal,
+        icon: Icons.home_repair_service_outlined,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const OtherServicesScreen(),
+            ),
+          );
+        },
       ),
     ];
   }
@@ -801,16 +774,11 @@ class _FuturisticButtonState extends State<FuturisticButton> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: (_) {
-        setState(() => pressed = true);
-      },
-      onTapUp: (_) {
-        setState(() => pressed = false);
-        widget.onPressed();
-      },
-      onTapCancel: () {
-        setState(() => pressed = false);
-      },
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onPressed,
+      onTapDown: (_) => setState(() => pressed = true),
+      onTapUp: (_) => setState(() => pressed = false),
+      onTapCancel: () => setState(() => pressed = false),
       child: AnimatedScale(
         scale: pressed ? .98 : 1,
         duration: const Duration(milliseconds: 100),

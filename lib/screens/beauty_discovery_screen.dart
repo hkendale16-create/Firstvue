@@ -1,16 +1,86 @@
 import 'package:flutter/material.dart';
 
+import '../theme/firstvue_theme.dart';
 import 'barber_results_screen.dart';
+
+class _BeautySubcategory {
+  final String title;
+  final String subtitle;
+  final String imagePath;
+  final Color accent;
+  final IconData icon;
+  final DiscoveryCategory category;
+
+  const _BeautySubcategory({
+    required this.title,
+    required this.subtitle,
+    required this.imagePath,
+    required this.accent,
+    required this.icon,
+    required this.category,
+  });
+}
 
 class BeautyDiscoveryScreen extends StatelessWidget {
   const BeautyDiscoveryScreen({super.key});
 
+  static const _subcategories = [
+    _BeautySubcategory(
+      title: 'BARBERS',
+      subtitle: 'Top-tier talent',
+      imagePath: 'assets/images/explore_barbers.jpg',
+      accent: FirstVueColors.teal,
+      icon: Icons.content_cut,
+      category: DiscoveryCategory.barbers,
+    ),
+    _BeautySubcategory(
+      title: 'BARBERSHOPS',
+      subtitle: 'Premium spaces',
+      imagePath: 'assets/images/explore_barbershops.jpg',
+      accent: FirstVueColors.coral,
+      icon: Icons.storefront_rounded,
+      category: DiscoveryCategory.barbershops,
+    ),
+    _BeautySubcategory(
+      title: 'SALONS',
+      subtitle: 'Elevate your look',
+      imagePath: 'assets/images/explore_salons.jpg',
+      accent: FirstVueColors.teal,
+      icon: Icons.chair_alt_rounded,
+      category: DiscoveryCategory.salons,
+    ),
+    _BeautySubcategory(
+      title: 'STYLISTS',
+      subtitle: 'Style. Slay. Repeat.',
+      imagePath: 'assets/images/explore_stylists.jpg',
+      accent: FirstVueColors.coral,
+      icon: Icons.face_retouching_natural_rounded,
+      category: DiscoveryCategory.stylists,
+    ),
+    _BeautySubcategory(
+      title: 'BEAUTY PROS',
+      subtitle: 'Makeup, lashes, nails',
+      imagePath: 'assets/images/explore_beauty.jpg',
+      accent: FirstVueColors.gold,
+      icon: Icons.auto_awesome_rounded,
+      category: DiscoveryCategory.beautyProfessionals,
+    ),
+    _BeautySubcategory(
+      title: 'BEAUTY STUDIOS',
+      subtitle: 'Spas & suite locations',
+      imagePath: 'assets/images/explore_beauty.jpg',
+      accent: FirstVueColors.teal,
+      icon: Icons.spa_rounded,
+      category: DiscoveryCategory.beautyStudios,
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: FirstVueColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF080B0F),
+        backgroundColor: FirstVueColors.background,
         surfaceTintColor: Colors.transparent,
         title: const Text(
           'BEAUTY',
@@ -24,96 +94,63 @@ class BeautyDiscoveryScreen extends StatelessWidget {
       body: SafeArea(
         top: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 30),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
           children: [
             const Text(
-              'WHO ARE YOU LOOKING FOR?',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Choose an individual professional or a physical beauty location.',
+              'Barbers, salons, stylists & beauty — all in one place.',
               style: TextStyle(color: Colors.white54, height: 1.45),
             ),
-            const SizedBox(height: 24),
-            _BeautyPathCard(
-              icon: Icons.auto_awesome_rounded,
-              accent: const Color(0xFFE5C16F),
-              title: 'BEAUTY PROFESSIONALS',
-              description:
-                  'Individual makeup artists, nail techs, estheticians, lash artists, and other specialists.',
-              badge: 'PEOPLE',
-              onPressed: () =>
-                  _open(context, DiscoveryCategory.beautyProfessionals),
-            ),
-            const SizedBox(height: 16),
-            _BeautyPathCard(
-              icon: Icons.spa_rounded,
-              accent: const Color(0xFFD68E98),
-              title: 'BEAUTY STUDIOS',
-              description:
-                  'Physical studios, spas, nail salons, and beauty-suite locations.',
-              badge: 'PLACES',
-              onPressed: () => _open(context, DiscoveryCategory.beautyStudios),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF151B22),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white.withValues(alpha: .08)),
+            const SizedBox(height: 18),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 0.72,
               ),
-              child: const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.info_outline, color: Color(0xFFD8B56A)),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Professional examples are fictional prototypes. Only approved business locations can appear as FIRSTVUE verified today.',
-                      style: TextStyle(color: Colors.white54, height: 1.4),
+              itemCount: _subcategories.length,
+              itemBuilder: (context, index) {
+                final item = _subcategories[index];
+                return _BeautyCategoryCard(
+                  title: item.title,
+                  subtitle: item.subtitle,
+                  imagePath: item.imagePath,
+                  accent: item.accent,
+                  icon: item.icon,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          BarberResultsScreen(category: item.category),
                     ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
           ],
         ),
       ),
     );
   }
-
-  void _open(BuildContext context, DiscoveryCategory category) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => BarberResultsScreen(category: category),
-      ),
-    );
-  }
 }
 
-class _BeautyPathCard extends StatelessWidget {
-  final IconData icon;
-  final Color accent;
+class _BeautyCategoryCard extends StatelessWidget {
   final String title;
-  final String description;
-  final String badge;
-  final VoidCallback onPressed;
+  final String subtitle;
+  final String imagePath;
+  final Color accent;
+  final IconData icon;
+  final VoidCallback onTap;
 
-  const _BeautyPathCard({
-    required this.icon,
-    required this.accent,
+  const _BeautyCategoryCard({
     required this.title,
-    required this.description,
-    required this.badge,
-    required this.onPressed,
+    required this.subtitle,
+    required this.imagePath,
+    required this.accent,
+    required this.icon,
+    required this.onTap,
   });
 
   @override
@@ -121,69 +158,66 @@ class _BeautyPathCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
         child: Ink(
-          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: const Color(0xFF151B22),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: accent.withValues(alpha: .42)),
-            boxShadow: [
-              BoxShadow(color: accent.withValues(alpha: .08), blurRadius: 20),
-            ],
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withValues(alpha: .10)),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 62,
-                height: 62,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: accent.withValues(alpha: .7)),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  imagePath,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) =>
+                      ColoredBox(color: FirstVueColors.elevatedSurface),
                 ),
-                child: Icon(icon, color: accent, size: 31),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      badge,
-                      style: TextStyle(
-                        color: accent,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.5,
-                      ),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: .12),
+                        Colors.black.withValues(alpha: .82),
+                      ],
                     ),
-                    const SizedBox(height: 5),
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontFamily: 'CormorantGaramond',
-                        color: Colors.white,
-                        fontSize: 18,
-                        letterSpacing: .6,
-                      ),
-                    ),
-                    const SizedBox(height: 7),
-                    Text(
-                      description,
-                      style: const TextStyle(
-                        color: Colors.white54,
-                        height: 1.35,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.arrow_forward_rounded, color: Colors.white38),
-            ],
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(icon, color: accent, size: 22),
+                      const Spacer(),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontFamily: 'CormorantGaramond',
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: .6,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: .72),
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

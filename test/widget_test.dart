@@ -20,6 +20,7 @@ void main() {
 
     expect(find.text('FIRSTVUE'), findsOneWidget);
     expect(find.text('EXPLORE'), findsOneWidget);
-    expect(find.text('BARBERS'), findsOneWidget);
+    expect(find.text('BEAUTY'), findsOneWidget);
+    expect(find.text('AVAILABLE RENTS'), findsOneWidget);
   });
 }

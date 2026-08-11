@@ -16,7 +16,9 @@ enum DiscoveryCategory {
   salons,
   barbershops,
   beautyProfessionals,
-  beautyStudios;
+  beautyStudios,
+  restaurants,
+  otherServices;
 
   String get title => switch (this) {
     DiscoveryCategory.barbers => 'BARBERS',
@@ -25,6 +27,8 @@ enum DiscoveryCategory {
     DiscoveryCategory.barbershops => 'BARBERSHOPS & SUITES',
     DiscoveryCategory.beautyProfessionals => 'BEAUTY PROFESSIONALS',
     DiscoveryCategory.beautyStudios => 'BEAUTY STUDIOS',
+    DiscoveryCategory.restaurants => 'RESTAURANTS',
+    DiscoveryCategory.otherServices => 'OTHER SERVICES',
   };
 
   IconData get icon => switch (this) {
@@ -34,6 +38,8 @@ enum DiscoveryCategory {
     DiscoveryCategory.barbershops => Icons.storefront_rounded,
     DiscoveryCategory.beautyProfessionals => Icons.auto_awesome_rounded,
     DiscoveryCategory.beautyStudios => Icons.spa_rounded,
+    DiscoveryCategory.restaurants => Icons.restaurant_rounded,
+    DiscoveryCategory.otherServices => Icons.home_repair_service_outlined,
   };
 
   bool get isIndividual =>
@@ -63,7 +69,31 @@ enum DiscoveryCategory {
       'Independent beauty professional shown as fictional prototype data for discovery testing.',
     DiscoveryCategory.beautyStudios =>
       'Beauty studio or suite location shown as fictional prototype data for discovery testing.',
+    DiscoveryCategory.restaurants =>
+      'Restaurant or dining spot shown as fictional prototype data for discovery testing.',
+    DiscoveryCategory.otherServices =>
+      'Local service business shown as fictional prototype data for discovery testing.',
   };
+
+  bool _isBeautyBusinessType(String normalized) {
+    return normalized.contains('barber') ||
+        normalized.contains('salon') ||
+        normalized.contains('beauty') ||
+        normalized.contains('spa') ||
+        normalized.contains('nail') ||
+        normalized.contains('suite') && normalized.contains('barber') ||
+        normalized.contains('stylist');
+  }
+
+  bool _isRestaurantBusinessType(String normalized) {
+    return normalized.contains('restaurant') ||
+        normalized.contains('dining') ||
+        normalized.contains('food') ||
+        normalized.contains('cafe') ||
+        normalized.contains('café') ||
+        normalized.contains('bistro') ||
+        normalized.contains('grill');
+  }
 
   bool matchesBusinessType(String businessType) {
     final normalized = businessType.toLowerCase();
@@ -83,6 +113,10 @@ enum DiscoveryCategory {
             normalized.contains('beauty suite') ||
             normalized.contains('spa') ||
             normalized.contains('nail salon'),
+      DiscoveryCategory.restaurants => _isRestaurantBusinessType(normalized),
+      DiscoveryCategory.otherServices =>
+        !_isBeautyBusinessType(normalized) &&
+            !_isRestaurantBusinessType(normalized),
     };
   }
 }
@@ -354,6 +388,90 @@ class _BarberResultsScreenState extends State<BarberResultsScreen> {
     ),
   ];
 
+  static const _restaurantBusinesses = [
+    _PrototypeBusiness(
+      name: 'District Kitchen',
+      rating: 4.8,
+      reviews: 412,
+      distance: '1.1 mi',
+      city: 'Atlanta',
+      state: 'GA',
+      zipCode: '30303',
+      latitude: 33.7510,
+      longitude: -84.3900,
+      verified: false,
+      specialty: 'Southern • Brunch • Cocktails',
+    ),
+    _PrototypeBusiness(
+      name: 'Goldline Bistro',
+      rating: 4.7,
+      reviews: 286,
+      distance: '2.3 mi',
+      city: 'Atlanta',
+      state: 'GA',
+      zipCode: '30308',
+      latitude: 33.7710,
+      longitude: -84.3820,
+      verified: false,
+      specialty: 'Date Night • Patio • Wine',
+    ),
+    _PrototypeBusiness(
+      name: 'Peachtree Grill',
+      rating: 4.6,
+      reviews: 198,
+      distance: '3.4 mi',
+      city: 'Decatur',
+      state: 'GA',
+      zipCode: '30030',
+      latitude: 33.7750,
+      longitude: -84.2960,
+      verified: false,
+      specialty: 'Grill • Family • Takeout',
+    ),
+  ];
+
+  static const _otherServiceBusinesses = [
+    _PrototypeBusiness(
+      name: 'Metro Auto Detail',
+      rating: 4.9,
+      reviews: 156,
+      distance: '1.8 mi',
+      city: 'Atlanta',
+      state: 'GA',
+      zipCode: '30312',
+      latitude: 33.7400,
+      longitude: -84.3780,
+      verified: false,
+      specialty: 'Detailing • Ceramic Coating',
+    ),
+    _PrototypeBusiness(
+      name: 'CleanPro Home Services',
+      rating: 4.8,
+      reviews: 221,
+      distance: '2.7 mi',
+      city: 'Atlanta',
+      state: 'GA',
+      zipCode: '30309',
+      latitude: 33.7890,
+      longitude: -84.3850,
+      verified: false,
+      specialty: 'Cleaning • Handyman • Move-out',
+    ),
+    _PrototypeBusiness(
+      name: 'Pulse Fitness Studio',
+      rating: 4.7,
+      reviews: 143,
+      distance: '3.2 mi',
+      city: 'Decatur',
+      state: 'GA',
+      zipCode: '30030',
+      latitude: 33.7730,
+      longitude: -84.2970,
+      verified: false,
+      specialty: 'Training • Yoga • Recovery',
+    ),
+  ];
+
   List<_PrototypeBusiness> get _businesses => switch (widget.category) {
     DiscoveryCategory.barbers => _barberBusinesses,
     DiscoveryCategory.stylists => _stylistBusinesses,
@@ -361,6 +479,8 @@ class _BarberResultsScreenState extends State<BarberResultsScreen> {
     DiscoveryCategory.barbershops => _barbershopBusinesses,
     DiscoveryCategory.beautyProfessionals => _beautyProfessionals,
     DiscoveryCategory.beautyStudios => _beautyStudios,
+    DiscoveryCategory.restaurants => _restaurantBusinesses,
+    DiscoveryCategory.otherServices => _otherServiceBusinesses,
   };
 
   ProfessionalType? get _professionalType => switch (widget.category) {
