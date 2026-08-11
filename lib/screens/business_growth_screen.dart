@@ -144,7 +144,7 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _selectedBusinessId,
+                initialValue: _selectedBusinessId,
                 dropdownColor: FirstVueColors.elevatedSurface,
                 decoration: InputDecoration(
                   labelText: 'Business',
