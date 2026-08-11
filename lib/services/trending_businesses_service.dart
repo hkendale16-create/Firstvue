@@ -1,0 +1,159 @@
+import 'package:geolocator/geolocator.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'location_service.dart';
+
+class TrendingBusiness {
+  final String id;
+  final String name;
+  final double rating;
+  final int reviewCount;
+  final double? distanceMiles;
+  final List<String> services;
+  final bool verified;
+  final bool availableToday;
+  final String? imageUrl;
+
+  const TrendingBusiness({
+    required this.id,
+    required this.name,
+    required this.rating,
+    required this.reviewCount,
+    required this.distanceMiles,
+    required this.services,
+    required this.verified,
+    required this.availableToday,
+    required this.imageUrl,
+  });
+}
+
+class TrendingBusinessesService {
+  TrendingBusinessesService._();
+
+  static final _client = Supabase.instance.client;
+
+  static Future<TrendingBusiness?> fetchTopNearYou() async {
+    final list = await fetchTrendingNearYou(limit: 1);
+    return list.isEmpty ? null : list.first;
+  }
+
+  static Future<List<TrendingBusiness>> fetchTrendingNearYou({
+    int limit = 8,
+  }) async {
+    final rows = await _client
+        .from('businesses')
+        .select(
+          'id, name, services, verification_status, average_rating, '
+          'popularity_score, demand_score, available_today, '
+          'business_locations(latitude, longitude, city)',
+        )
+        .eq('status', 'approved')
+        .order('popularity_score', ascending: false)
+        .order('demand_score', ascending: false)
+        .limit(limit * 2);
+
+    if (rows.isEmpty) return const [];
+
+    Position? position;
+    try {
+      position = await LocationService.getCurrentPosition();
+    } on LocationAccessException {
+      position = null;
+    }
+
+    final scored = <({Map<String, dynamic> row, double score})>[];
+    for (final row in rows) {
+      final popularity = (row['popularity_score'] as num?)?.toDouble() ?? 0;
+      final demand = (row['demand_score'] as num?)?.toDouble() ?? 0;
+      var score = popularity + demand * 0.5;
+
+      final locations = (row['business_locations'] as List?) ?? const [];
+      if (position != null && locations.isNotEmpty) {
+        final location = locations.first as Map<String, dynamic>;
+        final lat = (location['latitude'] as num?)?.toDouble();
+        final lng = (location['longitude'] as num?)?.toDouble();
+        if (lat != null && lng != null) {
+          final meters = Geolocator.distanceBetween(
+            position.latitude,
+            position.longitude,
+            lat,
+            lng,
+          );
+          score -= (meters / 1609.344) * 0.35;
+        }
+      }
+
+      scored.add((row: row, score: score));
+    }
+
+    scored.sort((a, b) => b.score.compareTo(a.score));
+    final topRows = scored.take(limit).map((entry) => entry.row).toList();
+
+    final businesses = <TrendingBusiness>[];
+    for (final row in topRows) {
+      final business = await _mapRowToTrendingBusiness(row, position);
+      if (business != null) businesses.add(business);
+    }
+    return businesses;
+  }
+
+  static Future<TrendingBusiness?> _mapRowToTrendingBusiness(
+    Map<String, dynamic> row,
+    Position? position,
+  ) async {
+    final businessId = row['id'] as String;
+
+    final reviewRows = await _client
+        .from('business_reviews')
+        .select('id')
+        .eq('business_id', businessId)
+        .eq('status', 'approved');
+
+    final mediaRow = await _client
+        .from('business_media')
+        .select('storage_path, thumbnail_path')
+        .eq('business_id', businessId)
+        .order('created_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    String? imageUrl;
+    if (mediaRow != null) {
+      final displayPath =
+          (mediaRow['thumbnail_path'] as String?) ??
+          mediaRow['storage_path'] as String;
+      imageUrl = await _client.storage
+          .from('business-media')
+          .createSignedUrl(displayPath, 3600);
+    }
+
+    final locations = (row['business_locations'] as List?) ?? const [];
+    double? distanceMiles;
+    if (position != null && locations.isNotEmpty) {
+      final location = locations.first as Map<String, dynamic>;
+      final lat = (location['latitude'] as num?)?.toDouble();
+      final lng = (location['longitude'] as num?)?.toDouble();
+      if (lat != null && lng != null) {
+        final meters = Geolocator.distanceBetween(
+          position.latitude,
+          position.longitude,
+          lat,
+          lng,
+        );
+        distanceMiles = (meters / 1609.344 * 10).roundToDouble() / 10;
+      }
+    }
+
+    return TrendingBusiness(
+      id: businessId,
+      name: row['name'] as String,
+      rating: (row['average_rating'] as num?)?.toDouble() ?? 0,
+      reviewCount: reviewRows.length,
+      distanceMiles: distanceMiles,
+      services: List<String>.from((row['services'] as List?) ?? const []),
+      verified: row['verification_status'] == 'verified',
+      availableToday: (row['available_today'] as bool?) ?? false,
+      imageUrl: imageUrl,
+    );
+  }
+}

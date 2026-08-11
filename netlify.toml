@@ -1,0 +1,15 @@
+# Netlify builds Flutter on their servers when connected to Git.
+# Manual drag-and-drop: upload the contents of build/web only (see NETLIFY_DEPLOY.md).
+
+[build]
+  command = "bash scripts/build-web.sh"
+  publish = "build/web"
+
+[build.environment]
+  # Flutter web builds can take several minutes on first deploy.
+  NODE_VERSION = "20"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

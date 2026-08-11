@@ -1,0 +1,2 @@
+# Keep shell scripts on LF so Linux CI (Netlify) does not break on CRLF.
+*.sh text eol=lf

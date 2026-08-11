@@ -1,0 +1,10 @@
+# FirstVue static web hosting (SPA)
+# Upload the contents of build/web/ to any static host with SPA fallback.
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[build]
+  publish = "build/web"

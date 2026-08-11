@@ -1,0 +1,686 @@
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../services/approved_businesses_service.dart';
+import '../services/business_media_service.dart';
+import '../services/business_reviews_service.dart';
+import '../services/messaging_service.dart';
+import 'auth_screen.dart';
+import 'conversation_screen.dart';
+
+class FirstVueBusinessProfileScreen extends StatelessWidget {
+  final String businessId;
+
+  const FirstVueBusinessProfileScreen({super.key, required this.businessId});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF080B0F),
+      body: FutureBuilder<PublicBusinessDetails>(
+        future: ApprovedBusinessesService.fetchPublicBusiness(businessId),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return const Center(
+              child: Text(
+                'Unable to load this business profile.',
+                style: TextStyle(color: Colors.white54),
+              ),
+            );
+          }
+          if (!snapshot.hasData) {
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFFD8B56A)),
+            );
+          }
+          return _BusinessProfileContent(details: snapshot.data!);
+        },
+      ),
+    );
+  }
+}
+
+class _BusinessProfileContent extends StatelessWidget {
+  final PublicBusinessDetails details;
+
+  const _BusinessProfileContent({required this.details});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar(
+          expandedHeight: 250,
+          pinned: true,
+          backgroundColor: const Color(0xFF080B0F),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+          flexibleSpace: FlexibleSpaceBar(
+            background: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF2B241B),
+                    Color(0xFF151B22),
+                    Color(0xFF080B0F),
+                  ],
+                ),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.verified_outlined,
+                  size: 82,
+                  color: Color(0xFFD8B56A),
+                ),
+              ),
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 40),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        details.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 27,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.verified, color: Color(0xFFD8B56A)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  details.businessType,
+                  style: const TextStyle(
+                    color: Color(0xFFD8B56A),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                const _ProfileSectionTitle('FIRSTVUE VERIFICATION'),
+                const SizedBox(height: 10),
+                const _ProfileInfoCard(
+                  icon: Icons.verified_user_outlined,
+                  text:
+                      'This business has been approved and verified by FirstVue.',
+                ),
+                const SizedBox(height: 14),
+                _MessageOwnerButton(
+                  businessId: details.id,
+                  businessName: details.name,
+                ),
+                const SizedBox(height: 22),
+                const _ProfileSectionTitle('ABOUT'),
+                const SizedBox(height: 10),
+                _ProfileInfoCard(
+                  icon: Icons.auto_stories_outlined,
+                  text: details.description?.trim().isNotEmpty == true
+                      ? details.description!
+                      : 'The owner has not added a business description yet.',
+                ),
+                const SizedBox(height: 22),
+                const _ProfileSectionTitle('LOCATION'),
+                const SizedBox(height: 10),
+                _ProfileInfoCard(
+                  icon: Icons.location_on_outlined,
+                  text:
+                      details.address ??
+                      'The owner has not added a public address yet.',
+                ),
+                const SizedBox(height: 22),
+                const _ProfileSectionTitle('SERVICES'),
+                const SizedBox(height: 10),
+                details.services.isEmpty
+                    ? const _ProfileInfoCard(
+                        icon: Icons.design_services_outlined,
+                        text: 'The owner has not added services yet.',
+                      )
+                    : Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: details.services
+                            .map((service) => _ServiceChip(text: service))
+                            .toList(),
+                      ),
+                const SizedBox(height: 22),
+                const _ProfileSectionTitle('PHOTOS'),
+                const SizedBox(height: 10),
+                _BusinessMediaGallery(businessId: details.id),
+                const SizedBox(height: 22),
+                const _ProfileSectionTitle('REVIEWS'),
+                const SizedBox(height: 10),
+                _BusinessReviewsSection(businessId: details.id),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BusinessReviewsSection extends StatefulWidget {
+  final String businessId;
+
+  const _BusinessReviewsSection({required this.businessId});
+
+  @override
+  State<_BusinessReviewsSection> createState() =>
+      _BusinessReviewsSectionState();
+}
+
+class _BusinessReviewsSectionState extends State<_BusinessReviewsSection> {
+  late Future<List<BusinessReview>> _reviews =
+      BusinessReviewsService.fetchApprovedReviews(widget.businessId);
+
+  Future<void> _startReview() async {
+    if (!BusinessReviewsService.isSignedIn) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const AuthScreen()),
+      );
+      if (!mounted || !BusinessReviewsService.isSignedIn) return;
+    }
+    final submitted = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF10151B),
+      builder: (_) => _ReviewSheet(businessId: widget.businessId),
+    );
+    if (submitted == true && mounted) {
+      setState(
+        () => _reviews = BusinessReviewsService.fetchApprovedReviews(
+          widget.businessId,
+        ),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Review submitted for FirstVue approval.'),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<BusinessReview>>(
+    future: _reviews,
+    builder: (context, snapshot) {
+      final reviews = snapshot.data ?? const <BusinessReview>[];
+      final average = reviews.isEmpty
+          ? null
+          : reviews.fold<int>(0, (sum, review) => sum + review.rating) /
+                reviews.length;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (average != null) ...[
+                const Icon(Icons.star, color: Color(0xFFE5C16F), size: 20),
+                const SizedBox(width: 5),
+                Text(
+                  average.toStringAsFixed(1),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  ' (${reviews.length})',
+                  style: const TextStyle(color: Colors.white54),
+                ),
+              ] else
+                const Expanded(
+                  child: Text(
+                    'No approved reviews yet.',
+                    style: TextStyle(color: Colors.white54),
+                  ),
+                ),
+              if (average != null) const Spacer(),
+              TextButton.icon(
+                onPressed: _startReview,
+                icon: const Icon(Icons.rate_review_outlined),
+                label: const Text('WRITE A REVIEW'),
+              ),
+            ],
+          ),
+          if (snapshot.hasError)
+            const _ProfileInfoCard(
+              icon: Icons.lock_outline,
+              text: 'Sign in to view and write customer reviews.',
+            )
+          else if (!snapshot.hasData)
+            const Center(
+              child: CircularProgressIndicator(color: Color(0xFFD8B56A)),
+            )
+          else
+            ...reviews.map(
+              (review) => Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: _ReviewCard(review: review),
+              ),
+            ),
+        ],
+      );
+    },
+  );
+}
+
+class _ReviewSheet extends StatefulWidget {
+  final String businessId;
+
+  const _ReviewSheet({required this.businessId});
+
+  @override
+  State<_ReviewSheet> createState() => _ReviewSheetState();
+}
+
+class _ReviewSheetState extends State<_ReviewSheet> {
+  final _body = TextEditingController();
+  int _rating = 0;
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _body.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_rating == 0 || _body.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose a rating and write a review.')),
+      );
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      await BusinessReviewsService.submitReview(
+        businessId: widget.businessId,
+        rating: _rating,
+        body: _body.text,
+      );
+      if (mounted) Navigator.pop(context, true);
+    } on PostgrestException catch (error) {
+      if (!mounted) return;
+      final message = error.code == '23505'
+          ? 'You have already submitted a review for this business.'
+          : 'Unable to submit your review.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to submit your review.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.fromLTRB(
+      20,
+      20,
+      20,
+      MediaQuery.viewInsetsOf(context).bottom + 24,
+    ),
+    child: SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'WRITE A REVIEW',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.4,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: List.generate(
+              5,
+              (index) => IconButton(
+                onPressed: _submitting
+                    ? null
+                    : () => setState(() => _rating = index + 1),
+                icon: Icon(
+                  index < _rating ? Icons.star : Icons.star_border,
+                  color: const Color(0xFFE5C16F),
+                  size: 32,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _body,
+            minLines: 3,
+            maxLines: 6,
+            maxLength: 2000,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Share your experience...',
+              hintStyle: const TextStyle(color: Colors.white38),
+              filled: true,
+              fillColor: const Color(0xFF151B22),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Reviews appear publicly only after FirstVue approval.',
+            style: TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _submitting ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD8B56A),
+                foregroundColor: Colors.black,
+              ),
+              child: Text(_submitting ? 'SUBMITTING...' : 'SUBMIT REVIEW'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ReviewCard extends StatelessWidget {
+  final BusinessReview review;
+
+  const _ReviewCard({required this.review});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: const Color(0xFF10151B),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: Colors.white.withValues(alpha: .08)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            ...List.generate(
+              5,
+              (index) => Icon(
+                index < review.rating ? Icons.star : Icons.star_border,
+                color: const Color(0xFFE5C16F),
+                size: 17,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '${review.createdAt.month}/${review.createdAt.day}/${review.createdAt.year}',
+              style: const TextStyle(color: Colors.white38, fontSize: 11),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Text(
+          review.body,
+          style: const TextStyle(color: Colors.white70, height: 1.4),
+        ),
+      ],
+    ),
+  );
+}
+
+class _BusinessMediaGallery extends StatelessWidget {
+  final String businessId;
+
+  const _BusinessMediaGallery({required this.businessId});
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<BusinessMediaItem>>(
+    future: BusinessMediaService.fetchMedia(businessId),
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return const _ProfileInfoCard(
+          icon: Icons.lock_outline,
+          text: 'Sign in to view this business\'s photos.',
+        );
+      }
+      if (!snapshot.hasData) {
+        return const Center(
+          child: CircularProgressIndicator(color: Color(0xFFD8B56A)),
+        );
+      }
+      final media = snapshot.data!;
+      if (media.isEmpty) {
+        return const _ProfileInfoCard(
+          icon: Icons.perm_media_outlined,
+          text: 'The owner has not added business photos yet.',
+        );
+      }
+      return SizedBox(
+        height: 190,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: media.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 10),
+          itemBuilder: (context, index) => GestureDetector(
+            onTap: () => showDialog<void>(
+              context: context,
+              builder: (_) => Dialog(
+                backgroundColor: Colors.transparent,
+                insetPadding: const EdgeInsets.all(16),
+                child: InteractiveViewer(
+                  child: Image.network(
+                    media[index].signedUrl,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(
+                media[index].signedUrl,
+                width: 250,
+                height: 190,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const SizedBox(
+                  width: 250,
+                  child: ColoredBox(
+                    color: Color(0xFF10151B),
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      color: Colors.white38,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _ProfileSectionTitle extends StatelessWidget {
+  final String text;
+
+  const _ProfileSectionTitle(this.text);
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: const TextStyle(
+      color: Colors.white,
+      fontWeight: FontWeight.bold,
+      letterSpacing: 1.5,
+    ),
+  );
+}
+
+class _ProfileInfoCard extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _ProfileInfoCard({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF10151B),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: .08)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: const Color(0xFFD8B56A)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(color: Colors.white60, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ServiceChip extends StatelessWidget {
+  final String text;
+  const _ServiceChip({required this.text});
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(
+      color: const Color(0xFFD8B56A).withValues(alpha: .1),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Text(
+      text,
+      style: const TextStyle(color: Color(0xFFD8B56A), fontSize: 12),
+    ),
+  );
+}
+
+class _MessageOwnerButton extends StatefulWidget {
+  final String businessId;
+  final String businessName;
+
+  const _MessageOwnerButton({
+    required this.businessId,
+    required this.businessName,
+  });
+
+  @override
+  State<_MessageOwnerButton> createState() => _MessageOwnerButtonState();
+}
+
+class _MessageOwnerButtonState extends State<_MessageOwnerButton> {
+  bool _loading = false;
+
+  Future<void> _openMessage() async {
+    if (Supabase.instance.client.auth.currentUser == null) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const AuthScreen()),
+      );
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final ownerId = await MessagingService.fetchBusinessOwnerId(
+        widget.businessId,
+      );
+      if (ownerId == null) {
+        throw StateError('missing owner');
+      }
+      if (ownerId == MessagingService.currentUserId) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('This is your business profile.')),
+          );
+        }
+        return;
+      }
+      final threadId = await MessagingService.openThreadWithUser(
+        otherUserId: ownerId,
+        businessId: widget.businessId,
+      );
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ConversationScreen(
+            threadId: threadId,
+            title: widget.businessName,
+            subtitle: 'Business owner',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to start a message right now.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _loading ? null : _openMessage,
+        icon: _loading
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.chat_bubble_outline),
+        label: const Text('MESSAGE OWNER'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFFD8B56A),
+          side: const BorderSide(color: Color(0x99D8B56A)),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+        ),
+      ),
+    );
+  }
+}
