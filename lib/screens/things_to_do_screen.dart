@@ -11,6 +11,7 @@ import '../theme/firstvue_theme.dart';
 import '../widgets/event_profile_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/media_picker_sheet.dart';
+import '../widgets/profile_photo_actions.dart';
 import 'auth_screen.dart';
 
 class ThingsToDoScreen extends StatefulWidget {
@@ -100,13 +101,27 @@ class _ThingsToDoScreenState extends State<ThingsToDoScreen> {
                   const SizedBox(height: 14),
                   OutlinedButton.icon(
                     onPressed: () async {
+                      if (coverPhoto != null) {
+                        final next = await runAttachedMediaEditFlow(
+                          context,
+                          current: coverPhoto!,
+                        );
+                        setSheetState(() => coverPhoto = next);
+                        return;
+                      }
                       final files = await showImagePickerSheet(context);
                       if (files == null || files.isEmpty) return;
                       setSheetState(() => coverPhoto = files.first);
                     },
-                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                    icon: Icon(
+                      coverPhoto == null
+                          ? Icons.add_photo_alternate_outlined
+                          : Icons.photo_camera_outlined,
+                    ),
                     label: Text(
-                      coverPhoto == null ? 'Add cover photo' : 'Change cover photo',
+                      coverPhoto == null
+                          ? 'Add cover photo'
+                          : 'Change / remove cover',
                     ),
                   ),
                   if (coverPhoto != null) ...[

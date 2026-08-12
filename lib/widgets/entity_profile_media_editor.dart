@@ -3,10 +3,14 @@ import 'package:flutter/material.dart';
 import '../theme/firstvue_theme.dart';
 
 /// Cover + profile photo controls for business and professional edit screens.
+///
+/// Supports change (not upload-only): parents should open a change/view/remove
+/// sheet from [onChangeCover] / [onChangeAvatar].
 class EntityProfileMediaEditor extends StatelessWidget {
   final String? avatarUrl;
   final String? coverUrl;
   final bool updating;
+  final bool avatarIsVideo;
   final IconData placeholderIcon;
   final VoidCallback? onChangeCover;
   final VoidCallback? onChangeAvatar;
@@ -16,10 +20,14 @@ class EntityProfileMediaEditor extends StatelessWidget {
     this.avatarUrl,
     this.coverUrl,
     this.updating = false,
+    this.avatarIsVideo = false,
     this.placeholderIcon = Icons.storefront_outlined,
     this.onChangeCover,
     this.onChangeAvatar,
   });
+
+  bool get _hasCover => (coverUrl ?? '').trim().isNotEmpty;
+  bool get _hasAvatar => (avatarUrl ?? '').trim().isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +44,7 @@ class EntityProfileMediaEditor extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Tap cover or profile photo to upload — just like your main profile.',
+          'Tap cover or profile photo to change, view, or remove — not only upload.',
           style: TextStyle(
             color: Colors.white.withValues(alpha: .45),
             fontSize: 12,
@@ -51,12 +59,12 @@ class EntityProfileMediaEditor extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.white.withValues(alpha: .08)),
-              gradient: coverUrl == null
+              gradient: !_hasCover
                   ? const LinearGradient(
                       colors: [Color(0xFF1A2530), Color(0xFF78B9BE)],
                     )
                   : null,
-              image: coverUrl != null
+              image: _hasCover
                   ? DecorationImage(
                       image: NetworkImage(coverUrl!),
                       fit: BoxFit.cover,
@@ -68,7 +76,7 @@ class EntityProfileMediaEditor extends StatelessWidget {
               child: TextButton.icon(
                 onPressed: updating ? null : onChangeCover,
                 icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                label: const Text('Cover photo'),
+                label: Text(_hasCover ? 'Change cover' : 'Add cover'),
               ),
             ),
           ),
@@ -82,18 +90,29 @@ class EntityProfileMediaEditor extends StatelessWidget {
                 radius: 40,
                 backgroundColor: const Color(0xFF241D22),
                 backgroundImage:
-                    avatarUrl != null ? NetworkImage(avatarUrl!) : null,
-                child: avatarUrl == null
+                    _hasAvatar && !avatarIsVideo ? NetworkImage(avatarUrl!) : null,
+                child: !_hasAvatar
                     ? Icon(placeholderIcon, color: FirstVueColors.teal, size: 34)
-                    : null,
+                    : (avatarIsVideo
+                        ? const Icon(Icons.videocam, color: FirstVueColors.teal)
+                        : null),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: updating ? null : onChangeAvatar,
-                icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-                label: Text(updating ? 'Uploading…' : 'Profile photo'),
+                icon: Icon(
+                  _hasAvatar
+                      ? Icons.photo_camera_outlined
+                      : Icons.add_a_photo_outlined,
+                  size: 18,
+                ),
+                label: Text(
+                  updating
+                      ? 'Updating…'
+                      : (_hasAvatar ? 'Change profile photo' : 'Add profile photo'),
+                ),
               ),
             ),
           ],

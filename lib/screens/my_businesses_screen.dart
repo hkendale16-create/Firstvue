@@ -11,6 +11,7 @@ import '../widgets/entity_profile_media_editor.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/location_autocomplete_field.dart';
 import '../widgets/media_picker_sheet.dart';
+import '../widgets/profile_photo_actions.dart';
 import 'firstvue_business_profile_screen.dart';
 import 'my_business_profile_view_screen.dart';
 import 'join_firstvue_screen.dart';
@@ -283,55 +284,114 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
   }
 
   Future<void> _changeCover() async {
-    final files = await showImagePickerSheet(context);
-    if (files == null || files.isEmpty || !mounted) return;
-    setState(() => _profileMediaUpdating = true);
-    try {
-      await BusinessMediaService.setCover(
-        businessId: widget.business.id,
-        file: files.first,
-      );
-      await _loadProfileImages();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cover photo updated.')),
-        );
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to update cover: $error')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _profileMediaUpdating = false);
-    }
+    if (_profileMediaUpdating) return;
+    final existing = _profileImages.cover;
+    await runProfilePhotoEditFlow(
+      context: context,
+      kindLabel: 'cover photo',
+      hasExisting: existing != null,
+      existingUrl: existing?.signedUrl,
+      existingIsVideo: existing?.isVideo ?? false,
+      onChange: (file) async {
+        setState(() => _profileMediaUpdating = true);
+        try {
+          await BusinessMediaService.setCover(
+            businessId: widget.business.id,
+            file: file,
+          );
+          await _loadProfileImages();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Cover photo updated.')),
+            );
+          }
+        } catch (error) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Unable to update cover: $error')),
+            );
+          }
+        } finally {
+          if (mounted) setState(() => _profileMediaUpdating = false);
+        }
+      },
+      onRemove: () async {
+        setState(() => _profileMediaUpdating = true);
+        try {
+          await BusinessMediaService.removeCover(widget.business.id);
+          await _loadProfileImages();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Cover photo removed.')),
+            );
+          }
+        } catch (error) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Unable to remove cover: $error')),
+            );
+          }
+        } finally {
+          if (mounted) setState(() => _profileMediaUpdating = false);
+        }
+      },
+    );
   }
 
   Future<void> _changeAvatar() async {
-    final files = await showImagePickerSheet(context);
-    if (files == null || files.isEmpty || !mounted) return;
-    setState(() => _profileMediaUpdating = true);
-    try {
-      await BusinessMediaService.setAvatar(
-        businessId: widget.business.id,
-        file: files.first,
-      );
-      await _loadProfileImages();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile photo updated.')),
-        );
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to update profile photo: $error')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _profileMediaUpdating = false);
-    }
+    if (_profileMediaUpdating) return;
+    final existing = _profileImages.avatar;
+    await runProfilePhotoEditFlow(
+      context: context,
+      kindLabel: 'profile photo',
+      hasExisting: existing != null,
+      existingUrl: existing?.signedUrl,
+      existingIsVideo: existing?.isVideo ?? false,
+      allowVideo: true,
+      onChange: (file) async {
+        setState(() => _profileMediaUpdating = true);
+        try {
+          await BusinessMediaService.setAvatar(
+            businessId: widget.business.id,
+            file: file,
+          );
+          await _loadProfileImages();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Profile photo updated.')),
+            );
+          }
+        } catch (error) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Unable to update profile photo: $error')),
+            );
+          }
+        } finally {
+          if (mounted) setState(() => _profileMediaUpdating = false);
+        }
+      },
+      onRemove: () async {
+        setState(() => _profileMediaUpdating = true);
+        try {
+          await BusinessMediaService.removeAvatar(widget.business.id);
+          await _loadProfileImages();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Profile photo removed.')),
+            );
+          }
+        } catch (error) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Unable to remove profile photo: $error')),
+            );
+          }
+        } finally {
+          if (mounted) setState(() => _profileMediaUpdating = false);
+        }
+      },
+    );
   }
 
   Future<void> _loadLocation() async {
@@ -577,6 +637,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
         EntityProfileMediaEditor(
           avatarUrl: _profileImages.avatar?.signedUrl,
           coverUrl: _profileImages.cover?.signedUrl,
+          avatarIsVideo: _profileImages.avatar?.isVideo ?? false,
           updating: _profileMediaUpdating,
           placeholderIcon: Icons.storefront_outlined,
           onChangeCover: _changeCover,

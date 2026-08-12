@@ -19,6 +19,7 @@ import 'feed_comments_sheet.dart';
 import 'local_media_thumbnail.dart';
 import 'post_identity_selector.dart';
 import 'media_picker_sheet.dart';
+import 'profile_photo_actions.dart';
 
 class HomeNewsFeedSection extends StatefulWidget {
   final int refreshToken;
@@ -575,10 +576,30 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
                           LocalMediaThumbnail(
                             file: file,
                             size: 72,
-                            onTap: () => LocalMediaThumbnail.previewLocalFile(
-                              context,
-                              file,
-                            ),
+                            onTap: () async {
+                              final next = await runAttachedMediaEditFlow(
+                                context,
+                                current: file,
+                              );
+                              if (!mounted) return;
+                              setState(() {
+                                if (next == null) {
+                                  _attachedMedia = [
+                                    for (var i = 0;
+                                        i < _attachedMedia.length;
+                                        i++)
+                                      if (i != index) _attachedMedia[i],
+                                  ];
+                                } else {
+                                  _attachedMedia = [
+                                    for (var i = 0;
+                                        i < _attachedMedia.length;
+                                        i++)
+                                      if (i == index) next else _attachedMedia[i],
+                                  ];
+                                }
+                              });
+                            },
                           ),
                           Positioned(
                             top: -6,

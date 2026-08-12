@@ -9,7 +9,7 @@ import '../theme/firstvue_theme.dart';
 import '../utils/profile_video_validator.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/location_autocomplete_field.dart';
-import '../widgets/media_picker_sheet.dart';
+import '../widgets/profile_photo_actions.dart';
 import '../widgets/username_handle_field.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -193,68 +193,120 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _changeAvatar({required bool allowVideo}) async {
-    final files = allowVideo
-        ? await showMediaPickerSheet(context)
-        : await showImagePickerSheet(context);
-    if (files == null || files.isEmpty || !mounted) return;
-
-    final validationError = await validateProfileVideoFile(files.first);
-    if (validationError != null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(validationError)),
-        );
-      }
-      return;
-    }
-
-    setState(() => _mediaUpdating = true);
-    try {
-      await ProfileMediaService.setAvatar(files.first);
-      _images = await ProfileMediaService.fetchProfileImages();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _images.avatar?.isVideo == true
-                  ? 'Profile video updated.'
-                  : 'Profile photo updated.',
+    if (_mediaUpdating) return;
+    final existing = _images.avatar;
+    await runProfilePhotoEditFlow(
+      context: context,
+      kindLabel: allowVideo ? 'profile photo or video' : 'profile photo',
+      hasExisting: existing != null,
+      existingUrl: existing?.signedUrl,
+      existingIsVideo: existing?.isVideo ?? false,
+      allowVideo: allowVideo,
+      onChange: (file) async {
+        final validationError = await validateProfileVideoFile(file);
+        if (validationError != null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(validationError)),
+            );
+          }
+          return;
+        }
+        setState(() => _mediaUpdating = true);
+        try {
+          await ProfileMediaService.setAvatar(file);
+          _images = await ProfileMediaService.fetchProfileImages();
+          if (!mounted) return;
+          setState(() {});
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _images.avatar?.isVideo == true
+                    ? 'Profile video updated.'
+                    : 'Profile photo updated.',
+              ),
             ),
-          ),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to update profile media.')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _mediaUpdating = false);
-    }
+          );
+        } catch (_) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unable to update profile media.')),
+          );
+        } finally {
+          if (mounted) setState(() => _mediaUpdating = false);
+        }
+      },
+      onRemove: () async {
+        setState(() => _mediaUpdating = true);
+        try {
+          await ProfileMediaService.removeAvatar();
+          _images = await ProfileMediaService.fetchProfileImages();
+          if (!mounted) return;
+          setState(() {});
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Profile photo removed.')),
+          );
+        } catch (_) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unable to remove profile photo.')),
+          );
+        } finally {
+          if (mounted) setState(() => _mediaUpdating = false);
+        }
+      },
+    );
   }
 
   Future<void> _changeCover() async {
-    final files = await showImagePickerSheet(context);
-    if (files == null || files.isEmpty || !mounted) return;
-    setState(() => _mediaUpdating = true);
-    try {
-      await ProfileMediaService.setCover(files.first);
-      _images = await ProfileMediaService.fetchProfileImages();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cover photo updated.')),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to update cover photo.')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _mediaUpdating = false);
-    }
+    if (_mediaUpdating) return;
+    final existing = _images.cover;
+    await runProfilePhotoEditFlow(
+      context: context,
+      kindLabel: 'cover photo',
+      hasExisting: existing != null,
+      existingUrl: existing?.signedUrl,
+      existingIsVideo: existing?.isVideo ?? false,
+      allowVideo: false,
+      onChange: (file) async {
+        setState(() => _mediaUpdating = true);
+        try {
+          await ProfileMediaService.setCover(file);
+          _images = await ProfileMediaService.fetchProfileImages();
+          if (!mounted) return;
+          setState(() {});
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cover photo updated.')),
+          );
+        } catch (_) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unable to update cover photo.')),
+          );
+        } finally {
+          if (mounted) setState(() => _mediaUpdating = false);
+        }
+      },
+      onRemove: () async {
+        setState(() => _mediaUpdating = true);
+        try {
+          await ProfileMediaService.removeCover();
+          _images = await ProfileMediaService.fetchProfileImages();
+          if (!mounted) return;
+          setState(() {});
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cover photo removed.')),
+          );
+        } catch (_) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unable to remove cover photo.')),
+          );
+        } finally {
+          if (mounted) setState(() => _mediaUpdating = false);
+        }
+      },
+    );
   }
 
   @override
@@ -324,7 +376,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         child: TextButton.icon(
                           onPressed: _mediaUpdating ? null : _changeCover,
                           icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                          label: const Text('Cover'),
+                          label: Text(_images.cover == null ? 'Add cover' : 'Change cover'),
                         ),
                       ),
                     ),
@@ -356,7 +408,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               onPressed: _mediaUpdating
                                   ? null
                                   : () => _changeAvatar(allowVideo: false),
-                              child: const Text('Photo'),
+                              child: Text(
+                                _images.avatar == null
+                                    ? 'Add photo'
+                                    : 'Change photo',
+                              ),
                             ),
                             const SizedBox(height: 8),
                             OutlinedButton(
