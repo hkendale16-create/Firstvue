@@ -43,25 +43,60 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
   List<FeedComment> _comments = const [];
   bool _loading = true;
   bool _loadFailed = false;
+  String? _loadErrorMessage;
   bool _posting = false;
   String? _replyParentId;
+  RealtimeChannel? _commentsChannel;
 
   @override
   void initState() {
     super.initState();
     _loadComments();
+    _subscribeToComments();
   }
 
   @override
   void dispose() {
+    _commentsChannel?.unsubscribe();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _subscribeToComments() {
+    _commentsChannel?.unsubscribe();
+    _commentsChannel = Supabase.instance.client
+        .channel('feed-comments-${widget.mediaId}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'feed_comments',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'media_id',
+            value: widget.mediaId,
+          ),
+          callback: (payload) async {
+            final record = payload.newRecord;
+            if (record.isEmpty) return;
+            final comment =
+                await FeedCommentsService.commentFromRealtimeRecord(record);
+            if (comment == null || !mounted) return;
+            setState(() {
+              if (_comments.any((existing) => existing.id == comment.id)) {
+                return;
+              }
+              _comments = [..._comments, comment];
+            });
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _loadComments() async {
     setState(() {
       _loading = true;
       _loadFailed = false;
+      _loadErrorMessage = null;
     });
     try {
       final comments = await FeedCommentsService.fetchComments(widget.mediaId);
@@ -70,11 +105,12 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
         _comments = comments;
         _loading = false;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
         _loading = false;
         _loadFailed = true;
+        _loadErrorMessage = FeedCommentsService.userMessageForError(error);
       });
     }
   }
@@ -90,30 +126,50 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
     }
     final text = _controller.text.trim();
     if (text.isEmpty || _posting) return;
+
+    final parentId = _replyParentId;
     setState(() => _posting = true);
     try {
       final newComment = await FeedCommentsService.postComment(
         mediaId: widget.mediaId,
         body: text,
-        parentId: _replyParentId,
+        parentId: parentId,
       );
       _controller.clear();
       _replyParentId = null;
       if (!mounted) return;
       setState(() {
-        _comments = [
-          ..._comments,
-          newComment,
-        ];
+        if (!_comments.any((comment) => comment.id == newComment.id)) {
+          _comments = [..._comments, newComment];
+        }
       });
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to post comment. Please try again.')),
+          SnackBar(
+            content: Text(FeedCommentsService.userMessageForError(error)),
+          ),
         );
       }
     } finally {
       if (mounted) setState(() => _posting = false);
+    }
+  }
+
+  Future<void> _sparkComment(FeedComment comment) async {
+    final previous = comment;
+    final optimistic = await FeedCommentsService.toggleSpark(comment);
+    if (!mounted) return;
+    setState(() {
+      _comments = [
+        for (final item in _comments)
+          if (item.id == comment.id) optimistic else item,
+      ];
+    });
+    if (optimistic.sparkedByMe == previous.sparkedByMe && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to spark this comment right now.')),
+      );
     }
   }
 
@@ -124,9 +180,21 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
   Widget _buildCommentsList(ScrollController scrollController) {
     if (_loadFailed) {
       return Center(
-        child: TextButton(
-          onPressed: _loadComments,
-          child: const Text('Unable to load comments. Tap to retry.'),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                _loadErrorMessage ??
+                    'Unable to load comments. Tap to retry.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white54),
+              ),
+              const SizedBox(height: 12),
+              TextButton(onPressed: _loadComments, child: const Text('Try again')),
+            ],
+          ),
         ),
       );
     }
@@ -164,20 +232,14 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
         return _CommentBlock(
           comment: comment,
           replies: replies,
-          onSpark: () async {
-            await FeedCommentsService.toggleSpark(comment);
-            await _loadComments();
-          },
+          onSpark: () => _sparkComment(comment),
           onReply: () {
             setState(() {
               _replyParentId = comment.id;
               _controller.text = '@${comment.authorName} ';
             });
           },
-          onSparkReply: (reply) async {
-            await FeedCommentsService.toggleSpark(reply);
-            await _loadComments();
-          },
+          onSparkReply: _sparkComment,
           onReplyToReply: (reply) {
             setState(() {
               _replyParentId = reply.id;

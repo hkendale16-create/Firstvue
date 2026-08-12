@@ -943,3 +943,31 @@ create index if not exists professional_media_trending_idx
 -- (Do not run section 13 alone — it depends on tables created in that file.)
 -- =============================================================================
 
+-- =============================================================================
+-- 14. feed_realtime (20260820)
+-- Enable Supabase Realtime for news feed posts and comments.
+-- =============================================================================
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'community_news_posts'
+  ) then
+    alter publication supabase_realtime add table public.community_news_posts;
+  end if;
+
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'feed_comments'
+  ) then
+    alter publication supabase_realtime add table public.feed_comments;
+  end if;
+end $$;
+

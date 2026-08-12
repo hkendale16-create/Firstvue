@@ -24,6 +24,23 @@ class FeedComment {
     required this.sparkCount,
     required this.sparkedByMe,
   });
+
+  FeedComment copyWith({
+    int? sparkCount,
+    bool? sparkedByMe,
+  }) {
+    return FeedComment(
+      id: id,
+      body: body,
+      authorName: authorName,
+      authorId: authorId,
+      createdAt: createdAt,
+      isMine: isMine,
+      parentId: parentId,
+      sparkCount: sparkCount ?? this.sparkCount,
+      sparkedByMe: sparkedByMe ?? this.sparkedByMe,
+    );
+  }
 }
 
 class FeedCommentsService {
@@ -31,15 +48,72 @@ class FeedCommentsService {
 
   static final _client = Supabase.instance.client;
 
+  static const migrationHint =
+      'Comments need Supabase migration 20260816_feed_comments_text_media_id.sql. '
+      'Run it in the Supabase SQL Editor (or apply_pending_migrations.sql).';
+
+  static String userMessageForError(Object error) {
+    final text = error.toString().toLowerCase();
+    if (_looksLikeTextMediaIdMigrationMissing(text)) {
+      return migrationHint;
+    }
+    if (error is FeedCommentsAuthException) {
+      return 'Sign in to view and post comments.';
+    }
+    if (error is PostgrestException) {
+      final code = error.code?.toLowerCase() ?? '';
+      if (code == '42501' || text.contains('row-level security')) {
+        return 'You do not have permission to access these comments.';
+      }
+    }
+    return 'Unable to load comments right now. Please try again.';
+  }
+
+  static bool _looksLikeTextMediaIdMigrationMissing(String text) {
+    return text.contains('invalid input syntax for type uuid') ||
+        text.contains('operator does not exist: uuid = text') ||
+        text.contains('operator does not exist: text = uuid') ||
+        (text.contains('media_id') &&
+            (text.contains('uuid') || text.contains('type')));
+  }
+
   static Future<List<FeedComment>> fetchComments(String mediaId) async {
     final me = _client.auth.currentUser?.id;
-    final rows = await _client
-        .from('feed_comments')
-        .select('id, body, created_at, author_id, parent_id, profiles(display_name)')
-        .eq('media_id', mediaId)
-        .order('created_at', ascending: true);
+    try {
+      final rows = await _client
+          .from('feed_comments')
+          .select('id, body, created_at, author_id, parent_id')
+          .eq('media_id', mediaId)
+          .order('created_at', ascending: true);
+
+      return _mapCommentRows(rows, me: me);
+    } on PostgrestException catch (error) {
+      throw FeedCommentsException(userMessageForError(error), cause: error);
+    }
+  }
+
+  static Future<FeedComment?> commentFromRealtimeRecord(
+    Map<String, dynamic> record,
+  ) async {
+    final me = _client.auth.currentUser?.id;
+    final comments = await _mapCommentRows([record], me: me);
+    return comments.isEmpty ? null : comments.first;
+  }
+
+  static Future<List<FeedComment>> _mapCommentRows(
+    List<dynamic> rows, {
+    required String? me,
+  }) async {
+    if (rows.isEmpty) return const [];
 
     final commentIds = rows.map((row) => row['id'] as String).toList();
+    final authorIds = rows
+        .map((row) => row['author_id'] as String?)
+        .whereType<String>()
+        .toSet()
+        .toList();
+
+    final authorNames = await _fetchProfileNames(authorIds);
     final sparkCounts = await _fetchSparkCounts(commentIds);
     final mySparks = me == null
         ? const <String>{}
@@ -48,8 +122,9 @@ class FeedCommentsService {
     return rows
         .map(
           (row) => _commentFromRow(
-            row,
+            row as Map<String, dynamic>,
             me: me,
+            authorNames: authorNames,
             sparkCounts: sparkCounts,
             mySparks: mySparks,
           ),
@@ -92,6 +167,25 @@ class FeedCommentsService {
     }
   }
 
+  static Future<Map<String, String>> _fetchProfileNames(
+    List<String> authorIds,
+  ) async {
+    if (authorIds.isEmpty) return {};
+    try {
+      final rows = await _client
+          .from('profiles')
+          .select('id, display_name')
+          .inFilter('id', authorIds);
+      return {
+        for (final row in rows)
+          row['id'] as String:
+              (row['display_name'] as String?) ?? 'FirstVue member',
+      };
+    } catch (_) {
+      return {};
+    }
+  }
+
   static Future<void> _ensureProfile(User user) async {
     final displayName = user.email?.split('@').first;
     try {
@@ -117,18 +211,21 @@ class FeedCommentsService {
   static FeedComment _commentFromRow(
     Map<String, dynamic> row, {
     required String? me,
+    Map<String, String> authorNames = const {},
     Map<String, int> sparkCounts = const {},
     Set<String> mySparks = const {},
   }) {
-    final profile = row['profiles'] as Map<String, dynamic>?;
+    final authorId = row['author_id'] as String?;
     final id = row['id'] as String;
     return FeedComment(
       id: id,
       body: row['body'] as String,
-      authorName: (profile?['display_name'] as String?) ?? 'FirstVue member',
-      authorId: row['author_id'] as String?,
+      authorName: authorId == null
+          ? 'FirstVue member'
+          : (authorNames[authorId] ?? 'FirstVue member'),
+      authorId: authorId,
       createdAt: DateTime.parse(row['created_at'] as String),
-      isMine: row['author_id'] == me,
+      isMine: authorId == me,
       parentId: row['parent_id'] as String?,
       sparkCount: sparkCounts[id] ?? 0,
       sparkedByMe: mySparks.contains(id),
@@ -149,43 +246,56 @@ class FeedCommentsService {
 
     await _ensureProfile(user);
 
-    final inserted = await _client
-        .from('feed_comments')
-        .insert({
-          'media_id': mediaId,
-          'author_id': user.id,
-          'body': trimmed,
-          'parent_id': ?parentId,
-        })
-        .select(
-          'id, body, created_at, author_id, parent_id, profiles(display_name)',
-        )
-        .single();
-
-    if (parentId != null) {
-      final parent = await _client
+    try {
+      final inserted = await _client
           .from('feed_comments')
-          .select('author_id')
-          .eq('id', parentId)
-          .maybeSingle();
-      final recipient = parent?['author_id'] as String?;
-      if (recipient != null && recipient != user.id) {
-        await ActivityNotificationsService.notifyUser(
-          userId: recipient,
-          type: 'comment_reply',
-          title: 'New reply on your comment',
-          body: trimmed,
-          payload: {'comment_id': inserted['id'], 'media_id': mediaId},
-        );
-      }
-    }
+          .insert({
+            'media_id': mediaId,
+            'author_id': user.id,
+            'body': trimmed,
+            'parent_id': parentId,
+          })
+          .select('id, body, created_at, author_id, parent_id')
+          .single();
 
-    return _commentFromRow(inserted, me: user.id);
+      if (parentId != null) {
+        final parent = await _client
+            .from('feed_comments')
+            .select('author_id')
+            .eq('id', parentId)
+            .maybeSingle();
+        final recipient = parent?['author_id'] as String?;
+        if (recipient != null && recipient != user.id) {
+          await ActivityNotificationsService.notifyUser(
+            userId: recipient,
+            type: 'comment_reply',
+            title: 'New reply on your comment',
+            body: trimmed,
+            payload: {'comment_id': inserted['id'], 'media_id': mediaId},
+          );
+        }
+      }
+
+      final authorNames = await _fetchProfileNames([user.id]);
+      return _commentFromRow(
+        inserted,
+        me: user.id,
+        authorNames: authorNames,
+      );
+    } on PostgrestException catch (error) {
+      throw FeedCommentsException(userMessageForError(error), cause: error);
+    }
   }
 
-  static Future<void> toggleSpark(FeedComment comment) async {
+  static Future<FeedComment> toggleSpark(FeedComment comment) async {
     final me = _client.auth.currentUser?.id;
     if (me == null) throw const FeedCommentsAuthException();
+
+    final optimistic = comment.copyWith(
+      sparkedByMe: !comment.sparkedByMe,
+      sparkCount: comment.sparkCount + (comment.sparkedByMe ? -1 : 1),
+    );
+
     try {
       if (comment.sparkedByMe) {
         await _client
@@ -209,10 +319,23 @@ class FeedCommentsService {
           );
         }
       }
-    } catch (_) {}
+      return optimistic;
+    } catch (_) {
+      return comment;
+    }
   }
 }
 
 class FeedCommentsAuthException implements Exception {
   const FeedCommentsAuthException();
+}
+
+class FeedCommentsException implements Exception {
+  final String message;
+  final Object? cause;
+
+  const FeedCommentsException(this.message, {this.cause});
+
+  @override
+  String toString() => message;
 }

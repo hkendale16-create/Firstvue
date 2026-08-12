@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../screens/firstvue_business_profile_screen.dart';
 import '../services/community_news_service.dart';
@@ -7,6 +8,7 @@ import '../services/things_to_do_service.dart';
 import '../services/trending_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/feed_comments_sheet.dart';
+import '../widgets/firstvue_refresh_scaffold.dart';
 
 const _screenBackground = Color(0xFF080B0F);
 
@@ -86,10 +88,10 @@ class _WhatsNowScreenState extends State<WhatsNowScreen>
           ),
         ),
       ),
-      body: RefreshIndicator(
-        color: FirstVueColors.gold,
+      body: FirstVueRefreshScaffold(
         onRefresh: _refresh,
         child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
           children: [
             Text(
@@ -587,48 +589,103 @@ class _CommunityPulseSection extends StatefulWidget {
 }
 
 class _CommunityPulseSectionState extends State<_CommunityPulseSection> {
-  late Future<List<CommunityNewsPost>> _postsFuture;
+  List<CommunityNewsPost> _posts = const [];
+  bool _loading = true;
+  String? _loadError;
+  RealtimeChannel? _newsChannel;
 
   @override
   void initState() {
     super.initState();
-    _postsFuture = CommunityNewsService.fetchPosts(limit: 5);
+    _loadPosts();
+    _subscribeToNewsFeed();
+  }
+
+  @override
+  void dispose() {
+    _newsChannel?.unsubscribe();
+    super.dispose();
+  }
+
+  Future<void> _loadPosts() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final posts = await CommunityNewsService.fetchPosts(limit: 5);
+      if (!mounted) return;
+      setState(() {
+        _posts = posts;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = 'Community updates are unavailable right now.';
+      });
+    }
+  }
+
+  void _subscribeToNewsFeed() {
+    _newsChannel?.unsubscribe();
+    _newsChannel = Supabase.instance.client
+        .channel('whats-now-news-feed')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'community_news_posts',
+          callback: (payload) async {
+            final record = payload.newRecord;
+            if (record.isEmpty) return;
+            if (record['status'] != 'approved') return;
+
+            final postId = record['id'] as String?;
+            if (postId == null) return;
+            if (_posts.any((post) => post.id == postId)) return;
+
+            final post = await CommunityNewsService.fetchPostById(postId);
+            if (post == null || !mounted) return;
+
+            setState(() {
+              _posts = [
+                post,
+                for (final existing in _posts)
+                  if (existing.id != post.id) existing,
+              ].take(5).toList();
+            });
+          },
+        )
+        .subscribe();
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<CommunityNewsPost>>(
-      future: _postsFuture,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const _FeedEmptyCard(
-            message: 'Community updates are unavailable right now.',
-          );
-        }
-        if (!snapshot.hasData) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(
-              child: CircularProgressIndicator(color: FirstVueColors.teal),
-            ),
-          );
-        }
-        final posts = snapshot.data!;
-        if (posts.isEmpty) {
-          return const _FeedEmptyCard(
-            message: 'Community posts will appear here.',
-          );
-        }
-        return Column(
-          children: [
-            for (var i = 0; i < posts.length; i++)
-              Padding(
-                padding: EdgeInsets.only(bottom: i == posts.length - 1 ? 0 : 10),
-                child: _PulsePostCard(post: posts[i]),
-              ),
-          ],
-        );
-      },
+    if (_loadError != null) {
+      return _FeedEmptyCard(message: _loadError!);
+    }
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: CircularProgressIndicator(color: FirstVueColors.teal),
+        ),
+      );
+    }
+    if (_posts.isEmpty) {
+      return const _FeedEmptyCard(
+        message: 'Community posts will appear here.',
+      );
+    }
+    return Column(
+      children: [
+        for (var i = 0; i < _posts.length; i++)
+          Padding(
+            padding: EdgeInsets.only(bottom: i == _posts.length - 1 ? 0 : 10),
+            child: _PulsePostCard(post: _posts[i]),
+          ),
+      ],
     );
   }
 }

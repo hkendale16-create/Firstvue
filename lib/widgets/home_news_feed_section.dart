@@ -8,10 +8,13 @@ import '../services/community_news_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'community_news_post_card.dart';
 import 'feed_comments_sheet.dart';
+import 'local_media_thumbnail.dart';
 import 'media_picker_sheet.dart';
 
 class HomeNewsFeedSection extends StatefulWidget {
-  const HomeNewsFeedSection({super.key});
+  final int refreshToken;
+
+  const HomeNewsFeedSection({super.key, this.refreshToken = 0});
 
   @override
   State<HomeNewsFeedSection> createState() => _HomeNewsFeedSectionState();
@@ -24,17 +27,60 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
   final _composer = TextEditingController();
   bool _posting = false;
   List<XFile> _attachedMedia = const [];
+  RealtimeChannel? _newsChannel;
 
   @override
   void initState() {
     super.initState();
     _loadPosts();
+    _subscribeToNewsFeed();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeNewsFeedSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      _loadPosts();
+    }
   }
 
   @override
   void dispose() {
+    _newsChannel?.unsubscribe();
     _composer.dispose();
     super.dispose();
+  }
+
+  void _subscribeToNewsFeed() {
+    _newsChannel?.unsubscribe();
+    _newsChannel = Supabase.instance.client
+        .channel('home-news-feed')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'community_news_posts',
+          callback: (payload) async {
+            final record = payload.newRecord;
+            if (record.isEmpty) return;
+            if (record['status'] != 'approved') return;
+
+            final postId = record['id'] as String?;
+            if (postId == null) return;
+            if (_posts.any((post) => post.id == postId)) return;
+
+            final post = await CommunityNewsService.fetchPostById(postId);
+            if (post == null || !mounted) return;
+
+            setState(() {
+              _posts = [
+                post,
+                for (final existing in _posts)
+                  if (existing.id != post.id) existing,
+              ];
+            });
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _loadPosts() async {
@@ -59,6 +105,8 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
       }
     }
   }
+
+  Future<void> refresh() => _loadPosts();
 
   Future<void> _refresh() => _loadPosts();
 
@@ -243,19 +291,48 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     }
   }
 
+  Future<void> _deletePost(int index) async {
+    if (index < 0 || index >= _posts.length) return;
+    final deleted = await confirmDeleteNewsPost(context, _posts[index]);
+    if (!deleted || !mounted) return;
+    setState(() {
+      _posts = [
+        for (var i = 0; i < _posts.length; i++)
+          if (i != index) _posts[i],
+      ];
+    });
+  }
+
+  Future<void> _showPostMenu(int index) async {
+    await _deletePost(index);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'NEWS FEED',
-          style: TextStyle(
-            color: FirstVueColors.ivory,
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.4,
-          ),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'COMMUNITY FEED',
+                style: TextStyle(
+                  color: FirstVueColors.ivory,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.4,
+                ),
+              ),
+            ),
+            if (!_loadingPosts)
+              IconButton(
+                onPressed: _refresh,
+                icon: const Icon(Icons.refresh, color: FirstVueColors.mutedIcon, size: 20),
+                tooltip: 'Refresh feed',
+                visualDensity: VisualDensity.compact,
+              ),
+          ],
         ),
         const SizedBox(height: 12),
         Container(
@@ -303,19 +380,15 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
                     separatorBuilder: (_, _) => const SizedBox(width: 8),
                     itemBuilder: (context, index) {
                       final file = _attachedMedia[index];
-                      final isVideo = _isVideoFile(file);
                       return Stack(
                         clipBehavior: Clip.none,
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              width: 72,
-                              height: 72,
-                              color: FirstVueColors.elevatedSurface,
-                              child: isVideo
-                                  ? const Icon(Icons.videocam_outlined, color: FirstVueColors.teal)
-                                  : const Icon(Icons.image_outlined, color: FirstVueColors.gold),
+                          LocalMediaThumbnail(
+                            file: file,
+                            size: 72,
+                            onTap: () => LocalMediaThumbnail.previewLocalFile(
+                              context,
+                              file,
                             ),
                           ),
                           Positioned(
@@ -407,30 +480,23 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
           Column(
             children: [
               for (var index = 0; index < _posts.length; index++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: CommunityNewsPostCard(
-                    post: _posts[index],
-                    onSpark: () => _sparkPost(index),
-                    onSave: () => _savePost(index),
-                    onComment: () => FeedCommentsSheet.show(
-                      context,
-                      mediaId: _posts[index].commentsMediaId,
-                      businessName: _posts[index].authorName,
-                    ),
+                CommunityNewsPostCard(
+                  post: _posts[index],
+                  style: CommunityNewsPostCardStyle.timeline,
+                  onSpark: () => _sparkPost(index),
+                  onSave: () => _savePost(index),
+                  onDelete: _posts[index].isMine
+                      ? () => _showPostMenu(index)
+                      : null,
+                  onComment: () => FeedCommentsSheet.show(
+                    context,
+                    mediaId: _posts[index].commentsMediaId,
+                    businessName: _posts[index].authorName,
                   ),
                 ),
             ],
           ),
       ],
     );
-  }
-
-  bool _isVideoFile(XFile file) {
-    final mime = file.mimeType?.toLowerCase() ?? '';
-    if (mime.startsWith('video/')) return true;
-    const videoExtensions = {'mp4', 'mov', 'webm', 'avi', 'mkv', '3gp', 'm4v'};
-    final extension = file.name.split('.').last.toLowerCase();
-    return videoExtensions.contains(extension);
   }
 }
