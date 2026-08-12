@@ -333,10 +333,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _handleAccountTap(User? user) async {
     if (user == null) {
-      await Navigator.push(
+      final needsHandle = await Navigator.push<bool>(
         context,
         FirstVuePageRoute(builder: (_) => const AuthScreen()),
       );
+      if (mounted) {
+        setState(() {});
+        await _loadStats();
+        await _loadDisplayName();
+        if (needsHandle == true) {
+          await _openEditProfile();
+        }
+      }
     } else {
       await Supabase.instance.client.auth.signOut();
     }
@@ -461,6 +469,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
             ),
           if (user != null) const LiveStreamEligibilityCard(),
+          if (user != null &&
+              !_nameLoading &&
+              (handle == null || handle.isEmpty))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Material(
+                color: FirstVueColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                child: ListTile(
+                  onTap: _openEditProfile,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  leading: const Icon(
+                    Icons.alternate_email,
+                    color: FirstVueColors.gold,
+                  ),
+                  title: const Text(
+                    'Choose your @handle',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Your tag must be unique. Display names can be shared.',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: .55),
+                      fontSize: 13,
+                    ),
+                  ),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: Colors.white.withValues(alpha: .45),
+                  ),
+                ),
+              ),
+            ),
           Stack(
             children: [
               FacebookStyleProfileHeader(

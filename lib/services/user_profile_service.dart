@@ -99,7 +99,6 @@ class UserProfileService {
 
   static Future<void> updateExtendedProfile({
     String? displayName,
-    String? username,
     String? bio,
     String? city,
     String? state,
@@ -120,10 +119,6 @@ class UserProfileService {
         throw ArgumentError('Display name cannot be empty.');
       }
       updates['display_name'] = trimmed;
-    }
-
-    if (username != null) {
-      updates['username'] = username.trim().isEmpty ? null : username.trim();
     }
 
     if (bio != null) {

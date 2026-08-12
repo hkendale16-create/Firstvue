@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../navigation/firstvue_page_route.dart';
+import '../screens/member_public_profile_screen.dart';
 import '../screens/search_screen.dart';
 import '../services/search_autocomplete_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -12,7 +13,7 @@ class FirstVueInlineSearchBar extends StatefulWidget {
 
   const FirstVueInlineSearchBar({
     super.key,
-    this.hintText = 'Search people, businesses, #tags…',
+    this.hintText = 'Search @handles, people, businesses, #tags…',
     this.autofocus = false,
     this.padding = const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
   });
@@ -42,7 +43,7 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
 
   Future<void> _onQueryChanged() async {
     final query = _controller.text;
-    if (query.trim().length < 2) {
+    if (!SearchAutocompleteService.shouldSearch(query)) {
       if (_suggestions.isNotEmpty && mounted) {
         setState(() => _suggestions = const []);
       }
@@ -55,6 +56,24 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
       _suggestions = results;
       _searching = false;
     });
+  }
+
+  void _openSuggestion(SearchAutocompleteResult result) {
+    setState(() => _suggestions = const []);
+    switch (result.type) {
+      case SearchResultType.profile:
+        Navigator.push(
+          context,
+          FirstVuePageRoute(
+            builder: (_) => MemberPublicProfileScreen(profileId: result.id),
+          ),
+        );
+      case SearchResultType.business:
+      case SearchResultType.community:
+      case SearchResultType.hashtag:
+        _controller.text = result.label;
+        _openFullSearch();
+    }
   }
 
   void _openFullSearch() {
@@ -129,11 +148,7 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
                               fontSize: 12,
                             ),
                           ),
-                    onTap: () {
-                      _controller.text = result.label;
-                      setState(() => _suggestions = const []);
-                      _openFullSearch();
-                    },
+                    onTap: () => _openSuggestion(result),
                   );
                 }).toList(),
               ),

@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'activity_notifications_service.dart';
+import 'username_service.dart';
 
 class ParsedPostMetadata {
   final List<String> hashtags;
@@ -82,27 +83,22 @@ class PostMetadataService {
 
   static Future<void> _linkMention(String postId, String username) async {
     try {
-      final profile = await _client
-          .from('profiles')
-          .select('id')
-          .eq('username', username)
-          .maybeSingle();
-      if (profile == null) return;
+      final profileId = await UsernameService.lookupProfileId(username);
+      if (profileId == null) return;
 
       await _client.from('post_mentions').insert({
         'post_id': postId,
-        'mentioned_profile_id': profile['id'],
-        'mention_text': '@$username',
+        'mentioned_profile_id': profileId,
+        'mention_text': '@${UsernameService.normalize(username) ?? username}',
       });
 
       final me = _client.auth.currentUser?.id;
-      final mentionedId = profile['id'] as String;
-      if (me != null && mentionedId != me) {
+      if (me != null && profileId != me) {
         await ActivityNotificationsService.notifyUser(
-          userId: mentionedId,
+          userId: profileId,
           type: 'mention',
           title: 'You were mentioned in a post',
-          body: '@$username',
+          body: '@${UsernameService.normalize(username) ?? username}',
           payload: {'post_id': postId, 'profile_id': me},
         );
       }

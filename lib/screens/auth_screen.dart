@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../services/username_service.dart';
+
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
@@ -54,7 +56,7 @@ class _AuthScreenState extends State<AuthScreen> {
           setState(() => _isSignUp = false);
         } else {
           await _ensureProfile(response.user);
-          if (mounted) Navigator.pop(context);
+          if (mounted) await _finishAuth(missingHandlePrompt: true);
         }
       } else {
         final response = await Supabase.instance.client.auth.signInWithPassword(
@@ -62,7 +64,7 @@ class _AuthScreenState extends State<AuthScreen> {
           password: password,
         );
         await _ensureProfile(response.user);
-        if (mounted) Navigator.pop(context);
+        if (mounted) await _finishAuth(missingHandlePrompt: true);
       }
     } on AuthException catch (error) {
       if (mounted) {
@@ -106,6 +108,13 @@ class _AuthScreenState extends State<AuthScreen> {
         });
       }
     }
+  }
+
+  Future<void> _finishAuth({required bool missingHandlePrompt}) async {
+    final needsHandle =
+        missingHandlePrompt && (await UsernameService.fetchUsername()) == null;
+    if (!mounted) return;
+    Navigator.pop(context, needsHandle);
   }
 
   Future<void> _resetPassword() async {

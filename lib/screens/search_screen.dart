@@ -30,7 +30,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _onQueryChanged() async {
     final query = _searchController.text;
-    if (query.trim().length < 2) {
+    if (!SearchAutocompleteService.shouldSearch(query)) {
       if (_suggestions.isNotEmpty && mounted) {
         setState(() => _suggestions = const []);
       }
@@ -167,7 +167,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 onSubmitted: _search,
                 style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(
-                  hintText: 'Search FirstVue...',
+                  hintText: 'Search @handles, places, #tags…',
                   hintStyle: TextStyle(color: Colors.white38),
                   prefixIcon: Icon(Icons.search, color: Color(0xFFD8B56A)),
                   border: InputBorder.none,

@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'username_service.dart';
+
 enum SearchResultType { profile, business, community, hashtag }
 
 class SearchAutocompleteResult {
@@ -21,12 +23,28 @@ class SearchAutocompleteService {
 
   static final _client = Supabase.instance.client;
 
+  /// Minimum trimmed query length before autocomplete runs.
+  static bool shouldSearch(String query) {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return false;
+    if (UsernameService.isUsernameQuery(trimmed)) {
+      return trimmed.length >= 2;
+    }
+    return trimmed.length >= 2;
+  }
+
   static Future<List<SearchAutocompleteResult>> search(String query) async {
-    final prefix = query.trim();
-    if (prefix.length < 2) return const [];
+    final trimmed = query.trim();
+    if (!shouldSearch(trimmed)) return const [];
+
+    if (UsernameService.isUsernameQuery(trimmed)) {
+      final handlePrefix = UsernameService.autocompletePrefix(trimmed);
+      if (handlePrefix == null) return const [];
+      return _searchUsernames(handlePrefix);
+    }
 
     final results = <SearchAutocompleteResult>[];
-    final lower = prefix.toLowerCase();
+    final lower = trimmed.toLowerCase();
 
     results.addAll(await _searchProfiles(lower));
     results.addAll(await _searchBusinesses(lower));
@@ -36,36 +54,67 @@ class SearchAutocompleteService {
     return results;
   }
 
-  static Future<List<SearchAutocompleteResult>> _searchProfiles(
+  static Future<List<SearchAutocompleteResult>> _searchUsernames(
     String prefix,
   ) async {
     try {
       final rows = await _client
           .from('profiles')
           .select('id, display_name, username, city, state')
-          .or('display_name.ilike.%$prefix%,username.ilike.%$prefix%')
+          .not('username', 'is', null)
+          .ilike('username', '$prefix%')
+          .order('username')
           .limit(8);
 
-      return rows.map((row) {
-        final username = row['username'] as String?;
-        final displayName =
-            (row['display_name'] as String?) ?? 'FirstVue member';
-        final city = row['city'] as String?;
-        final state = row['state'] as String?;
-        final location = [city, state]
-            .whereType<String>()
-            .where((p) => p.trim().isNotEmpty)
-            .join(', ');
+      return rows.map(_profileRowToResult).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
 
-        return SearchAutocompleteResult(
-          id: row['id'] as String,
-          label: username != null ? '@$username' : displayName,
-          subtitle: username != null
-              ? displayName + (location.isNotEmpty ? ' · $location' : '')
-              : (location.isNotEmpty ? location : null),
-          type: SearchResultType.profile,
-        );
-      }).toList();
+  static SearchAutocompleteResult _profileRowToResult(Map<String, dynamic> row) {
+    final username = (row['username'] as String?)?.trim();
+    final displayName = (row['display_name'] as String?) ?? 'FirstVue member';
+    final city = row['city'] as String?;
+    final state = row['state'] as String?;
+    final location = [city, state]
+        .whereType<String>()
+        .where((part) => part.trim().isNotEmpty)
+        .join(', ');
+
+    final handle = username != null && username.isNotEmpty
+        ? UsernameService.normalize(username) ?? username.toLowerCase()
+        : null;
+
+    return SearchAutocompleteResult(
+      id: row['id'] as String,
+      label: handle != null ? '@$handle' : displayName,
+      subtitle: handle != null
+          ? displayName + (location.isNotEmpty ? ' · $location' : '')
+          : (location.isNotEmpty ? location : null),
+      type: SearchResultType.profile,
+    );
+  }
+
+  static Future<List<SearchAutocompleteResult>> _searchProfiles(
+    String prefix,
+  ) async {
+    try {
+      final handlePart = prefix.startsWith('@')
+          ? UsernameService.autocompletePrefix(prefix) ?? ''
+          : prefix;
+
+      final filter = handlePart.isNotEmpty
+          ? 'display_name.ilike.%$prefix%,username.ilike.%$handlePart%'
+          : 'display_name.ilike.%$prefix%,username.ilike.%$prefix%';
+
+      final rows = await _client
+          .from('profiles')
+          .select('id, display_name, username, city, state')
+          .or(filter)
+          .limit(8);
+
+      return rows.map(_profileRowToResult).toList();
     } catch (_) {
       return const [];
     }
@@ -112,7 +161,7 @@ class SearchAutocompleteService {
         final state = row['state'] as String?;
         final location = [city, state]
             .whereType<String>()
-            .where((p) => p.trim().isNotEmpty)
+            .where((part) => part.trim().isNotEmpty)
             .join(', ');
 
         return SearchAutocompleteResult(

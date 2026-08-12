@@ -10,6 +10,7 @@ import '../utils/profile_video_validator.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/location_autocomplete_field.dart';
 import '../widgets/media_picker_sheet.dart';
+import '../widgets/username_handle_field.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -33,6 +34,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _showEmailOnProfile = false;
   String? _error;
   String? _usernameError;
+  UsernameAvailability _usernameAvailability = UsernameAvailability.empty;
 
   @override
   void initState() {
@@ -104,32 +106,42 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     try {
       final usernameRaw = _usernameController.text.trim();
-      if (usernameRaw.isNotEmpty) {
-        final normalized = UsernameService.normalize(usernameRaw);
-        if (normalized == null) {
-          setState(() {
-            _saving = false;
-            _usernameError =
-                'Username must be 3–30 characters: lowercase letters, numbers, and underscores.';
-          });
-          return;
-        }
-
-        final user = Supabase.instance.client.auth.currentUser!;
-        final available = await UsernameService.isAvailable(
-          normalized,
-          excludeUserId: user.id,
-        );
-        if (!available) {
-          setState(() {
-            _saving = false;
-            _usernameError = 'That username is already taken.';
-          });
-          return;
-        }
-
-        await UsernameService.updateUsername(normalized);
+      final validationError = UsernameService.validationMessage(usernameRaw);
+      if (validationError != null) {
+        setState(() {
+          _saving = false;
+          _usernameError = validationError;
+        });
+        return;
       }
+
+      if (_usernameAvailability == UsernameAvailability.taken ||
+          _usernameAvailability == UsernameAvailability.invalid) {
+        setState(() {
+          _saving = false;
+          _usernameError = _usernameAvailability == UsernameAvailability.taken
+              ? 'That @handle is already taken. Choose another one.'
+              : 'Use 3–30 lowercase letters, numbers, or underscores.';
+        });
+        return;
+      }
+
+      if (_usernameAvailability == UsernameAvailability.checking) {
+        final availability =
+            await UsernameService.checkAvailability(usernameRaw);
+        if (availability != UsernameAvailability.available) {
+          setState(() {
+            _saving = false;
+            _usernameAvailability = availability;
+            _usernameError = availability == UsernameAvailability.taken
+                ? 'That @handle is already taken. Choose another one.'
+                : 'Could not verify @handle availability.';
+          });
+          return;
+        }
+      }
+
+      await UsernameService.updateUsername(usernameRaw);
 
       await UserProfileService.updateExtendedProfile(
         displayName: _nameController.text,
@@ -339,16 +351,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   _field(
                     controller: _nameController,
                     label: 'Display name',
+                    hint: 'John Smith',
                     capitalization: TextCapitalization.words,
                   ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Display names can be shared — many members can use the same name.',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: .38),
+                      fontSize: 12,
+                    ),
+                  ),
                   const SizedBox(height: 12),
-                  _field(
+                  UsernameHandleField(
                     controller: _usernameController,
-                    label: 'Username',
-                    hint: 'your_handle',
-                    prefix: '@',
-                    error: _usernameError,
-                    onChanged: (_) => setState(() {}),
+                    errorText: _usernameError,
+                    onAvailabilityChanged: (availability) {
+                      if (!mounted) return;
+                      setState(() {
+                        _usernameAvailability = availability;
+                        if (availability == UsernameAvailability.available) {
+                          _usernameError = null;
+                        }
+                      });
+                    },
                   ),
                   const SizedBox(height: 12),
                   _field(
