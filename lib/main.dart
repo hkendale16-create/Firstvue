@@ -417,13 +417,14 @@ class _FirstVueHomeState extends State<FirstVueHome> {
 
               const SizedBox(height: 30),
 
-              const HomeNewsFeedSection(),
-
-              const SizedBox(height: 30),
-
               HomeDiscoverySection(
                 onViewAllVue: () => setState(() => selectedIndex = 2),
               ),
+
+              const SizedBox(height: 30),
+
+              const HomeNewsFeedSection(),
+
               const YouMightLikeSection(),
               const SizedBox(height: 12),
             ],
