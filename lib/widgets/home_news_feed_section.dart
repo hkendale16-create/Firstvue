@@ -117,8 +117,17 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     try {
       final posts = await CommunityNewsService.fetchPosts();
       final postIds = posts.map((p) => p.id).toList();
-      final reposted = await RepostService.fetchMyRepostedIds(postIds);
-      final repostCounts = await RepostService.fetchRepostCounts(postIds);
+      Set<String> reposted = const {};
+      Map<String, int> repostCounts = const {};
+      try {
+        reposted = await RepostService.fetchMyRepostedIds(postIds);
+        repostCounts = await RepostService.fetchRepostCounts(postIds);
+      } catch (error) {
+        CommunityNewsService.logFeedError(
+          error,
+          context: 'HomeNewsFeed.repostMeta',
+        );
+      }
       if (!mounted) return;
       setState(() {
         _posts = posts
@@ -131,10 +140,16 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
         _loadError = null;
       });
     } catch (error) {
+      CommunityNewsService.logFeedError(error, context: 'HomeNewsFeed._loadPosts');
       if (mounted) {
+        final detail = error is PostgrestException
+            ? 'Unable to load posts (${error.code ?? 'error'}): ${error.message}'
+            : 'Unable to load posts. Pull to refresh or tap below.';
         setState(() {
           _loadingPosts = false;
-          _loadError = error.toString();
+          if (_posts.isEmpty) {
+            _loadError = detail;
+          }
         });
       }
     }
@@ -500,7 +515,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
           children: [
             const Expanded(
               child: Text(
-                'COMMUNITY FEED',
+                'NEWS FEED',
                 style: TextStyle(
                   color: FirstVueColors.ivory,
                   fontSize: 14,
@@ -519,8 +534,15 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
           ],
         ),
         const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: FirstVueColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: FirstVueColors.gold.withValues(alpha: .35),
+            ),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -638,7 +660,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
             ],
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 14),
         if (_loadingPosts)
           const Center(
             child: Padding(
@@ -653,7 +675,8 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Unable to load posts. Pull to refresh or tap below.',
+                  _loadError ??
+                      'Unable to load posts. Pull to refresh or tap below.',
                   style: TextStyle(color: Colors.white.withValues(alpha: .54)),
                 ),
                 TextButton(onPressed: _refresh, child: const Text('Try again')),
@@ -662,40 +685,43 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
           )
         else if (_posts.isEmpty)
           const Text(
-            'Community posts will appear here.',
+            'Posts from FirstVue members, businesses, and more will appear here.',
             style: TextStyle(color: Colors.white54),
           )
         else
           Column(
             children: [
               for (var index = 0; index < _posts.length; index++)
-                CommunityNewsPostCard(
-                  post: _posts[index],
-                  style: CommunityNewsPostCardStyle.timeline,
-                  onTap: () => CommunityNewsPostDetailSheet.show(
-                    context,
-                    postId: _posts[index].id,
-                    initialPost: _posts[index],
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: CommunityNewsPostCard(
+                    post: _posts[index],
+                    style: CommunityNewsPostCardStyle.compact,
+                    onTap: () => CommunityNewsPostDetailSheet.show(
+                      context,
+                      postId: _posts[index].id,
+                      initialPost: _posts[index],
+                    ),
+                    onAuthorTap: _posts[index].authorId.isNotEmpty
+                        ? () => openMemberProfile(
+                              context,
+                              profileId: _posts[index].authorId,
+                              displayName: _posts[index].authorName,
+                            )
+                        : null,
+                    onSpark: () => _sparkPost(index),
+                    onSave: () => _savePost(index),
+                    onDelete: _posts[index].isMine
+                        ? () => _showPostMenu(index)
+                        : null,
+                    onComment: () => FeedCommentsSheet.show(
+                      context,
+                      mediaId: _posts[index].commentsMediaId,
+                      businessName: _posts[index].authorName,
+                    ),
+                    onRepost: () => _repostPost(index),
+                    repostedByMe: _repostedPostIds.contains(_posts[index].id),
                   ),
-                  onAuthorTap: _posts[index].authorId.isNotEmpty
-                      ? () => openMemberProfile(
-                            context,
-                            profileId: _posts[index].authorId,
-                            displayName: _posts[index].authorName,
-                          )
-                      : null,
-                  onSpark: () => _sparkPost(index),
-                  onSave: () => _savePost(index),
-                  onDelete: _posts[index].isMine
-                      ? () => _showPostMenu(index)
-                      : null,
-                  onComment: () => FeedCommentsSheet.show(
-                    context,
-                    mediaId: _posts[index].commentsMediaId,
-                    businessName: _posts[index].authorName,
-                  ),
-                  onRepost: () => _repostPost(index),
-                  repostedByMe: _repostedPostIds.contains(_posts[index].id),
                 ),
             ],
           ),

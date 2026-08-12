@@ -222,31 +222,105 @@ class ProfileMediaService {
     required String role,
     required String subfolder,
   }) async {
-    ProfileMediaItem? existing;
+    Map<String, dynamic>? existingRow;
     try {
-      final row = await _client
+      existingRow = await _client
           .from('profile_media')
-          .select(_selectColumns)
+          .select('id, storage_path, storage_provider')
           .eq('profile_id', userId)
           .eq('media_role', role)
           .maybeSingle();
-      if (row != null) {
-        existing = await _rowToItem(row, userId);
-      }
-    } catch (_) {}
-
-    if (existing != null) {
-      await deleteMedia(existing);
+    } catch (_) {
+      existingRow = null;
     }
 
-    await _uploadSingle(
-      file: file,
-      userId: userId,
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) {
+      throw const StorageException('Selected file is empty.');
+    }
+    if (bytes.length > _maxMediaBytes) {
+      throw const StorageException(
+        'Each photo or video must be 50 MB or smaller.',
+      );
+    }
+
+    final mediaType = mediaTypeForFile(file);
+    final contentType = mimeTypeForFile(file, mediaType);
+    final upload = await MediaStorageService.uploadBytes(
+      bucket: MediaBucket.profile,
+      bytes: bytes,
+      contentType: contentType,
+      fileName: file.name,
       index: 0,
-      sortOrder: 0,
-      mediaRole: role,
       subfolder: subfolder,
+      context: {'profile_id': userId},
     );
+
+    final payload = {
+      'storage_path': upload.path,
+      'storage_provider': upload.provider.value,
+      'media_type': mediaType,
+      'sort_order': 0,
+      'media_role': role,
+    };
+
+    try {
+      if (existingRow == null) {
+        try {
+          await _client.from('profile_media').insert({
+            'profile_id': userId,
+            ...payload,
+          });
+        } on PostgrestException catch (error) {
+          if (error.code != '23505') rethrow;
+          final raced = await _client
+              .from('profile_media')
+              .select('id, storage_path, storage_provider')
+              .eq('profile_id', userId)
+              .eq('media_role', role)
+              .maybeSingle();
+          if (raced == null) rethrow;
+          existingRow = raced;
+          await _client
+              .from('profile_media')
+              .update(payload)
+              .eq('id', raced['id'] as String);
+        }
+      } else {
+        await _client
+            .from('profile_media')
+            .update(payload)
+            .eq('id', existingRow['id'] as String);
+      }
+    } catch (_) {
+      try {
+        await MediaStorageService.deleteObject(
+          bucket: MediaBucket.profile,
+          path: upload.path,
+          provider: upload.provider,
+          context: {'profile_id': userId},
+        );
+      } catch (_) {}
+      rethrow;
+    }
+
+    if (existingRow != null) {
+      final oldPath = existingRow['storage_path'] as String?;
+      if (oldPath != null &&
+          oldPath.isNotEmpty &&
+          oldPath != upload.path) {
+        try {
+          await MediaStorageService.deleteObject(
+            bucket: MediaBucket.profile,
+            path: oldPath,
+            provider: MediaStorageProvider.parse(
+              existingRow['storage_provider'] as String?,
+            ),
+            context: {'profile_id': userId},
+          );
+        } catch (_) {}
+      }
+    }
   }
 
   static Future<void> _removeRoleImage(String role) async {
@@ -255,18 +329,34 @@ class ProfileMediaService {
       throw const AuthException('Sign in to remove this photo.');
     }
 
+    List<dynamic> rows = const [];
     try {
-      final row = await _client
+      rows = await _client
           .from('profile_media')
-          .select(_selectColumns)
+          .select('id, storage_path, storage_provider')
           .eq('profile_id', user.id)
-          .eq('media_role', role)
-          .maybeSingle();
-      if (row == null) return;
-      final item = await _rowToItem(row, user.id);
-      await deleteMedia(item);
+          .eq('media_role', role);
     } catch (_) {
-      rethrow;
+      return;
+    }
+
+    for (final row in rows) {
+      final path = row['storage_path'] as String?;
+      final id = row['id'] as String?;
+      if (path == null || id == null) continue;
+      try {
+        await MediaStorageService.deleteObject(
+          bucket: MediaBucket.profile,
+          path: path,
+          provider: MediaStorageProvider.parse(
+            row['storage_provider'] as String?,
+          ),
+          context: {'profile_id': user.id},
+        );
+      } catch (_) {}
+      try {
+        await _client.from('profile_media').delete().eq('id', id);
+      } catch (_) {}
     }
   }
 

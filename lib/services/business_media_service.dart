@@ -184,6 +184,10 @@ class BusinessMediaService {
     );
   }
 
+  /// First avatar/cover uses INSERT. Later changes UPDATE the existing role
+  /// row so `business_media_one_avatar_idx` / cover unique indexes stay intact.
+  /// Lookup never depends on signed-URL hydration (that previously skipped
+  /// delete and caused 23505 on INSERT).
   static Future<void> _setRoleImage({
     required String businessId,
     required XFile file,
@@ -195,31 +199,107 @@ class BusinessMediaService {
       throw const AuthException('Sign in before updating profile photos.');
     }
 
-    BusinessMediaItem? existing;
+    Map<String, dynamic>? existingRow;
     try {
-      final row = await _client
+      existingRow = await _client
           .from('business_media')
-          .select(_selectColumns)
+          .select('id, storage_path, storage_provider')
           .eq('business_id', businessId)
           .eq('media_role', role)
           .maybeSingle();
-      if (row != null) {
-        existing = await _rowToItem(row, businessId);
-      }
-    } catch (_) {}
-
-    if (existing != null) {
-      await deleteMedia(existing);
+    } catch (_) {
+      existingRow = null;
     }
 
-    await _uploadSingle(
-      businessId: businessId,
-      file: file,
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) {
+      throw const StorageException('Selected file is empty.');
+    }
+    if (bytes.length > _maxMediaBytes) {
+      throw const StorageException(
+        'Each photo or video must be 50 MB or smaller.',
+      );
+    }
+
+    final mediaType = mediaTypeForFile(file);
+    final contentType = mimeTypeForFile(file, mediaType);
+    final upload = await MediaStorageService.uploadBytes(
+      bucket: MediaBucket.business,
+      bytes: bytes,
+      contentType: contentType,
+      fileName: file.name,
       index: 0,
-      sortOrder: 0,
-      mediaRole: role,
       subfolder: subfolder,
+      context: {'business_id': businessId},
     );
+
+    final payload = {
+      'storage_path': upload.path,
+      'storage_provider': upload.provider.value,
+      'media_type': mediaType,
+      'sort_order': 0,
+      'media_role': role,
+    };
+
+    try {
+      if (existingRow == null) {
+        try {
+          await _client.from('business_media').insert({
+            'business_id': businessId,
+            ...payload,
+          });
+        } on PostgrestException catch (error) {
+          // Concurrent first-write race: unique index hit → UPDATE instead.
+          if (error.code != '23505') rethrow;
+          final raced = await _client
+              .from('business_media')
+              .select('id, storage_path, storage_provider')
+              .eq('business_id', businessId)
+              .eq('media_role', role)
+              .maybeSingle();
+          if (raced == null) rethrow;
+          existingRow = raced;
+          await _client
+              .from('business_media')
+              .update(payload)
+              .eq('id', raced['id'] as String);
+        }
+      } else {
+        await _client
+            .from('business_media')
+            .update(payload)
+            .eq('id', existingRow['id'] as String);
+      }
+    } catch (error) {
+      try {
+        await MediaStorageService.deleteObject(
+          bucket: MediaBucket.business,
+          path: upload.path,
+          provider: upload.provider,
+          context: {'business_id': businessId},
+        );
+      } catch (_) {}
+      rethrow;
+    }
+
+    // Cleanup previous storage object after successful DB write.
+    if (existingRow != null) {
+      final oldPath = existingRow['storage_path'] as String?;
+      if (oldPath != null &&
+          oldPath.isNotEmpty &&
+          oldPath != upload.path) {
+        try {
+          await MediaStorageService.deleteObject(
+            bucket: MediaBucket.business,
+            path: oldPath,
+            provider: MediaStorageProvider.parse(
+              existingRow['storage_provider'] as String?,
+            ),
+            context: {'business_id': businessId},
+          );
+        } catch (_) {}
+      }
+    }
   }
 
   static Future<void> _uploadSingle({
@@ -275,12 +355,57 @@ class BusinessMediaService {
   }
 
   static Future<void> deleteMedia(BusinessMediaItem media) async {
-    await MediaStorageService.deleteObject(
-      bucket: MediaBucket.business,
-      path: media.storagePath,
-      provider: media.storageProvider,
-    );
+    try {
+      await MediaStorageService.deleteObject(
+        bucket: MediaBucket.business,
+        path: media.storagePath,
+        provider: media.storageProvider,
+      );
+    } catch (_) {}
     await _client.from('business_media').delete().eq('id', media.id);
+  }
+
+  static Future<void> removeAvatar(String businessId) async {
+    await _removeRoleMedia(businessId: businessId, role: 'avatar');
+  }
+
+  static Future<void> removeCover(String businessId) async {
+    await _removeRoleMedia(businessId: businessId, role: 'cover');
+  }
+
+  static Future<void> _removeRoleMedia({
+    required String businessId,
+    required String role,
+  }) async {
+    List<dynamic> rows = const [];
+    try {
+      rows = await _client
+          .from('business_media')
+          .select('id, storage_path, storage_provider')
+          .eq('business_id', businessId)
+          .eq('media_role', role);
+    } catch (_) {
+      return;
+    }
+
+    for (final row in rows) {
+      final path = row['storage_path'] as String?;
+      final id = row['id'] as String?;
+      if (path == null || id == null) continue;
+      try {
+        await MediaStorageService.deleteObject(
+          bucket: MediaBucket.business,
+          path: path,
+          provider: MediaStorageProvider.parse(
+            row['storage_provider'] as String?,
+          ),
+          context: {'business_id': businessId},
+        );
+      } catch (_) {}
+      try {
+        await _client.from('business_media').delete().eq('id', id);
+      } catch (_) {}
+    }
   }
 
   static Future<void> setFeaturedForTrending({
