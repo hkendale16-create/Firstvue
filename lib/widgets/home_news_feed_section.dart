@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../navigation/firstvue_page_route.dart';
 import '../screens/auth_screen.dart';
+import '../screens/create_post_screen.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../models/post_identity.dart';
 import '../services/community_news_service.dart';
@@ -16,9 +16,7 @@ import '../utils/app_environment.dart';
 import 'community_news_post_card.dart';
 import 'community_news_post_detail_sheet.dart';
 import 'feed_comments_sheet.dart';
-import 'local_media_thumbnail.dart';
 import 'post_identity_selector.dart';
-import 'profile_composer_media_actions.dart';
 
 class HomeNewsFeedSection extends StatefulWidget {
   final int refreshToken;
@@ -34,9 +32,6 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
   Set<String> _repostedPostIds = const {};
   bool _loadingPosts = true;
   String? _loadError;
-  final _composer = TextEditingController();
-  bool _posting = false;
-  List<XFile> _attachedMedia = const [];
   RealtimeChannel? _newsChannel;
   List<PostIdentityOption> _identityOptions = const [];
   PostIdentityOption? _selectedIdentity;
@@ -72,7 +67,6 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
   @override
   void dispose() {
     _newsChannel?.unsubscribe();
-    _composer.dispose();
     super.dispose();
   }
 
@@ -144,7 +138,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
 
   Future<void> _refresh() => _loadPosts();
 
-  Future<void> _submitPost() async {
+  Future<void> _openCreatePost() async {
     if (Supabase.instance.client.auth.currentUser == null) {
       await Navigator.push(
         context,
@@ -152,68 +146,19 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
       );
       return;
     }
-    final text = _composer.text.trim();
-    if ((text.isEmpty && _attachedMedia.isEmpty) || _posting) return;
-    setState(() => _posting = true);
-    try {
-      final hadMedia = _attachedMedia.isNotEmpty;
-      CommunityNewsPost newPost;
-      try {
-        final identity = _selectedIdentity;
-        newPost = await CommunityNewsService.createPost(
-          text,
-          businessId: identity?.businessId,
-          professionalProfileId: identity?.professionalProfileId,
-          communityId: identity?.communityId,
-          files: _attachedMedia,
-        );
-      } on CommunityNewsMediaUploadException catch (error) {
-        newPost = error.post;
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Post saved but photo/video upload failed: ${error.cause}',
-              ),
-            ),
-          );
-        }
-      }
-      _composer.clear();
-      if (!mounted) return;
-      setState(() {
-        _attachedMedia = const [];
-        _posts = [
-          newPost,
-          for (final post in _posts)
-            if (post.id != newPost.id) post,
-        ];
-        _loadingPosts = false;
-      });
-      if (hadMedia && newPost.media.isEmpty && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Post saved without media. Check Supabase migrations or storage buckets.',
-            ),
-          ),
-        );
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              error is AuthException
-                  ? 'Sign in to post.'
-                  : 'Unable to post right now.',
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _posting = false);
-    }
+    final result = await Navigator.push<CommunityNewsPost>(
+      context,
+      FirstVuePageRoute(builder: (_) => const CreatePostScreen()),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _posts = [
+        result,
+        for (final post in _posts)
+          if (post.id != result.id) post,
+      ];
+      _loadingPosts = false;
+    });
   }
 
   Future<void> _savePost(int index) async {
@@ -338,7 +283,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     if (!wasReposted) {
       final action = await showModalBottomSheet<String>(
         context: context,
-        backgroundColor: const Color(0xFF10151B),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
@@ -348,14 +293,14 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
             children: [
               ListTile(
                 leading: const Icon(Icons.repeat, color: FirstVueColors.teal),
-                title: const Text('Repost', style: TextStyle(color: Colors.white)),
+                title: Text('Repost', style: TextStyle(color: ctx.fv.primaryText)),
                 onTap: () => Navigator.pop(ctx, 'repost'),
               ),
               ListTile(
                 leading: const Icon(Icons.edit_note, color: FirstVueColors.gold),
-                title: const Text(
+                title: Text(
                   'Repost with comment',
-                  style: TextStyle(color: Colors.white),
+                  style: TextStyle(color: ctx.fv.primaryText),
                 ),
                 onTap: () => Navigator.pop(ctx, 'comment'),
               ),
@@ -383,13 +328,13 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF10151B),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text('Add a comment'),
         content: TextField(
           controller: controller,
           autofocus: true,
           maxLines: 3,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: context.fv.primaryText),
           decoration: const InputDecoration(
             hintText: 'Say something about this post…',
           ),
@@ -530,96 +475,41 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
                     PostIdentityStore.saveSelected(value);
                   },
                 ),
-              TextField(
-                controller: _composer,
-                style: const TextStyle(color: Colors.white),
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText:
-                      'Share news… Use #hashtags and @usernames in your post.',
-                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: .38)),
-                  filled: true,
-                  fillColor: FirstVueColors.elevatedSurface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _openCreatePost,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Ink(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: FirstVueColors.elevatedSurface,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Share news… Use #hashtags and @handles.',
+                      style: TextStyle(
+                        color: context.fv.tertiaryText,
+                      ),
+                    ),
                   ),
                 ),
               ),
               const SizedBox(height: 10),
-              if (_attachedMedia.isNotEmpty) ...[
-                SizedBox(
-                  height: 72,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _attachedMedia.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final file = _attachedMedia[index];
-                      return Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          LocalMediaThumbnail(
-                            file: file,
-                            size: 72,
-                            onTap: () => LocalMediaThumbnail.previewLocalFile(
-                              context,
-                              file,
-                            ),
-                          ),
-                          Positioned(
-                            top: -6,
-                            right: -6,
-                            child: IconButton.filledTonal(
-                              visualDensity: VisualDensity.compact,
-                              style: IconButton.styleFrom(
-                                backgroundColor: FirstVueColors.surface,
-                                foregroundColor: Colors.white70,
-                                minimumSize: const Size(24, 24),
-                                padding: EdgeInsets.zero,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _attachedMedia = [
-                                    for (var i = 0; i < _attachedMedia.length; i++)
-                                      if (i != index) _attachedMedia[i],
-                                  ];
-                                });
-                              },
-                              icon: const Icon(Icons.close, size: 14),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton(
+                  onPressed: _openCreatePost,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: FirstVueColors.coral,
+                    foregroundColor: context.fv.primaryText,
                   ),
+                  child: const Text('Create post'),
                 ),
-                const SizedBox(height: 10),
-              ],
-              Row(
-                children: [
-                  Expanded(
-                    child: ProfileComposerMediaActions(
-                      enabled: !_posting,
-                      onMediaPicked: (files) {
-                        setState(
-                          () => _attachedMedia = [
-                            ..._attachedMedia,
-                            ...files,
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                  FilledButton(
-                    onPressed: _posting ? null : _submitPost,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: FirstVueColors.coral,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: Text(_posting ? 'POSTING...' : 'POST'),
-                  ),
-                ],
               ),
             ],
           ),
@@ -640,16 +530,16 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
               children: [
                 Text(
                   'Unable to load posts. Pull to refresh or tap below.',
-                  style: TextStyle(color: Colors.white.withValues(alpha: .54)),
+                  style: TextStyle(color: context.fv.secondaryText),
                 ),
                 TextButton(onPressed: _refresh, child: const Text('Try again')),
               ],
             ),
           )
         else if (_posts.isEmpty)
-          const Text(
+          Text(
             'Community posts will appear here.',
-            style: TextStyle(color: Colors.white54),
+            style: TextStyle(color: context.fv.secondaryText),
           )
         else
           Column(

@@ -120,11 +120,12 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.white,
+        foregroundColor: fv.primaryText,
         title: const Text('Search'),
       ),
       body: SafeArea(
@@ -135,33 +136,33 @@ class _SearchScreenState extends State<SearchScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-            const Text(
+            Text(
               'SEARCH',
               style: TextStyle(
                 fontFamily: 'CormorantGaramond',
-                color: Colors.white,
+                color: fv.primaryText,
                 fontSize: 25,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 2,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Choose people or places, then search by name, specialty, city, state, or ZIP.',
-              style: TextStyle(color: Colors.white54, height: 1.4),
+              style: TextStyle(color: fv.secondaryText, height: 1.4),
             ),
             const SizedBox(height: 22),
             DropdownButtonFormField<DiscoveryCategory>(
               initialValue: _category,
-              dropdownColor: const Color(0xFF151B22),
+              dropdownColor: fv.elevatedSurface,
               decoration: InputDecoration(
                 labelText: 'Search category',
                 prefixIcon: Icon(
                   _category.icon,
-                  color: const Color(0xFFD8B56A),
+                  color: FirstVueColors.warmGold,
                 ),
                 filled: true,
-                fillColor: const Color(0xFF151B22),
+                fillColor: fv.inputFill,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(18),
                   borderSide: BorderSide.none,
@@ -192,13 +193,13 @@ class _SearchScreenState extends State<SearchScreen> {
               controller: _searchController,
               autofocus: widget.autofocus,
               onSubmitted: _search,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: fv.primaryText),
               decoration: InputDecoration(
                 hintText: 'Search @handles, places, #tags…',
-                hintStyle: const TextStyle(color: Colors.white38),
-                prefixIcon: const Icon(Icons.search, color: Color(0xFFD8B56A)),
+                hintStyle: TextStyle(color: fv.tertiaryText),
+                prefixIcon: const Icon(Icons.search, color: FirstVueColors.warmGold),
                 filled: true,
-                fillColor: const Color(0xFF151B22),
+                fillColor: fv.inputFill,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(18),
                   borderSide: BorderSide.none,
@@ -223,9 +224,9 @@ class _SearchScreenState extends State<SearchScreen> {
               const SizedBox(height: 12),
               Container(
                 decoration: BoxDecoration(
-                  color: Theme.of(context).extension<FirstVuePalette>()?.elevatedSurface ?? FirstVueColors.elevatedSurface,
+                  color: fv.elevatedSurface,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withValues(alpha: .08)),
+                  border: Border.all(color: fv.borderSubtle),
                 ),
                 child: ListView.separated(
                   shrinkWrap: true,
@@ -233,7 +234,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   itemCount: _suggestions.length,
                   separatorBuilder: (_, _) => Divider(
                     height: 1,
-                    color: Colors.white.withValues(alpha: .06),
+                    color: fv.divider,
                   ),
                   itemBuilder: (context, index) {
                     final item = _suggestions[index];
@@ -241,13 +242,13 @@ class _SearchScreenState extends State<SearchScreen> {
                       dense: true,
                       title: Text(
                         item.label,
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(color: fv.primaryText),
                       ),
                       subtitle: item.subtitle == null
                           ? null
                           : Text(
                               item.subtitle!,
-                              style: const TextStyle(color: Colors.white54),
+                              style: TextStyle(color: fv.secondaryText),
                             ),
                       onTap: () => _openSuggestion(item),
                     );
@@ -256,10 +257,10 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ],
             const SizedBox(height: 30),
-            const Text(
+            Text(
               'QUICK SEARCHES',
               style: TextStyle(
-                color: Colors.white,
+                color: fv.primaryText,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.5,
               ),
@@ -292,18 +293,18 @@ class _SearchScreenState extends State<SearchScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
+                color: fv.surface,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white.withValues(alpha: .07)),
+                border: Border.all(color: fv.borderSubtle),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: Color(0xFFD8B56A)),
-                  SizedBox(width: 12),
+                  const Icon(Icons.info_outline, color: FirstVueColors.warmGold),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'Individual results are prototype-only. Approved location results come from FirstVue business verification.',
-                      style: TextStyle(color: Colors.white54, height: 1.35),
+                      style: TextStyle(color: fv.secondaryText, height: 1.35),
                     ),
                   ),
                 ],
@@ -335,12 +336,13 @@ class _QuickSearch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return OutlinedButton(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFFD8B56A),
-        side: BorderSide(color: const Color(0xFFD8B56A).withValues(alpha: .3)),
-        backgroundColor: const Color(0xFF151B22),
+        foregroundColor: FirstVueColors.warmGold,
+        side: BorderSide(color: FirstVueColors.warmGold.withValues(alpha: .3)),
+        backgroundColor: fv.inputFill,
       ),
       child: Text(label),
     );

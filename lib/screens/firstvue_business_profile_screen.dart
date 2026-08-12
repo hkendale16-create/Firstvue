@@ -17,9 +17,13 @@ import '../widgets/entity_details_form.dart';
 import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/firstvue_inline_search_bar.dart';
 import '../widgets/facebook_style_profile_header.dart';
+import '../widgets/entity_profile_tab_bar.dart';
+import '../widgets/shoutout_card.dart';
+import '../services/shoutout_service.dart';
 import '../widgets/portfolio_albums_section.dart';
 import '../services/portfolio_album_service.dart';
 import 'auth_screen.dart';
+import 'business_menu_item_detail_screen.dart';
 import 'conversation_screen.dart';
 import 'meet_the_owner_screen.dart';
 
@@ -73,7 +77,7 @@ class _FirstVueBusinessProfileScreenState
             ? null
             : AppBar(
                 backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                foregroundColor: Colors.white,
+                foregroundColor: context.fv.primaryText,
                 title: Text(
                   widget.previewDetails!.name,
                   style: const TextStyle(fontSize: 16),
@@ -97,7 +101,7 @@ class _FirstVueBusinessProfileScreenState
           ? null
           : AppBar(
               backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-              foregroundColor: Colors.white,
+              foregroundColor: context.fv.primaryText,
             ),
       body: FutureBuilder<PublicBusinessDetails>(
         future: _detailsFuture,
@@ -156,11 +160,16 @@ class _BusinessProfileContent extends StatefulWidget {
 class _BusinessProfileContentState extends State<_BusinessProfileContent> {
   BusinessImageSet _profileImages = const BusinessImageSet();
   bool _loadingImages = true;
+  int _selectedTab = 0;
 
   @override
   void initState() {
     super.initState();
     _loadImages();
+    final tabs = EntityProfileTabs.forBusinessType(widget.details.businessType);
+    // Prefer MENU first for dining; ABOUT for general businesses.
+    _selectedTab = 0;
+    assert(tabs.isNotEmpty);
   }
 
   Future<void> _loadImages() async {
@@ -178,6 +187,9 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
     final details = widget.details;
     final isApproved = (widget.businessStatus ?? 'approved') == 'approved';
     final isOwnerPreview = widget.isOwnerPreview;
+    final tabs = EntityProfileTabs.forBusinessType(details.businessType);
+    final selectedLabel = tabs[_selectedTab.clamp(0, tabs.length - 1)];
+    final fv = context.fv;
 
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -197,7 +209,7 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
             ],
             actionButtons: [
               if (isApproved && !isOwnerPreview)
-                const Icon(Icons.verified, color: Color(0xFFD8B56A), size: 28),
+                const Icon(Icons.verified, color: FirstVueColors.warmGold, size: 28),
             ],
           ),
         ),
@@ -212,17 +224,17 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1A2530),
+                      color: fv.elevatedSurface,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: const Color(0xFF78B9BE).withValues(alpha: .4),
+                        color: FirstVueColors.teal.withValues(alpha: .4),
                       ),
                     ),
                     child: Row(
                       children: [
                         const Icon(
                           Icons.visibility_outlined,
-                          color: Color(0xFF78B9BE),
+                          color: FirstVueColors.teal,
                           size: 20,
                         ),
                         const SizedBox(width: 10),
@@ -231,8 +243,8 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
                             isApproved
                                 ? 'Customer preview — this is how users see your profile.'
                                 : 'Customer preview — goes fully public after business approval.',
-                            style: const TextStyle(
-                              color: Colors.white70,
+                            style: TextStyle(
+                              color: fv.secondaryText,
                               fontSize: 12,
                               height: 1.35,
                             ),
@@ -248,119 +260,166 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
                   padding: EdgeInsets.zero,
                   hintText: 'Search businesses, people, #tags…',
                 ),
-                const SizedBox(height: 22),
-                const _ProfileSectionTitle('FIRSTVUE VERIFICATION'),
-                const SizedBox(height: 10),
-                _ProfileInfoCard(
-                  icon: isApproved
-                      ? Icons.verified_user_outlined
-                      : Icons.hourglass_top_outlined,
-                  text: isApproved
-                      ? 'This business has been approved and verified by FirstVue.'
-                      : 'This business is pending FirstVue approval. Customers will see this profile once approved.',
+                const SizedBox(height: 12),
+                EntityProfileTabBar(
+                  labels: tabs,
+                  selectedIndex: _selectedTab.clamp(0, tabs.length - 1),
+                  onSelected: (index) => setState(() => _selectedTab = index),
                 ),
-                if (!isOwnerPreview) ...[
-                  const SizedBox(height: 14),
-                  _MessageOwnerButton(
-                    businessId: details.id,
-                    businessName: details.name,
-                  ),
-                  const SizedBox(height: 12),
-                  _MeetOwnerButton(
-                    businessId: details.id,
-                    businessName: details.name,
-                  ),
-                ],
-                const SizedBox(height: 22),
-                const _ProfileSectionTitle('SOCIAL LINKS'),
-                const SizedBox(height: 10),
-                _BusinessSocialLinksSection(businessId: details.id),
-                const SizedBox(height: 22),
-                const _ProfileSectionTitle('ABOUT'),
-                const SizedBox(height: 10),
-                _ProfileInfoCard(
-                  icon: Icons.auto_stories_outlined,
-                  text: details.description?.trim().isNotEmpty == true
-                      ? details.description!
-                      : 'The owner has not added a business description yet.',
+                const SizedBox(height: 18),
+                ..._buildTabBody(
+                  selectedLabel: selectedLabel,
+                  details: details,
+                  isApproved: isApproved,
+                  isOwnerPreview: isOwnerPreview,
                 ),
-                FutureBuilder<Map<String, dynamic>>(
-                  future: EntityDetailsService.fetchBusinessDetails(details.id),
-                  builder: (context, snap) {
-                    final map = snap.data ?? const <String, dynamic>{};
-                    return EntityDetailsSection(
-                      title: 'Details',
-                      details: map,
-                      fields: EntityDetailSchemas.forBusinessType(
-                        details.businessType,
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 22),
-                EntityProfileFeedSection(
-                  scope: EntityFeedScope.business,
-                  entityId: details.id,
-                  canPost: isOwnerPreview,
-                ),
-                const SizedBox(height: 22),
-                const _ProfileSectionTitle('LOCATION'),
-                const SizedBox(height: 10),
-                _ProfileInfoCard(
-                  icon: Icons.location_on_outlined,
-                  text:
-                      details.address ??
-                      'The owner has not added a public address yet.',
-                ),
-                const SizedBox(height: 22),
-                const _ProfileSectionTitle('SERVICES'),
-                const SizedBox(height: 10),
-                details.services.isEmpty
-                    ? const _ProfileInfoCard(
-                        icon: Icons.design_services_outlined,
-                        text: 'The owner has not added services yet.',
-                      )
-                    : Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: details.services
-                            .map((service) => _ServiceChip(text: service))
-                            .toList(),
-                      ),
-                if (BusinessMenuService.isDiningBusinessType(
-                  details.businessType,
-                )) ...[
-                  const SizedBox(height: 22),
-                  const _ProfileSectionTitle('MENU'),
-                  const SizedBox(height: 10),
-                  _DiningMenuSection(businessId: details.id),
-                  const SizedBox(height: 22),
-                  const _ProfileSectionTitle('SPECIALS'),
-                  const SizedBox(height: 10),
-                  _DiningSpecialsSection(businessId: details.id),
-                ],
-                const SizedBox(height: 22),
-                const _ProfileSectionTitle('PHOTOS'),
-                const SizedBox(height: 10),
-                _BusinessMediaGallery(businessId: details.id),
-                const SizedBox(height: 22),
-                const _ProfileSectionTitle('PORTFOLIO'),
-                const SizedBox(height: 10),
-                PortfolioAlbumsSection(
-                  ownerType: PortfolioOwnerType.business,
-                  ownerId: details.id,
-                  canManage: isOwnerPreview,
-                ),
-                const SizedBox(height: 22),
-                const _ProfileSectionTitle('REVIEWS'),
-                const SizedBox(height: 10),
-                _BusinessReviewsSection(businessId: details.id),
               ],
             ),
           ),
         ),
       ],
     );
+  }
+
+  List<Widget> _buildTabBody({
+    required String selectedLabel,
+    required PublicBusinessDetails details,
+    required bool isApproved,
+    required bool isOwnerPreview,
+  }) {
+    switch (selectedLabel) {
+      case 'MENU':
+        return [
+          const _ProfileSectionTitle('MENU'),
+          const SizedBox(height: 10),
+          _DiningMenuSection(businessId: details.id),
+          const SizedBox(height: 22),
+          const _ProfileSectionTitle('SPECIALS'),
+          const SizedBox(height: 10),
+          _DiningSpecialsSection(businessId: details.id),
+        ];
+      case 'PHOTOS':
+        return [
+          const _ProfileSectionTitle('PHOTOS'),
+          const SizedBox(height: 10),
+          _BusinessMediaGallery(businessId: details.id),
+        ];
+      case 'PORTFOLIO':
+        return [
+          const _ProfileSectionTitle('PORTFOLIO'),
+          const SizedBox(height: 10),
+          PortfolioAlbumsSection(
+            ownerType: PortfolioOwnerType.business,
+            ownerId: details.id,
+            canManage: isOwnerPreview,
+          ),
+        ];
+      case 'REVIEWS':
+        return [
+          const _ProfileSectionTitle('REVIEWS'),
+          const SizedBox(height: 10),
+          _BusinessReviewsSection(businessId: details.id),
+        ];
+      case 'FEED':
+        return [
+          EntityProfileFeedSection(
+            scope: EntityFeedScope.business,
+            entityId: details.id,
+            canPost: isOwnerPreview,
+          ),
+        ];
+      case 'SHOUT-OUTS':
+        return [
+          ShoutoutsReceivedSection(
+            targetType: ShoutoutTargetType.business,
+            targetId: details.id,
+            title: 'SHOUT-OUTS',
+          ),
+        ];
+      case 'ABOUT':
+      default:
+        return [
+          const _ProfileSectionTitle('FIRSTVUE VERIFICATION'),
+          const SizedBox(height: 10),
+          _ProfileInfoCard(
+            icon: isApproved
+                ? Icons.verified_user_outlined
+                : Icons.hourglass_top_outlined,
+            text: isApproved
+                ? 'This business has been approved and verified by FirstVue.'
+                : 'This business is pending FirstVue approval. Customers will see this profile once approved.',
+          ),
+          if (!isOwnerPreview) ...[
+            const SizedBox(height: 14),
+            _MessageOwnerButton(
+              businessId: details.id,
+              businessName: details.name,
+            ),
+            const SizedBox(height: 12),
+            _MeetOwnerButton(
+              businessId: details.id,
+              businessName: details.name,
+            ),
+          ],
+          const SizedBox(height: 22),
+          const _ProfileSectionTitle('SOCIAL LINKS'),
+          const SizedBox(height: 10),
+          _BusinessSocialLinksSection(businessId: details.id),
+          const SizedBox(height: 22),
+          const _ProfileSectionTitle('ABOUT'),
+          const SizedBox(height: 10),
+          _ProfileInfoCard(
+            icon: Icons.auto_stories_outlined,
+            text: details.description?.trim().isNotEmpty == true
+                ? details.description!
+                : 'The owner has not added a business description yet.',
+          ),
+          FutureBuilder<Map<String, dynamic>>(
+            future: EntityDetailsService.fetchBusinessDetails(details.id),
+            builder: (context, snap) {
+              final map = snap.data ?? const <String, dynamic>{};
+              return EntityDetailsSection(
+                title: 'Details',
+                details: map,
+                fields: EntityDetailSchemas.forBusinessType(
+                  details.businessType,
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 22),
+          const _ProfileSectionTitle('LOCATION'),
+          const SizedBox(height: 10),
+          _ProfileInfoCard(
+            icon: Icons.location_on_outlined,
+            text: details.address ??
+                'The owner has not added a public address yet.',
+          ),
+          const SizedBox(height: 22),
+          const _ProfileSectionTitle('SERVICES'),
+          const SizedBox(height: 10),
+          details.services.isEmpty
+              ? const _ProfileInfoCard(
+                  icon: Icons.design_services_outlined,
+                  text: 'The owner has not added services yet.',
+                )
+              : Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: details.services
+                      .map((service) => _ServiceChip(text: service))
+                      .toList(),
+                ),
+          if (!BusinessMenuService.isDiningBusinessType(details.businessType)) ...[
+            const SizedBox(height: 22),
+            EntityProfileFeedSection(
+              scope: EntityFeedScope.business,
+              entityId: details.id,
+              canPost: isOwnerPreview,
+            ),
+          ],
+        ];
+    }
   }
 }
 
@@ -769,13 +828,13 @@ class _ProfileSectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(
-    text,
-    style: const TextStyle(
-      color: Colors.white,
-      fontWeight: FontWeight.bold,
-      letterSpacing: 1.5,
-    ),
-  );
+        text,
+        style: TextStyle(
+          color: context.fv.primaryText,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.5,
+        ),
+      );
 }
 
 class _ProfileInfoCard extends StatelessWidget {
@@ -786,23 +845,24 @@ class _ProfileInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
+        color: fv.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: .08)),
+        border: Border.all(color: fv.borderSubtle),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: const Color(0xFFD8B56A)),
+          Icon(icon, color: FirstVueColors.warmGold),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(color: Colors.white60, height: 1.4),
+              style: TextStyle(color: fv.secondaryText, height: 1.4),
             ),
           ),
         ],
@@ -1045,30 +1105,136 @@ class _DiningMenuSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return FutureBuilder<List<BusinessMenuItem>>(
       future: BusinessMenuService.fetchMenuItems(businessId),
       builder: (context, snapshot) {
         final items = snapshot.data ?? const [];
+        if (!snapshot.hasData && !snapshot.hasError) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: CircularProgressIndicator(color: FirstVueColors.warmGold),
+            ),
+          );
+        }
         if (items.isEmpty) {
           return const _ProfileInfoCard(
             icon: Icons.restaurant_menu_outlined,
             text: 'The owner has not added menu items yet.',
           );
         }
+        final groups = BusinessMenuService.groupByCategory(
+          items,
+          includeUnavailable: true,
+        );
         return Column(
-          children: items
-              .map(
-                (item) => Padding(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final group in groups) ...[
+              Text(
+                group.name.toUpperCase(),
+                style: const TextStyle(
+                  color: FirstVueColors.warmGold,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.1,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 8),
+              for (final item in group.items)
+                Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: _ProfileInfoCard(
-                    icon: Icons.restaurant_outlined,
-                    text:
-                        '${item.name}${item.priceLabel != null ? ' • ${item.priceLabel}' : ''}'
-                        '${item.description?.trim().isNotEmpty == true ? '\n${item.description}' : ''}',
+                  child: Material(
+                    color: fv.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => showBusinessMenuItemDetail(context, item),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: fv.borderSubtle),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.restaurant_outlined,
+                              color: FirstVueColors.warmGold.withValues(
+                                alpha: item.isAvailable ? 1 : .45,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          item.name,
+                                          style: TextStyle(
+                                            color: fv.primaryText,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      if (item.priceLabel
+                                              ?.trim()
+                                              .isNotEmpty ==
+                                          true)
+                                        Text(
+                                          item.priceLabel!,
+                                          style: TextStyle(
+                                            color: item.isAvailable
+                                                ? FirstVueColors.warmGold
+                                                : fv.tertiaryText,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  if (item.description?.trim().isNotEmpty ==
+                                      true) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      item.description!,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: fv.secondaryText,
+                                        height: 1.35,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                  if (!item.isAvailable) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Sold out',
+                                      style: TextStyle(
+                                        color: fv.tertiaryText,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              )
-              .toList(),
+              const SizedBox(height: 12),
+            ],
+          ],
         );
       },
     );

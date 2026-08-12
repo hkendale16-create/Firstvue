@@ -1,3 +1,5 @@
+import 'dart:ui' show Color;
+
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -35,6 +37,7 @@ class CommunityNewsPost {
   final bool savedByMe;
   final int repostCount;
   final String visibility;
+  final String? backgroundColor;
   final List<CommunityNewsMediaItem> media;
 
   const CommunityNewsPost({
@@ -54,10 +57,26 @@ class CommunityNewsPost {
     required this.savedByMe,
     this.repostCount = 0,
     this.visibility = 'public',
+    this.backgroundColor,
     this.media = const [],
   });
 
   String get commentsMediaId => 'news-post:$id';
+
+  /// Subtle panel fill for composer / post body backgrounds.
+  static Color? backgroundFill(String? key) {
+    return switch (key) {
+      null || 'none' || '' => null,
+      'bronze' => const Color(0x33E5C16F),
+      'teal' => const Color(0x333DD9C9),
+      'coral' => const Color(0x33FF7A59),
+      'navy' => const Color(0x44243B6B),
+      'forest' => const Color(0x331F6B4A),
+      'sunset' => const Color(0x33D9894B),
+      'midnight' => const Color(0x4412162A),
+      _ => null,
+    };
+  }
 
   CommunityNewsPost copyWith({
     String? id,
@@ -76,6 +95,7 @@ class CommunityNewsPost {
     bool? savedByMe,
     int? repostCount,
     String? visibility,
+    String? backgroundColor,
     List<CommunityNewsMediaItem>? media,
   }) {
     return CommunityNewsPost(
@@ -95,6 +115,7 @@ class CommunityNewsPost {
       savedByMe: savedByMe ?? this.savedByMe,
       repostCount: repostCount ?? this.repostCount,
       visibility: visibility ?? this.visibility,
+      backgroundColor: backgroundColor ?? this.backgroundColor,
       media: media ?? this.media,
     );
   }
@@ -104,6 +125,9 @@ class CommunityNewsService {
   CommunityNewsService._();
 
   static final _client = Supabase.instance.client;
+
+  static const _postColumnsWithBackground =
+      'id, body, created_at, author_id, business_id, community_id, visibility, professional_profile_id, event_id, author_profile_type, author_profile_id, background_color';
 
   static const _postColumns =
       'id, body, created_at, author_id, business_id, community_id, visibility, professional_profile_id, event_id, author_profile_type, author_profile_id';
@@ -127,14 +151,18 @@ class CommunityNewsService {
     }
 
     try {
-      return await run(_postColumns);
+      return await run(_postColumnsWithBackground);
     } catch (_) {
       try {
-        return await run(
-          'id, body, created_at, author_id, business_id, community_id, visibility',
-        );
+        return await run(_postColumns);
       } catch (_) {
-        return await run(_postColumnsBase);
+        try {
+          return await run(
+            'id, body, created_at, author_id, business_id, community_id, visibility',
+          );
+        } catch (_) {
+          return await run(_postColumnsBase);
+        }
       }
     }
   }
@@ -156,31 +184,40 @@ class CommunityNewsService {
   static Future<Map<String, dynamic>> _insertPostReturning(
     Map<String, dynamic> insertPayload,
   ) async {
-    try {
-      return await _client
+    Future<Map<String, dynamic>> attempt(
+      Map<String, dynamic> payload,
+      String columns,
+    ) {
+      return _client
           .from('community_news_posts')
-          .insert(insertPayload)
-          .select(_postColumns)
+          .insert(payload)
+          .select(columns)
           .single();
+    }
+
+    try {
+      return await attempt(insertPayload, _postColumnsWithBackground);
     } catch (_) {
-      final fallback = Map<String, dynamic>.from(insertPayload)
-        ..remove('author_profile_type')
-        ..remove('author_profile_id');
+      final withoutBg = Map<String, dynamic>.from(insertPayload)
+        ..remove('background_color');
       try {
-        return await _client
-            .from('community_news_posts')
-            .insert(fallback)
-            .select(
-              'id, body, created_at, author_id, business_id, community_id, '
-              'visibility, professional_profile_id, event_id',
-            )
-            .single();
+        return await attempt(withoutBg, _postColumns);
       } catch (_) {
-        return await _client
-            .from('community_news_posts')
-            .insert(fallback)
-            .select(_postColumnsBase)
-            .single();
+        final fallback = Map<String, dynamic>.from(withoutBg)
+          ..remove('author_profile_type')
+          ..remove('author_profile_id')
+          ..remove('visibility');
+        try {
+          return await attempt(
+            Map<String, dynamic>.from(withoutBg)
+              ..remove('author_profile_type')
+              ..remove('author_profile_id'),
+            'id, body, created_at, author_id, business_id, community_id, '
+            'visibility, professional_profile_id, event_id',
+          );
+        } catch (_) {
+          return await attempt(fallback, _postColumnsBase);
+        }
       }
     }
   }
@@ -447,6 +484,14 @@ class CommunityNewsService {
           followsAuthor: followsAuthor,
           hasMedia: media.isNotEmpty,
         );
+        String? backgroundColor;
+        try {
+          final rawBg = row['background_color'] as String?;
+          if (rawBg != null && rawBg.trim().isNotEmpty && rawBg != 'none') {
+            backgroundColor = rawBg.trim();
+          }
+        } catch (_) {}
+
         posts.add(
           CommunityNewsPost(
             id: id,
@@ -466,6 +511,7 @@ class CommunityNewsService {
             sparkedByMe: mySparks.contains(id),
             savedByMe: mySaves.contains(id),
             visibility: visibility,
+            backgroundColor: backgroundColor,
             media: media,
           ),
         );
@@ -776,6 +822,8 @@ class CommunityNewsService {
     String? professionalProfileId,
     String? eventId,
     List<XFile> files = const [],
+    String? backgroundColor,
+    String? visibility,
   }) async {
     final me = _client.auth.currentUser;
     if (me == null) throw const AuthException('Sign in to post.');
@@ -822,6 +870,13 @@ class CommunityNewsService {
         insertPayload['author_profile_id'] = communityId;
       }
     }
+    final resolvedVisibility =
+        visibility == 'followers' ? 'followers' : 'public';
+    insertPayload['visibility'] = resolvedVisibility;
+    final bg = backgroundColor?.trim();
+    if (bg != null && bg.isNotEmpty && bg != 'none') {
+      insertPayload['background_color'] = bg;
+    }
 
     final row = await _insertPostReturning(insertPayload);
 
@@ -866,6 +921,16 @@ class CommunityNewsService {
           insertedCommunityId];
     }
 
+    String? insertedBackground;
+    try {
+      final rawBg = row['background_color'] as String?;
+      if (rawBg != null && rawBg.trim().isNotEmpty && rawBg != 'none') {
+        insertedBackground = rawBg.trim();
+      }
+    } catch (_) {
+      insertedBackground = bg != null && bg.isNotEmpty && bg != 'none' ? bg : null;
+    }
+
     final post = CommunityNewsPost(
       id: postId,
       body: row['body'] as String,
@@ -881,7 +946,8 @@ class CommunityNewsService {
       sparkCount: 0,
       sparkedByMe: false,
       savedByMe: false,
-      visibility: (row['visibility'] as String?) ?? 'public',
+      visibility: (row['visibility'] as String?) ?? resolvedVisibility,
+      backgroundColor: insertedBackground,
       media: media,
     );
 

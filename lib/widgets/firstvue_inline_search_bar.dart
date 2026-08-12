@@ -29,7 +29,8 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
   bool _searching = false;
   bool _focused = false;
 
-  static InputDecoration _borderlessDecoration({
+  InputDecoration _borderlessDecoration({
+    required FirstVuePalette fv,
     required String hintText,
     required Widget? suffixIcon,
   }) {
@@ -39,11 +40,11 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
     );
     return InputDecoration(
       hintText: hintText,
-      hintStyle: TextStyle(color: Colors.white.withValues(alpha: .4)),
+      hintStyle: TextStyle(color: fv.tertiaryText),
       prefixIcon: const Icon(Icons.search, color: FirstVueColors.teal),
       suffixIcon: suffixIcon,
       filled: true,
-      fillColor: FirstVueColors.surface.withValues(alpha: .72),
+      fillColor: fv.surface.withValues(alpha: .72),
       border: border,
       enabledBorder: border,
       focusedBorder: border,
@@ -116,6 +117,7 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Padding(
       padding: widget.padding,
       child: Column(
@@ -126,9 +128,10 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
             child: TextField(
               controller: _controller,
               autofocus: widget.autofocus,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: fv.primaryText),
               onSubmitted: (_) => _openFullSearch(),
               decoration: _borderlessDecoration(
+                fv: fv,
                 hintText: widget.hintText,
                 suffixIcon: _searching
                     ? const Padding(
@@ -151,7 +154,7 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
             Container(
               margin: const EdgeInsets.only(top: 6),
               decoration: BoxDecoration(
-                color: FirstVueColors.surface,
+                color: fv.surface,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -160,14 +163,14 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
                     dense: true,
                     title: Text(
                       result.label,
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      style: TextStyle(color: fv.primaryText, fontSize: 14),
                     ),
                     subtitle: result.subtitle == null
                         ? null
                         : Text(
                             result.subtitle!,
-                            style: const TextStyle(
-                              color: Colors.white54,
+                            style: TextStyle(
+                              color: fv.secondaryText,
                               fontSize: 12,
                             ),
                           ),

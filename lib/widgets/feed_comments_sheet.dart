@@ -26,7 +26,7 @@ class FeedCommentsSheet extends StatefulWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF10151B),
+      backgroundColor: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -213,7 +213,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
                 _loadErrorMessage ??
                     'Unable to load comments. Tap to retry.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white54),
+                style: TextStyle(color: context.fv.secondaryText),
               ),
               const SizedBox(height: 12),
               TextButton(onPressed: _loadComments, child: const Text('Try again')),
@@ -224,7 +224,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
     }
     if (_loading) {
       return const Center(
-        child: CircularProgressIndicator(color: Color(0xFFD8B56A)),
+        child: CircularProgressIndicator(color: FirstVueColors.warmGold),
       );
     }
 
@@ -233,12 +233,12 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
     if (topLevel.isEmpty) {
       return ListView(
         controller: scrollController,
-        children: const [
-          SizedBox(height: 80),
+        children: [
+          const SizedBox(height: 80),
           Center(
             child: Text(
               'Be the first to comment.',
-              style: TextStyle(color: Colors.white54),
+              style: TextStyle(color: context.fv.secondaryText),
             ),
           ),
         ],
@@ -283,7 +283,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
                 width: 42,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: context.fv.borderSubtle,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -303,7 +303,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
                     const SizedBox(height: 4),
                     Text(
                       widget.businessName,
-                      style: const TextStyle(color: Colors.white54, fontSize: 12),
+                      style: TextStyle(color: context.fv.secondaryText, fontSize: 12),
                     ),
                   ],
                 ),
@@ -327,7 +327,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
                                 child: Text(
                                   'Replying to $_replyToName',
                                   style: TextStyle(
-                                    color: Colors.white.withValues(alpha: .6),
+                                    color: context.fv.secondaryText,
                                     fontSize: 12,
                                   ),
                                 ),
@@ -351,16 +351,16 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
                             child: TextField(
                               controller: _controller,
                               focusNode: _inputFocus,
-                              style: const TextStyle(color: Colors.white),
+                              style: TextStyle(color: context.fv.primaryText),
                               decoration: InputDecoration(
                                 hintText: _replyParentId == null
                                     ? 'Add a comment...'
                                     : 'Write a reply...',
                                 hintStyle: TextStyle(
-                                  color: Colors.white.withValues(alpha: .38),
+                                  color: context.fv.tertiaryText,
                                 ),
                                 filled: true,
-                                fillColor: const Color(0xFF151B22),
+                                fillColor: context.fv.inputFill,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(20),
                                   borderSide: BorderSide.none,
@@ -373,7 +373,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
                           IconButton.filled(
                             onPressed: _posting ? null : _post,
                             style: IconButton.styleFrom(
-                              backgroundColor: const Color(0xFFD8B56A),
+                              backgroundColor: FirstVueColors.warmGold,
                               foregroundColor: Colors.black,
                             ),
                             icon: const Icon(Icons.send_rounded),
@@ -470,7 +470,7 @@ class _CommentTile extends StatelessWidget {
           const SizedBox(height: 4),
           SocialRichText(
             text: comment.body,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: context.fv.primaryText),
           ),
           const SizedBox(height: 6),
           Row(

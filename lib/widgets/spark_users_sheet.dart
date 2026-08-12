@@ -13,7 +13,7 @@ class SparkUsersSheet {
   static Future<void> show(BuildContext context, {required String postId}) {
     return showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF10151B),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),

@@ -179,17 +179,61 @@ class BusinessSubmissionService {
   }
 
   static Future<Map<String, String>> fetchLocation(String businessId) async {
-    final row = await _client
-        .from('business_locations')
-        .select('address_line_1, city, state, postal_code')
-        .eq('business_id', businessId)
-        .maybeSingle();
-    return {
-      'address': (row?['address_line_1'] as String?) ?? '',
-      'city': (row?['city'] as String?) ?? '',
-      'state': (row?['state'] as String?) ?? '',
-      'zip': (row?['postal_code'] as String?) ?? '',
-    };
+    try {
+      final row = await _client
+          .from('business_locations')
+          .select(
+            'address_line_1, address_line_2, city, state, postal_code, '
+            'country_code, formatted_address, place_id, latitude, longitude',
+          )
+          .eq('business_id', businessId)
+          .maybeSingle();
+      return {
+        'address': (row?['address_line_1'] as String?) ?? '',
+        'address_line_2': (row?['address_line_2'] as String?) ?? '',
+        'city': (row?['city'] as String?) ?? '',
+        'state': (row?['state'] as String?) ?? '',
+        'zip': (row?['postal_code'] as String?) ?? '',
+        'country': (row?['country_code'] as String?) ?? 'US',
+        'formatted_address': (row?['formatted_address'] as String?) ?? '',
+        'place_id': (row?['place_id'] as String?) ?? '',
+        'latitude': row?['latitude']?.toString() ?? '',
+        'longitude': row?['longitude']?.toString() ?? '',
+      };
+    } catch (_) {
+      try {
+        final row = await _client
+            .from('business_locations')
+            .select('address_line_1, city, state, postal_code')
+            .eq('business_id', businessId)
+            .maybeSingle();
+        return {
+          'address': (row?['address_line_1'] as String?) ?? '',
+          'address_line_2': '',
+          'city': (row?['city'] as String?) ?? '',
+          'state': (row?['state'] as String?) ?? '',
+          'zip': (row?['postal_code'] as String?) ?? '',
+          'country': 'US',
+          'formatted_address': '',
+          'place_id': '',
+          'latitude': '',
+          'longitude': '',
+        };
+      } catch (_) {
+        return {
+          'address': '',
+          'address_line_2': '',
+          'city': '',
+          'state': '',
+          'zip': '',
+          'country': 'US',
+          'formatted_address': '',
+          'place_id': '',
+          'latitude': '',
+          'longitude': '',
+        };
+      }
+    }
   }
 
   static Future<void> saveBusinessProfile({
@@ -201,6 +245,12 @@ class BusinessSubmissionService {
     required String state,
     required String zip,
     bool comingSoon = false,
+    String? addressLine2,
+    String? formattedAddress,
+    String? placeId,
+    double? latitude,
+    double? longitude,
+    String countryCode = 'US',
   }) async {
     final serviceList = services
         .split(',')
@@ -217,22 +267,44 @@ class BusinessSubmissionService {
         .select('id')
         .eq('business_id', business.id)
         .maybeSingle();
-    final location = {
+    final baseLocation = {
       'address_line_1': address,
       'city': city,
       'state': state.toUpperCase(),
       'postal_code': zip,
     };
-    if (existing == null) {
-      await _client.from('business_locations').insert({
-        ...location,
-        'business_id': business.id,
-      });
-    } else {
-      await _client
-          .from('business_locations')
-          .update(location)
-          .eq('id', existing['id'] as String);
+    final extendedLocation = {
+      ...baseLocation,
+      'address_line_2':
+          addressLine2?.trim().isEmpty == true ? null : addressLine2?.trim(),
+      'formatted_address': formattedAddress?.trim().isEmpty == true
+          ? null
+          : formattedAddress?.trim(),
+      'place_id': placeId?.trim().isEmpty == true ? null : placeId?.trim(),
+      'country_code': countryCode.trim().isEmpty ? 'US' : countryCode.trim(),
+      'latitude': ?latitude,
+      'longitude': ?longitude,
+    };
+
+    Future<void> write(Map<String, dynamic> location) async {
+      if (existing == null) {
+        await _client.from('business_locations').insert({
+          ...location,
+          'business_id': business.id,
+        });
+      } else {
+        await _client
+            .from('business_locations')
+            .update(location)
+            .eq('id', existing['id'] as String);
+      }
+    }
+
+    try {
+      await write(extendedLocation);
+    } catch (_) {
+      // Graceful fallback when Phase 4 address columns are not migrated yet.
+      await write(baseLocation);
     }
   }
 

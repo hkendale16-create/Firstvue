@@ -12,7 +12,10 @@ import 'create_community_hub_screen.dart';
 import 'create_community_screen.dart';
 
 class CommunitiesScreen extends StatefulWidget {
-  const CommunitiesScreen({super.key});
+  /// When true (e.g. from Settings), show create FABs.
+  final bool allowCreate;
+
+  const CommunitiesScreen({super.key, this.allowCreate = false});
 
   @override
   State<CommunitiesScreen> createState() => _CommunitiesScreenState();
@@ -111,19 +114,21 @@ class _CommunitiesScreenState extends State<CommunitiesScreen>
           ],
         ),
       ),
-      floatingActionButton: AnimatedBuilder(
-        animation: _tabs,
-        builder: (context, _) {
-          final isGroups = _tabs.index == 0;
-          return FloatingActionButton.extended(
-            onPressed: isGroups ? _createGroup : _createHub,
-            backgroundColor: FirstVueColors.coral,
-            foregroundColor: Colors.white,
-            icon: const Icon(Icons.add),
-            label: Text(isGroups ? 'Create Group' : 'Create Community'),
-          );
-        },
-      ),
+      floatingActionButton: widget.allowCreate
+          ? AnimatedBuilder(
+              animation: _tabs,
+              builder: (context, _) {
+                final isGroups = _tabs.index == 0;
+                return FloatingActionButton.extended(
+                  onPressed: isGroups ? _createGroup : _createHub,
+                  backgroundColor: FirstVueColors.coral,
+                  foregroundColor: Colors.white,
+                  icon: const Icon(Icons.add),
+                  label: Text(isGroups ? 'Create Group' : 'Create Community'),
+                );
+              },
+            )
+          : null,
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(color: FirstVueColors.teal),
@@ -137,10 +142,20 @@ class _CommunitiesScreenState extends State<CommunitiesScreen>
                       ? ListView(
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.all(24),
-                          children: const [
-                            Text(
-                              'No groups yet. Create one to connect with people nearby.',
+                          children: [
+                            const Text(
+                              'No groups yet.',
                               style: TextStyle(color: Colors.white54),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              widget.allowCreate
+                                  ? 'Tap Create Group to connect with people nearby.'
+                                  : 'Create from Settings → Groups & Communities.',
+                              style: const TextStyle(
+                                color: Colors.white38,
+                                fontSize: 13,
+                              ),
                             ),
                           ],
                         )
@@ -175,10 +190,20 @@ class _CommunitiesScreenState extends State<CommunitiesScreen>
                       ? ListView(
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.all(24),
-                          children: const [
-                            Text(
-                              'No Communities yet. Approved Community Leaders can create local hubs that contain many Groups.',
+                          children: [
+                            const Text(
+                              'No Communities yet.',
                               style: TextStyle(color: Colors.white54),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              widget.allowCreate
+                                  ? 'Approved Community Leaders can create local hubs that contain many Groups.'
+                                  : 'Create from Settings → Groups & Communities.',
+                              style: const TextStyle(
+                                color: Colors.white38,
+                                fontSize: 13,
+                              ),
                             ),
                           ],
                         )

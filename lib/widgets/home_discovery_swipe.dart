@@ -4,8 +4,6 @@ import '../navigation/firstvue_page_route.dart';
 import '../screens/communities_screen.dart';
 import '../screens/community_detail_screen.dart';
 import '../screens/community_hub_detail_screen.dart';
-import '../screens/create_community_hub_screen.dart';
-import '../screens/create_community_screen.dart';
 import '../screens/whats_now_screen.dart';
 import '../services/community_hub_service.dart';
 import '../services/community_service.dart';
@@ -233,48 +231,6 @@ class _CommunitiesSwipePageState extends State<_CommunitiesSwipePage> {
     });
   }
 
-  Future<void> _openCreateGroup() async {
-    final created = await Navigator.push<Community>(
-      context,
-      FirstVuePageRoute(builder: (_) => const CreateCommunityScreen()),
-    );
-    if (created != null && mounted) {
-      await _load();
-      if (!mounted) return;
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(
-          builder: (_) => CommunityDetailScreen(
-            communityId: created.id,
-            initialCommunity: created,
-          ),
-        ),
-      );
-      if (mounted) await _load();
-    }
-  }
-
-  Future<void> _openCreateHub() async {
-    final created = await Navigator.push<CommunityHub>(
-      context,
-      FirstVuePageRoute(builder: (_) => const CreateCommunityHubScreen()),
-    );
-    if (created != null && mounted) {
-      await _load();
-      if (!mounted) return;
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(
-          builder: (_) => CommunityHubDetailScreen(
-            hubId: created.id,
-            initialHub: created,
-          ),
-        ),
-      );
-      if (mounted) await _load();
-    }
-  }
-
   void _openAll() {
     Navigator.push(
       context,
@@ -352,9 +308,9 @@ class _CommunitiesSwipePageState extends State<_CommunitiesSwipePage> {
         const SizedBox(height: 10),
         _GroupCircleRow(
           groups: _yours,
-          includeCreate: true,
-          emptyLabel: 'Create or join',
-          onCreate: _openCreateGroup,
+          includeCreate: false,
+          emptyLabel: 'Browse groups',
+          onCreate: _openAll,
           onOpen: _openGroup,
           onEmptyTap: _openAll,
         ),
@@ -372,22 +328,22 @@ class _CommunitiesSwipePageState extends State<_CommunitiesSwipePage> {
             ),
             const Spacer(),
             TextButton(
-              onPressed: _openCreateHub,
+              onPressed: _openAll,
               style: TextButton.styleFrom(
                 padding: EdgeInsets.zero,
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: const Text('Create', style: TextStyle(fontSize: 12)),
+              child: const Text('Browse', style: TextStyle(fontSize: 12)),
             ),
           ],
         ),
         const SizedBox(height: 10),
         if (_nearbyHubs.isEmpty)
           GestureDetector(
-            onTap: _openCreateHub,
+            onTap: _openAll,
             child: const Text(
-              'Local Communities will appear here. Create one if you are an approved Community Leader.',
+              'Local Communities will appear here. Browse to explore groups & hubs.',
               style: TextStyle(color: Colors.white54, fontSize: 13),
             ),
           )

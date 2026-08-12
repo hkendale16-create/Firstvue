@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 
+import '../screens/create_shoutout_screen.dart';
 import '../screens/firstvue_business_profile_screen.dart';
 import '../services/recommendations_service.dart';
+import '../services/shoutout_service.dart';
 import '../services/things_to_do_service.dart';
 import '../services/trending_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'shoutout_card.dart';
 
 class HomeDiscoverySection extends StatefulWidget {
   final VoidCallback onViewAllVue;
@@ -26,13 +29,28 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
   late TabController _tabController;
   bool _showComingSoon = false;
   bool _tabsReady = false;
+  ShoutoutSort _shoutoutSort = ShoutoutSort.popular;
+  late Future<List<Shoutout>> _shoutoutsFuture;
 
   final _tabLabels = <String>['Trending', 'New', 'Recommended', 'Events'];
 
   @override
   void initState() {
     super.initState();
+    _shoutoutsFuture = _loadShoutouts();
     _initTabs();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeDiscoverySection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      _shoutoutsFuture = _loadShoutouts();
+    }
+  }
+
+  Future<List<Shoutout>> _loadShoutouts() {
+    return ShoutoutService.fetchFeed(sort: _shoutoutSort, limit: 8);
   }
 
   Future<void> _initTabs() async {
@@ -144,26 +162,124 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
-          'SHOUTOUTS',
-          style: TextStyle(
-            color: FirstVueColors.ivory,
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
-          ),
-        ),
-        const SizedBox(height: 10),
-        _ShoutoutCard(
-          title: 'Highlighted comment',
-          body: '“FirstVue helped me find my barber in one tap.”',
-          accent: FirstVueColors.teal,
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'SHOUTOUTS',
+                style: TextStyle(
+                  color: FirstVueColors.ivory,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                final created = await Navigator.push(
+                  context,
+                  FirstVuePageRoute(
+                    builder: (_) => const CreateShoutoutScreen(),
+                  ),
+                );
+                if (created != null && mounted) {
+                  setState(() => _shoutoutsFuture = _loadShoutouts());
+                }
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: FirstVueColors.coral,
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text('Create', style: TextStyle(fontSize: 12)),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
-        _ShoutoutCard(
-          title: 'Community shoutout',
-          body: 'Support local owners and leave a spark on their posts.',
-          accent: FirstVueColors.coral,
+        Row(
+          children: [
+            ChoiceChip(
+              label: const Text('Popular'),
+              selected: _shoutoutSort == ShoutoutSort.popular,
+              onSelected: (_) {
+                if (_shoutoutSort == ShoutoutSort.popular) return;
+                setState(() {
+                  _shoutoutSort = ShoutoutSort.popular;
+                  _shoutoutsFuture = _loadShoutouts();
+                });
+              },
+              selectedColor: FirstVueColors.gold.withValues(alpha: .25),
+              labelStyle: TextStyle(
+                color: _shoutoutSort == ShoutoutSort.popular
+                    ? FirstVueColors.gold
+                    : Colors.white54,
+                fontSize: 12,
+              ),
+              backgroundColor: FirstVueColors.surface,
+              side: BorderSide.none,
+            ),
+            const SizedBox(width: 8),
+            ChoiceChip(
+              label: const Text('Newest'),
+              selected: _shoutoutSort == ShoutoutSort.newest,
+              onSelected: (_) {
+                if (_shoutoutSort == ShoutoutSort.newest) return;
+                setState(() {
+                  _shoutoutSort = ShoutoutSort.newest;
+                  _shoutoutsFuture = _loadShoutouts();
+                });
+              },
+              selectedColor: FirstVueColors.gold.withValues(alpha: .25),
+              labelStyle: TextStyle(
+                color: _shoutoutSort == ShoutoutSort.newest
+                    ? FirstVueColors.gold
+                    : Colors.white54,
+                fontSize: 12,
+              ),
+              backgroundColor: FirstVueColors.surface,
+              side: BorderSide.none,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        FutureBuilder<List<Shoutout>>(
+          future: _shoutoutsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting &&
+                !snapshot.hasData) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: FirstVueColors.teal,
+                    ),
+                  ),
+                ),
+              );
+            }
+            final items = snapshot.data ?? const <Shoutout>[];
+            if (items.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'Be the first to shout out a local favorite.',
+                  style: TextStyle(color: Colors.white54),
+                ),
+              );
+            }
+            return Column(
+              children: [
+                for (final shoutout in items)
+                  ShoutoutCard(shoutout: shoutout, compact: true),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -290,41 +406,6 @@ class _EventsSwipeList extends StatelessWidget {
           },
         );
       },
-    );
-  }
-}
-
-class _ShoutoutCard extends StatelessWidget {
-  final String title;
-  final String body;
-  final Color accent;
-
-  const _ShoutoutCard({
-    required this.title,
-    required this.body,
-    required this.accent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title.toUpperCase(),
-            style: TextStyle(
-              color: accent,
-              fontWeight: FontWeight.bold,
-              fontSize: 11,
-              letterSpacing: 1,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(body, style: const TextStyle(color: Colors.white70, height: 1.35)),
-        ],
-      ),
     );
   }
 }
