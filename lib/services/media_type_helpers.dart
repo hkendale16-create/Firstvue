@@ -9,6 +9,45 @@ String mediaTypeForFile(XFile file) {
   return videoExtensions.contains(extension) ? 'video' : 'image';
 }
 
+String mediaTypeFromMetadata({
+  String? mediaType,
+  String? mimeType,
+  String? pathOrUrl,
+}) {
+  final stored = mediaType?.toLowerCase().trim();
+  if (stored == 'video' || stored == 'image') return stored!;
+  final mime = mimeType?.toLowerCase() ?? '';
+  if (mime.startsWith('video/')) return 'video';
+  if (mime.startsWith('image/')) return 'image';
+  final path = (pathOrUrl ?? '').toLowerCase().split('?').first;
+  const videoExt = {
+    '.mp4',
+    '.mov',
+    '.m4v',
+    '.webm',
+    '.avi',
+    '.mkv',
+    '.3gp',
+  };
+  const imageExt = {
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.webp',
+    '.heic',
+    '.heif',
+    '.gif',
+    '.bmp',
+  };
+  for (final e in videoExt) {
+    if (path.endsWith(e)) return 'video';
+  }
+  for (final e in imageExt) {
+    if (path.endsWith(e)) return 'image';
+  }
+  return 'image';
+}
+
 String mimeTypeForFile(XFile file, String mediaType) {
   final supplied = file.mimeType?.toLowerCase();
   if (supplied != null && supplied.isNotEmpty) {
