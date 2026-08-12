@@ -29,6 +29,7 @@ import 'widgets/home_discovery_section.dart';
 import 'widgets/home_news_feed_section.dart';
 import 'widgets/firstvue_inline_search_bar.dart';
 import 'widgets/home_city_chip.dart';
+import 'widgets/firstvue_animated_header_title.dart';
 import 'services/profile_media_service.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -239,17 +240,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
                       behavior: HitTestBehavior.opaque,
                       child: Column(
                         children: [
-                          const Text(
-                            'FIRSTVUE',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontFamily: 'CormorantGaramond',
-                              color: FirstVueColors.gold,
-                              fontSize: 32,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 3,
-                            ),
-                          ),
+                          const FirstVueAnimatedHeaderTitle(),
                           const SizedBox(height: 4),
                           Text(
                             'SEE FIRST. BOOK FIRST.',

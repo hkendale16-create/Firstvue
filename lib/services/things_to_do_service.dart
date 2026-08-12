@@ -1,4 +1,7 @@
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'event_media_service.dart';
 
 class CommunityEvent {
   final String id;
@@ -7,6 +10,8 @@ class CommunityEvent {
   final DateTime? eventAt;
   final String? locationLabel;
   final String? businessName;
+  final String? coverImageUrl;
+  final String? organizerId;
 
   const CommunityEvent({
     required this.id,
@@ -15,6 +20,8 @@ class CommunityEvent {
     required this.eventAt,
     required this.locationLabel,
     required this.businessName,
+    this.coverImageUrl,
+    this.organizerId,
   });
 }
 
@@ -27,11 +34,13 @@ class ThingsToDoService {
     try {
       final rows = await _client
           .from('community_events')
-          .select('id, title, description, event_at, location_label, businesses(name)')
+          .select(
+            'id, title, description, event_at, location_label, organizer_id, cover_storage_path, cover_storage_provider, businesses(name)',
+          )
           .eq('status', 'approved')
           .order('event_at', ascending: true)
           .limit(40);
-      return rows.map(_mapRow).toList();
+      return Future.wait(rows.map(_mapRow));
     } catch (_) {
       return _prototypeEvents;
     }
@@ -65,24 +74,44 @@ class ThingsToDoService {
     DateTime? eventAt,
     String? locationLabel,
     String? businessId,
+    XFile? coverPhoto,
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) throw const AuthException('Sign in to post an event.');
-    await _client.from('community_events').insert({
-      'organizer_id': user.id,
-      'business_id': businessId,
-      'title': title.trim(),
-      'description': description.trim(),
-      'event_at': eventAt?.toIso8601String(),
-      'location_label': locationLabel?.trim(),
-      'status': 'approved',
-    });
+
+    final inserted = await _client
+        .from('community_events')
+        .insert({
+          'organizer_id': user.id,
+          'business_id': businessId,
+          'title': title.trim(),
+          'description': description.trim(),
+          'event_at': eventAt?.toIso8601String(),
+          'location_label': locationLabel?.trim(),
+          'status': 'approved',
+        })
+        .select('id')
+        .single();
+
+    final eventId = inserted['id'] as String;
+    if (coverPhoto != null) {
+      await EventMediaService.setCover(eventId: eventId, file: coverPhoto);
+    }
   }
 
-  static CommunityEvent _mapRow(Map<String, dynamic> row) {
+  static Future<CommunityEvent> _mapRow(Map<String, dynamic> row) async {
     final business = row['businesses'] as Map<String, dynamic>?;
+    final eventId = row['id'] as String;
+    final coverPath = row['cover_storage_path'] as String?;
+    final coverProvider = row['cover_storage_provider'] as String?;
+    final coverUrl = await EventMediaService.coverUrlForEvent(
+      eventId: eventId,
+      storagePath: coverPath,
+      storageProvider: coverProvider,
+    );
+
     return CommunityEvent(
-      id: row['id'] as String,
+      id: eventId,
       title: row['title'] as String,
       description: row['description'] as String?,
       eventAt: row['event_at'] == null
@@ -90,6 +119,8 @@ class ThingsToDoService {
           : DateTime.parse(row['event_at'] as String),
       locationLabel: row['location_label'] as String?,
       businessName: business?['name'] as String?,
+      coverImageUrl: coverUrl,
+      organizerId: row['organizer_id'] as String?,
     );
   }
 

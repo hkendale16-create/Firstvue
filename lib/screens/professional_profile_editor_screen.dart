@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../widgets/editable_media_grid.dart';
+import '../widgets/entity_profile_media_editor.dart';
 import '../widgets/media_picker_sheet.dart';
 
 import '../services/professional_media_service.dart';
@@ -32,7 +33,9 @@ class _ProfessionalProfileEditorScreenState
   bool _loading = true;
   bool _saving = false;
   bool _uploading = false;
+  bool _profileMediaUpdating = false;
   bool _acceptsNewClients = true;
+  ProfessionalImageSet _profileImages = const ProfessionalImageSet();
   Future<List<ProfessionalMediaItem>> _media = Future.value(const []);
 
   @override
@@ -57,6 +60,8 @@ class _ProfessionalProfileEditorScreenState
         _acceptsNewClients = profile.acceptsNewClients;
         _type = profile.type;
         _media = ProfessionalMediaService.fetchMedia(profile.id);
+        _profileImages =
+            await ProfessionalMediaService.fetchProfileImages(profile.id);
       }
       setState(() {
         _existing = profile;
@@ -107,6 +112,54 @@ class _ProfessionalProfileEditorScreenState
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _changeCover() async {
+    final profile = _existing;
+    if (profile == null) {
+      _showMessage('Save your profile before adding photos.');
+      return;
+    }
+    final files = await showImagePickerSheet(context);
+    if (files == null || files.isEmpty || !mounted) return;
+    setState(() => _profileMediaUpdating = true);
+    try {
+      await ProfessionalMediaService.setCover(
+        professionalProfileId: profile.id,
+        file: files.first,
+      );
+      _profileImages =
+          await ProfessionalMediaService.fetchProfileImages(profile.id);
+      if (mounted) _showMessage('Cover photo updated.');
+    } catch (_) {
+      if (mounted) _showMessage('Unable to update cover photo.');
+    } finally {
+      if (mounted) setState(() => _profileMediaUpdating = false);
+    }
+  }
+
+  Future<void> _changeAvatar() async {
+    final profile = _existing;
+    if (profile == null) {
+      _showMessage('Save your profile before adding photos.');
+      return;
+    }
+    final files = await showImagePickerSheet(context);
+    if (files == null || files.isEmpty || !mounted) return;
+    setState(() => _profileMediaUpdating = true);
+    try {
+      await ProfessionalMediaService.setAvatar(
+        professionalProfileId: profile.id,
+        file: files.first,
+      );
+      _profileImages =
+          await ProfessionalMediaService.fetchProfileImages(profile.id);
+      if (mounted) _showMessage('Profile photo updated.');
+    } catch (_) {
+      if (mounted) _showMessage('Unable to update profile photo.');
+    } finally {
+      if (mounted) setState(() => _profileMediaUpdating = false);
+    }
   }
 
   Future<void> _addMedia() async {
@@ -201,6 +254,26 @@ class _ProfessionalProfileEditorScreenState
                   if (_existing != null)
                     _StatusBanner(status: _existing!.status),
                   if (_existing != null) const SizedBox(height: 16),
+                  if (_existing != null)
+                    EntityProfileMediaEditor(
+                      avatarUrl: _profileImages.avatar?.signedUrl,
+                      coverUrl: _profileImages.cover?.signedUrl,
+                      updating: _profileMediaUpdating,
+                      placeholderIcon: Icons.badge_outlined,
+                      onChangeCover: _changeCover,
+                      onChangeAvatar: _changeAvatar,
+                    ),
+                  if (_existing == null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Save your profile once, then add a profile photo and cover.',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: .45),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
                   const Text(
                     'YOUR PUBLIC IDENTITY',
                     style: TextStyle(

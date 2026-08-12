@@ -1,11 +1,16 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/event_social_service.dart';
 import '../services/things_to_do_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../widgets/event_profile_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/media_picker_sheet.dart';
 import 'auth_screen.dart';
 
 class ThingsToDoScreen extends StatefulWidget {
@@ -51,62 +56,103 @@ class _ThingsToDoScreenState extends State<ThingsToDoScreen> {
       isScrollControlled: true,
       backgroundColor: FirstVueColors.surface,
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            20,
-            20,
-            MediaQuery.viewInsetsOf(context).bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'POST AN EVENT',
-                style: TextStyle(
-                  color: FirstVueColors.gold,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                ),
+        XFile? coverPhoto;
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                20,
+                20,
+                MediaQuery.viewInsetsOf(context).bottom + 24,
               ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: title,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(labelText: 'Event title'),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'POST AN EVENT',
+                    style: TextStyle(
+                      color: FirstVueColors.gold,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: title,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(labelText: 'Event title'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: description,
+                    style: const TextStyle(color: Colors.white),
+                    maxLines: 3,
+                    decoration: const InputDecoration(labelText: 'Description'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: location,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(labelText: 'Location'),
+                  ),
+                  const SizedBox(height: 14),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final files = await showImagePickerSheet(context);
+                      if (files == null || files.isEmpty) return;
+                      setSheetState(() => coverPhoto = files.first);
+                    },
+                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                    label: Text(
+                      coverPhoto == null ? 'Add cover photo' : 'Change cover photo',
+                    ),
+                  ),
+                  if (coverPhoto != null) ...[
+                    const SizedBox(height: 10),
+                    FutureBuilder<Uint8List>(
+                      future: coverPhoto!.readAsBytes(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return const SizedBox(
+                            height: 120,
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.memory(
+                            snapshot.data!,
+                            height: 120,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () async {
+                        if (title.text.trim().isEmpty) return;
+                        await ThingsToDoService.postEvent(
+                          title: title.text,
+                          description: description.text,
+                          locationLabel: location.text,
+                          coverPhoto: coverPhoto,
+                        );
+                        if (context.mounted) Navigator.pop(context, true);
+                      },
+                      child: const Text('PUBLISH'),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: description,
-                style: const TextStyle(color: Colors.white),
-                maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Description'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: location,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(labelText: 'Location'),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () async {
-                    if (title.text.trim().isEmpty) return;
-                    await ThingsToDoService.postEvent(
-                      title: title.text,
-                      description: description.text,
-                      locationLabel: location.text,
-                    );
-                    if (context.mounted) Navigator.pop(context, true);
-                  },
-                  child: const Text('PUBLISH'),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -296,13 +342,29 @@ class _EventCardState extends State<_EventCard> {
     }
   }
 
+  Future<void> _openProfile() async {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    final canPost =
+        userId != null && userId == widget.event.organizerId;
+    await EventProfileSheet.show(
+      context,
+      event: widget.event,
+      canPost: canPost,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final event = widget.event;
     final isPrototype = event.id.startsWith('proto-');
 
-    return Container(
-      padding: const EdgeInsets.all(18),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _openProfile,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: FirstVueColors.surface,
         borderRadius: BorderRadius.circular(18),
@@ -313,6 +375,18 @@ class _EventCardState extends State<_EventCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (event.coverImageUrl != null)
+            Image.network(
+              event.coverImageUrl!,
+              height: 140,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
           Text(
             event.title,
             style: const TextStyle(
@@ -399,7 +473,12 @@ class _EventCardState extends State<_EventCard> {
               ),
             ],
           ],
+              ],
+            ),
+          ),
         ],
+      ),
+        ),
       ),
     );
   }

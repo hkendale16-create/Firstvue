@@ -4,9 +4,11 @@ import 'package:flutter/services.dart';
 import '../services/professional_media_service.dart';
 import '../services/professional_profiles_service.dart';
 import '../services/professional_showcase_service.dart';
+import '../widgets/facebook_style_profile_header.dart';
+import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/firstvue_inline_search_bar.dart';
 
-class ProfessionalPublicProfileScreen extends StatelessWidget {
+class ProfessionalPublicProfileScreen extends StatefulWidget {
   final ProfessionalProfile profile;
   final IconData icon;
 
@@ -17,7 +19,34 @@ class ProfessionalPublicProfileScreen extends StatelessWidget {
   });
 
   @override
+  State<ProfessionalPublicProfileScreen> createState() =>
+      _ProfessionalPublicProfileScreenState();
+}
+
+class _ProfessionalPublicProfileScreenState
+    extends State<ProfessionalPublicProfileScreen> {
+  ProfessionalImageSet _profileImages = const ProfessionalImageSet();
+  bool _loadingImages = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadImages();
+  }
+
+  Future<void> _loadImages() async {
+    final images =
+        await ProfessionalMediaService.fetchProfileImages(widget.profile.id);
+    if (!mounted) return;
+    setState(() {
+      _profileImages = images;
+      _loadingImages = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final profile = widget.profile;
     final location = [
       profile.city,
       profile.state,
@@ -25,73 +54,39 @@ class ProfessionalPublicProfileScreen extends StatelessWidget {
     ].where((part) => part.isNotEmpty).join(', ');
 
     return Scaffold(
+      backgroundColor: const Color(0xFF080B0F),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF080B0F),
+        foregroundColor: Colors.white,
+        title: Text(profile.displayName, style: const TextStyle(fontSize: 16)),
+      ),
       body: CustomScrollView(
         slivers: [
-          SliverAppBar(
-            expandedHeight: 230,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              background: DecoratedBox(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF2A241B),
-                      Color(0xFF10151B),
-                      Color(0xFF080B0F),
-                    ],
-                  ),
-                ),
-                child: Center(
-                  child: Container(
-                    width: 92,
-                    height: 92,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFD8B56A)),
-                      color: const Color(0xFF10151B),
-                    ),
-                    child: Icon(icon, size: 44, color: const Color(0xFFD8B56A)),
-                  ),
-                ),
-              ),
+          SliverToBoxAdapter(
+            child: FacebookStyleProfileHeader(
+              title: profile.displayName,
+              subtitle: 'FIRSTVUE VERIFIED ${profile.type.label.toUpperCase()}',
+              avatarIcon: widget.icon,
+              avatarImageUrl: _profileImages.avatar?.signedUrl,
+              coverImageUrl: _profileImages.cover?.signedUrl,
+              showImageLoading: _loadingImages,
+              coverGradient: const [
+                Color(0xFF2A241B),
+                Color(0xFF10151B),
+                Color(0xFF080B0F),
+              ],
+              actionButtons: const [
+                Icon(Icons.verified, color: Color(0xFFD8B56A), size: 28),
+              ],
             ),
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 36),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 36),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          profile.displayName,
-                          style: const TextStyle(
-                            fontFamily: 'CormorantGaramond',
-                            color: Colors.white,
-                            fontSize: 31,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const Icon(Icons.verified, color: Color(0xFFD8B56A)),
-                    ],
-                  ),
-                  const SizedBox(height: 7),
-                  Text(
-                    'FIRSTVUE VERIFIED ${profile.type.label.toUpperCase()}',
-                    style: const TextStyle(
-                      color: Color(0xFFD8B56A),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.1,
-                    ),
-                  ),
                   if (location.isNotEmpty) ...[
-                    const SizedBox(height: 12),
                     Row(
                       children: [
                         const Icon(
@@ -106,8 +101,8 @@ class ProfessionalPublicProfileScreen extends StatelessWidget {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 18),
                   ],
-                  const SizedBox(height: 18),
                   const FirstVueInlineSearchBar(
                     padding: EdgeInsets.zero,
                     hintText: 'Search professionals, events, #tags…',
@@ -333,6 +328,11 @@ class ProfessionalPublicProfileScreen extends StatelessWidget {
                       }
                       return _ShowcaseSection(showcase: showcase);
                     },
+                  ),
+                  const SizedBox(height: 28),
+                  EntityProfileFeedSection(
+                    scope: EntityFeedScope.professional,
+                    entityId: profile.id,
                   ),
                   const SizedBox(height: 28),
                   Container(

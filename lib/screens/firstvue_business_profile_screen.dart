@@ -9,10 +9,11 @@ import '../services/business_menu_service.dart';
 import '../services/business_reviews_service.dart';
 import '../services/business_social_links_service.dart';
 import '../services/messaging_service.dart';
-import '../widgets/profile_recent_activity_section.dart';
 import '../widgets/social_platform_icon.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/firstvue_inline_search_bar.dart';
+import '../widgets/facebook_style_profile_header.dart';
 import 'auth_screen.dart';
 import 'conversation_screen.dart';
 import 'meet_the_owner_screen.dart';
@@ -63,6 +64,16 @@ class _FirstVueBusinessProfileScreenState
     if (widget.previewDetails != null) {
       return Scaffold(
         backgroundColor: const Color(0xFF080B0F),
+        appBar: widget.hideAppBarBack
+            ? null
+            : AppBar(
+                backgroundColor: const Color(0xFF080B0F),
+                foregroundColor: Colors.white,
+                title: Text(
+                  widget.previewDetails!.name,
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
         body: FirstVueRefreshScaffold(
           onRefresh: _refresh,
           child: _BusinessProfileContent(
@@ -77,6 +88,12 @@ class _FirstVueBusinessProfileScreenState
 
     return Scaffold(
       backgroundColor: const Color(0xFF080B0F),
+      appBar: widget.hideAppBarBack
+          ? null
+          : AppBar(
+              backgroundColor: const Color(0xFF080B0F),
+              foregroundColor: Colors.white,
+            ),
       body: FutureBuilder<PublicBusinessDetails>(
         future: _detailsFuture,
         builder: (context, snapshot) {
@@ -113,7 +130,7 @@ class _FirstVueBusinessProfileScreenState
   }
 }
 
-class _BusinessProfileContent extends StatelessWidget {
+class _BusinessProfileContent extends StatefulWidget {
   final PublicBusinessDetails details;
   final bool isOwnerPreview;
   final bool hideAppBarBack;
@@ -127,49 +144,61 @@ class _BusinessProfileContent extends StatelessWidget {
   });
 
   @override
+  State<_BusinessProfileContent> createState() =>
+      _BusinessProfileContentState();
+}
+
+class _BusinessProfileContentState extends State<_BusinessProfileContent> {
+  BusinessImageSet _profileImages = const BusinessImageSet();
+  bool _loadingImages = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadImages();
+  }
+
+  Future<void> _loadImages() async {
+    final images =
+        await BusinessMediaService.fetchProfileImages(widget.details.id);
+    if (!mounted) return;
+    setState(() {
+      _profileImages = images;
+      _loadingImages = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isApproved = (businessStatus ?? 'approved') == 'approved';
+    final details = widget.details;
+    final isApproved = (widget.businessStatus ?? 'approved') == 'approved';
+    final isOwnerPreview = widget.isOwnerPreview;
 
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
-        SliverAppBar(
-          expandedHeight: 250,
-          pinned: true,
-          backgroundColor: const Color(0xFF080B0F),
-          automaticallyImplyLeading: !hideAppBarBack,
-          leading: hideAppBarBack
-              ? null
-              : IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
-                ),
-          flexibleSpace: FlexibleSpaceBar(
-            background: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF2B241B),
-                    Color(0xFF151B22),
-                    Color(0xFF080B0F),
-                  ],
-                ),
-              ),
-              child: const Center(
-                child: Icon(
-                  Icons.verified_outlined,
-                  size: 82,
-                  color: Color(0xFFD8B56A),
-                ),
-              ),
-            ),
+        SliverToBoxAdapter(
+          child: FacebookStyleProfileHeader(
+            title: details.name,
+            subtitle: details.businessType,
+            avatarIcon: Icons.storefront_outlined,
+            avatarImageUrl: _profileImages.avatar?.signedUrl,
+            coverImageUrl: _profileImages.cover?.signedUrl,
+            showImageLoading: _loadingImages,
+            coverGradient: const [
+              Color(0xFF2B241B),
+              Color(0xFF151B22),
+              Color(0xFF080B0F),
+            ],
+            actionButtons: [
+              if (isApproved && !isOwnerPreview)
+                const Icon(Icons.verified, color: Color(0xFFD8B56A), size: 28),
+            ],
           ),
         ),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 40),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -209,31 +238,7 @@ class _BusinessProfileContent extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                 ],
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        details.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 27,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    if (isApproved && !isOwnerPreview)
-                      const Icon(Icons.verified, color: Color(0xFFD8B56A)),
-                  ],
-                ),
                 const SizedBox(height: 8),
-                Text(
-                  details.businessType,
-                  style: const TextStyle(
-                    color: Color(0xFFD8B56A),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 22),
                 const FirstVueInlineSearchBar(
                   padding: EdgeInsets.zero,
                   hintText: 'Search businesses, people, #tags…',
@@ -275,9 +280,10 @@ class _BusinessProfileContent extends StatelessWidget {
                       : 'The owner has not added a business description yet.',
                 ),
                 const SizedBox(height: 22),
-                ProfileRecentActivitySection(
-                  scope: ProfileActivityScope.business,
-                  businessId: details.id,
+                EntityProfileFeedSection(
+                  scope: EntityFeedScope.business,
+                  entityId: details.id,
+                  canPost: isOwnerPreview,
                 ),
                 const SizedBox(height: 22),
                 const _ProfileSectionTitle('LOCATION'),

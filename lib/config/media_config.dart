@@ -18,7 +18,8 @@ enum MediaBucket {
   rental('rental-media'),
   professional('professional-media'),
   communityNews('community-news-media'),
-  profile('profile-media');
+  profile('profile-media'),
+  event('event-media');
 
   final String id;
   const MediaBucket(this.id);

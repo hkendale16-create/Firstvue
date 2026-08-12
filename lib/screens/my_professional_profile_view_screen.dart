@@ -3,9 +3,9 @@ import '../navigation/firstvue_page_route.dart';
 
 import '../services/professional_media_service.dart';
 import '../services/professional_profiles_service.dart';
+import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
-import '../widgets/profile_recent_activity_section.dart';
 import 'professional_profile_editor_screen.dart';
 import 'professional_public_profile_screen.dart';
 import 'professional_showcase_editor_screen.dart';
@@ -22,6 +22,7 @@ class _MyProfessionalProfileViewScreenState
     extends State<MyProfessionalProfileViewScreen> {
   ProfessionalProfile? _profile;
   List<ProfessionalMediaItem> _media = const [];
+  ProfessionalImageSet _profileImages = const ProfessionalImageSet();
   bool _loading = true;
   int _refreshToken = 0;
 
@@ -36,13 +37,17 @@ class _MyProfessionalProfileViewScreenState
     try {
       final profile = await ProfessionalProfilesService.fetchMine();
       var media = const <ProfessionalMediaItem>[];
+      var profileImages = const ProfessionalImageSet();
       if (profile != null) {
         media = await ProfessionalMediaService.fetchMedia(profile.id);
+        profileImages =
+            await ProfessionalMediaService.fetchProfileImages(profile.id);
       }
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _media = media;
+        _profileImages = profileImages;
         _loading = false;
       });
     } catch (_) {
@@ -149,7 +154,9 @@ class _MyProfessionalProfileViewScreenState
       profile.postalCode,
     ].where((part) => part.isNotEmpty).join(', ');
 
-    final coverUrl = _media.isNotEmpty ? _media.first.signedUrl : null;
+    final coverUrl = _profileImages.cover?.signedUrl ??
+        (_media.isNotEmpty ? _media.first.signedUrl : null);
+    final avatarUrl = _profileImages.avatar?.signedUrl;
 
     return Scaffold(
       backgroundColor: const Color(0xFF080B0F),
@@ -165,7 +172,10 @@ class _MyProfessionalProfileViewScreenState
               statusLabel: _statusLabel(profile.status),
               statusColor: _statusColor(profile.status),
               avatarIcon: _iconForType(profile.type),
+              avatarImageUrl: avatarUrl,
               coverImageUrl: coverUrl,
+              onAvatarTap: _openEditor,
+              onCoverTap: _openEditor,
               coverGradient: const [
                 Color(0xFF2A241B),
                 Color(0xFF10151B),
@@ -317,7 +327,12 @@ class _MyProfessionalProfileViewScreenState
                 ),
               ],
             ),
-            ProfileRecentActivitySection(refreshToken: _refreshToken),
+            EntityProfileFeedSection(
+              scope: EntityFeedScope.professional,
+              entityId: profile.id,
+              canPost: true,
+              refreshToken: _refreshToken,
+            ),
             const SizedBox(height: 24),
           ],
         ),

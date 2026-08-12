@@ -4,8 +4,8 @@ import '../navigation/firstvue_page_route.dart';
 import '../services/business_media_service.dart';
 import '../services/business_submission_service.dart';
 import '../widgets/facebook_style_profile_header.dart';
+import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
-import '../widgets/profile_recent_activity_section.dart';
 import 'firstvue_business_profile_screen.dart';
 import 'my_businesses_screen.dart';
 
@@ -34,7 +34,13 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
       widget.business.id,
     );
     final media = await BusinessMediaService.fetchMedia(widget.business.id);
-    return _BusinessViewData(location: location, media: media);
+    final profileImages =
+        await BusinessMediaService.fetchProfileImages(widget.business.id);
+    return _BusinessViewData(
+      location: location,
+      media: media,
+      profileImages: profileImages,
+    );
   }
 
   Future<void> _refresh() async {
@@ -94,16 +100,22 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
           builder: (context, snapshot) {
             final data = snapshot.data;
             final media = data?.media ?? const <BusinessMediaItem>[];
-            BusinessMediaItem? coverMedia;
-            for (final item in media) {
-              if (item.featuredForTrending) {
-                coverMedia = item;
-                break;
-              }
-            }
-            coverMedia ??= media.isNotEmpty ? media.first : null;
-            final coverUrl =
-                coverMedia != null && !coverMedia.isVideo ? coverMedia.signedUrl : null;
+            final profileImages = data?.profileImages ?? const BusinessImageSet();
+            final coverUrl = profileImages.cover?.signedUrl ??
+                (() {
+                  BusinessMediaItem? coverMedia;
+                  for (final item in media) {
+                    if (item.featuredForTrending) {
+                      coverMedia = item;
+                      break;
+                    }
+                  }
+                  coverMedia ??= media.isNotEmpty ? media.first : null;
+                  return coverMedia != null && !coverMedia.isVideo
+                      ? coverMedia.signedUrl
+                      : null;
+                })();
+            final avatarUrl = profileImages.avatar?.signedUrl;
 
             return ListView(
               padding: EdgeInsets.zero,
@@ -114,7 +126,12 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
                   statusLabel: _statusLabel(business.status),
                   statusColor: _statusColor(business.status),
                   avatarIcon: Icons.storefront_outlined,
+                  avatarImageUrl: avatarUrl,
                   coverImageUrl: coverUrl,
+                  onAvatarTap: avatarUrl != null
+                      ? () => _openEdit()
+                      : null,
+                  onCoverTap: coverUrl != null ? () => _openEdit() : null,
                   coverGradient: const [
                     Color(0xFF2A241B),
                     Color(0xFF1A2530),
@@ -251,9 +268,10 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
                       ],
                     ),
                   ),
-                ProfileRecentActivitySection(
-                  scope: ProfileActivityScope.business,
-                  businessId: business.id,
+                EntityProfileFeedSection(
+                  scope: EntityFeedScope.business,
+                  entityId: business.id,
+                  canPost: true,
                   refreshToken: _refreshToken,
                 ),
                 const SizedBox(height: 24),
@@ -269,6 +287,11 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
 class _BusinessViewData {
   final Map<String, String> location;
   final List<BusinessMediaItem> media;
+  final BusinessImageSet profileImages;
 
-  const _BusinessViewData({required this.location, required this.media});
+  const _BusinessViewData({
+    required this.location,
+    required this.media,
+    required this.profileImages,
+  });
 }

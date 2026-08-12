@@ -1,9 +1,14 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/media_config.dart';
+import 'community_news_media_service.dart';
+import 'media_storage_service.dart';
+
 enum ProfileActivityType {
   newsPost,
   feedComment,
   businessMedia,
+  professionalMedia,
   sparkGiven,
   sparkReceived,
   reviewWritten,
@@ -16,6 +21,9 @@ class ProfileActivityItem {
   final String? subtitle;
   final DateTime createdAt;
   final String? referenceId;
+  final String? thumbnailUrl;
+  final bool thumbnailIsVideo;
+  final String? linkUrl;
 
   const ProfileActivityItem({
     required this.type,
@@ -23,6 +31,9 @@ class ProfileActivityItem {
     this.subtitle,
     required this.createdAt,
     this.referenceId,
+    this.thumbnailUrl,
+    this.thumbnailIsVideo = false,
+    this.linkUrl,
   });
 }
 
@@ -30,6 +41,16 @@ class ProfileActivityService {
   ProfileActivityService._();
 
   static final _client = Supabase.instance.client;
+
+  static final _urlPattern = RegExp(
+    r'https?://[^\s<>"\]]+',
+    caseSensitive: false,
+  );
+
+  static String? extractLink(String? text) {
+    if (text == null || text.trim().isEmpty) return null;
+    return _urlPattern.firstMatch(text.trim())?.group(0);
+  }
 
   static Future<List<ProfileActivityItem>> fetchUserActivity({
     int limit = 20,
@@ -64,6 +85,26 @@ class ProfileActivityService {
     return _mergeAndLimit(batches.expand((items) => items), limit);
   }
 
+  static Future<List<ProfileActivityItem>> fetchProfessionalActivity(
+    String professionalProfileId, {
+    int limit = 15,
+  }) async {
+    final perSource = (limit / 2).ceil().clamp(3, limit);
+    final batches = await Future.wait([
+      _fetchNewsPostsForProfessional(professionalProfileId, perSource),
+      _fetchProfessionalMedia(professionalProfileId, perSource),
+    ]);
+
+    return _mergeAndLimit(batches.expand((items) => items), limit);
+  }
+
+  static Future<List<ProfileActivityItem>> fetchEventActivity(
+    String eventId, {
+    int limit = 15,
+  }) async {
+    return _fetchNewsPostsForEvent(eventId, limit);
+  }
+
   static List<ProfileActivityItem> _mergeAndLimit(
     Iterable<ProfileActivityItem> items,
     int limit,
@@ -71,6 +112,34 @@ class ProfileActivityService {
     final sorted = items.toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return sorted.take(limit).toList();
+  }
+
+  static Future<List<ProfileActivityItem>> _mapNewsPostRows(
+    List<dynamic> rows, {
+    required String titleForRow(Map<String, dynamic> row, String? businessName),
+  }) async {
+    if (rows.isEmpty) return const [];
+
+    final postIds = rows.map((row) => row['id'] as String).toList();
+    final mediaByPost =
+        await CommunityNewsMediaService.fetchMediaByPostIds(postIds);
+
+    return rows.map((row) {
+      final id = row['id'] as String;
+      final body = _truncate(row['body'] as String);
+      final media = mediaByPost[id] ?? const [];
+      final firstMedia = media.isNotEmpty ? media.first : null;
+      return ProfileActivityItem(
+        type: ProfileActivityType.newsPost,
+        title: titleForRow(row, null),
+        subtitle: body,
+        createdAt: DateTime.parse(row['created_at'] as String),
+        referenceId: id,
+        thumbnailUrl: firstMedia?.signedUrl,
+        thumbnailIsVideo: firstMedia?.isVideo ?? false,
+        linkUrl: extractLink(body),
+      );
+    }).toList();
   }
 
   static Future<List<ProfileActivityItem>> _fetchNewsPostsByAuthor(
@@ -92,21 +161,17 @@ class ProfileActivityService {
           .toList();
       final businessNames = await _fetchBusinessNames(businessIds);
 
-      return rows.map((row) {
-        final businessId = row['business_id'] as String?;
-        final businessName =
-            businessId == null ? null : businessNames[businessId];
-        final body = _truncate(row['body'] as String);
-        return ProfileActivityItem(
-          type: ProfileActivityType.newsPost,
-          title: businessName == null
+      return _mapNewsPostRows(
+        rows,
+        titleForRow: (row, _) {
+          final businessId = row['business_id'] as String?;
+          final businessName =
+              businessId == null ? null : businessNames[businessId];
+          return businessName == null
               ? 'Posted to news feed'
-              : 'Posted as $businessName',
-          subtitle: body,
-          createdAt: DateTime.parse(row['created_at'] as String),
-          referenceId: row['id'] as String,
-        );
-      }).toList();
+              : 'Posted as $businessName';
+        },
+      );
     } catch (_) {
       return const [];
     }
@@ -143,12 +208,14 @@ class ProfileActivityService {
           .limit(limit);
 
       return rows.map((row) {
+        final body = _truncate(row['body'] as String);
         return ProfileActivityItem(
           type: ProfileActivityType.feedComment,
           title: 'Commented on a post',
-          subtitle: _truncate(row['body'] as String),
+          subtitle: body,
           createdAt: DateTime.parse(row['created_at'] as String),
           referenceId: row['media_id'] as String?,
+          linkUrl: extractLink(body),
         );
       }).toList();
     } catch (_) {
@@ -169,18 +236,67 @@ class ProfileActivityService {
           .order('created_at', ascending: false)
           .limit(limit);
 
-      return rows.map((row) {
-        final profile = row['profiles'] as Map<String, dynamic>?;
-        final author =
-            (profile?['display_name'] as String?) ?? 'FirstVue member';
-        return ProfileActivityItem(
-          type: ProfileActivityType.newsPost,
-          title: 'News post by $author',
-          subtitle: _truncate(row['body'] as String),
-          createdAt: DateTime.parse(row['created_at'] as String),
-          referenceId: row['id'] as String,
-        );
-      }).toList();
+      return _mapNewsPostRows(
+        rows,
+        titleForRow: (row, _) {
+          final profile = row['profiles'] as Map<String, dynamic>?;
+          final author =
+              (profile?['display_name'] as String?) ?? 'FirstVue member';
+          return 'News post by $author';
+        },
+      );
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<List<ProfileActivityItem>> _fetchNewsPostsForProfessional(
+    String professionalProfileId,
+    int limit,
+  ) async {
+    try {
+      final rows = await _client
+          .from('community_news_posts')
+          .select('id, body, created_at, profiles(display_name)')
+          .eq('professional_profile_id', professionalProfileId)
+          .eq('status', 'approved')
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return _mapNewsPostRows(
+        rows,
+        titleForRow: (row, _) {
+          final profile = row['profiles'] as Map<String, dynamic>?;
+          final author =
+              (profile?['display_name'] as String?) ?? 'FirstVue member';
+          return 'Update from $author';
+        },
+      );
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<List<ProfileActivityItem>> _fetchNewsPostsForEvent(
+    String eventId,
+    int limit,
+  ) async {
+    try {
+      final rows = await _client
+          .from('community_news_posts')
+          .select('id, body, created_at, profiles(display_name)')
+          .eq('event_id', eventId)
+          .eq('status', 'approved')
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return _mapNewsPostRows(
+        rows,
+        titleForRow: (row, _) {
+          final profile = row['profiles'] as Map<String, dynamic>?;
+          final author =
+              (profile?['display_name'] as String?) ?? 'FirstVue member';
+          return 'Event update by $author';
+        },
+      );
     } catch (_) {
       return const [];
     }
@@ -203,22 +319,39 @@ class ProfileActivityService {
       };
       final rows = await _client
           .from('business_media')
-          .select('id, created_at, media_type, business_id')
+          .select(
+            'id, created_at, media_type, business_id, storage_path, storage_provider',
+          )
           .inFilter('business_id', names.keys.toList())
+          .or('media_role.eq.gallery,media_role.is.null')
           .order('created_at', ascending: false)
           .limit(limit);
 
-      return rows.map((row) {
+      return Future.wait(rows.map((row) async {
         final businessId = row['business_id'] as String;
         final mediaType = (row['media_type'] as String?) ?? 'image';
         final label = mediaType == 'video' ? 'video' : 'photo';
+        final path = row['storage_path'] as String?;
+        String? thumbUrl;
+        if (path != null) {
+          thumbUrl = await MediaStorageService.createReadUrl(
+            bucket: MediaBucket.business,
+            path: path,
+            provider: MediaStorageProvider.parse(
+              row['storage_provider'] as String?,
+            ),
+            context: {'business_id': businessId},
+          );
+        }
         return ProfileActivityItem(
           type: ProfileActivityType.businessMedia,
           title: 'Added $label to ${names[businessId] ?? 'your business'}',
           createdAt: DateTime.parse(row['created_at'] as String),
-          referenceId: businessId,
+          referenceId: row['id'] as String,
+          thumbnailUrl: thumbUrl,
+          thumbnailIsVideo: mediaType == 'video',
         );
-      }).toList();
+      }));
     } catch (_) {
       return const [];
     }
@@ -231,21 +364,82 @@ class ProfileActivityService {
     try {
       final rows = await _client
           .from('business_media')
-          .select('id, created_at, media_type')
+          .select(
+            'id, created_at, media_type, storage_path, storage_provider',
+          )
           .eq('business_id', businessId)
+          .or('media_role.eq.gallery,media_role.is.null')
           .order('created_at', ascending: false)
           .limit(limit);
 
-      return rows.map((row) {
+      return Future.wait(rows.map((row) async {
         final mediaType = (row['media_type'] as String?) ?? 'image';
         final label = mediaType == 'video' ? 'video' : 'photo';
+        final path = row['storage_path'] as String?;
+        String? thumbUrl;
+        if (path != null) {
+          thumbUrl = await MediaStorageService.createReadUrl(
+            bucket: MediaBucket.business,
+            path: path,
+            provider: MediaStorageProvider.parse(
+              row['storage_provider'] as String?,
+            ),
+            context: {'business_id': businessId},
+          );
+        }
         return ProfileActivityItem(
           type: ProfileActivityType.businessMedia,
           title: 'New $label added',
           createdAt: DateTime.parse(row['created_at'] as String),
           referenceId: row['id'] as String,
+          thumbnailUrl: thumbUrl,
+          thumbnailIsVideo: mediaType == 'video',
         );
-      }).toList();
+      }));
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<List<ProfileActivityItem>> _fetchProfessionalMedia(
+    String professionalProfileId,
+    int limit,
+  ) async {
+    try {
+      final rows = await _client
+          .from('professional_media')
+          .select(
+            'id, created_at, media_type, storage_path, storage_provider',
+          )
+          .eq('professional_profile_id', professionalProfileId)
+          .or('media_role.eq.gallery,media_role.is.null')
+          .order('created_at', ascending: false)
+          .limit(limit);
+
+      return Future.wait(rows.map((row) async {
+        final mediaType = (row['media_type'] as String?) ?? 'image';
+        final label = mediaType == 'video' ? 'video' : 'photo';
+        final path = row['storage_path'] as String?;
+        String? thumbUrl;
+        if (path != null) {
+          thumbUrl = await MediaStorageService.createReadUrl(
+            bucket: MediaBucket.professional,
+            path: path,
+            provider: MediaStorageProvider.parse(
+              row['storage_provider'] as String?,
+            ),
+            context: {'professional_profile_id': professionalProfileId},
+          );
+        }
+        return ProfileActivityItem(
+          type: ProfileActivityType.professionalMedia,
+          title: 'New portfolio $label',
+          createdAt: DateTime.parse(row['created_at'] as String),
+          referenceId: row['id'] as String,
+          thumbnailUrl: thumbUrl,
+          thumbnailIsVideo: mediaType == 'video',
+        );
+      }));
     } catch (_) {
       return const [];
     }
@@ -263,15 +457,28 @@ class ProfileActivityService {
           .order('created_at', ascending: false)
           .limit(limit);
 
+      final postIds = rows
+          .map((row) => row['post_id'] as String?)
+          .whereType<String>()
+          .toList();
+      final mediaByPost =
+          await CommunityNewsMediaService.fetchMediaByPostIds(postIds);
+
       return rows.map((row) {
         final post = row['community_news_posts'] as Map<String, dynamic>?;
         final body = _truncate((post?['body'] as String?) ?? 'a news post');
+        final postId = row['post_id'] as String?;
+        final media = postId == null ? const [] : (mediaByPost[postId] ?? const []);
+        final firstMedia = media.isNotEmpty ? media.first : null;
         return ProfileActivityItem(
           type: ProfileActivityType.sparkGiven,
           title: 'Sparked a post',
           subtitle: body,
           createdAt: DateTime.parse(row['created_at'] as String),
-          referenceId: row['post_id'] as String?,
+          referenceId: postId,
+          thumbnailUrl: firstMedia?.signedUrl,
+          thumbnailIsVideo: firstMedia?.isVideo ?? false,
+          linkUrl: extractLink(body),
         );
       }).toList();
     } catch (_) {
@@ -302,17 +509,27 @@ class ProfileActivityService {
           .order('created_at', ascending: false)
           .limit(limit);
 
+      final mediaByPost = await CommunityNewsMediaService.fetchMediaByPostIds(
+        postBodies.keys.toList(),
+      );
+
       return rows.map((row) {
         final profile = row['profiles'] as Map<String, dynamic>?;
         final sparker =
             (profile?['display_name'] as String?) ?? 'Someone';
         final postId = row['post_id'] as String;
+        final body = _truncate(postBodies[postId] ?? '');
+        final media = mediaByPost[postId] ?? const [];
+        final firstMedia = media.isNotEmpty ? media.first : null;
         return ProfileActivityItem(
           type: ProfileActivityType.sparkReceived,
           title: '$sparker sparked your post',
-          subtitle: _truncate(postBodies[postId] ?? ''),
+          subtitle: body,
           createdAt: DateTime.parse(row['created_at'] as String),
           referenceId: postId,
+          thumbnailUrl: firstMedia?.signedUrl,
+          thumbnailIsVideo: firstMedia?.isVideo ?? false,
+          linkUrl: extractLink(body),
         );
       }).toList();
     } catch (_) {
@@ -342,12 +559,14 @@ class ProfileActivityService {
           'rejected' => ' (not approved)',
           _ => ' (pending review)',
         };
+        final body = _truncate(row['body'] as String);
         return ProfileActivityItem(
           type: ProfileActivityType.reviewWritten,
           title: 'Reviewed $businessName$statusLabel',
-          subtitle: '${'★' * (row['rating'] as int)} · ${_truncate(row['body'] as String)}',
+          subtitle: '${'★' * (row['rating'] as int)} · $body',
           createdAt: DateTime.parse(row['created_at'] as String),
           referenceId: row['id'] as String,
+          linkUrl: extractLink(body),
         );
       }).toList();
     } catch (_) {
@@ -369,12 +588,14 @@ class ProfileActivityService {
           .limit(limit);
 
       return rows.map((row) {
+        final body = _truncate(row['body'] as String);
         return ProfileActivityItem(
           type: ProfileActivityType.reviewReceived,
           title: 'New ${row['rating']}-star review',
-          subtitle: _truncate(row['body'] as String),
+          subtitle: body,
           createdAt: DateTime.parse(row['created_at'] as String),
           referenceId: row['id'] as String,
+          linkUrl: extractLink(body),
         );
       }).toList();
     } catch (_) {

@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/profile_activity_service.dart';
+import '../theme/firstvue_theme.dart';
 import 'community_news_post_detail_sheet.dart';
+import 'feed_comments_sheet.dart';
+import 'signed_media_viewer.dart';
+import 'social_rich_text.dart';
 
-enum ProfileActivityScope { user, business }
+enum ProfileActivityScope { user, business, professional, event }
 
 class ProfileRecentActivitySection extends StatefulWidget {
   final ProfileActivityScope scope;
   final String? businessId;
+  final String? professionalProfileId;
+  final String? eventId;
   final int refreshToken;
   final bool embedded;
 
@@ -15,6 +22,8 @@ class ProfileRecentActivitySection extends StatefulWidget {
     super.key,
     this.scope = ProfileActivityScope.user,
     this.businessId,
+    this.professionalProfileId,
+    this.eventId,
     this.refreshToken = 0,
     this.embedded = false,
   });
@@ -39,18 +48,29 @@ class _ProfileRecentActivitySectionState
     super.didUpdateWidget(oldWidget);
     if (oldWidget.refreshToken != widget.refreshToken ||
         oldWidget.businessId != widget.businessId ||
+        oldWidget.professionalProfileId != widget.professionalProfileId ||
+        oldWidget.eventId != widget.eventId ||
         oldWidget.scope != widget.scope) {
       _activityFuture = _loadActivity();
     }
   }
 
   Future<List<ProfileActivityItem>> _loadActivity() {
-    if (widget.scope == ProfileActivityScope.business) {
-      final businessId = widget.businessId;
-      if (businessId == null) return Future.value(const []);
-      return ProfileActivityService.fetchBusinessActivity(businessId);
-    }
-    return ProfileActivityService.fetchUserActivity();
+    return switch (widget.scope) {
+      ProfileActivityScope.business => widget.businessId == null
+          ? Future.value(const [])
+          : ProfileActivityService.fetchBusinessActivity(widget.businessId!),
+      ProfileActivityScope.professional =>
+        widget.professionalProfileId == null
+            ? Future.value(const [])
+            : ProfileActivityService.fetchProfessionalActivity(
+                widget.professionalProfileId!,
+              ),
+      ProfileActivityScope.event => widget.eventId == null
+          ? Future.value(const [])
+          : ProfileActivityService.fetchEventActivity(widget.eventId!),
+      ProfileActivityScope.user => ProfileActivityService.fetchUserActivity(),
+    };
   }
 
   Future<void> _refresh() async {
@@ -58,11 +78,29 @@ class _ProfileRecentActivitySectionState
     await _activityFuture;
   }
 
+  String get _emptyMessage {
+    return switch (widget.scope) {
+      ProfileActivityScope.business =>
+        'No recent updates yet. Post news, add photos, or get reviews — they show here.',
+      ProfileActivityScope.professional =>
+        'No recent updates yet. Post news or add portfolio photos to fill this feed.',
+      ProfileActivityScope.event =>
+        'No event updates yet. Organizers can post news and photos here.',
+      ProfileActivityScope.user =>
+        'No activity yet. Post to the feed, spark posts, or update a business profile.',
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final embedded = widget.embedded;
     return Padding(
-      padding: EdgeInsets.fromLTRB(embedded ? 16 : 20, 0, embedded ? 16 : 20, embedded ? 0 : 18),
+      padding: EdgeInsets.fromLTRB(
+        embedded ? 16 : 20,
+        0,
+        embedded ? 16 : 20,
+        embedded ? 0 : 18,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -116,9 +154,6 @@ class _ProfileRecentActivitySectionState
 
               final items = snapshot.data ?? const [];
               if (items.isEmpty) {
-                final message = widget.scope == ProfileActivityScope.business
-                    ? 'No recent updates yet. Posts, photos, and reviews will show here.'
-                    : 'No activity yet. Post to the feed, spark posts, or update a business profile.';
                 return embedded
                     ? Padding(
                         padding: const EdgeInsets.symmetric(vertical: 36),
@@ -131,7 +166,7 @@ class _ProfileRecentActivitySectionState
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              message,
+                              _emptyMessage,
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                 color: Colors.white54,
@@ -158,7 +193,7 @@ class _ProfileRecentActivitySectionState
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Text(
-                                  message,
+                                  _emptyMessage,
                                   style: const TextStyle(
                                     color: Colors.white54,
                                     height: 1.4,
@@ -172,42 +207,29 @@ class _ProfileRecentActivitySectionState
                       );
               }
 
+              final listChildren = [
+                for (var i = 0; i < items.length; i++) ...[
+                  _ActivityTile(
+                    item: items[i],
+                    onTap: () => _handleActivityTap(context, items[i]),
+                    onLinkTap: items[i].linkUrl == null
+                        ? null
+                        : () => _openLink(context, items[i].linkUrl!),
+                  ),
+                  if (i < items.length - 1)
+                    Divider(
+                      height: 1,
+                      indent: embedded ? 0 : 56,
+                      color: Colors.white.withValues(alpha: .08),
+                    ),
+                ],
+              ];
+
               if (embedded) {
-                return Column(
-                  children: [
-                    for (var i = 0; i < items.length; i++) ...[
-                      _ActivityTile(
-                        item: items[i],
-                        onTap: () => _handleActivityTap(context, items[i]),
-                      ),
-                      if (i < items.length - 1)
-                        Divider(
-                          height: 1,
-                          color: Colors.white.withValues(alpha: .08),
-                        ),
-                    ],
-                  ],
-                );
+                return Column(children: listChildren);
               }
 
-              return _ActivityContainer(
-                child: Column(
-                  children: [
-                    for (var i = 0; i < items.length; i++) ...[
-                      _ActivityTile(
-                        item: items[i],
-                        onTap: () => _handleActivityTap(context, items[i]),
-                      ),
-                      if (i < items.length - 1)
-                        Divider(
-                          height: 1,
-                          indent: 56,
-                          color: Colors.white.withValues(alpha: .08),
-                        ),
-                    ],
-                  ],
-                ),
-              );
+              return _ActivityContainer(child: Column(children: listChildren));
             },
           ),
         ],
@@ -215,24 +237,75 @@ class _ProfileRecentActivitySectionState
     );
   }
 
-  void _handleActivityTap(BuildContext context, ProfileActivityItem item) {
-    final postId = item.referenceId;
-    if (postId == null || postId.isEmpty) return;
+  Future<void> _openLink(BuildContext context, String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open this link.')),
+      );
+    }
+  }
 
+  void _handleActivityTap(BuildContext context, ProfileActivityItem item) {
     switch (item.type) {
       case ProfileActivityType.newsPost:
       case ProfileActivityType.sparkGiven:
       case ProfileActivityType.sparkReceived:
-        CommunityNewsPostDetailSheet.show(
-          context,
-          postId: postId,
-        );
+        final postId = item.referenceId;
+        if (postId == null || postId.isEmpty) return;
+        CommunityNewsPostDetailSheet.show(context, postId: postId);
       case ProfileActivityType.feedComment:
+        final mediaId = item.referenceId;
+        if (mediaId == null || mediaId.isEmpty) return;
+        if (mediaId.startsWith('news-post:')) {
+          CommunityNewsPostDetailSheet.show(
+            context,
+            postId: mediaId.substring('news-post:'.length),
+          );
+        } else {
+          FeedCommentsSheet.show(
+            context,
+            mediaId: mediaId,
+            businessName: 'Post',
+          );
+        }
       case ProfileActivityType.businessMedia:
+      case ProfileActivityType.professionalMedia:
+        if (item.thumbnailUrl == null) return;
+        openSignedMedia(
+          context,
+          url: item.thumbnailUrl!,
+          isVideo: item.thumbnailIsVideo,
+          title: item.thumbnailIsVideo ? 'VIDEO' : 'PHOTO',
+        );
       case ProfileActivityType.reviewWritten:
       case ProfileActivityType.reviewReceived:
-        break;
+        _showReviewDialog(context, item);
     }
+  }
+
+  void _showReviewDialog(BuildContext context, ProfileActivityItem item) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF10151B),
+        title: Text(item.title, style: const TextStyle(color: Colors.white)),
+        content: SingleChildScrollView(
+          child: SocialRichText(
+            text: item.subtitle ?? '',
+            style: const TextStyle(color: Colors.white70, height: 1.45),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -257,16 +330,15 @@ class _ActivityContainer extends StatelessWidget {
 class _ActivityTile extends StatelessWidget {
   final ProfileActivityItem item;
   final VoidCallback? onTap;
+  final VoidCallback? onLinkTap;
 
-  const _ActivityTile({required this.item, this.onTap});
+  const _ActivityTile({
+    required this.item,
+    this.onTap,
+    this.onLinkTap,
+  });
 
-  bool get _isTappable =>
-      onTap != null &&
-      item.referenceId != null &&
-      item.referenceId!.isNotEmpty &&
-      (item.type == ProfileActivityType.newsPost ||
-          item.type == ProfileActivityType.sparkGiven ||
-          item.type == ProfileActivityType.sparkReceived);
+  bool get _isTappable => onTap != null;
 
   @override
   Widget build(BuildContext context) {
@@ -275,11 +347,23 @@ class _ActivityTile extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            _iconForType(item.type),
-            color: const Color(0xFFD8B56A),
-            size: 22,
-          ),
+          if (item.thumbnailUrl != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SignedMediaThumbnail(
+                url: item.thumbnailUrl!,
+                isVideo: item.thumbnailIsVideo,
+                width: 52,
+                height: 52,
+                fit: BoxFit.cover,
+              ),
+            )
+          else
+            Icon(
+              _iconForType(item.type),
+              color: const Color(0xFFD8B56A),
+              size: 22,
+            ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -295,14 +379,40 @@ class _ActivityTile extends StatelessWidget {
                 ),
                 if (item.subtitle != null && item.subtitle!.isNotEmpty) ...[
                   const SizedBox(height: 4),
-                  Text(
-                    item.subtitle!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  SocialRichText(
+                    text: item.subtitle!,
                     style: const TextStyle(
                       color: Colors.white54,
                       fontSize: 12,
                       height: 1.35,
+                    ),
+                  ),
+                ],
+                if (item.linkUrl != null) ...[
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: onLinkTap,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.link,
+                          size: 14,
+                          color: FirstVueColors.teal.withValues(alpha: .85),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            item.linkUrl!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: FirstVueColors.teal.withValues(alpha: .85),
+                              fontSize: 11,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -327,10 +437,7 @@ class _ActivityTile extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: content,
-      ),
+      child: InkWell(onTap: onTap, child: content),
     );
   }
 
@@ -339,6 +446,7 @@ class _ActivityTile extends StatelessWidget {
       ProfileActivityType.newsPost => Icons.campaign_outlined,
       ProfileActivityType.feedComment => Icons.chat_bubble_outline,
       ProfileActivityType.businessMedia => Icons.photo_library_outlined,
+      ProfileActivityType.professionalMedia => Icons.collections_outlined,
       ProfileActivityType.sparkGiven => Icons.bolt_outlined,
       ProfileActivityType.sparkReceived => Icons.bolt_rounded,
       ProfileActivityType.reviewWritten => Icons.rate_review_outlined,

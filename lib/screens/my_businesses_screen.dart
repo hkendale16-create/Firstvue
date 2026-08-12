@@ -7,6 +7,7 @@ import '../services/business_menu_service.dart';
 import '../services/business_social_links_service.dart';
 import '../services/business_submission_service.dart';
 import '../widgets/editable_media_grid.dart';
+import '../widgets/entity_profile_media_editor.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/location_autocomplete_field.dart';
 import '../widgets/media_picker_sheet.dart';
@@ -191,6 +192,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
   final _zip = TextEditingController();
   bool _saving = false;
   bool _uploading = false;
+  bool _profileMediaUpdating = false;
   bool _comingSoon = false;
   final _instagram = TextEditingController();
   final _facebook = TextEditingController();
@@ -198,6 +200,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
   final _menuLines = TextEditingController();
   final _specialLines = TextEditingController();
   late Future<List<BusinessMediaItem>> _media;
+  BusinessImageSet _profileImages = const BusinessImageSet();
   late TabController _tabController;
   int _previewToken = 0;
 
@@ -211,6 +214,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
       }
     });
     _media = BusinessMediaService.fetchMedia(widget.business.id);
+    _loadProfileImages();
     _loadLocation();
     _loadExtras();
   }
@@ -269,6 +273,65 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
       if (platform.contains('youtube')) _youtube.text = link.url;
     }
     setState(() {});
+  }
+
+  Future<void> _loadProfileImages() async {
+    final images =
+        await BusinessMediaService.fetchProfileImages(widget.business.id);
+    if (!mounted) return;
+    setState(() => _profileImages = images);
+  }
+
+  Future<void> _changeCover() async {
+    final files = await showImagePickerSheet(context);
+    if (files == null || files.isEmpty || !mounted) return;
+    setState(() => _profileMediaUpdating = true);
+    try {
+      await BusinessMediaService.setCover(
+        businessId: widget.business.id,
+        file: files.first,
+      );
+      await _loadProfileImages();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cover photo updated.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to update cover: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _profileMediaUpdating = false);
+    }
+  }
+
+  Future<void> _changeAvatar() async {
+    final files = await showImagePickerSheet(context);
+    if (files == null || files.isEmpty || !mounted) return;
+    setState(() => _profileMediaUpdating = true);
+    try {
+      await BusinessMediaService.setAvatar(
+        businessId: widget.business.id,
+        file: files.first,
+      );
+      await _loadProfileImages();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile photo updated.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to update profile photo: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _profileMediaUpdating = false);
+    }
   }
 
   Future<void> _loadLocation() async {
@@ -511,6 +574,15 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
           style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.4),
         ),
         const SizedBox(height: 14),
+        EntityProfileMediaEditor(
+          avatarUrl: _profileImages.avatar?.signedUrl,
+          coverUrl: _profileImages.cover?.signedUrl,
+          updating: _profileMediaUpdating,
+          placeholderIcon: Icons.storefront_outlined,
+          onChangeCover: _changeCover,
+          onChangeAvatar: _changeAvatar,
+        ),
+        const SizedBox(height: 24),
         _Field(controller: _about, label: 'About your business', lines: 4),
         const SizedBox(height: 12),
         _Field(
