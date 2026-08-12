@@ -88,19 +88,13 @@ create policy "Admins manage community creation requests"
   using (public.is_firstvue_admin())
   with check (public.is_firstvue_admin());
 
--- Block direct hub inserts by normal users (only via admin approve RPC).
+-- Block direct hub inserts by normal users (only via admin approve RPC /
+-- FirstVue admin). The review RPC is SECURITY DEFINER and bypasses RLS.
 drop policy if exists "Approved leaders create community hubs" on public.community_hubs;
-create policy "Admins or approve-RPC create community hubs"
+drop policy if exists "Admins or approve-RPC create community hubs" on public.community_hubs;
+create policy "Only admins insert community hubs directly"
   on public.community_hubs for insert to authenticated
-  with check (
-    public.is_firstvue_admin()
-    or (
-      created_by_profile_id = auth.uid()
-      and leader_user_id = auth.uid()
-      and status = 'active'
-      and public.is_approved_community_leader()
-    )
-  );
+  with check (public.is_firstvue_admin());
 
 -- ---------------------------------------------------------------------------
 -- 3) Community Editors (max 6 active) + granular permissions
