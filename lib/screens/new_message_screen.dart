@@ -5,7 +5,9 @@ import '../services/messaging_service.dart';
 import 'conversation_screen.dart';
 
 class NewMessageScreen extends StatefulWidget {
-  const NewMessageScreen({super.key});
+  final String? initialMessage;
+
+  const NewMessageScreen({super.key, this.initialMessage});
 
   @override
   State<NewMessageScreen> createState() => _NewMessageScreenState();
@@ -65,6 +67,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
             threadId: threadId,
             title: recipient.displayName,
             subtitle: recipient.businessName,
+            initialMessage: widget.initialMessage,
           ),
         ),
       );

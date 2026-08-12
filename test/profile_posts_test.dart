@@ -9,6 +9,7 @@ void main() {
       final post = CommunityNewsPost(
         id: 'post-1',
         body: 'Hello community',
+        authorId: 'user-1',
         authorName: 'Kendale',
         businessName: null,
         createdAt: createdAt,

@@ -28,11 +28,11 @@ void main() {
 
     expect(find.text('TRENDING NEAR YOU'), findsOneWidget);
 
-    final nowNav = find.text('NOW');
-    await tester.ensureVisible(nowNav);
-    await tester.tap(nowNav);
+    final exploreNav = find.text('EXPLORE');
+    await tester.ensureVisible(exploreNav);
+    await tester.tap(exploreNav);
     await tester.pumpAndSettle();
 
-    expect(find.text("WHAT'S NOW"), findsWidgets);
+    expect(find.text('EXPLORE'), findsWidgets);
   });
 }

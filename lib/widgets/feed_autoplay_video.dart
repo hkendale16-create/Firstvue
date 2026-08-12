@@ -96,7 +96,9 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
     if (!_ready || controller == null || _failed) return;
 
     _previewTimer?.cancel();
-    controller.seekTo(Duration.zero);
+    if (controller.value.position > Duration.zero) {
+      controller.seekTo(Duration.zero);
+    }
     controller.play();
     setState(() {
       _playing = true;

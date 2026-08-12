@@ -44,9 +44,9 @@ class FirstVueBottomNav extends StatelessWidget {
                   onTap: () => onSelected(0),
                 ),
                 _NavItem(
-                  label: 'NOW',
-                  icon: Icons.bolt_outlined,
-                  selectedIcon: Icons.bolt_rounded,
+                  label: 'EXPLORE',
+                  icon: Icons.explore_outlined,
+                  selectedIcon: Icons.explore_rounded,
                   selected: selectedIndex == 1,
                   selectedColor: FirstVueColors.teal,
                   onTap: () => onSelected(1),

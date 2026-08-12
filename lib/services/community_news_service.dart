@@ -18,7 +18,9 @@ class ProfileEngagementStats {
 class CommunityNewsPost {
   final String id;
   final String body;
+  final String authorId;
   final String authorName;
+  final String? authorUsername;
   final String? businessName;
   final DateTime createdAt;
   final bool isMine;
@@ -30,7 +32,9 @@ class CommunityNewsPost {
   const CommunityNewsPost({
     required this.id,
     required this.body,
+    required this.authorId,
     required this.authorName,
+    this.authorUsername,
     required this.businessName,
     required this.createdAt,
     required this.isMine,
@@ -45,7 +49,9 @@ class CommunityNewsPost {
   CommunityNewsPost copyWith({
     String? id,
     String? body,
+    String? authorId,
     String? authorName,
+    String? authorUsername,
     String? businessName,
     DateTime? createdAt,
     bool? isMine,
@@ -57,7 +63,9 @@ class CommunityNewsPost {
     return CommunityNewsPost(
       id: id ?? this.id,
       body: body ?? this.body,
+      authorId: authorId ?? this.authorId,
       authorName: authorName ?? this.authorName,
+      authorUsername: authorUsername ?? this.authorUsername,
       businessName: businessName ?? this.businessName,
       createdAt: createdAt ?? this.createdAt,
       isMine: isMine ?? this.isMine,
@@ -121,6 +129,7 @@ class CommunityNewsService {
         .toList();
 
     final authorNames = await _fetchProfileNames(authorIds);
+    final authorUsernames = await _fetchProfileUsernames(authorIds);
     final businessNames = await _fetchBusinessNames(businessIds);
     final sparkCounts = await _fetchSparkCounts(postIds);
     final mySparks = currentUserId == null
@@ -147,7 +156,9 @@ class CommunityNewsService {
       return CommunityNewsPost(
         id: id,
         body: (row['body'] as String?) ?? '',
+        authorId: authorId,
         authorName: authorNames[authorId] ?? 'FirstVue member',
+        authorUsername: authorUsernames[authorId],
         businessName:
             businessId == null ? null : businessNames[businessId],
         createdAt: createdAt,
@@ -182,6 +193,25 @@ class CommunityNewsService {
         for (final row in rows)
           row['id'] as String:
               (row['display_name'] as String?) ?? 'FirstVue member',
+      };
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<Map<String, String>> _fetchProfileUsernames(
+    List<String> authorIds,
+  ) async {
+    if (authorIds.isEmpty) return {};
+    try {
+      final rows = await _client
+          .from('profiles')
+          .select('id, username')
+          .inFilter('id', authorIds);
+      return {
+        for (final row in rows)
+          if ((row['username'] as String?)?.trim().isNotEmpty == true)
+            row['id'] as String: (row['username'] as String).trim(),
       };
     } catch (_) {
       return {};
@@ -337,6 +367,7 @@ class CommunityNewsService {
     }
 
     final authorNames = await _fetchProfileNames([me.id]);
+    final authorUsernames = await _fetchProfileUsernames([me.id]);
     final insertedBusinessId = row['business_id'] as String?;
     final businessNames = insertedBusinessId == null
         ? const <String, String>{}
@@ -345,7 +376,9 @@ class CommunityNewsService {
     final post = CommunityNewsPost(
       id: postId,
       body: row['body'] as String,
+      authorId: me.id,
       authorName: authorNames[me.id] ?? 'FirstVue member',
+      authorUsername: authorUsernames[me.id],
       businessName: insertedBusinessId == null
           ? null
           : businessNames[insertedBusinessId],
@@ -378,6 +411,29 @@ class CommunityNewsService {
     return post.copyWith(savedByMe: saved);
   }
 
+  /// Approved posts by a member (RLS also allows viewing own pending posts).
+  static Future<List<CommunityNewsPost>> fetchPostsByAuthor(
+    String authorId, {
+    int limit = 20,
+  }) async {
+    if (authorId.trim().isEmpty) return const [];
+
+    final me = _client.auth.currentUser?.id;
+
+    try {
+      final rows = await _client
+          .from('community_news_posts')
+          .select('id, body, created_at, author_id, business_id')
+          .eq('author_id', authorId)
+          .order('created_at', ascending: false)
+          .limit(limit);
+
+      return _mapPostRows(rows, currentUserId: me);
+    } catch (_) {
+      return const [];
+    }
+  }
+
   /// Post count and sparks received on the signed-in user's posts.
   static Future<ProfileEngagementStats> fetchMyEngagementStats() async {
     final me = _client.auth.currentUser;
@@ -390,6 +446,40 @@ class CommunityNewsService {
           .from('community_news_posts')
           .select('id')
           .eq('author_id', me.id);
+      final postIds =
+          posts.map((row) => row['id'] as String).toList(growable: false);
+      final postCount = postIds.length;
+
+      if (postIds.isEmpty) {
+        return ProfileEngagementStats(postCount: postCount, sparksReceived: 0);
+      }
+
+      final sparkRows = await _client
+          .from('community_news_post_sparks')
+          .select('post_id')
+          .inFilter('post_id', postIds);
+      return ProfileEngagementStats(
+        postCount: postCount,
+        sparksReceived: sparkRows.length,
+      );
+    } catch (_) {
+      return const ProfileEngagementStats(postCount: 0, sparksReceived: 0);
+    }
+  }
+
+  /// Post count and sparks received for any member's posts.
+  static Future<ProfileEngagementStats> fetchEngagementStatsForAuthor(
+    String authorId,
+  ) async {
+    if (authorId.trim().isEmpty) {
+      return const ProfileEngagementStats(postCount: 0, sparksReceived: 0);
+    }
+
+    try {
+      final posts = await _client
+          .from('community_news_posts')
+          .select('id')
+          .eq('author_id', authorId);
       final postIds =
           posts.map((row) => row['id'] as String).toList(growable: false);
       final postCount = postIds.length;

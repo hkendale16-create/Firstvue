@@ -19,9 +19,31 @@ class AppConfig {
     return '$webBaseUrl/?business=$businessId';
   }
 
+  static String memberShareUrl(String profileId) {
+    return '$webBaseUrl/?profile=$profileId';
+  }
+
+  static String newsPostShareUrl(String postId) {
+    return '$webBaseUrl/?post=$postId';
+  }
+
   static String? initialBusinessIdFromUri() {
     if (!kIsWeb) return null;
     final id = Uri.base.queryParameters['business'];
+    if (id == null || id.trim().isEmpty) return null;
+    return id.trim();
+  }
+
+  static String? initialProfileIdFromUri() {
+    if (!kIsWeb) return null;
+    final id = Uri.base.queryParameters['profile'];
+    if (id == null || id.trim().isEmpty) return null;
+    return id.trim();
+  }
+
+  static String? initialPostIdFromUri() {
+    if (!kIsWeb) return null;
+    final id = Uri.base.queryParameters['post'];
     if (id == null || id.trim().isEmpty) return null;
     return id.trim();
   }

@@ -77,6 +77,21 @@ class FeedCommentsService {
             (text.contains('uuid') || text.contains('type')));
   }
 
+  /// All replies under a top-level comment, including nested replies.
+  static List<FeedComment> collectThreadReplies(
+    List<FeedComment> all,
+    String rootId,
+  ) {
+    final direct =
+        all.where((comment) => comment.parentId == rootId).toList();
+    final result = <FeedComment>[];
+    for (final reply in direct) {
+      result.add(reply);
+      result.addAll(collectThreadReplies(all, reply.id));
+    }
+    return result;
+  }
+
   static Future<List<FeedComment>> fetchComments(String mediaId) async {
     final me = _client.auth.currentUser?.id;
     try {

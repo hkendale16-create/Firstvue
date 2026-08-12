@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../data/us_locations.dart';
 import '../services/profile_media_service.dart';
 import '../services/user_profile_service.dart';
+import '../services/username_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/location_autocomplete_field.dart';
 import '../widgets/media_picker_sheet.dart';
 import '../widgets/signed_media_viewer.dart';
 
@@ -17,11 +20,16 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _bioController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
   ProfileImageSet _images = const ProfileImageSet();
   bool _loading = true;
   bool _saving = false;
   bool _mediaUpdating = false;
   String? _error;
+  String? _usernameError;
 
   @override
   void initState() {
@@ -32,6 +40,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _usernameController.dispose();
+    _bioController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
     super.dispose();
   }
 
@@ -50,13 +62,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         return;
       }
 
-      final name = await UserProfileService.fetchDisplayName();
+      final profile = await UserProfileService.fetchProfile();
       final images = await ProfileMediaService.fetchProfileImages();
       if (!mounted) return;
       _nameController.text =
-          (name?.trim().isNotEmpty == true ? name!.trim() : null) ??
+          (profile?.displayName?.trim().isNotEmpty == true
+              ? profile!.displayName!.trim()
+              : null) ??
           user.email?.split('@').first ??
           '';
+      _usernameController.text = profile?.username ?? '';
+      _bioController.text = profile?.bio ?? '';
+      _cityController.text = profile?.city ?? '';
+      _stateController.text = profile?.state ?? '';
       setState(() {
         _images = images;
         _loading = false;
@@ -74,19 +92,57 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() {
       _saving = true;
       _error = null;
+      _usernameError = null;
     });
+
     try {
-      await UserProfileService.updateDisplayName(_nameController.text);
+      final usernameRaw = _usernameController.text.trim();
+      if (usernameRaw.isNotEmpty) {
+        final normalized = UsernameService.normalize(usernameRaw);
+        if (normalized == null) {
+          setState(() {
+            _saving = false;
+            _usernameError =
+                'Username must be 3–30 characters: lowercase letters, numbers, and underscores.';
+          });
+          return;
+        }
+
+        final user = Supabase.instance.client.auth.currentUser!;
+        final available = await UsernameService.isAvailable(
+          normalized,
+          excludeUserId: user.id,
+        );
+        if (!available) {
+          setState(() {
+            _saving = false;
+            _usernameError = 'That username is already taken.';
+          });
+          return;
+        }
+
+        await UsernameService.updateUsername(normalized);
+      }
+
+      await UserProfileService.updateExtendedProfile(
+        displayName: _nameController.text,
+        bio: _bioController.text,
+        city: _cityController.text,
+        state: _stateController.text,
+      );
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile updated.')),
       );
       Navigator.pop(context, true);
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _error = 'Unable to save your profile right now.';
+        _error = error is ArgumentError
+            ? error.message?.toString() ?? 'Unable to save profile.'
+            : 'Unable to save your profile right now.';
       });
     }
   }
@@ -252,6 +308,53 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         borderSide: BorderSide.none,
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _usernameController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Username',
+                      hintText: 'your_handle',
+                      prefixText: '@',
+                      prefixStyle: const TextStyle(color: FirstVueColors.teal),
+                      labelStyle: const TextStyle(color: Colors.white54),
+                      errorText: _usernameError,
+                      filled: true,
+                      fillColor: FirstVueColors.surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _bioController,
+                    style: const TextStyle(color: Colors.white),
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      labelText: 'Bio',
+                      labelStyle: const TextStyle(color: Colors.white54),
+                      filled: true,
+                      fillColor: FirstVueColors.surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  LocationAutocompleteField(
+                    controller: _cityController,
+                    label: 'City',
+                    type: LocationFieldType.city,
+                  ),
+                  const SizedBox(height: 12),
+                  LocationAutocompleteField(
+                    controller: _stateController,
+                    label: 'State',
+                    type: LocationFieldType.state,
                   ),
                   const SizedBox(height: 12),
                   Text(

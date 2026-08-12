@@ -3,6 +3,7 @@ import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../screens/firstvue_business_profile_screen.dart';
+import '../screens/member_public_profile_screen.dart';
 import '../services/community_news_service.dart';
 import '../services/things_to_do_service.dart';
 import '../services/trending_businesses_service.dart';
@@ -10,6 +11,7 @@ import '../theme/firstvue_theme.dart';
 import '../utils/app_environment.dart';
 import '../widgets/feed_comments_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/community_news_post_detail_sheet.dart';
 
 const _screenBackground = Color(0xFF080B0F);
 
@@ -713,12 +715,22 @@ class _PulsePostCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  post.authorName,
-                  style: const TextStyle(
-                    color: FirstVueColors.gold,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: post.authorId.isNotEmpty
+                      ? () => openMemberProfile(
+                            context,
+                            profileId: post.authorId,
+                            displayName: post.authorName,
+                          )
+                      : null,
+                  child: Text(
+                    post.authorName,
+                    style: const TextStyle(
+                      color: FirstVueColors.gold,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ),
@@ -730,44 +742,57 @@ class _PulsePostCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            post.body,
-            style: const TextStyle(color: Colors.white, height: 1.4),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(
-                Icons.bolt_rounded,
-                size: 16,
-                color: post.sparkedByMe
-                    ? FirstVueColors.gold
-                    : Colors.white.withValues(alpha: .5),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '${post.sparkCount} sparks',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: .6),
-                  fontSize: 12,
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => CommunityNewsPostDetailSheet.show(
+              context,
+              postId: post.id,
+              initialPost: post,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  post.body,
+                  style: const TextStyle(color: Colors.white, height: 1.4),
                 ),
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed: () => FeedCommentsSheet.show(
-                  context,
-                  mediaId: post.commentsMediaId,
-                  businessName: post.authorName,
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.bolt_rounded,
+                      size: 16,
+                      color: post.sparkedByMe
+                          ? FirstVueColors.gold
+                          : Colors.white.withValues(alpha: .5),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${post.sparkCount} sparks',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: .6),
+                        fontSize: 12,
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () => FeedCommentsSheet.show(
+                        context,
+                        mediaId: post.commentsMediaId,
+                        businessName: post.authorName,
+                      ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white70,
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('Comment'),
+                    ),
+                  ],
                 ),
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.white70,
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text('Comment'),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

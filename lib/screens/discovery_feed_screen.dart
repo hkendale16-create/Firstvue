@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
-import 'package:flutter/services.dart';
 
 import '../config/app_config.dart';
 import '../services/discovery_feed_service.dart';
 import '../widgets/feed_comments_sheet.dart';
+import '../widgets/vue_video_player.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/firstvue_share_sheet.dart';
+import '../models/share_payload.dart';
 import 'ai_search_screen.dart';
 import 'business_profile_screen.dart';
 import 'firstvue_business_profile_screen.dart';
+import 'member_public_profile_screen.dart';
 
 enum _FeedMode { forYou, nearby, trending }
 
@@ -21,7 +24,10 @@ class DiscoveryFeedScreen extends StatefulWidget {
 
 class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   final _searchController = TextEditingController();
+  final _pageController = PageController();
   late Future<List<DiscoveryFeedItem>> _feedFuture;
+  List<_FeedItem> _feedItems = const [];
+  int _currentPage = 0;
   _FeedMode _mode = _FeedMode.forYou;
 
   static const _items = [
@@ -66,11 +72,48 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   @override
   void initState() {
     super.initState();
-    _feedFuture = DiscoveryFeedService.fetchFeed();
+    _feedFuture = _loadFeed();
+    _pageController.addListener(_onPageChanged);
+  }
+
+  void _onPageChanged() {
+    if (!_pageController.hasClients) return;
+    final page = _pageController.page?.round() ?? 0;
+    if (page != _currentPage) {
+      _currentPage = page;
+    }
+  }
+
+  Future<List<DiscoveryFeedItem>> _loadFeed() async {
+    final mode = switch (_mode) {
+      _FeedMode.forYou => VueFeedMode.forYou,
+      _FeedMode.nearby => VueFeedMode.nearby,
+      _FeedMode.trending => VueFeedMode.trending,
+    };
+    final items = await DiscoveryFeedService.fetchFeed(mode: mode);
+    if (!mounted) return items;
+    final mapped = _connectedItems(items);
+    setState(() {
+      _feedItems = mapped.isEmpty ? _items : mapped;
+    });
+    return items;
+  }
+
+  Future<void> _refreshFeed() async {
+    final savedPage = _currentPage;
+    await _loadFeed();
+    if (!mounted || !_pageController.hasClients) return;
+    final maxPage = (_feedItems.length - 1).clamp(0, _feedItems.length);
+    final target = savedPage.clamp(0, maxPage);
+    if (_pageController.page?.round() != target) {
+      _pageController.jumpToPage(target);
+    }
   }
 
   @override
   void dispose() {
+    _pageController.removeListener(_onPageChanged);
+    _pageController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -86,7 +129,16 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
 
   void _openProfile(_FeedItem item) {
     final connected = item.connected;
-    if (connected != null) {
+    if (connected != null && connected.isMember) {
+      DiscoveryFeedService.recordProfileTap(connected);
+      openMemberProfile(
+        context,
+        profileId: connected.ownerId,
+        displayName: connected.ownerName,
+      );
+      return;
+    }
+    if (connected != null && connected.businessId.isNotEmpty) {
       DiscoveryFeedService.recordProfileTap(connected);
       Navigator.push(
         context,
@@ -120,16 +172,19 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
       .map(
         (item) => _FeedItem(
           item.businessName,
-          '${item.caption} • @${item.ownerName}',
+          item.isMember
+              ? '${item.caption} • @${item.ownerName}'
+              : '${item.caption} • @${item.ownerName}',
           item.services.isEmpty ? item.businessType : item.services.join(' • '),
-          'Nearby',
+          item.isMember ? 'Member' : 'Nearby',
           item.rating,
           0,
           item.mediaUrl,
-          Icons.storefront_rounded,
+          item.isMember ? Icons.person_rounded : Icons.storefront_rounded,
           item.verified,
           item.sponsored,
           connected: item,
+          mediaType: item.mediaType,
         ),
       )
       .toList();
@@ -160,17 +215,29 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                   _ModeButton(
                     label: 'For You',
                     selected: _mode == _FeedMode.forYou,
-                    onTap: () => setState(() => _mode = _FeedMode.forYou),
+                    onTap: () {
+                      if (_mode == _FeedMode.forYou) return;
+                      setState(() => _mode = _FeedMode.forYou);
+                      _feedFuture = _loadFeed();
+                    },
                   ),
                   _ModeButton(
                     label: 'Nearby',
                     selected: _mode == _FeedMode.nearby,
-                    onTap: () => setState(() => _mode = _FeedMode.nearby),
+                    onTap: () {
+                      if (_mode == _FeedMode.nearby) return;
+                      setState(() => _mode = _FeedMode.nearby);
+                      _feedFuture = _loadFeed();
+                    },
                   ),
                   _ModeButton(
                     label: 'Trending',
                     selected: _mode == _FeedMode.trending,
-                    onTap: () => setState(() => _mode = _FeedMode.trending),
+                    onTap: () {
+                      if (_mode == _FeedMode.trending) return;
+                      setState(() => _mode = _FeedMode.trending);
+                      _feedFuture = _loadFeed();
+                    },
                   ),
                 ],
               ),
@@ -216,23 +283,27 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                       ),
                     );
                   }
-                  final connected = snapshot.hasData
-                      ? _connectedItems(snapshot.data!)
-                      : <_FeedItem>[];
-                  final items = connected.isEmpty ? _items : connected;
+                  final items = _feedItems.isEmpty ? _items : _feedItems;
                   return FirstVueRefreshScaffold(
-                    onRefresh: () async {
-                      final next = DiscoveryFeedService.fetchFeed();
-                      setState(() => _feedFuture = next);
-                      await next;
+                    onRefresh: _refreshFeed,
+                    notificationPredicate: (notification) {
+                      if (_currentPage != 0) return false;
+                      return defaultScrollNotificationPredicate(notification);
                     },
                     child: PageView.builder(
+                      controller: _pageController,
                       scrollDirection: Axis.vertical,
                       itemCount: items.length,
-                      itemBuilder: (_, index) => _InteractiveFeedCard(
-                        item: items[index],
-                        onOpen: () => _openProfile(items[index]),
-                      ),
+                      itemBuilder: (_, index) {
+                        final item = items[index];
+                        final itemKey = item.connected?.mediaId ??
+                            '${item.name}-${item.image}';
+                        return _InteractiveFeedCard(
+                          key: ValueKey(itemKey),
+                          item: item,
+                          onViewProfile: () => _openProfile(item),
+                        );
+                      },
                     ),
                   );
                 },
@@ -439,8 +510,12 @@ class _Action extends StatelessWidget {
 
 class _InteractiveFeedCard extends StatefulWidget {
   final _FeedItem item;
-  final VoidCallback onOpen;
-  const _InteractiveFeedCard({required this.item, required this.onOpen});
+  final VoidCallback onViewProfile;
+  const _InteractiveFeedCard({
+    super.key,
+    required this.item,
+    required this.onViewProfile,
+  });
 
   @override
   State<_InteractiveFeedCard> createState() => _InteractiveFeedCardState();
@@ -457,15 +532,26 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
     }
   }
 
-  void _share() {
+  void _openRouteShare() {
     final connected = widget.item.connected;
-    final link = connected != null
-        ? AppConfig.businessShareUrl(connected.businessId)
-        : AppConfig.webBaseUrl;
-    Clipboard.setData(ClipboardData(text: link));
-    _record('share');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('FirstVue link copied: $link')),
+    final item = widget.item;
+    final link = connected == null
+        ? AppConfig.webBaseUrl
+        : connected.isMember
+            ? AppConfig.memberShareUrl(connected.ownerId)
+            : AppConfig.businessShareUrl(connected.businessId);
+
+    FirstVueShareSheet.show(
+      context,
+      payload: SharePayload(
+        title: item.name,
+        subtitle: item.caption,
+        link: link,
+        detailLine: connected?.isMember == true
+            ? 'FirstVue member profile'
+            : '★ ${item.rating} (${item.reviews} reviews) • ${item.distance} • ${item.specialty}',
+      ),
+      onAction: (_) => _record('share'),
     );
   }
 
@@ -475,6 +561,14 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Comments are available on verified Vue posts.'),
+        ),
+      );
+      return;
+    }
+    if (connected.isMember) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Comments on member Vue posts are coming soon.'),
         ),
       );
       return;
@@ -489,6 +583,10 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
+    final connected = item.connected;
+    final isVideo = connected?.isVideo ?? false;
+    final isMember = connected?.isMember ?? false;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
       child: ClipRRect(
@@ -496,21 +594,10 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            GestureDetector(
-              onTap: widget.onOpen,
-              child: item.connected == null
-                  ? Image.asset(
-                      item.image,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
-                          const ColoredBox(color: Color(0xFF202833)),
-                    )
-                  : Image.network(
-                      item.image,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
-                          const ColoredBox(color: Color(0xFF202833)),
-                    ),
+            _VueFeedMediaBackground(
+              assetPath: item.connected == null ? item.image : null,
+              networkUrl: item.connected == null ? null : item.image,
+              isVideo: connected?.isVideo ?? false,
             ),
             const IgnorePointer(
               child: DecoratedBox(
@@ -528,15 +615,16 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
                 ),
               ),
             ),
-            const IgnorePointer(
-              child: Center(
-                child: Icon(
-                  Icons.play_circle_outline_rounded,
-                  color: Color(0xCCFFFFFF),
-                  size: 64,
+            if (!isVideo)
+              const IgnorePointer(
+                child: Center(
+                  child: Icon(
+                    Icons.play_circle_outline_rounded,
+                    color: Color(0xCCFFFFFF),
+                    size: 64,
+                  ),
                 ),
               ),
-            ),
             Positioned(
               right: 13,
               bottom: 116,
@@ -575,7 +663,7 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
                   _VueAction(
                     icon: Icons.route_outlined,
                     label: 'Route',
-                    onTap: _share,
+                    onTap: _openRouteShare,
                   ),
                 ],
               ),
@@ -598,25 +686,49 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
                     ),
                   Row(
                     children: [
-                      Flexible(
-                        child: Text(
-                          item.name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 21,
-                            fontWeight: FontWeight.bold,
+                      if (connected != null)
+                        GestureDetector(
+                          onTap: widget.onViewProfile,
+                          child: CircleAvatar(
+                            radius: 18,
+                            backgroundColor: Colors.black45,
+                            child: Icon(
+                              isMember ? Icons.person : Icons.storefront,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      if (connected != null) const SizedBox(width: 10),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: connected != null ? widget.onViewProfile : null,
+                          behavior: HitTestBehavior.opaque,
+                          child: Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  item.name,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 21,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              if (item.verified)
+                                const Padding(
+                                  padding: EdgeInsets.only(left: 6),
+                                  child: Icon(
+                                    Icons.workspace_premium_rounded,
+                                    color: Color(0xFFD8B56A),
+                                    size: 19,
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ),
-                      if (item.verified)
-                        const Padding(
-                          padding: EdgeInsets.only(left: 6),
-                          child: Icon(
-                            Icons.workspace_premium_rounded,
-                            color: Color(0xFFD8B56A),
-                            size: 19,
-                          ),
-                        ),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -628,7 +740,9 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '★ ${item.rating} (${item.reviews}) • ${item.distance} • ${item.specialty}',
+                    isMember
+                        ? '${item.specialty} • FirstVue member'
+                        : '★ ${item.rating} (${item.reviews}) • ${item.distance} • ${item.specialty}',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: Colors.white70, fontSize: 11),
@@ -637,13 +751,13 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: widget.onOpen,
+                      onPressed: widget.onViewProfile,
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFFD8B56A),
                         foregroundColor: Colors.black,
                         visualDensity: VisualDensity.compact,
                       ),
-                      child: const Text('VIEW BUSINESS'),
+                      child: Text(isMember ? 'VIEW PROFILE' : 'VIEW BUSINESS'),
                     ),
                   ),
                 ],
@@ -652,6 +766,59 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _VueFeedMediaBackground extends StatelessWidget {
+  final String? assetPath;
+  final String? networkUrl;
+  final bool isVideo;
+
+  const _VueFeedMediaBackground({
+    this.assetPath,
+    this.networkUrl,
+    this.isVideo = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (assetPath != null) {
+      return Image.asset(
+        assetPath!,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) =>
+            const ColoredBox(color: Color(0xFF202833)),
+      );
+    }
+
+    final url = networkUrl;
+    if (url == null || url.isEmpty) {
+      return const ColoredBox(color: Color(0xFF202833));
+    }
+
+    if (isVideo) {
+      return VueVideoPlayer(
+        url: url,
+        fit: BoxFit.cover,
+        autoPlay: true,
+        startMuted: true,
+      );
+    }
+
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return const ColoredBox(
+          color: Color(0xFF202833),
+          child: Center(
+            child: CircularProgressIndicator(color: Color(0xFFD8B56A)),
+          ),
+        );
+      },
+      errorBuilder: (_, _, _) => const ColoredBox(color: Color(0xFF202833)),
     );
   }
 }
@@ -707,6 +874,7 @@ class _FeedItem {
   final IconData icon;
   final bool verified, sponsored;
   final DiscoveryFeedItem? connected;
+  final String? mediaType;
   const _FeedItem(
     this.name,
     this.caption,
@@ -719,5 +887,6 @@ class _FeedItem {
     this.verified,
     this.sponsored, {
     this.connected,
+    this.mediaType,
   });
 }

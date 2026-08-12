@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 
+import '../screens/community_detail_screen.dart';
+import '../screens/firstvue_business_profile_screen.dart';
+import '../screens/member_public_profile_screen.dart';
+import '../services/search_autocomplete_service.dart';
+import '../theme/firstvue_theme.dart';
 import 'barber_results_screen.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 
@@ -14,6 +19,59 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final _searchController = TextEditingController();
   DiscoveryCategory _category = DiscoveryCategory.barbers;
+  List<SearchAutocompleteResult> _suggestions = const [];
+  bool _searching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onQueryChanged);
+  }
+
+  Future<void> _onQueryChanged() async {
+    final query = _searchController.text;
+    if (query.trim().length < 2) {
+      if (_suggestions.isNotEmpty && mounted) {
+        setState(() => _suggestions = const []);
+      }
+      return;
+    }
+    setState(() => _searching = true);
+    final results = await SearchAutocompleteService.search(query);
+    if (!mounted) return;
+    setState(() {
+      _suggestions = results;
+      _searching = false;
+    });
+  }
+
+  void _openSuggestion(SearchAutocompleteResult result) {
+    switch (result.type) {
+      case SearchResultType.profile:
+        Navigator.push(
+          context,
+          FirstVuePageRoute(
+            builder: (_) => MemberPublicProfileScreen(profileId: result.id),
+          ),
+        );
+      case SearchResultType.business:
+        Navigator.push(
+          context,
+          FirstVuePageRoute(
+            builder: (_) => FirstVueBusinessProfileScreen(businessId: result.id),
+          ),
+        );
+      case SearchResultType.community:
+        Navigator.push(
+          context,
+          FirstVuePageRoute(
+            builder: (_) => CommunityDetailScreen(communityId: result.id),
+          ),
+        );
+      case SearchResultType.hashtag:
+        _search(result.label.replaceFirst('#', ''));
+    }
+  }
 
   @override
   void dispose() {
@@ -117,6 +175,47 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ),
             ),
+            if (_searching)
+              const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: LinearProgressIndicator(color: FirstVueColors.teal),
+              ),
+            if (_suggestions.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF151B22),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withValues(alpha: .08)),
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _suggestions.length,
+                  separatorBuilder: (_, _) => Divider(
+                    height: 1,
+                    color: Colors.white.withValues(alpha: .06),
+                  ),
+                  itemBuilder: (context, index) {
+                    final item = _suggestions[index];
+                    return ListTile(
+                      dense: true,
+                      title: Text(
+                        item.label,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      subtitle: item.subtitle == null
+                          ? null
+                          : Text(
+                              item.subtitle!,
+                              style: const TextStyle(color: Colors.white54),
+                            ),
+                      onTap: () => _openSuggestion(item),
+                    );
+                  },
+                ),
+              ),
+            ],
             const SizedBox(height: 30),
             const Text(
               'QUICK SEARCHES',

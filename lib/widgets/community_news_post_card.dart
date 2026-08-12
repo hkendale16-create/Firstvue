@@ -12,10 +12,13 @@ enum CommunityNewsPostCardStyle { compact, timeline }
 class CommunityNewsPostCard extends StatefulWidget {
   final CommunityNewsPost post;
   final VoidCallback? onTap;
+  final VoidCallback? onAuthorTap;
   final VoidCallback? onSpark;
   final VoidCallback? onSave;
   final VoidCallback? onComment;
+  final VoidCallback? onRepost;
   final VoidCallback? onDelete;
+  final bool repostedByMe;
   final bool compact;
   final CommunityNewsPostCardStyle style;
 
@@ -23,10 +26,13 @@ class CommunityNewsPostCard extends StatefulWidget {
     super.key,
     required this.post,
     this.onTap,
+    this.onAuthorTap,
     this.onSpark,
     this.onSave,
     this.onComment,
+    this.onRepost,
     this.onDelete,
+    this.repostedByMe = false,
     this.compact = false,
     this.style = CommunityNewsPostCardStyle.compact,
   });
@@ -78,85 +84,112 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
     return trimmed[0].toUpperCase();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final content = Column(
+  Widget _buildAuthorHeader() {
+    final horizontalPadding = _isTimeline ? 0.0 : 14.0;
+    final topPadding = _isTimeline ? 0.0 : 14.0;
+
+    final row = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(
-            _isTimeline ? 0 : 14,
-            _isTimeline ? 0 : 14,
-            _isTimeline ? 0 : 6,
-            0,
+        CircleAvatar(
+          radius: _isTimeline ? 20 : 18,
+          backgroundColor: FirstVueColors.elevatedSurface,
+          child: Text(
+            _authorInitial(),
+            style: TextStyle(
+              color: FirstVueColors.gold,
+              fontWeight: FontWeight.bold,
+              fontSize: _isTimeline ? 15 : 14,
+            ),
           ),
-          child: Row(
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: _isTimeline ? 20 : 18,
-                backgroundColor: FirstVueColors.elevatedSurface,
-                child: Text(
-                  _authorInitial(),
-                  style: TextStyle(
-                    color: FirstVueColors.gold,
-                    fontWeight: FontWeight.bold,
-                    fontSize: _isTimeline ? 15 : 14,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            post.authorName,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: _isTimeline ? 15 : 14,
-                            ),
-                          ),
-                        ),
-                        if (post.businessName != null)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 8),
-                            child: Text(
-                              post.businessName!,
-                              style: TextStyle(
-                                color: FirstVueColors.teal.withValues(alpha: .85),
-                                fontSize: 11,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      ProfileActivityService.formatRelativeTime(post.createdAt),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      post.authorName,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: .4),
-                        fontSize: 11,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: _isTimeline ? 15 : 14,
                       ),
                     ),
-                  ],
+                  ),
+                  if (post.businessName != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Text(
+                        post.businessName!,
+                        style: TextStyle(
+                          color: FirstVueColors.teal.withValues(alpha: .85),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              if (post.authorUsername != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  '@${post.authorUsername}',
+                  style: TextStyle(
+                    color: FirstVueColors.teal.withValues(alpha: .75),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 2),
+              Text(
+                ProfileActivityService.formatRelativeTime(post.createdAt),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: .4),
+                  fontSize: 11,
                 ),
               ),
-              if (widget.onDelete != null)
-                IconButton(
-                  onPressed: widget.onDelete,
-                  icon: const Icon(Icons.more_horiz, color: Colors.white54),
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                ),
             ],
           ),
         ),
+        if (widget.onDelete != null)
+          IconButton(
+            onPressed: widget.onDelete,
+            icon: const Icon(Icons.more_horiz, color: Colors.white54),
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
+      ],
+    );
+
+    final header = Padding(
+      padding: EdgeInsets.fromLTRB(
+        horizontalPadding,
+        topPadding,
+        horizontalPadding,
+        0,
+      ),
+      child: row,
+    );
+
+    if (widget.onAuthorTap == null) return header;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: widget.onAuthorTap,
+        child: header,
+      ),
+    );
+  }
+
+  Widget _buildPostContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         if (post.body.isNotEmpty) ...[
           SizedBox(height: _isTimeline ? 10 : 8),
           Padding(
@@ -199,69 +232,98 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
             ),
           ),
         ],
-        if (widget.onSpark != null ||
-            widget.onComment != null ||
-            widget.onSave != null) ...[
-          SizedBox(height: _isTimeline ? 4 : 2),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: _isTimeline ? 0 : 4),
-            child: Row(
-              children: [
-                if (widget.onSpark != null)
-                  Expanded(
-                    child: _ActionButton(
-                      icon: post.sparkedByMe
-                          ? Icons.bolt_rounded
-                          : Icons.bolt_outlined,
-                      label: post.sparkCount > 0
-                          ? '${post.sparkCount}'
-                          : 'Spark',
-                      active: post.sparkedByMe,
-                      activeColor: FirstVueColors.gold,
-                      onTap: widget.onSpark!,
-                    ),
-                  ),
-                if (widget.onComment != null)
-                  Expanded(
-                    child: _ActionButton(
-                      icon: Icons.chat_bubble_outline_rounded,
-                      label: 'Comment',
-                      onTap: widget.onComment!,
-                    ),
-                  ),
-                if (widget.onSave != null)
-                  Expanded(
-                    child: _ActionButton(
-                      icon: post.savedByMe
-                          ? Icons.bookmark_rounded
-                          : Icons.bookmark_border_rounded,
-                      label: post.savedByMe ? 'Saved' : 'Save',
-                      active: post.savedByMe,
-                      activeColor: FirstVueColors.gold,
-                      onTap: widget.onSave!,
-                    ),
-                  ),
-              ],
+      ],
+    );
+  }
+
+  Widget _buildPostActions() {
+    if (widget.onSpark == null &&
+        widget.onComment == null &&
+        widget.onSave == null &&
+        widget.onRepost == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        _isTimeline ? 0 : 4,
+        _isTimeline ? 4 : 2,
+        _isTimeline ? 0 : 4,
+        0,
+      ),
+      child: Row(
+        children: [
+          if (widget.onSpark != null)
+            Expanded(
+              child: _ActionButton(
+                icon: post.sparkedByMe
+                    ? Icons.bolt_rounded
+                    : Icons.bolt_outlined,
+                label:
+                    post.sparkCount > 0 ? '${post.sparkCount}' : 'Spark',
+                active: post.sparkedByMe,
+                activeColor: FirstVueColors.gold,
+                onTap: widget.onSpark!,
+              ),
+            ),
+          if (widget.onComment != null)
+            Expanded(
+              child: _ActionButton(
+                icon: Icons.chat_bubble_outline_rounded,
+                label: 'Comment',
+                onTap: widget.onComment!,
+              ),
+            ),
+          if (widget.onRepost != null)
+            Expanded(
+              child: _ActionButton(
+                icon: widget.repostedByMe
+                    ? Icons.repeat_rounded
+                    : Icons.repeat_outlined,
+                label: widget.repostedByMe ? 'Reposted' : 'Repost',
+                active: widget.repostedByMe,
+                activeColor: FirstVueColors.teal,
+                onTap: widget.onRepost!,
+              ),
+            ),
+          if (widget.onSave != null)
+            Expanded(
+              child: _ActionButton(
+                icon: post.savedByMe
+                    ? Icons.bookmark_rounded
+                    : Icons.bookmark_border_rounded,
+                label: post.savedByMe ? 'Saved' : 'Save',
+                active: post.savedByMe,
+                activeColor: FirstVueColors.gold,
+                onTap: widget.onSave!,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isTimeline) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildAuthorHeader(),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: _buildPostContent(),
+              ),
             ),
           ),
-        ],
-        if (_isTimeline) ...[
+          _buildPostActions(),
           const SizedBox(height: 14),
           Divider(height: 1, color: Colors.white.withValues(alpha: .08)),
         ],
-      ],
-    );
-
-    if (_isTimeline) {
-      return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: widget.onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: content,
-          ),
-        ),
       );
     }
 
@@ -273,19 +335,27 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white.withValues(alpha: .08)),
       ),
-      child: content,
-    );
-
-    if (widget.onTap == null) return card;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: card,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildAuthorHeader(),
+          if (widget.onTap == null)
+            _buildPostContent()
+          else
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: widget.onTap,
+                borderRadius: BorderRadius.circular(14),
+                child: _buildPostContent(),
+              ),
+            ),
+          _buildPostActions(),
+        ],
       ),
     );
+
+    return card;
   }
 }
 

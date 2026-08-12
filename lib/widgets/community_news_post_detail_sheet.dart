@@ -3,9 +3,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../navigation/firstvue_page_route.dart';
 import '../screens/auth_screen.dart';
+import '../screens/member_public_profile_screen.dart';
+import '../config/app_config.dart';
+import '../models/share_payload.dart';
 import '../services/community_news_service.dart';
 import 'community_news_post_card.dart';
 import 'feed_comments_sheet.dart';
+import 'firstvue_share_sheet.dart';
 
 class CommunityNewsPostDetailSheet extends StatefulWidget {
   final String postId;
@@ -124,6 +128,16 @@ class _CommunityNewsPostDetailSheetState
       final updated = await CommunityNewsService.toggleSave(post);
       if (!mounted) return;
       setState(() => _post = updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            updated.savedByMe
+                ? 'Saved to Favorites'
+                : 'Removed from Favorites',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
     } on AuthException {
       if (!mounted) return;
       setState(() => _post = previous);
@@ -138,6 +152,20 @@ class _CommunityNewsPostDetailSheetState
         const SnackBar(content: Text('Unable to save this post right now.')),
       );
     }
+  }
+
+  Future<void> _sharePost() async {
+    final post = _post;
+    if (post == null) return;
+
+    await FirstVueShareSheet.show(
+      context,
+      payload: SharePayload(
+        title: 'Post by ${post.authorName}',
+        subtitle: post.body,
+        link: AppConfig.newsPostShareUrl(post.id),
+      ),
+    );
   }
 
   Future<void> _deletePost() async {
@@ -174,6 +202,11 @@ class _CommunityNewsPostDetailSheetState
                       letterSpacing: 1.2,
                     ),
                   ),
+                ),
+                IconButton(
+                  onPressed: _post == null ? null : _sharePost,
+                  icon: const Icon(Icons.route_outlined, color: Colors.white54),
+                  tooltip: 'Route & share',
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
@@ -216,6 +249,16 @@ class _CommunityNewsPostDetailSheetState
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                         child: CommunityNewsPostCard(
                           post: _post!,
+                          onAuthorTap: _post!.authorId.isNotEmpty
+                              ? () {
+                                  Navigator.pop(context);
+                                  openMemberProfile(
+                                    context,
+                                    profileId: _post!.authorId,
+                                    displayName: _post!.authorName,
+                                  );
+                                }
+                              : null,
                           onSpark: _toggleSpark,
                           onSave: _toggleSave,
                           onDelete: _post!.isMine ? _deletePost : null,

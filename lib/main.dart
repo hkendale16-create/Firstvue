@@ -15,8 +15,11 @@ import 'screens/rentals_screen.dart';
 import 'screens/saved_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/things_to_do_screen.dart';
+import 'screens/explore_screen.dart';
 import 'screens/whats_now_screen.dart';
 import 'screens/firstvue_business_profile_screen.dart';
+import 'screens/member_public_profile_screen.dart';
+import 'screens/post_detail_screen.dart';
 import 'services/activity_notifications_service.dart';
 import 'services/deep_link_service.dart';
 import 'services/notification_service.dart';
@@ -25,6 +28,9 @@ import 'theme/firstvue_theme.dart';
 import 'widgets/firstvue_bottom_nav.dart';
 import 'widgets/firstvue_onboarding.dart';
 import 'widgets/firstvue_refresh_scaffold.dart';
+import 'widgets/firstvue_settings_drawer.dart';
+import 'widgets/floating_messages_bubble.dart';
+import 'widgets/home_communities_section.dart';
 import 'widgets/home_discovery_section.dart';
 import 'widgets/home_news_feed_section.dart';
 
@@ -85,11 +91,13 @@ class _FirstVueHomeState extends State<FirstVueHome> {
   int _profileRefreshToken = 0;
   int _homeRefreshToken = 0;
   int _notificationBadge = 0;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+  final _messagesBubbleKey = GlobalKey<FloatingMessagesBubbleState>();
 
   @override
   void initState() {
     super.initState();
-    _openInitialBusinessLink();
+    _openInitialDeepLink();
     _listenForDeepLinks();
     _showBillingResultIfNeeded();
     _refreshNotificationBadge();
@@ -112,7 +120,34 @@ class _FirstVueHomeState extends State<FirstVueHome> {
   }
 
   void _listenForDeepLinks() {
-    DeepLinkService.listen(_openBusinessProfile);
+    DeepLinkService.listen(_handleDeepLink);
+  }
+
+  void _handleDeepLink(DeepLinkTarget target) {
+    switch (target.type) {
+      case 'business':
+        _openBusinessProfile(target.id);
+      case 'profile':
+        _openMemberProfile(target.id);
+      case 'post':
+        _openPostDetail(target.id);
+    }
+  }
+
+  void _openMemberProfile(String profileId) {
+    _rootNavigatorKey.currentState?.push(
+      FirstVuePageRoute(
+        builder: (_) => MemberPublicProfileScreen(profileId: profileId),
+      ),
+    );
+  }
+
+  void _openPostDetail(String postId) {
+    _rootNavigatorKey.currentState?.push(
+      FirstVuePageRoute(
+        builder: (_) => PostDetailScreen(postId: postId),
+      ),
+    );
   }
 
   void _openBusinessProfile(String businessId) {
@@ -229,13 +264,34 @@ class _FirstVueHomeState extends State<FirstVueHome> {
     ];
   }
 
-  Future<void> _openInitialBusinessLink() async {
-    final businessId =
-        AppConfig.initialBusinessIdFromUri() ??
-        await DeepLinkService.initialBusinessId();
-    if (businessId == null) return;
+  Future<void> _openInitialDeepLink() async {
+    final webBusiness = AppConfig.initialBusinessIdFromUri();
+    final webProfile = AppConfig.initialProfileIdFromUri();
+    final webPost = AppConfig.initialPostIdFromUri();
+
+    if (webBusiness != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openBusinessProfile(webBusiness);
+      });
+      return;
+    }
+    if (webProfile != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openMemberProfile(webProfile);
+      });
+      return;
+    }
+    if (webPost != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openPostDetail(webPost);
+      });
+      return;
+    }
+
+    final target = await DeepLinkService.initialTarget();
+    if (target == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _openBusinessProfile(businessId);
+      _handleDeepLink(target);
     });
   }
 
@@ -250,10 +306,15 @@ class _FirstVueHomeState extends State<FirstVueHome> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: FirstVueColors.background,
-
-      body: switch (selectedIndex) {
-        1 => const WhatsNowScreen(),
+      endDrawer: const FirstVueSettingsDrawer(),
+      body: Stack(
+        children: [
+          switch (selectedIndex) {
+        1 => ExploreScreen(
+              onOpenVueFeed: () => setState(() => selectedIndex = 2),
+            ),
         2 => const DiscoveryFeedScreen(),
         3 => const SavedScreen(),
         4 => ProfileScreen(refreshToken: _profileRefreshToken),
@@ -299,6 +360,17 @@ class _FirstVueHomeState extends State<FirstVueHome> {
                         ],
                       ),
                     ),
+                  ),
+                  IconButton(
+                    onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    icon: const Icon(
+                      Icons.settings_outlined,
+                      color: FirstVueColors.gold,
+                      size: 24,
+                    ),
+                    tooltip: 'Settings',
                   ),
                   IconButton(
                     onPressed: () async {
@@ -399,49 +471,65 @@ class _FirstVueHomeState extends State<FirstVueHome> {
 
               const SizedBox(height: 30),
 
+              HomeCommunitiesSection(refreshToken: _homeRefreshToken),
+
+              const SizedBox(height: 30),
+
               HomeNewsFeedSection(refreshToken: _homeRefreshToken),
 
               const SizedBox(height: 30),
 
-              const Text(
-                'EXPLORE',
-                style: TextStyle(
-                  fontFamily: 'CormorantGaramond',
-                  color: FirstVueColors.gold,
-                  fontSize: 19,
-                  letterSpacing: 1.8,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              Builder(
-                builder: (context) {
-                  final categories = _exploreCategories(context);
-                  return GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 0.68,
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => setState(() => selectedIndex = 1),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Ink(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: FirstVueColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withValues(alpha: .08)),
                     ),
-                    itemCount: categories.length,
-                    itemBuilder: (context, index) {
-                      final category = categories[index];
-                      return FuturisticButton(
-                        icon: category.icon,
-                        title: category.title,
-                        subtitle: category.subtitle,
-                        imagePath: category.imagePath,
-                        accent: category.accent,
-                        onPressed: category.onTap,
-                      );
-                    },
-                  );
-                },
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.explore_outlined,
+                          color: FirstVueColors.teal.withValues(alpha: .9),
+                          size: 28,
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Explore & rate local pros',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Barbers, beauty, dining, rentals & more',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: .55),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: Colors.white.withValues(alpha: .45),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
 
               const SizedBox(height: 30),
@@ -479,7 +567,11 @@ class _FirstVueHomeState extends State<FirstVueHome> {
           ),
         ),
         ),
-      },
+          },
+          if (selectedIndex == 0)
+            FloatingMessagesBubble(key: _messagesBubbleKey),
+        ],
+      ),
 
       bottomNavigationBar: FirstVueBottomNav(
         selectedIndex: selectedIndex,

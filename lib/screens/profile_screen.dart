@@ -2,22 +2,8 @@ import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'admin_rentals_screen.dart';
-import 'admin_approvals_hub_screen.dart';
-import 'admin_business_submissions_screen.dart';
-import 'admin_business_reviews_screen.dart';
-import 'admin_professional_profiles_screen.dart';
 import 'auth_screen.dart';
 import 'edit_profile_screen.dart';
-import 'join_firstvue_screen.dart';
-import 'business_growth_screen.dart';
-import 'legal_policy_screen.dart';
-import 'rental_inquiries_screen.dart';
-import 'rentals_screen.dart';
-import 'my_businesses_screen.dart';
-import 'messages_inbox_screen.dart';
-import 'my_professional_profile_view_screen.dart';
-import '../services/admin_auth_service.dart';
 import '../services/community_news_service.dart';
 import '../services/profile_media_service.dart';
 import '../services/user_profile_service.dart';
@@ -30,6 +16,10 @@ import '../widgets/profile_my_posts_section.dart';
 import '../widgets/profile_recent_activity_section.dart';
 import '../widgets/profile_saved_section.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../config/app_config.dart';
+import '../widgets/firstvue_share_sheet.dart';
+import '../widgets/firstvue_settings_drawer.dart';
+import '../models/share_payload.dart';
 
 class ProfileScreen extends StatefulWidget {
   final int refreshToken;
@@ -41,8 +31,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  bool _isAdmin = false;
-  bool _adminLoaded = false;
   ProfileImageSet _profileImages = const ProfileImageSet();
   bool _imagesLoading = false;
   bool _imageUpdating = false;
@@ -55,14 +43,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _nameLoading = false;
   int _selectedTab = 0;
   int _pullRefreshToken = 0;
-  bool _showSettings = false;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   static const _tabLabels = ['POSTS', 'PHOTOS', 'ACTIVITY'];
 
   @override
   void initState() {
     super.initState();
-    _loadAdminAccess();
     _loadProfileImages();
     _loadStats();
     _loadDisplayName();
@@ -89,7 +76,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void didUpdateWidget(covariant ProfileScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.refreshToken != widget.refreshToken) {
-      _loadAdminAccess();
       _loadProfileImages();
       _loadStats();
       _loadDisplayName();
@@ -306,15 +292,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _loadAdminAccess() async {
-    final isAdmin = await AdminAuthService.isAdmin();
-    if (!mounted) return;
-    setState(() {
-      _isAdmin = isAdmin;
-      _adminLoaded = true;
-    });
-  }
-
   Future<void> _handleAccountTap(User? user) async {
     if (user == null) {
       await Navigator.push(
@@ -327,20 +304,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (mounted) {
       setState(() {});
-      await _loadAdminAccess();
       await _loadStats();
     }
-  }
-
-  void _open(Widget screen) {
-    Navigator.push(context, FirstVuePageRoute(builder: (_) => screen));
   }
 
   int get _effectiveRefreshToken => widget.refreshToken + _pullRefreshToken;
 
   Future<void> _refreshProfile() async {
     await Future.wait([
-      _loadAdminAccess(),
       _loadProfileImages(),
       _loadStats(),
       _loadDisplayName(),
@@ -348,9 +319,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) setState(() => _pullRefreshToken++);
   }
 
-  void _shareProfilePlaceholder() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile sharing is coming soon.')),
+  Future<void> _shareProfile() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      await _handleAccountTap(null);
+      return;
+    }
+
+    final name = _displayName?.trim().isNotEmpty == true
+        ? _displayName!.trim()
+        : (user.email?.split('@').first ?? 'My FirstVue profile');
+
+    FirstVueShareSheet.show(
+      context,
+      payload: SharePayload(
+        title: name,
+        subtitle: 'See my posts, photos & ratings on FirstVue',
+        link: AppConfig.memberShareUrl(user.id),
+      ),
     );
   }
 
@@ -400,8 +386,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ? (email.isEmpty ? '…' : email.split('@').first)
             : (_displayName ?? (email.isEmpty ? 'Guest' : email.split('@').first)));
 
-    return SafeArea(
-      child: FirstVueRefreshScaffold(
+    return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: FirstVueColors.background,
+      endDrawer: FirstVueSettingsDrawer(
+        onSignOut: () {
+          if (mounted) {
+            setState(() {});
+            _loadStats();
+          }
+        },
+        onSignIn: () {
+          if (mounted) setState(() {});
+        },
+      ),
+      body: SafeArea(
+        child: FirstVueRefreshScaffold(
         onRefresh: _refreshProfile,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -455,7 +455,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         OutlinedButton.icon(
-                          onPressed: _shareProfilePlaceholder,
+                          onPressed: _shareProfile,
                           icon: const Icon(Icons.share_outlined, size: 18),
                           label: const Text('Share profile'),
                           style: OutlinedButton.styleFrom(
@@ -469,12 +469,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 top: 8,
                 right: 8,
                 child: IconButton(
-                  onPressed: () => setState(() => _showSettings = !_showSettings),
+                  onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
                   icon: Icon(
-                    _showSettings ? Icons.close : Icons.settings_outlined,
+                    Icons.settings_outlined,
                     color: Colors.white.withValues(alpha: .85),
                   ),
-                  tooltip: _showSettings ? 'Hide settings' : 'Settings',
+                  tooltip: 'Settings',
                 ),
               ),
             ],
@@ -528,140 +528,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ],
-          if (_showSettings || user == null) ...[
+          if (user == null) ...[
             const SizedBox(height: 16),
-            _SettingsGroup(
-              title: 'Your profile',
-              children: [
-                _SettingsTile(
-                  icon: Icons.how_to_reg_outlined,
-                  title: 'Get verified',
-                  subtitle: 'Business owner, professional, or organizer',
-                  onTap: user == null
-                      ? () => _handleAccountTap(user)
-                      : () => _open(const JoinFirstVueScreen()),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: FilledButton(
+                onPressed: () => _handleAccountTap(user),
+                style: FilledButton.styleFrom(
+                  backgroundColor: FirstVueColors.gold,
+                  foregroundColor: Colors.black,
+                  minimumSize: const Size.fromHeight(48),
                 ),
-                _SettingsTile(
-                  icon: Icons.storefront_outlined,
-                  title: 'My business profiles',
-                  subtitle: 'Photos, address, menu & details',
-                  onTap: user == null
-                      ? () => _handleAccountTap(user)
-                      : () => _open(const MyBusinessesScreen()),
-                ),
-                _SettingsTile(
-                  icon: Icons.badge_outlined,
-                  title: 'My professional profile',
-                  subtitle: 'Individual barber or stylist profile',
-                  onTap: user == null
-                      ? () => _handleAccountTap(user)
-                      : () => _open(const MyProfessionalProfileViewScreen()),
-                ),
-              ],
-            ),
-            _SettingsGroup(
-              title: 'Activity',
-              children: [
-                _SettingsTile(
-                  icon: Icons.chat_bubble_outline,
-                  title: 'Messages',
-                  onTap: user == null
-                      ? () => _handleAccountTap(user)
-                      : () => _open(const MessagesInboxScreen()),
-                ),
-                _SettingsTile(
-                  icon: Icons.trending_up_rounded,
-                  title: 'Growth, plans & analytics',
-                  onTap: user == null
-                      ? () => _handleAccountTap(user)
-                      : () => _open(const BusinessGrowthScreen()),
-                ),
-                _SettingsTile(
-                  icon: Icons.key_outlined,
-                  title: 'My rental listings',
-                  onTap: user == null
-                      ? () => _handleAccountTap(user)
-                      : () => _open(const MyRentalListingsScreen()),
-                ),
-                _SettingsTile(
-                  icon: Icons.mark_email_unread_outlined,
-                  title: 'Rental inquiries',
-                  onTap: user == null
-                      ? () => _handleAccountTap(user)
-                      : () => _open(const RentalInquiriesScreen()),
-                ),
-              ],
-            ),
-            _SettingsGroup(
-              title: 'Preferences',
-              children: [
-                _SettingsTile(
-                  icon: Icons.location_on_outlined,
-                  title: 'Location',
-                  subtitle: 'Controlled by device permissions',
-                ),
-                _SettingsTile(
-                  icon: Icons.notifications_outlined,
-                  title: 'Notifications',
-                  subtitle: 'Push alerts for messages & updates',
-                ),
-              ],
-            ),
-            if (_adminLoaded && _isAdmin)
-              _SettingsGroup(
-                title: 'Admin tools',
-                titleColor: const Color(0xFFD8B56A),
-                children: [
-                  _SettingsTile(
-                    icon: Icons.admin_panel_settings_outlined,
-                    title: 'Approval center',
-                    subtitle: 'Business, professional & organizer',
-                    onTap: () => _open(const AdminApprovalsHubScreen()),
-                  ),
-                  _SettingsTile(
-                    icon: Icons.verified_outlined,
-                    title: 'Business approvals',
-                    onTap: () => _open(const AdminBusinessSubmissionsScreen()),
-                  ),
-                  _SettingsTile(
-                    icon: Icons.how_to_reg_outlined,
-                    title: 'Professional approvals',
-                    onTap: () => _open(const AdminProfessionalProfilesScreen()),
-                  ),
-                  _SettingsTile(
-                    icon: Icons.reviews_outlined,
-                    title: 'Review approvals',
-                    onTap: () => _open(const AdminBusinessReviewsScreen()),
-                  ),
-                  _SettingsTile(
-                    icon: Icons.admin_panel_settings_outlined,
-                    title: 'Rental approvals',
-                    onTap: () => _open(const AdminRentalsScreen()),
-                  ),
-                ],
+                child: const Text('Sign in or create account'),
               ),
-            _SettingsGroup(
-              title: 'Legal & support',
-              children: [
-                _SettingsTile(
-                  icon: Icons.privacy_tip_outlined,
-                  title: 'Privacy policy',
-                  onTap: () => _open(
-                    const LegalPolicyScreen(type: LegalPolicyType.privacy),
-                  ),
-                ),
-                _SettingsTile(
-                  icon: Icons.description_outlined,
-                  title: 'Terms of service',
-                  onTap: () => _open(
-                    const LegalPolicyScreen(type: LegalPolicyType.terms),
-                  ),
-                ),
-              ],
             ),
           ],
           const SizedBox(height: 28),
         ],
+      ),
       ),
       ),
     );
@@ -709,123 +593,6 @@ class _ProfileTabButton extends StatelessWidget {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SettingsGroup extends StatelessWidget {
-  final String title;
-  final Color? titleColor;
-  final List<Widget> children;
-
-  const _SettingsGroup({
-    required this.title,
-    required this.children,
-    this.titleColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Text(
-              title.toUpperCase(),
-              style: TextStyle(
-                color: titleColor ?? Colors.white54,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF10151B),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withValues(alpha: .07)),
-            ),
-            child: Column(
-              children: [
-                for (var i = 0; i < children.length; i++) ...[
-                  children[i],
-                  if (i < children.length - 1)
-                    Divider(
-                      height: 1,
-                      indent: 56,
-                      color: Colors.white.withValues(alpha: .08),
-                    ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SettingsTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  final VoidCallback? onTap;
-
-  const _SettingsTile({
-    required this.icon,
-    required this.title,
-    this.subtitle,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Icon(icon, color: const Color(0xFFD8B56A), size: 22),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                      ),
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle!,
-                        style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              if (onTap != null)
-                const Icon(Icons.chevron_right, color: Colors.white38, size: 20),
             ],
           ),
         ),

@@ -41,12 +41,14 @@ class FeedCommentsSheet extends StatefulWidget {
 
 class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
   final _controller = TextEditingController();
+  final _inputFocus = FocusNode();
   List<FeedComment> _comments = const [];
   bool _loading = true;
   bool _loadFailed = false;
   String? _loadErrorMessage;
   bool _posting = false;
   String? _replyParentId;
+  String? _replyToName;
   RealtimeChannel? _commentsChannel;
 
   @override
@@ -59,8 +61,25 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
   @override
   void dispose() {
     _commentsChannel?.unsubscribe();
+    _inputFocus.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _startReply(FeedComment comment) {
+    setState(() {
+      _replyParentId = comment.id;
+      _replyToName = comment.authorName;
+      _controller.text = '@${comment.authorName} ';
+    });
+    _inputFocus.requestFocus();
+  }
+
+  void _cancelReply() {
+    setState(() {
+      _replyParentId = null;
+      _replyToName = null;
+    });
   }
 
   void _subscribeToComments() {
@@ -139,6 +158,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
       );
       _controller.clear();
       _replyParentId = null;
+      _replyToName = null;
       if (!mounted) return;
       setState(() {
         if (!_comments.any((comment) => comment.id == newComment.id)) {
@@ -176,7 +196,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
   }
 
   List<FeedComment> _repliesFor(List<FeedComment> all, String parentId) {
-    return all.where((comment) => comment.parentId == parentId).toList();
+    return FeedCommentsService.collectThreadReplies(all, parentId);
   }
 
   Widget _buildCommentsList(ScrollController scrollController) {
@@ -235,19 +255,9 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
           comment: comment,
           replies: replies,
           onSpark: () => _sparkComment(comment),
-          onReply: () {
-            setState(() {
-              _replyParentId = comment.id;
-              _controller.text = '@${comment.authorName} ';
-            });
-          },
+          onReply: () => _startReply(comment),
           onSparkReply: _sparkComment,
-          onReplyToReply: (reply) {
-            setState(() {
-              _replyParentId = reply.id;
-              _controller.text = '@${reply.authorName} ';
-            });
-          },
+          onReplyToReply: _startReply,
         );
       },
     );
@@ -303,37 +313,70 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
                 top: false,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _controller,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            hintText: _replyParentId == null
-                                ? 'Add a comment...'
-                                : 'Write a reply...',
-                            hintStyle: TextStyle(
-                              color: Colors.white.withValues(alpha: .38),
-                            ),
-                            filled: true,
-                            fillColor: const Color(0xFF151B22),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: BorderSide.none,
+                      if (_replyToName != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Replying to $_replyToName',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: .6),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: _cancelReply,
+                                style: TextButton.styleFrom(
+                                  foregroundColor: const Color(0xFFD8B56A),
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: const Text('Cancel'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _controller,
+                              focusNode: _inputFocus,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                hintText: _replyParentId == null
+                                    ? 'Add a comment...'
+                                    : 'Write a reply...',
+                                hintStyle: TextStyle(
+                                  color: Colors.white.withValues(alpha: .38),
+                                ),
+                                filled: true,
+                                fillColor: const Color(0xFF151B22),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                              onSubmitted: (_) => _post(),
                             ),
                           ),
-                          onSubmitted: (_) => _post(),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton.filled(
-                        onPressed: _posting ? null : _post,
-                        style: IconButton.styleFrom(
-                          backgroundColor: const Color(0xFFD8B56A),
-                          foregroundColor: Colors.black,
-                        ),
-                        icon: const Icon(Icons.send_rounded),
+                          const SizedBox(width: 8),
+                          IconButton.filled(
+                            onPressed: _posting ? null : _post,
+                            style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFFD8B56A),
+                              foregroundColor: Colors.black,
+                            ),
+                            icon: const Icon(Icons.send_rounded),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -376,7 +419,10 @@ class _CommentBlock extends StatelessWidget {
         ),
         ...replies.map(
           (reply) => Padding(
-            padding: const EdgeInsets.only(left: 18, top: 8),
+            padding: EdgeInsets.only(
+              left: reply.parentId == comment.id ? 18 : 28,
+              top: 8,
+            ),
             child: _CommentTile(
               comment: reply,
               onSpark: () => onSparkReply(reply),

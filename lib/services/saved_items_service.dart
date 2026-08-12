@@ -72,6 +72,28 @@ class SavedItemsService {
     }
   }
 
+  static Future<void> _ensureProfile(User user) async {
+    final displayName = user.email?.split('@').first;
+    try {
+      await _client.rpc(
+        'ensure_user_profile',
+        params: {'display_name': displayName},
+      );
+    } catch (_) {
+      final existing = await _client
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .maybeSingle();
+      if (existing == null) {
+        await _client.from('profiles').insert({
+          'id': user.id,
+          'display_name': displayName,
+        });
+      }
+    }
+  }
+
   static Future<void> save({
     required SavedContentType contentType,
     required String contentId,
@@ -79,11 +101,18 @@ class SavedItemsService {
     final user = _client.auth.currentUser;
     if (user == null) throw const AuthException('Sign in to save items.');
 
-    await _client.from('user_saved_items').insert({
-      'user_id': user.id,
-      'content_type': contentType.value,
-      'content_id': contentId,
-    });
+    await _ensureProfile(user);
+
+    try {
+      await _client.from('user_saved_items').insert({
+        'user_id': user.id,
+        'content_type': contentType.value,
+        'content_id': contentId,
+      });
+    } on PostgrestException catch (error) {
+      if (error.code == '23505') return;
+      rethrow;
+    }
   }
 
   static Future<void> unsave({
@@ -106,12 +135,27 @@ class SavedItemsService {
     required String contentId,
     required bool currentlySaved,
   }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw const AuthException('Sign in to save items.');
+
     if (currentlySaved) {
       await unsave(contentType: contentType, contentId: contentId);
       return false;
     }
-    await save(contentType: contentType, contentId: contentId);
-    return true;
+
+    await _ensureProfile(user);
+
+    try {
+      await _client.from('user_saved_items').insert({
+        'user_id': user.id,
+        'content_type': contentType.value,
+        'content_id': contentId,
+      });
+      return true;
+    } on PostgrestException catch (error) {
+      if (error.code == '23505') return true;
+      rethrow;
+    }
   }
 
   static Future<List<SavedItem>> fetchRecentSaved({int limit = 8}) async {

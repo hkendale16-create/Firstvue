@@ -4,10 +4,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../navigation/firstvue_page_route.dart';
 import '../screens/auth_screen.dart';
+import '../screens/member_public_profile_screen.dart';
 import '../services/community_news_service.dart';
+import '../services/repost_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../utils/app_environment.dart';
 import 'community_news_post_card.dart';
+import 'community_news_post_detail_sheet.dart';
 import 'feed_comments_sheet.dart';
 import 'local_media_thumbnail.dart';
 import 'media_picker_sheet.dart';
@@ -23,6 +26,7 @@ class HomeNewsFeedSection extends StatefulWidget {
 
 class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
   List<CommunityNewsPost> _posts = const [];
+  Set<String> _repostedPostIds = const {};
   bool _loadingPosts = true;
   String? _loadError;
   final _composer = TextEditingController();
@@ -92,9 +96,13 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     });
     try {
       final posts = await CommunityNewsService.fetchPosts();
+      final reposted = await RepostService.fetchMyRepostedIds(
+        posts.map((p) => p.id).toList(),
+      );
       if (!mounted) return;
       setState(() {
         _posts = posts;
+        _repostedPostIds = reposted;
         _loadingPosts = false;
         _loadError = null;
       });
@@ -216,6 +224,16 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
             if (i == index) updated else _posts[i],
         ];
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            updated.savedByMe
+                ? 'Saved to Favorites'
+                : 'Removed from Favorites',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
     } on AuthException {
       if (!mounted) return;
       setState(() {
@@ -289,6 +307,56 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Unable to spark this post right now.')),
+      );
+    }
+  }
+
+  Future<void> _repostPost(int index) async {
+    if (index < 0 || index >= _posts.length) return;
+    final post = _posts[index];
+    final wasReposted = _repostedPostIds.contains(post.id);
+
+    setState(() {
+      if (wasReposted) {
+        _repostedPostIds =
+            _repostedPostIds.where((id) => id != post.id).toSet();
+      } else {
+        _repostedPostIds = {..._repostedPostIds, post.id};
+      }
+    });
+
+    try {
+      await RepostService.toggleRepost(
+        post.id,
+        currentlyReposted: wasReposted,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(wasReposted ? 'Repost removed' : 'Reposted to your feed'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } on AuthException {
+      if (!mounted) return;
+      setState(() {
+        _repostedPostIds = wasReposted
+            ? {..._repostedPostIds, post.id}
+            : _repostedPostIds.where((id) => id != post.id).toSet();
+      });
+      await Navigator.push(
+        context,
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _repostedPostIds = wasReposted
+            ? {..._repostedPostIds, post.id}
+            : _repostedPostIds.where((id) => id != post.id).toSet();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to repost right now.')),
       );
     }
   }
@@ -485,6 +553,18 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
                 CommunityNewsPostCard(
                   post: _posts[index],
                   style: CommunityNewsPostCardStyle.timeline,
+                  onTap: () => CommunityNewsPostDetailSheet.show(
+                    context,
+                    postId: _posts[index].id,
+                    initialPost: _posts[index],
+                  ),
+                  onAuthorTap: _posts[index].authorId.isNotEmpty
+                      ? () => openMemberProfile(
+                            context,
+                            profileId: _posts[index].authorId,
+                            displayName: _posts[index].authorName,
+                          )
+                      : null,
                   onSpark: () => _sparkPost(index),
                   onSave: () => _savePost(index),
                   onDelete: _posts[index].isMine
@@ -495,6 +575,8 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
                     mediaId: _posts[index].commentsMediaId,
                     businessName: _posts[index].authorName,
                   ),
+                  onRepost: () => _repostPost(index),
+                  repostedByMe: _repostedPostIds.contains(_posts[index].id),
                 ),
             ],
           ),

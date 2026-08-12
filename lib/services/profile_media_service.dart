@@ -78,18 +78,25 @@ class ProfileMediaService {
   static Future<ProfileImageSet> fetchProfileImages() async {
     final user = _client.auth.currentUser;
     if (user == null) return const ProfileImageSet();
+    return fetchProfileImagesForUser(user.id);
+  }
+
+  static Future<ProfileImageSet> fetchProfileImagesForUser(
+    String profileId,
+  ) async {
+    if (profileId.trim().isEmpty) return const ProfileImageSet();
 
     try {
       final rows = await _client
           .from('profile_media')
           .select(_selectColumns)
-          .eq('profile_id', user.id)
+          .eq('profile_id', profileId)
           .inFilter('media_role', ['avatar', 'cover']);
 
       ProfileMediaItem? avatar;
       ProfileMediaItem? cover;
       for (final row in rows) {
-        final item = await _rowToItem(row, user.id);
+        final item = await _rowToItem(row, profileId);
         final role = (row['media_role'] as String?) ?? 'gallery';
         if (role == 'avatar') avatar = item;
         if (role == 'cover') cover = item;
@@ -97,6 +104,35 @@ class ProfileMediaService {
       return ProfileImageSet(avatar: avatar, cover: cover);
     } catch (_) {
       return const ProfileImageSet();
+    }
+  }
+
+  static Future<List<ProfileMediaItem>> fetchGalleryMediaForUser(
+    String profileId,
+  ) async {
+    if (profileId.trim().isEmpty) return const [];
+
+    try {
+      final rows = await _client
+          .from('profile_media')
+          .select(_selectColumns)
+          .eq('profile_id', profileId)
+          .or('media_role.eq.gallery,media_role.is.null')
+          .order('sort_order')
+          .order('created_at');
+
+      return _mapRows(rows, profileId);
+    } catch (_) {
+      final rows = await _client
+          .from('profile_media')
+          .select(
+            'id, storage_path, storage_provider, media_type, featured_for_trending',
+          )
+          .eq('profile_id', profileId)
+          .order('sort_order')
+          .order('created_at');
+
+      return _mapRows(rows, profileId);
     }
   }
 

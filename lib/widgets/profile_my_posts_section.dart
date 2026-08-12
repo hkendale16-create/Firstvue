@@ -73,6 +73,16 @@ class _ProfileMyPostsSectionState extends State<ProfileMyPostsSection> {
             if (i == index) updated else _posts[i],
         ];
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            updated.savedByMe
+                ? 'Saved to Favorites'
+                : 'Removed from Favorites',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
     } on AuthException {
       if (!mounted) return;
       setState(() {
