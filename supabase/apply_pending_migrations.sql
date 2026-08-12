@@ -936,20 +936,10 @@ create index if not exists professional_media_trending_idx
 -- =============================================================================
 -- 13. profile_avatar_cover (20260819)
 -- Avatar/cover roles on profile_media; storage_bucket on news post media
+-- Includes 20260817/20260818 prerequisites if not yet applied.
+--
+-- In Supabase SQL Editor, open and run the FULL file:
+--   supabase/migrations/20260819_profile_avatar_cover.sql
+-- (Do not run section 13 alone — it depends on tables created in that file.)
 -- =============================================================================
-
-alter table public.profile_media
-  add column if not exists media_role text not null default 'gallery'
-  check (media_role in ('gallery', 'avatar', 'cover'));
-
-create unique index if not exists profile_media_one_avatar_per_profile
-  on public.profile_media (profile_id)
-  where media_role = 'avatar';
-
-create unique index if not exists profile_media_one_cover_per_profile
-  on public.profile_media (profile_id)
-  where media_role = 'cover';
-
-alter table public.community_news_post_media
-  add column if not exists storage_bucket text not null default 'community-news-media';
 
