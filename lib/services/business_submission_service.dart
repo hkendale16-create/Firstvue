@@ -282,8 +282,8 @@ class BusinessSubmissionService {
           : formattedAddress?.trim(),
       'place_id': placeId?.trim().isEmpty == true ? null : placeId?.trim(),
       'country_code': countryCode.trim().isEmpty ? 'US' : countryCode.trim(),
-      if (latitude != null) 'latitude': latitude,
-      if (longitude != null) 'longitude': longitude,
+      'latitude': ?latitude,
+      'longitude': ?longitude,
     };
 
     Future<void> write(Map<String, dynamic> location) async {

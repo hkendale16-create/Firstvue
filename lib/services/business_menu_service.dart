@@ -259,7 +259,7 @@ class BusinessMenuService {
         'description': payload['description'],
         'price_label': payload['price_label'],
         'category': payload['category'],
-        if (sortOrder != null) 'sort_order': sortOrder,
+        'sort_order': ?sortOrder,
       };
       final row = await _client
           .from('business_menu_items')
