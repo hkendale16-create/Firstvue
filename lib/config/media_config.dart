@@ -22,6 +22,14 @@ enum MediaBucket {
 
   final String id;
   const MediaBucket(this.id);
+
+  static MediaBucket fromId(String? raw) {
+    if (raw == null || raw.isEmpty) return MediaBucket.communityNews;
+    for (final bucket in MediaBucket.values) {
+      if (bucket.id == raw) return bucket;
+    }
+    return MediaBucket.communityNews;
+  }
 }
 
 /// Where a media row is stored.

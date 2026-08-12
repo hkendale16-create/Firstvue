@@ -17,6 +17,8 @@ import 'my_businesses_screen.dart';
 import 'messages_inbox_screen.dart';
 import 'my_professional_profile_view_screen.dart';
 import '../services/admin_auth_service.dart';
+import '../services/profile_media_service.dart';
+import '../widgets/media_picker_sheet.dart';
 import '../widgets/profile_media_section.dart';
 import '../widgets/profile_my_posts_section.dart';
 import '../widgets/profile_recent_activity_section.dart';
@@ -34,11 +36,15 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isAdmin = false;
   bool _adminLoaded = false;
+  ProfileImageSet _profileImages = const ProfileImageSet();
+  bool _imagesLoading = false;
+  bool _imageUpdating = false;
 
   @override
   void initState() {
     super.initState();
     _loadAdminAccess();
+    _loadProfileImages();
   }
 
   @override
@@ -46,6 +52,166 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.refreshToken != widget.refreshToken) {
       _loadAdminAccess();
+      _loadProfileImages();
+    }
+  }
+
+  Future<void> _loadProfileImages() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _profileImages = const ProfileImageSet());
+      return;
+    }
+    setState(() => _imagesLoading = true);
+    final images = await ProfileMediaService.fetchProfileImages();
+    if (!mounted) return;
+    setState(() {
+      _profileImages = images;
+      _imagesLoading = false;
+    });
+  }
+
+  Future<void> _showAvatarOptions() async {
+    if (Supabase.instance.client.auth.currentUser == null) {
+      await _handleAccountTap(null);
+      return;
+    }
+    final hasAvatar = _profileImages.avatar != null;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF10151B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined, color: Color(0xFFD8B56A)),
+              title: const Text('Change profile photo', style: TextStyle(color: Colors.white)),
+              onTap: () => Navigator.pop(ctx, 'change'),
+            ),
+            if (hasAvatar)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.white54),
+                title: const Text('Remove profile photo', style: TextStyle(color: Colors.white70)),
+                onTap: () => Navigator.pop(ctx, 'remove'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'remove') {
+      await _removeProfileImage(isAvatar: true);
+    } else if (action == 'change') {
+      await _changeProfileImage(isAvatar: true);
+    }
+  }
+
+  Future<void> _showCoverOptions() async {
+    if (Supabase.instance.client.auth.currentUser == null) {
+      await _handleAccountTap(null);
+      return;
+    }
+    final hasCover = _profileImages.cover != null;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF10151B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined, color: Color(0xFFD8B56A)),
+              title: const Text('Change cover photo', style: TextStyle(color: Colors.white)),
+              onTap: () => Navigator.pop(ctx, 'change'),
+            ),
+            if (hasCover)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.white54),
+                title: const Text('Remove cover photo', style: TextStyle(color: Colors.white70)),
+                onTap: () => Navigator.pop(ctx, 'remove'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'remove') {
+      await _removeProfileImage(isAvatar: false);
+    } else if (action == 'change') {
+      await _changeProfileImage(isAvatar: false);
+    }
+  }
+
+  Future<void> _changeProfileImage({required bool isAvatar}) async {
+    final files = await showMediaPickerSheet(context);
+    if (files == null || files.isEmpty || !mounted) return;
+    setState(() => _imageUpdating = true);
+    try {
+      if (isAvatar) {
+        await ProfileMediaService.setAvatar(files.first);
+      } else {
+        await ProfileMediaService.setCover(files.first);
+      }
+      await _loadProfileImages();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isAvatar ? 'Profile photo updated.' : 'Cover photo updated.',
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isAvatar
+                  ? 'Unable to update profile photo.'
+                  : 'Unable to update cover photo.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _imageUpdating = false);
+    }
+  }
+
+  Future<void> _removeProfileImage({required bool isAvatar}) async {
+    setState(() => _imageUpdating = true);
+    try {
+      if (isAvatar) {
+        await ProfileMediaService.removeAvatar();
+      } else {
+        await ProfileMediaService.removeCover();
+      }
+      await _loadProfileImages();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isAvatar ? 'Profile photo removed.' : 'Cover photo removed.',
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to remove photo.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _imageUpdating = false);
     }
   }
 
@@ -93,33 +259,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              Container(
-                height: 150,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF1A2530),
-                      Color(0xFF243540),
-                      Color(0xFF78B9BE),
-                    ],
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _imageUpdating ? null : _showCoverOptions,
+                child: Container(
+                  height: 150,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: _profileImages.cover == null
+                        ? const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFF1A2530),
+                              Color(0xFF243540),
+                              Color(0xFF78B9BE),
+                            ],
+                          )
+                        : null,
+                    image: _profileImages.cover != null
+                        ? DecorationImage(
+                            image: NetworkImage(_profileImages.cover!.signedUrl),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
                   ),
+                  child: _profileImages.cover == null && user != null
+                      ? Align(
+                          alignment: Alignment.bottomRight,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Icon(
+                              Icons.add_photo_alternate_outlined,
+                              color: Colors.white.withValues(alpha: .45),
+                              size: 22,
+                            ),
+                          ),
+                        )
+                      : null,
                 ),
               ),
+              if (_imagesLoading || _imageUpdating)
+                const Positioned(
+                  top: 12,
+                  right: 12,
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
               Positioned(
                 left: 20,
                 bottom: -36,
-                child: CircleAvatar(
-                  radius: 46,
-                  backgroundColor: const Color(0xFF080B0F),
+                child: GestureDetector(
+                  onTap: _imageUpdating ? null : _showAvatarOptions,
                   child: CircleAvatar(
-                    radius: 42,
-                    backgroundColor: const Color(0xFF241D22),
-                    child: Icon(
-                      user == null ? Icons.person_outline : Icons.person,
-                      color: const Color(0xFF78B9BE),
-                      size: 40,
+                    radius: 46,
+                    backgroundColor: const Color(0xFF080B0F),
+                    child: CircleAvatar(
+                      radius: 42,
+                      backgroundColor: const Color(0xFF241D22),
+                      backgroundImage: _profileImages.avatar != null
+                          ? NetworkImage(_profileImages.avatar!.signedUrl)
+                          : null,
+                      child: _profileImages.avatar == null
+                          ? Icon(
+                              user == null ? Icons.person_outline : Icons.person,
+                              color: const Color(0xFF78B9BE),
+                              size: 40,
+                            )
+                          : null,
                     ),
                   ),
                 ),

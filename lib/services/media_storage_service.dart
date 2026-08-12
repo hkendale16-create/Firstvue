@@ -51,6 +51,7 @@ class MediaStorageService {
     required String fileName,
     required int index,
     Map<String, String>? context,
+    String? subfolder,
   }) async {
     if (useAwsMedia) {
       try {
@@ -61,6 +62,7 @@ class MediaStorageService {
           fileName: fileName,
           index: index,
           context: context,
+          subfolder: subfolder,
         );
       } on StateError catch (error) {
         if (!error.message.contains('not configured')) rethrow;
@@ -72,8 +74,11 @@ class MediaStorageService {
       throw const AuthException('Sign in before uploading media.');
     }
 
-    final path =
-        '${user.id}/${DateTime.now().microsecondsSinceEpoch}_${index}_${_safeFileName(fileName)}';
+    final filePart =
+        '${DateTime.now().microsecondsSinceEpoch}_${index}_${_safeFileName(fileName)}';
+    final path = subfolder == null || subfolder.isEmpty
+        ? '${user.id}/$filePart'
+        : '${user.id}/$subfolder/$filePart';
     await _client.storage.from(bucket.id).uploadBinary(
           path,
           bytes,
@@ -135,6 +140,7 @@ class MediaStorageService {
     required String fileName,
     required int index,
     Map<String, String>? context,
+    String? subfolder,
   }) async {
     final data = await _invokeMediaStorage({
       'action': 'upload-url',
@@ -143,6 +149,7 @@ class MediaStorageService {
       'file_name': fileName,
       'index': index,
       'context': context ?? {},
+      if (subfolder != null && subfolder.isNotEmpty) 'subfolder': subfolder,
     });
 
     final uploadUrl = data['upload_url'] as String?;

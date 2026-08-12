@@ -66,24 +66,14 @@ class CommunityNewsService {
 
   static Future<List<CommunityNewsPost>> fetchPosts({int limit = 20}) async {
     final me = _client.auth.currentUser?.id;
-    var query = _client
+    // RLS returns approved posts plus the signed-in author's own posts.
+    final rows = await _client
         .from('community_news_posts')
-        .select('id, body, created_at, author_id, business_id');
-
-    if (me != null) {
-      query = query.or('status.eq.approved,author_id.eq.$me');
-    } else {
-      query = query.eq('status', 'approved');
-    }
-
-    final rows = await query
+        .select('id, body, created_at, author_id, business_id')
         .order('created_at', ascending: false)
         .limit(limit);
-    try {
-      return await _mapPostRows(rows, currentUserId: me);
-    } catch (_) {
-      return const [];
-    }
+
+    return _mapPostRows(rows, currentUserId: me);
   }
 
   /// Posts authored by the signed-in user (any status), for profile display.
@@ -140,13 +130,17 @@ class CommunityNewsService {
       final id = row['id'] as String;
       final authorId = row['author_id'] as String;
       final businessId = row['business_id'] as String?;
+      final createdRaw = row['created_at'];
+      final createdAt = createdRaw is String
+          ? DateTime.tryParse(createdRaw) ?? DateTime.now()
+          : DateTime.now();
       return CommunityNewsPost(
         id: id,
-        body: row['body'] as String,
+        body: (row['body'] as String?) ?? '',
         authorName: authorNames[authorId] ?? 'FirstVue member',
         businessName:
             businessId == null ? null : businessNames[businessId],
-        createdAt: DateTime.parse(row['created_at'] as String),
+        createdAt: createdAt,
         isMine: authorId == currentUserId,
         sparkCount: sparkCounts[id] ?? 0,
         sparkedByMe: mySparks.contains(id),
@@ -154,6 +148,15 @@ class CommunityNewsService {
         media: mediaByPost[id] ?? const [],
       );
     }).toList();
+  }
+
+  static String normalizePostId(String raw) {
+    final trimmed = raw.trim();
+    const prefix = 'news-post:';
+    if (trimmed.startsWith(prefix)) {
+      return trimmed.substring(prefix.length);
+    }
+    return trimmed;
   }
 
   static Future<Map<String, String>> _fetchProfileNames(
@@ -250,6 +253,40 @@ class CommunityNewsService {
     }
   }
 
+  /// Single post by id (author's own or approved), for detail sheets.
+  static Future<CommunityNewsPost?> fetchPostById(String id) async {
+    final postId = normalizePostId(id);
+    if (postId.isEmpty) return null;
+
+    final me = _client.auth.currentUser?.id;
+
+    try {
+      final rows = await _client
+          .from('community_news_posts')
+          .select('id, body, created_at, author_id, business_id')
+          .eq('id', postId)
+          .limit(1);
+
+      if (rows.isNotEmpty) {
+        final posts = await _mapPostRows(rows, currentUserId: me);
+        if (posts.isNotEmpty) return posts.first;
+      }
+    } catch (_) {
+      // Fall through to author fallback below.
+    }
+
+    if (me != null) {
+      try {
+        final mine = await fetchMyPosts(limit: 50);
+        for (final post in mine) {
+          if (post.id == postId) return post;
+        }
+      } catch (_) {}
+    }
+
+    return null;
+  }
+
   static Future<CommunityNewsPost> createPost(
     String body, {
     String? businessId,
@@ -277,14 +314,15 @@ class CommunityNewsService {
 
     final postId = row['id'] as String;
     var media = const <CommunityNewsMediaItem>[];
+    Object? mediaError;
     if (files.isNotEmpty) {
       try {
         media = await CommunityNewsMediaService.uploadMedia(
           postId: postId,
           files: files,
         );
-      } catch (_) {
-        // Keep the text post even if media upload fails (e.g. migration pending).
+      } catch (error) {
+        mediaError = error;
       }
     }
 
@@ -294,7 +332,7 @@ class CommunityNewsService {
         ? const <String, String>{}
         : await _fetchBusinessNames([insertedBusinessId]);
 
-    return CommunityNewsPost(
+    final post = CommunityNewsPost(
       id: postId,
       body: row['body'] as String,
       authorName: authorNames[me.id] ?? 'FirstVue member',
@@ -308,6 +346,12 @@ class CommunityNewsService {
       savedByMe: false,
       media: media,
     );
+
+    if (mediaError != null && files.isNotEmpty && media.isEmpty) {
+      throw CommunityNewsMediaUploadException(post, mediaError);
+    }
+
+    return post;
   }
 
   static Future<CommunityNewsPost> toggleSave(CommunityNewsPost post) async {
@@ -372,4 +416,14 @@ class CommunityNewsService {
       sparkCount: post.sparkCount + 1,
     );
   }
+}
+
+class CommunityNewsMediaUploadException implements Exception {
+  final CommunityNewsPost post;
+  final Object cause;
+
+  const CommunityNewsMediaUploadException(this.post, this.cause);
+
+  @override
+  String toString() => 'Post saved but media upload failed: $cause';
 }

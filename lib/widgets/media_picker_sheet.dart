@@ -7,6 +7,7 @@ Future<List<XFile>?> showMediaPickerSheet(BuildContext context) {
   final picker = ImagePicker();
   return showModalBottomSheet<List<XFile>>(
     context: context,
+    isScrollControlled: true,
     backgroundColor: const Color(0xFF10151B),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -32,9 +33,10 @@ Future<List<XFile>?> showMediaPickerSheet(BuildContext context) {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 14),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined, color: FirstVueColors.gold),
-              title: const Text('Photos from gallery', style: TextStyle(color: Colors.white)),
+            _PickerButton(
+              icon: Icons.photo_library_outlined,
+              iconColor: FirstVueColors.gold,
+              label: 'Photos from gallery',
               onTap: () async {
                 final photos = await picker.pickMultiImage(imageQuality: 90);
                 if (sheetContext.mounted) {
@@ -42,22 +44,24 @@ Future<List<XFile>?> showMediaPickerSheet(BuildContext context) {
                 }
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.videocam_outlined, color: FirstVueColors.teal),
-              title: const Text('Video from gallery', style: TextStyle(color: Colors.white)),
+            _PickerButton(
+              icon: Icons.videocam_outlined,
+              iconColor: FirstVueColors.teal,
+              label: 'Video from gallery',
               onTap: () async {
                 final video = await picker.pickVideo(source: ImageSource.gallery);
                 if (sheetContext.mounted) {
-                  Navigator.pop(sheetContext, video == null ? <XFile>[] : [video]);
+                  Navigator.pop(
+                    sheetContext,
+                    video == null ? <XFile>[] : [video],
+                  );
                 }
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.perm_media_outlined, color: Color(0xFFE5C16F)),
-              title: const Text(
-                'Photos & videos (all types)',
-                style: TextStyle(color: Colors.white),
-              ),
+            _PickerButton(
+              icon: Icons.perm_media_outlined,
+              iconColor: const Color(0xFFE5C16F),
+              label: 'Photos & videos (all types)',
               onTap: () async {
                 final media = await picker.pickMultipleMedia(imageQuality: 90);
                 if (sheetContext.mounted) {
@@ -70,4 +74,47 @@ Future<List<XFile>?> showMediaPickerSheet(BuildContext context) {
       ),
     ),
   );
+}
+
+class _PickerButton extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final VoidCallback onTap;
+
+  const _PickerButton({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+            child: Row(
+              children: [
+                Icon(icon, color: iconColor),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(color: Colors.white, fontSize: 15),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

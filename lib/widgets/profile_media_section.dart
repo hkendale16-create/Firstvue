@@ -37,7 +37,7 @@ class _ProfileMediaSectionState extends State<ProfileMediaSection> {
   }
 
   Future<List<ProfileMediaItem>> _load() async {
-    final media = await ProfileMediaService.fetchMyMedia();
+    final media = await ProfileMediaService.fetchGalleryMedia();
     if (mounted) setState(() => _media = media);
     return media;
   }

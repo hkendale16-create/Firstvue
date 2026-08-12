@@ -75,10 +75,24 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     setState(() => _posting = true);
     try {
       final hadMedia = _attachedMedia.isNotEmpty;
-      final newPost = await CommunityNewsService.createPost(
-        text,
-        files: _attachedMedia,
-      );
+      CommunityNewsPost newPost;
+      try {
+        newPost = await CommunityNewsService.createPost(
+          text,
+          files: _attachedMedia,
+        );
+      } on CommunityNewsMediaUploadException catch (error) {
+        newPost = error.post;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Post saved but photo/video upload failed: ${error.cause}',
+              ),
+            ),
+          );
+        }
+      }
       _composer.clear();
       if (!mounted) return;
       setState(() {
@@ -94,15 +108,21 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Post saved. Photo/video needs Supabase migration 20260817_community_news_post_media.sql.',
+              'Post saved without media. Check Supabase migrations or storage buckets.',
             ),
           ),
         );
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to post right now.')),
+          SnackBar(
+            content: Text(
+              error is AuthException
+                  ? 'Sign in to post.'
+                  : 'Unable to post right now.',
+            ),
+          ),
         );
       }
     } finally {
@@ -238,129 +258,122 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
           ),
         ),
         const SizedBox(height: 12),
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => FocusScope.of(context).requestFocus(FocusNode()),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: FirstVueColors.surface,
             borderRadius: BorderRadius.circular(16),
-            child: Ink(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: FirstVueColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: FirstVueColors.gold.withValues(alpha: .35)),
+            border: Border.all(color: FirstVueColors.gold.withValues(alpha: .35)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'POST HERE',
+                style: TextStyle(
+                  color: FirstVueColors.gold,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1,
+                  fontSize: 12,
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: 8),
+              TextField(
+                controller: _composer,
+                style: const TextStyle(color: Colors.white),
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Share news, updates, or shoutouts with the community...',
+                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: .38)),
+                  filled: true,
+                  fillColor: FirstVueColors.elevatedSurface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              if (_attachedMedia.isNotEmpty) ...[
+                SizedBox(
+                  height: 72,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _attachedMedia.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final file = _attachedMedia[index];
+                      final isVideo = _isVideoFile(file);
+                      return Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              width: 72,
+                              height: 72,
+                              color: FirstVueColors.elevatedSurface,
+                              child: isVideo
+                                  ? const Icon(Icons.videocam_outlined, color: FirstVueColors.teal)
+                                  : const Icon(Icons.image_outlined, color: FirstVueColors.gold),
+                            ),
+                          ),
+                          Positioned(
+                            top: -6,
+                            right: -6,
+                            child: IconButton.filledTonal(
+                              visualDensity: VisualDensity.compact,
+                              style: IconButton.styleFrom(
+                                backgroundColor: FirstVueColors.surface,
+                                foregroundColor: Colors.white70,
+                                minimumSize: const Size(24, 24),
+                                padding: EdgeInsets.zero,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _attachedMedia = [
+                                    for (var i = 0; i < _attachedMedia.length; i++)
+                                      if (i != index) _attachedMedia[i],
+                                  ];
+                                });
+                              },
+                              icon: const Icon(Icons.close, size: 14),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              Row(
                 children: [
-                  const Text(
-                    'POST HERE',
-                    style: TextStyle(
-                      color: FirstVueColors.gold,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1,
-                      fontSize: 12,
+                  OutlinedButton.icon(
+                    onPressed: _posting ? null : _showMediaPicker,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: FirstVueColors.teal,
+                      side: BorderSide(color: FirstVueColors.teal.withValues(alpha: .45)),
+                    ),
+                    icon: const Icon(Icons.perm_media_outlined, size: 18),
+                    label: Text(
+                      _attachedMedia.isEmpty
+                          ? 'PHOTO / VIDEO'
+                          : '${_attachedMedia.length} ATTACHED',
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _composer,
-                    style: const TextStyle(color: Colors.white),
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      hintText: 'Share news, updates, or shoutouts with the community...',
-                      hintStyle: TextStyle(color: Colors.white.withValues(alpha: .38)),
-                      filled: true,
-                      fillColor: FirstVueColors.elevatedSurface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
+                  const Spacer(),
+                  FilledButton(
+                    onPressed: _posting ? null : _submitPost,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: FirstVueColors.coral,
+                      foregroundColor: Colors.white,
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  if (_attachedMedia.isNotEmpty) ...[
-                    SizedBox(
-                      height: 72,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _attachedMedia.length,
-                        separatorBuilder: (_, _) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final file = _attachedMedia[index];
-                          final isVideo = _isVideoFile(file);
-                          return Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  width: 72,
-                                  height: 72,
-                                  color: FirstVueColors.elevatedSurface,
-                                  child: isVideo
-                                      ? const Icon(Icons.videocam_outlined, color: FirstVueColors.teal)
-                                      : const Icon(Icons.image_outlined, color: FirstVueColors.gold),
-                                ),
-                              ),
-                              Positioned(
-                                top: -6,
-                                right: -6,
-                                child: IconButton.filledTonal(
-                                  visualDensity: VisualDensity.compact,
-                                  style: IconButton.styleFrom(
-                                    backgroundColor: FirstVueColors.surface,
-                                    foregroundColor: Colors.white70,
-                                    minimumSize: const Size(24, 24),
-                                    padding: EdgeInsets.zero,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _attachedMedia = [
-                                        for (var i = 0; i < _attachedMedia.length; i++)
-                                          if (i != index) _attachedMedia[i],
-                                      ];
-                                    });
-                                  },
-                                  icon: const Icon(Icons.close, size: 14),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                  Row(
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: _posting ? null : _showMediaPicker,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: FirstVueColors.teal,
-                          side: BorderSide(color: FirstVueColors.teal.withValues(alpha: .45)),
-                        ),
-                        icon: const Icon(Icons.perm_media_outlined, size: 18),
-                        label: Text(
-                          _attachedMedia.isEmpty
-                              ? 'PHOTO / VIDEO'
-                              : '${_attachedMedia.length} ATTACHED',
-                        ),
-                      ),
-                      const Spacer(),
-                      FilledButton(
-                        onPressed: _posting ? null : _submitPost,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: FirstVueColors.coral,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: Text(_posting ? 'POSTING...' : 'POST'),
-                      ),
-                    ],
+                    child: Text(_posting ? 'POSTING...' : 'POST'),
                   ),
                 ],
               ),
-            ),
+            ],
           ),
         ),
         const SizedBox(height: 14),

@@ -12,6 +12,7 @@ class ProfileMediaItem {
   final MediaStorageProvider storageProvider;
   final String mediaType;
   final bool featuredForTrending;
+  final String mediaRole;
 
   const ProfileMediaItem({
     required this.id,
@@ -20,9 +21,17 @@ class ProfileMediaItem {
     required this.storageProvider,
     required this.mediaType,
     required this.featuredForTrending,
+    this.mediaRole = 'gallery',
   });
 
   bool get isVideo => mediaType == 'video';
+}
+
+class ProfileImageSet {
+  final ProfileMediaItem? avatar;
+  final ProfileMediaItem? cover;
+
+  const ProfileImageSet({this.avatar, this.cover});
 }
 
 class ProfileMediaService {
@@ -31,39 +40,94 @@ class ProfileMediaService {
   static const _maxMediaBytes = 50 * 1024 * 1024;
   static final _client = Supabase.instance.client;
 
-  static Future<List<ProfileMediaItem>> fetchMyMedia() async {
+  static const _selectColumns =
+      'id, storage_path, storage_provider, media_type, featured_for_trending, media_role';
+
+  static Future<List<ProfileMediaItem>> fetchMyMedia() =>
+      fetchGalleryMedia();
+
+  static Future<List<ProfileMediaItem>> fetchGalleryMedia() async {
     final user = _client.auth.currentUser;
     if (user == null) return const [];
 
-    final rows = await _client
-        .from('profile_media')
-        .select(
-          'id, storage_path, storage_provider, media_type, featured_for_trending',
-        )
-        .eq('profile_id', user.id)
-        .order('sort_order')
-        .order('created_at');
+    try {
+      final rows = await _client
+          .from('profile_media')
+          .select(_selectColumns)
+          .eq('profile_id', user.id)
+          .or('media_role.eq.gallery,media_role.is.null')
+          .order('sort_order')
+          .order('created_at');
 
-    return Future.wait(
-      rows.map((row) async {
-        final path = row['storage_path'] as String;
-        final provider = MediaStorageProvider.parse(
-          row['storage_provider'] as String?,
-        );
-        return ProfileMediaItem(
-          id: row['id'] as String,
-          storagePath: path,
-          storageProvider: provider,
-          mediaType: (row['media_type'] as String?) ?? 'image',
-          featuredForTrending: (row['featured_for_trending'] as bool?) ?? false,
-          signedUrl: await MediaStorageService.createReadUrl(
-            bucket: MediaBucket.profile,
-            path: path,
-            provider: provider,
-            context: {'profile_id': user.id},
-          ),
-        );
-      }),
+      return _mapRows(rows, user.id);
+    } catch (_) {
+      // media_role column may not exist yet — fall back without role filter.
+      final rows = await _client
+          .from('profile_media')
+          .select(
+            'id, storage_path, storage_provider, media_type, featured_for_trending',
+          )
+          .eq('profile_id', user.id)
+          .order('sort_order')
+          .order('created_at');
+
+      return _mapRows(rows, user.id);
+    }
+  }
+
+  static Future<ProfileImageSet> fetchProfileImages() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return const ProfileImageSet();
+
+    try {
+      final rows = await _client
+          .from('profile_media')
+          .select(_selectColumns)
+          .eq('profile_id', user.id)
+          .inFilter('media_role', ['avatar', 'cover']);
+
+      ProfileMediaItem? avatar;
+      ProfileMediaItem? cover;
+      for (final row in rows) {
+        final item = await _rowToItem(row, user.id);
+        final role = (row['media_role'] as String?) ?? 'gallery';
+        if (role == 'avatar') avatar = item;
+        if (role == 'cover') cover = item;
+      }
+      return ProfileImageSet(avatar: avatar, cover: cover);
+    } catch (_) {
+      return const ProfileImageSet();
+    }
+  }
+
+  static Future<List<ProfileMediaItem>> _mapRows(
+    List<dynamic> rows,
+    String userId,
+  ) {
+    return Future.wait(rows.map((row) => _rowToItem(row, userId)));
+  }
+
+  static Future<ProfileMediaItem> _rowToItem(
+    Map<String, dynamic> row,
+    String userId,
+  ) async {
+    final path = row['storage_path'] as String;
+    final provider = MediaStorageProvider.parse(
+      row['storage_provider'] as String?,
+    );
+    return ProfileMediaItem(
+      id: row['id'] as String,
+      storagePath: path,
+      storageProvider: provider,
+      mediaType: (row['media_type'] as String?) ?? 'image',
+      featuredForTrending: (row['featured_for_trending'] as bool?) ?? false,
+      mediaRole: (row['media_role'] as String?) ?? 'gallery',
+      signedUrl: await MediaStorageService.createReadUrl(
+        bucket: MediaBucket.profile,
+        path: path,
+        provider: provider,
+        context: {'profile_id': userId},
+      ),
     );
   }
 
@@ -77,6 +141,7 @@ class ProfileMediaService {
         .from('profile_media')
         .select('sort_order')
         .eq('profile_id', user.id)
+        .or('media_role.eq.gallery,media_role.is.null')
         .order('sort_order', ascending: false)
         .limit(1);
     final firstSortOrder = existing.isEmpty
@@ -84,44 +149,140 @@ class ProfileMediaService {
         : (existing.first['sort_order'] as int) + 1;
 
     for (var index = 0; index < files.length; index++) {
-      final file = files[index];
-      final bytes = await file.readAsBytes();
-      if (bytes.isEmpty) {
-        throw const StorageException('Selected file is empty.');
-      }
-      if (bytes.length > _maxMediaBytes) {
-        throw const StorageException(
-          'Each photo or video must be 50 MB or smaller.',
-        );
-      }
-
-      final mediaType = mediaTypeForFile(file);
-      final contentType = mimeTypeForFile(file, mediaType);
-      final upload = await MediaStorageService.uploadBytes(
-        bucket: MediaBucket.profile,
-        bytes: bytes,
-        contentType: contentType,
-        fileName: file.name,
+      await _uploadSingle(
+        file: files[index],
+        userId: user.id,
         index: index,
-        context: {'profile_id': user.id},
+        sortOrder: firstSortOrder + index,
+        mediaRole: 'gallery',
+        subfolder: null,
       );
-      try {
-        await _client.from('profile_media').insert({
-          'profile_id': user.id,
-          'storage_path': upload.path,
-          'storage_provider': upload.provider.value,
-          'media_type': mediaType,
-          'sort_order': firstSortOrder + index,
-        });
-      } catch (_) {
-        await MediaStorageService.deleteObject(
-          bucket: MediaBucket.profile,
-          path: upload.path,
-          provider: upload.provider,
-          context: {'profile_id': user.id},
-        );
-        rethrow;
+    }
+  }
+
+  static Future<void> setAvatar(XFile file) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw const AuthException('Sign in before updating your profile photo.');
+    }
+    await _setRoleImage(user.id, file, role: 'avatar', subfolder: 'avatar');
+  }
+
+  static Future<void> setCover(XFile file) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw const AuthException('Sign in before updating your cover photo.');
+    }
+    await _setRoleImage(user.id, file, role: 'cover', subfolder: 'cover');
+  }
+
+  static Future<void> removeAvatar() => _removeRoleImage('avatar');
+
+  static Future<void> removeCover() => _removeRoleImage('cover');
+
+  static Future<void> _setRoleImage(
+    String userId,
+    XFile file, {
+    required String role,
+    required String subfolder,
+  }) async {
+    ProfileMediaItem? existing;
+    try {
+      final row = await _client
+          .from('profile_media')
+          .select(_selectColumns)
+          .eq('profile_id', userId)
+          .eq('media_role', role)
+          .maybeSingle();
+      if (row != null) {
+        existing = await _rowToItem(row, userId);
       }
+    } catch (_) {}
+
+    if (existing != null) {
+      await deleteMedia(existing);
+    }
+
+    await _uploadSingle(
+      file: file,
+      userId: userId,
+      index: 0,
+      sortOrder: 0,
+      mediaRole: role,
+      subfolder: subfolder,
+    );
+  }
+
+  static Future<void> _removeRoleImage(String role) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw const AuthException('Sign in to remove this photo.');
+    }
+
+    try {
+      final row = await _client
+          .from('profile_media')
+          .select(_selectColumns)
+          .eq('profile_id', user.id)
+          .eq('media_role', role)
+          .maybeSingle();
+      if (row == null) return;
+      final item = await _rowToItem(row, user.id);
+      await deleteMedia(item);
+    } catch (_) {
+      rethrow;
+    }
+  }
+
+  static Future<void> _uploadSingle({
+    required XFile file,
+    required String userId,
+    required int index,
+    required int sortOrder,
+    required String mediaRole,
+    required String? subfolder,
+  }) async {
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) {
+      throw const StorageException('Selected file is empty.');
+    }
+    if (bytes.length > _maxMediaBytes) {
+      throw const StorageException(
+        'Each photo or video must be 50 MB or smaller.',
+      );
+    }
+
+    final mediaType = mediaTypeForFile(file);
+    final contentType = mimeTypeForFile(file, mediaType);
+    final upload = await MediaStorageService.uploadBytes(
+      bucket: MediaBucket.profile,
+      bytes: bytes,
+      contentType: contentType,
+      fileName: file.name,
+      index: index,
+      subfolder: subfolder,
+      context: {'profile_id': userId},
+    );
+
+    final insertPayload = {
+      'profile_id': userId,
+      'storage_path': upload.path,
+      'storage_provider': upload.provider.value,
+      'media_type': mediaType,
+      'sort_order': sortOrder,
+      'media_role': mediaRole,
+    };
+
+    try {
+      await _client.from('profile_media').insert(insertPayload);
+    } catch (_) {
+      await MediaStorageService.deleteObject(
+        bucket: MediaBucket.profile,
+        path: upload.path,
+        provider: upload.provider,
+        context: {'profile_id': userId},
+      );
+      rethrow;
     }
   }
 

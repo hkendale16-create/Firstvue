@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../screens/auth_screen.dart';
 import '../services/community_news_service.dart';
 import 'community_news_post_card.dart';
+import 'community_news_post_detail_sheet.dart';
 import 'feed_comments_sheet.dart';
 
 class ProfileMyPostsSection extends StatefulWidget {
@@ -278,6 +279,11 @@ class _ProfileMyPostsSectionState extends State<ProfileMyPostsSection> {
                       child: CommunityNewsPostCard(
                         post: posts[index],
                         compact: true,
+                        onTap: () => CommunityNewsPostDetailSheet.show(
+                          context,
+                          postId: posts[index].id,
+                          initialPost: posts[index],
+                        ),
                         onSpark: () => _sparkPost(index),
                         onSave: () => _savePost(index),
                         onComment: () => FeedCommentsSheet.show(

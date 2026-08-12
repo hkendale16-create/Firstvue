@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/profile_activity_service.dart';
+import 'community_news_post_detail_sheet.dart';
 
 enum ProfileActivityScope { user, business }
 
@@ -147,7 +148,10 @@ class _ProfileRecentActivitySectionState
                 child: Column(
                   children: [
                     for (var i = 0; i < items.length; i++) ...[
-                      _ActivityTile(item: items[i]),
+                      _ActivityTile(
+                        item: items[i],
+                        onTap: () => _handleActivityTap(context, items[i]),
+                      ),
                       if (i < items.length - 1)
                         Divider(
                           height: 1,
@@ -163,6 +167,26 @@ class _ProfileRecentActivitySectionState
         ],
       ),
     );
+  }
+
+  void _handleActivityTap(BuildContext context, ProfileActivityItem item) {
+    final postId = item.referenceId;
+    if (postId == null || postId.isEmpty) return;
+
+    switch (item.type) {
+      case ProfileActivityType.newsPost:
+      case ProfileActivityType.sparkGiven:
+      case ProfileActivityType.sparkReceived:
+        CommunityNewsPostDetailSheet.show(
+          context,
+          postId: postId,
+        );
+      case ProfileActivityType.feedComment:
+      case ProfileActivityType.businessMedia:
+      case ProfileActivityType.reviewWritten:
+      case ProfileActivityType.reviewReceived:
+        break;
+    }
   }
 }
 
@@ -186,12 +210,21 @@ class _ActivityContainer extends StatelessWidget {
 
 class _ActivityTile extends StatelessWidget {
   final ProfileActivityItem item;
+  final VoidCallback? onTap;
 
-  const _ActivityTile({required this.item});
+  const _ActivityTile({required this.item, this.onTap});
+
+  bool get _isTappable =>
+      onTap != null &&
+      item.referenceId != null &&
+      item.referenceId!.isNotEmpty &&
+      (item.type == ProfileActivityType.newsPost ||
+          item.type == ProfileActivityType.sparkGiven ||
+          item.type == ProfileActivityType.sparkReceived);
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final content = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -238,7 +271,19 @@ class _ActivityTile extends StatelessWidget {
               ],
             ),
           ),
+          if (_isTappable)
+            const Icon(Icons.chevron_right, color: Colors.white38, size: 18),
         ],
+      ),
+    );
+
+    if (!_isTappable) return content;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: content,
       ),
     );
   }

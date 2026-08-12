@@ -8,6 +8,7 @@ import '../theme/firstvue_theme.dart';
 
 class CommunityNewsPostCard extends StatelessWidget {
   final CommunityNewsPost post;
+  final VoidCallback? onTap;
   final VoidCallback? onSpark;
   final VoidCallback? onSave;
   final VoidCallback? onComment;
@@ -16,6 +17,7 @@ class CommunityNewsPostCard extends StatelessWidget {
   const CommunityNewsPostCard({
     super.key,
     required this.post,
+    this.onTap,
     this.onSpark,
     this.onSave,
     this.onComment,
@@ -24,7 +26,7 @@ class CommunityNewsPostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final card = Container(
       width: double.infinity,
       padding: EdgeInsets.all(compact ? 12 : 14),
       decoration: BoxDecoration(
@@ -137,6 +139,17 @@ class CommunityNewsPostCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+
+    if (onTap == null) return card;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: card,
       ),
     );
   }
