@@ -10,6 +10,8 @@ class EntityProfileMediaEditor extends StatelessWidget {
   final IconData placeholderIcon;
   final VoidCallback? onChangeCover;
   final VoidCallback? onChangeAvatar;
+  final VoidCallback? onRemoveCover;
+  final VoidCallback? onRemoveAvatar;
 
   const EntityProfileMediaEditor({
     super.key,
@@ -19,6 +21,8 @@ class EntityProfileMediaEditor extends StatelessWidget {
     this.placeholderIcon = Icons.storefront_outlined,
     this.onChangeCover,
     this.onChangeAvatar,
+    this.onRemoveCover,
+    this.onRemoveAvatar,
   });
 
   @override
@@ -36,7 +40,7 @@ class EntityProfileMediaEditor extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Tap cover or profile photo to upload — just like your main profile.',
+          'Tap cover or profile photo to upload — replace anytime.',
           style: TextStyle(
             color: Colors.white.withValues(alpha: .45),
             fontSize: 12,
@@ -65,10 +69,20 @@ class EntityProfileMediaEditor extends StatelessWidget {
             ),
             child: Align(
               alignment: Alignment.bottomRight,
-              child: TextButton.icon(
-                onPressed: updating ? null : onChangeCover,
-                icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                label: const Text('Cover photo'),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (coverUrl != null && onRemoveCover != null)
+                    TextButton(
+                      onPressed: updating ? null : onRemoveCover,
+                      child: const Text('Remove'),
+                    ),
+                  TextButton.icon(
+                    onPressed: updating ? null : onChangeCover,
+                    icon: const Icon(Icons.photo_camera_outlined, size: 18),
+                    label: Text(coverUrl == null ? 'Cover photo' : 'Replace cover'),
+                  ),
+                ],
               ),
             ),
           ),
@@ -79,6 +93,7 @@ class EntityProfileMediaEditor extends StatelessWidget {
             GestureDetector(
               onTap: updating ? null : onChangeAvatar,
               child: CircleAvatar(
+                key: ValueKey('entity-avatar-${avatarUrl ?? 'empty'}'),
                 radius: 40,
                 backgroundColor: const Color(0xFF241D22),
                 backgroundImage:
@@ -90,10 +105,28 @@ class EntityProfileMediaEditor extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: updating ? null : onChangeAvatar,
-                icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-                label: Text(updating ? 'Uploading…' : 'Profile photo'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: updating ? null : onChangeAvatar,
+                    icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+                    label: Text(
+                      updating
+                          ? 'Uploading…'
+                          : (avatarUrl == null
+                              ? 'Profile photo'
+                              : 'Replace photo'),
+                    ),
+                  ),
+                  if (avatarUrl != null && onRemoveAvatar != null) ...[
+                    const SizedBox(height: 6),
+                    TextButton(
+                      onPressed: updating ? null : onRemoveAvatar,
+                      child: const Text('Remove profile photo'),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],

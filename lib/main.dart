@@ -322,14 +322,14 @@ class _FirstVueHomeState extends State<FirstVueHome> {
 
               const SizedBox(height: 24),
 
+              HomeCommunitiesSection(refreshToken: _homeRefreshToken),
+
+              const SizedBox(height: 30),
+
               HomeDiscoverySection(
                 refreshToken: _homeRefreshToken,
                 onViewAllVue: () => setState(() => selectedIndex = 2),
               ),
-
-              const SizedBox(height: 30),
-
-              HomeCommunitiesSection(refreshToken: _homeRefreshToken),
 
               const SizedBox(height: 30),
 

@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/post_identity.dart';
+import 'community_service.dart';
 import 'user_profile_service.dart';
 
 class PostIdentityService {
@@ -8,6 +9,7 @@ class PostIdentityService {
 
   static final _client = Supabase.instance.client;
 
+  /// Identities you can post *as* (personal / business).
   static Future<List<PostIdentityOption>> fetchOptions() async {
     final user = _client.auth.currentUser;
     if (user == null) return const [];
@@ -43,35 +45,52 @@ class PostIdentityService {
       }
     } catch (_) {}
 
+    return options;
+  }
+
+  /// Communities the active profile may post *to*.
+  static Future<List<PostDestinationOption>> fetchDestinations() async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      return const [PostDestinationOption.mainFeed()];
+    }
+
+    final destinations = <PostDestinationOption>[
+      const PostDestinationOption.mainFeed(),
+    ];
+
     try {
-      final memberships = await _client
-          .from('community_members')
-          .select('community_id, communities(id, name, city, state)')
-          .eq('profile_id', user.id)
-          .eq('status', 'active')
-          .limit(20);
-
-      for (final row in memberships) {
-        final community = row['communities'] as Map<String, dynamic>?;
-        if (community == null) continue;
-        final city = community['city'] as String?;
-        final state = community['state'] as String?;
-        final location = [city, state]
-            .whereType<String>()
-            .where((p) => p.trim().isNotEmpty)
-            .join(', ');
-
-        options.add(
-          PostIdentityOption(
-            kind: PostIdentityKind.community,
-            communityId: community['id'] as String,
-            label: community['name'] as String,
-            subtitle: location.isEmpty ? 'Community' : location,
+      final communities = await CommunityService.fetchMyCommunities(limit: 30);
+      for (final community in communities) {
+        if (!community.canPost) continue;
+        destinations.add(
+          PostDestinationOption(
+            communityId: community.id,
+            label: community.name,
+            subtitle: community.locationLabel ?? 'Community',
           ),
         );
       }
     } catch (_) {}
 
+    return destinations;
+  }
+
+  /// Legacy helper: identity options including communities (compat).
+  static Future<List<PostIdentityOption>> fetchOptionsIncludingCommunities() async {
+    final options = await fetchOptions();
+    final destinations = await fetchDestinations();
+    for (final destination in destinations) {
+      if (destination.isMainFeed) continue;
+      options.add(
+        PostIdentityOption(
+          kind: PostIdentityKind.community,
+          communityId: destination.communityId,
+          label: destination.label,
+          subtitle: destination.subtitle ?? 'Community',
+        ),
+      );
+    }
     return options;
   }
 }

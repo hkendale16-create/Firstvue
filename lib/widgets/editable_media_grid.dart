@@ -61,7 +61,9 @@ class EditableMediaGrid extends StatelessWidget {
           itemCount: items.length,
           itemBuilder: (context, index) {
             final media = items[index];
-            return ClipRRect(
+            return KeyedSubtree(
+              key: ValueKey('editable-media-${media.id}'),
+              child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Stack(
                 fit: StackFit.expand,
@@ -116,6 +118,7 @@ class EditableMediaGrid extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
             );
           },
         ),
