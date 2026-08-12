@@ -25,6 +25,7 @@ import 'widgets/firstvue_refresh_scaffold.dart';
 import 'widgets/firstvue_settings_drawer.dart';
 import 'widgets/floating_messages_bubble.dart';
 import 'widgets/home_communities_section.dart';
+import 'widgets/home_community_feed_section.dart';
 import 'widgets/home_discovery_section.dart';
 import 'widgets/home_news_feed_section.dart';
 import 'widgets/firstvue_inline_search_bar.dart';
@@ -330,6 +331,10 @@ class _FirstVueHomeState extends State<FirstVueHome> {
               const SizedBox(height: 30),
 
               HomeCommunitiesSection(refreshToken: _homeRefreshToken),
+
+              const SizedBox(height: 30),
+
+              HomeCommunityFeedSection(refreshToken: _homeRefreshToken),
 
               const SizedBox(height: 30),
 

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../navigation/firstvue_page_route.dart';
+import '../services/community_hub_service.dart';
 import '../services/community_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/group_circle_avatar.dart';
 import 'community_detail_screen.dart';
+import 'community_hub_detail_screen.dart';
+import 'create_community_hub_screen.dart';
 import 'create_community_screen.dart';
 
 class CommunitiesScreen extends StatefulWidget {
@@ -14,32 +18,78 @@ class CommunitiesScreen extends StatefulWidget {
   State<CommunitiesScreen> createState() => _CommunitiesScreenState();
 }
 
-class _CommunitiesScreenState extends State<CommunitiesScreen> {
-  List<Community> _communities = const [];
+class _CommunitiesScreenState extends State<CommunitiesScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabs;
+  List<Community> _groups = const [];
+  List<CommunityHub> _hubs = const [];
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
+    _tabs = TabController(length: 2, vsync: this);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final items = await CommunityService.fetchCommunities();
+    final results = await Future.wait([
+      CommunityService.fetchCommunities(),
+      CommunityHubService.fetchHubs(),
+    ]);
     if (!mounted) return;
     setState(() {
-      _communities = items;
+      _groups = results[0] as List<Community>;
+      _hubs = results[1] as List<CommunityHub>;
       _loading = false;
     });
   }
 
   Future<void> _createGroup() async {
-    final created = await Navigator.push<bool>(
+    final created = await Navigator.push<Community>(
       context,
       FirstVuePageRoute(builder: (_) => const CreateCommunityScreen()),
     );
-    if (created == true) await _load();
+    if (created == null || !mounted) return;
+    await _load();
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      FirstVuePageRoute(
+        builder: (_) => CommunityDetailScreen(
+          communityId: created.id,
+          initialCommunity: created,
+        ),
+      ),
+    );
+    if (mounted) await _load();
+  }
+
+  Future<void> _createHub() async {
+    final created = await Navigator.push<CommunityHub>(
+      context,
+      FirstVuePageRoute(builder: (_) => const CreateCommunityHubScreen()),
+    );
+    if (created == null || !mounted) return;
+    await _load();
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      FirstVuePageRoute(
+        builder: (_) => CommunityHubDetailScreen(
+          hubId: created.id,
+          initialHub: created,
+        ),
+      ),
+    );
+    if (mounted) await _load();
   }
 
   @override
@@ -49,53 +99,139 @@ class _CommunitiesScreenState extends State<CommunitiesScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF080B0F),
         foregroundColor: Colors.white,
-        title: const Text('COMMUNITIES'),
+        title: const Text('GROUPS & COMMUNITIES'),
+        bottom: TabBar(
+          controller: _tabs,
+          labelColor: FirstVueColors.gold,
+          unselectedLabelColor: Colors.white54,
+          indicatorColor: FirstVueColors.teal,
+          tabs: const [
+            Tab(text: 'GROUPS'),
+            Tab(text: 'COMMUNITIES'),
+          ],
+        ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _createGroup,
-        backgroundColor: FirstVueColors.coral,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Create Group'),
+      floatingActionButton: AnimatedBuilder(
+        animation: _tabs,
+        builder: (context, _) {
+          final isGroups = _tabs.index == 0;
+          return FloatingActionButton.extended(
+            onPressed: isGroups ? _createGroup : _createHub,
+            backgroundColor: FirstVueColors.coral,
+            foregroundColor: Colors.white,
+            icon: const Icon(Icons.add),
+            label: Text(isGroups ? 'Create Group' : 'Create Community'),
+          );
+        },
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: FirstVueColors.teal))
-          : FirstVueRefreshScaffold(
-              onRefresh: _load,
-              child: _communities.isEmpty
-                  ? ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(24),
-                      children: const [
-                        Text(
-                          'No groups yet. Create one to connect with your community.',
-                          style: TextStyle(color: Colors.white54),
+          ? const Center(
+              child: CircularProgressIndicator(color: FirstVueColors.teal),
+            )
+          : TabBarView(
+              controller: _tabs,
+              children: [
+                FirstVueRefreshScaffold(
+                  onRefresh: _load,
+                  child: _groups.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(24),
+                          children: const [
+                            Text(
+                              'No groups yet. Create one to connect with people nearby.',
+                              style: TextStyle(color: Colors.white54),
+                            ),
+                          ],
+                        )
+                      : ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+                          itemCount: _groups.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final community = _groups[index];
+                            return _CommunityListTile(
+                              community: community,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  FirstVuePageRoute(
+                                    builder: (_) => CommunityDetailScreen(
+                                      communityId: community.id,
+                                      initialCommunity: community,
+                                    ),
+                                  ),
+                                ).then((_) => _load());
+                              },
+                            );
+                          },
                         ),
-                      ],
-                    )
-                  : ListView.separated(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
-                      itemCount: _communities.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final community = _communities[index];
-                        return _CommunityListTile(
-                          community: community,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              FirstVuePageRoute(
-                                builder: (_) => CommunityDetailScreen(
-                                  communityId: community.id,
-                                  initialCommunity: community,
+                ),
+                FirstVueRefreshScaffold(
+                  onRefresh: _load,
+                  child: _hubs.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(24),
+                          children: const [
+                            Text(
+                              'No Communities yet. Approved Community Leaders can create local hubs that contain many Groups.',
+                              style: TextStyle(color: Colors.white54),
+                            ),
+                          ],
+                        )
+                      : ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+                          itemCount: _hubs.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final hub = _hubs[index];
+                            return ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
+                              ),
+                              leading: GroupCircleAvatar(
+                                imageUrl: hub.imageUrl,
+                                size: 52,
+                                ringColor: FirstVueColors.gold,
+                                fallbackIcon: Icons.location_city_rounded,
+                              ),
+                              title: Text(
+                                hub.name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            ).then((_) => _load());
+                              subtitle: Text(
+                                hub.locationLabel ?? 'Community hub',
+                                style: const TextStyle(color: Colors.white54),
+                              ),
+                              trailing: const Icon(
+                                Icons.chevron_right,
+                                color: Colors.white38,
+                              ),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  FirstVuePageRoute(
+                                    builder: (_) => CommunityHubDetailScreen(
+                                      hubId: hub.id,
+                                      initialHub: hub,
+                                    ),
+                                  ),
+                                ).then((_) => _load());
+                              },
+                            );
                           },
-                        );
-                      },
-                    ),
+                        ),
+                ),
+              ],
             ),
     );
   }
@@ -126,17 +262,12 @@ class _CommunityListTile extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: FirstVueColors.elevatedSurface,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.groups_rounded,
-                  color: FirstVueColors.teal.withValues(alpha: .9),
-                ),
+              GroupCircleAvatar(
+                imageUrl: community.imageUrl,
+                size: 52,
+                ringColor: community.isMember
+                    ? FirstVueColors.teal
+                    : Colors.white24,
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -153,8 +284,11 @@ class _CommunityListTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      community.locationLabel ??
-                          '${community.memberCount} member${community.memberCount == 1 ? '' : 's'}',
+                      [
+                        if (community.isPrivate) 'Private',
+                        community.locationLabel ??
+                            '${community.memberCount} member${community.memberCount == 1 ? '' : 's'}',
+                      ].join(' · '),
                       style: const TextStyle(color: Colors.white54, fontSize: 12),
                     ),
                     if (community.description?.trim().isNotEmpty == true) ...[

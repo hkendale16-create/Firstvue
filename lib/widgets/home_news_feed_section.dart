@@ -500,7 +500,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
           children: [
             const Expanded(
               child: Text(
-                'COMMUNITY FEED',
+                'NEWS FEED',
                 style: TextStyle(
                   color: FirstVueColors.ivory,
                   fontSize: 14,
@@ -662,7 +662,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
           )
         else if (_posts.isEmpty)
           const Text(
-            'Community posts will appear here.',
+            'Posts from FirstVue members, businesses, and more will appear here.',
             style: TextStyle(color: Colors.white54),
           )
         else
