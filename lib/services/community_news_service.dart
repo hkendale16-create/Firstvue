@@ -98,24 +98,31 @@ class CommunityNewsService {
   static const _postColumnsBase =
       'id, body, created_at, author_id, business_id, community_id';
 
+  /// Builds a select query with filters applied *after* `.select()`.
+  ///
+  /// Calling `.order` / `.eq` / `.limit` on the pre-select builder (and
+  /// discarding the returned filter builder) breaks feed loading under
+  /// supabase_flutter / postgrest.
   static Future<List<dynamic>> _selectPosts(
-    void Function(dynamic query) configure,
+    dynamic Function(dynamic query) configure,
   ) async {
-    dynamic query = _client.from('community_news_posts');
-    configure(query);
+    Future<List<dynamic>> run(String columns) async {
+      dynamic query = _client.from('community_news_posts').select(columns);
+      query = configure(query);
+      final rows = await query;
+      if (rows is List) return rows;
+      return const [];
+    }
+
     try {
-      return await query.select(_postColumns);
+      return await run(_postColumns);
     } catch (_) {
       try {
-        query = _client.from('community_news_posts');
-        configure(query);
-        return await query.select(
+        return await run(
           'id, body, created_at, author_id, business_id, community_id, visibility',
         );
       } catch (_) {
-        query = _client.from('community_news_posts');
-        configure(query);
-        return await query.select(_postColumnsBase);
+        return await run(_postColumnsBase);
       }
     }
   }
@@ -755,6 +762,25 @@ class CommunityNewsService {
       final rows = await _selectPosts(
         (query) => query
             .eq('event_id', eventId)
+            .order('created_at', ascending: false)
+            .limit(limit),
+      );
+      return _mapPostRows(rows, currentUserId: me);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<List<CommunityNewsPost>> fetchPostsForCommunity(
+    String communityId, {
+    int limit = 20,
+  }) async {
+    if (communityId.trim().isEmpty) return const [];
+    final me = _client.auth.currentUser?.id;
+    try {
+      final rows = await _selectPosts(
+        (query) => query
+            .eq('community_id', communityId)
             .order('created_at', ascending: false)
             .limit(limit),
       );

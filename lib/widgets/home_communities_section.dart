@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../screens/communities_screen.dart';
 import '../screens/community_detail_screen.dart';
+import '../screens/create_community_screen.dart';
 import '../services/community_service.dart';
 import '../theme/firstvue_theme.dart';
 
@@ -107,32 +108,121 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
             ),
           )
         else
-          SizedBox(
-            height: 110,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _communities.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 12),
-              itemBuilder: (context, index) {
-                final community = _communities[index];
-                return _CommunityPreviewCard(
-                  community: community,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      FirstVuePageRoute(
-                        builder: (_) => CommunityDetailScreen(
-                          communityId: community.id,
-                          initialCommunity: community,
-                        ),
-                      ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 110,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _communities.length + 1,
+                  separatorBuilder: (_, _) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return _CreateGroupCard(
+                        onTap: () async {
+                          final created = await Navigator.push<Community>(
+                            context,
+                            FirstVuePageRoute(
+                              builder: (_) => const CreateCommunityScreen(),
+                            ),
+                          );
+                          if (created == null || !mounted) return;
+                          await _load();
+                          if (!mounted) return;
+                          await Navigator.push(
+                            context,
+                            FirstVuePageRoute(
+                              builder: (_) => CommunityDetailScreen(
+                                communityId: created.id,
+                                initialCommunity: created,
+                              ),
+                            ),
+                          );
+                          if (mounted) await _load();
+                        },
+                      );
+                    }
+                    final community = _communities[index - 1];
+                    return _CommunityPreviewCard(
+                      community: community,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          FirstVuePageRoute(
+                            builder: (_) => CommunityDetailScreen(
+                              communityId: community.id,
+                              initialCommunity: community,
+                            ),
+                          ),
+                        );
+                      },
                     );
                   },
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ),
       ],
+    );
+  }
+}
+
+class _CreateGroupCard extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _CreateGroupCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          width: 140,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: FirstVueColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: FirstVueColors.coral.withValues(alpha: .45),
+            ),
+          ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.add_circle_outline_rounded,
+                color: FirstVueColors.coral,
+                size: 24,
+              ),
+              Spacer(),
+              Text(
+                'Create group',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Start another',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

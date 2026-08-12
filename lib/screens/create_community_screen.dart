@@ -6,7 +6,6 @@ import '../services/community_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/location_autocomplete_field.dart';
 import 'auth_screen.dart';
-import 'community_detail_screen.dart';
 
 class CreateCommunityScreen extends StatefulWidget {
   const CreateCommunityScreen({super.key});
@@ -54,16 +53,8 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
         state: _stateController.text,
       );
       if (!mounted) return;
-      Navigator.pop(context, true);
-      Navigator.pushReplacement(
-        context,
-        FirstVuePageRoute(
-          builder: (_) => CommunityDetailScreen(
-            communityId: community.id,
-            initialCommunity: community,
-          ),
-        ),
-      );
+      // Pop back to Communities (keeps Create Group FAB available for more groups).
+      Navigator.pop(context, community);
     } catch (error) {
       if (!mounted) return;
       setState(() {
