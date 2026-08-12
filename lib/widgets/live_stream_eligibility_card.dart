@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../services/live_stream_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'firstvue_ephemeral_toast.dart';
 
+/// Compact Go Live status control. Status messages are ephemeral toasts —
+/// they never remain stuck on the profile.
 class LiveStreamEligibilityCard extends StatefulWidget {
   const LiveStreamEligibilityCard({super.key});
 
@@ -14,148 +17,123 @@ class LiveStreamEligibilityCard extends StatefulWidget {
 class _LiveStreamEligibilityCardState extends State<LiveStreamEligibilityCard> {
   LiveStreamEligibility? _eligibility;
   bool _loading = true;
+  bool _checking = false;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _load(showToast: false);
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
-    final eligibility = await LiveStreamService.fetchMyEligibility();
-    if (!mounted) return;
+  Future<void> _load({required bool showToast}) async {
+    if (_checking) return;
     setState(() {
-      _eligibility = eligibility;
-      _loading = false;
+      _checking = true;
+      // Never leave an indefinite full-width loader on screen; only show
+      // progressive state on first load.
+      if (_eligibility == null) _loading = true;
     });
+
+    try {
+      final eligibility = await LiveStreamService.fetchMyEligibility()
+          .timeout(const Duration(seconds: 8));
+      if (!mounted) return;
+      setState(() {
+        _eligibility = eligibility;
+        _loading = false;
+        _checking = false;
+      });
+      if (showToast) {
+        final eligible = eligibility?.isEligible ?? false;
+        FirstVueEphemeralToast.show(
+          context,
+          message: eligible
+              ? 'You are eligible to Go Live once broadcasting launches.'
+              : 'Not eligible yet — need a verified business and '
+                  '${LiveStreamEligibility.minFollowers}+ followers '
+                  '(${eligibility?.followerCount ?? 0}/'
+                  '${LiveStreamEligibility.minFollowers}).',
+          duration: const Duration(seconds: 3),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _checking = false;
+      });
+      if (showToast) {
+        FirstVueEphemeralToast.show(
+          context,
+          message: 'Unable to check Go Live status right now.',
+          duration: const Duration(seconds: 3),
+        );
+      }
+    }
   }
 
-  void _goLive() {
+  Future<void> _goLiveOrCheck() async {
     final eligible = _eligibility?.isEligible ?? false;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          eligible
-              ? 'Live streaming is coming soon. You meet the eligibility requirements.'
-              : 'Go Live unlocks with a verified business and ${LiveStreamEligibility.minFollowers}+ followers.',
-        ),
-      ),
+    if (!eligible) {
+      await _load(showToast: true);
+      return;
+    }
+    FirstVueEphemeralToast.show(
+      context,
+      message:
+          'Live streaming is coming soon. You meet the eligibility requirements.',
+      duration: const Duration(seconds: 3),
+      backgroundColor: FirstVueColors.teal.withValues(alpha: .92),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Padding(
-        padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
-        child: LinearProgressIndicator(color: FirstVueColors.teal),
-      );
+    if (_loading && _eligibility == null) {
+      return const SizedBox.shrink();
     }
 
     final eligibility = _eligibility;
     if (eligibility == null) return const SizedBox.shrink();
 
-    final verifiedLabel = eligibility.isVerified ? 'Verified' : 'Not verified';
-    final followersLabel =
-        '${eligibility.followerCount}/${LiveStreamEligibility.minFollowers} followers';
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Container(
-        decoration: BoxDecoration(
-          color: FirstVueColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: eligibility.isEligible
-                ? FirstVueColors.teal.withValues(alpha: .35)
-                : Colors.white12,
-          ),
-        ),
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'GO LIVE',
-              style: TextStyle(
-                color: FirstVueColors.gold,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.1,
-                fontSize: 11,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
               eligibility.isEligible
-                  ? 'You are eligible to stream once live broadcasting launches.'
-                  : 'Unlock live streaming with a verified business profile and ${LiveStreamEligibility.minFollowers}+ followers.',
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                _StatusChip(
-                  label: verifiedLabel,
-                  active: eligibility.isVerified,
-                ),
-                _StatusChip(
-                  label: followersLabel,
-                  active: eligibility.followerCount >=
-                      LiveStreamEligibility.minFollowers,
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: _goLive,
-              icon: const Icon(Icons.videocam_outlined, size: 18),
-              label: Text(eligibility.isEligible ? 'GO LIVE' : 'CHECK STATUS'),
-              style: FilledButton.styleFrom(
-                backgroundColor: eligibility.isEligible
+                  ? 'Go Live eligible'
+                  : 'Go Live: ${eligibility.followerCount}/'
+                      '${LiveStreamEligibility.minFollowers} followers',
+              style: TextStyle(
+                color: eligibility.isEligible
                     ? FirstVueColors.teal
-                    : FirstVueColors.elevatedSurface,
-                foregroundColor:
-                    eligibility.isEligible ? Colors.black : Colors.white70,
+                    : Colors.white54,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  final String label;
-  final bool active;
-
-  const _StatusChip({required this.label, required this.active});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: active
-            ? FirstVueColors.teal.withValues(alpha: .15)
-            : Colors.white.withValues(alpha: .06),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: active
-              ? FirstVueColors.teal.withValues(alpha: .45)
-              : Colors.white12,
-        ),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: active ? FirstVueColors.teal : Colors.white54,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-        ),
+          ),
+          TextButton.icon(
+            onPressed: _checking ? null : _goLiveOrCheck,
+            icon: Icon(
+              eligibility.isEligible
+                  ? Icons.sensors
+                  : Icons.info_outline,
+              size: 16,
+              color: FirstVueColors.gold,
+            ),
+            label: Text(
+              eligibility.isEligible ? 'GO LIVE' : 'CHECK STATUS',
+              style: const TextStyle(
+                color: FirstVueColors.gold,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

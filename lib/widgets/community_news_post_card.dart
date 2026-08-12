@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 
 import '../navigation/firstvue_page_route.dart';
 import '../screens/community_detail_screen.dart';
+import '../screens/full_screen_media_viewer.dart';
 import '../services/community_news_media_service.dart';
 import '../services/community_news_service.dart';
+import '../services/firstvue_feedback_sounds.dart';
 import '../services/profile_activity_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'group_circle_avatar.dart';
 import 'spark_users_sheet.dart';
 import 'profile_avatar_thumbnail.dart';
 import 'social_rich_text.dart';
 import 'feed_autoplay_video.dart';
+import 'spark_reaction_button.dart';
 import 'signed_media_viewer.dart';
 
 enum CommunityNewsPostCardStyle { compact, timeline }
@@ -80,6 +84,7 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
   void _handleDoubleTapSpark() {
     if (widget.onSpark == null) return;
     widget.onSpark!();
+    FirstVueFeedbackSounds.playSpark(fromUserTap: true);
     _sparkFlashController.forward(from: 0);
   }
 
@@ -139,7 +144,7 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
                 ],
               ),
               if (post.communityName != null) ...[
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 GestureDetector(
                   onTap: post.communityId == null
                       ? null
@@ -153,13 +158,27 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
                             ),
                           );
                         },
-                  child: Text(
-                    '${post.authorName} in ${post.communityName}',
-                    style: TextStyle(
-                      color: FirstVueColors.gold.withValues(alpha: .85),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: Row(
+                    children: [
+                      GroupCircleAvatar(
+                        imageUrl: post.communityImageUrl,
+                        size: 18,
+                        fallbackIcon: Icons.groups_rounded,
+                        ringColor: FirstVueColors.gold.withValues(alpha: .55),
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          post.communityName!,
+                          style: TextStyle(
+                            color: FirstVueColors.gold.withValues(alpha: .85),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -285,17 +304,16 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
         children: [
           if (widget.onSpark != null)
             Expanded(
-              child: _ActionButton(
-                icon: post.sparkedByMe
-                    ? Icons.bolt_rounded
-                    : Icons.bolt_outlined,
-                label: post.sparkCount > 0 ? '${post.sparkCount}' : 'Spark',
-                active: post.sparkedByMe,
-                activeColor: FirstVueColors.gold,
-                onTap: widget.onSpark!,
-                onLabelTap: post.sparkCount > 0
-                    ? () => SparkUsersSheet.show(context, postId: post.id)
-                    : null,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: SparkReactionButton(
+                  sparked: post.sparkedByMe,
+                  count: post.sparkCount,
+                  onPressed: () {
+                    FirstVueFeedbackSounds.playSpark(fromUserTap: true);
+                    widget.onSpark!();
+                  },
+                ),
               ),
             ),
           if (widget.onComment != null)
@@ -367,10 +385,8 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
     final card = Container(
       width: double.infinity,
       padding: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: FirstVueColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: .08)),
+      decoration: const BoxDecoration(
+        color: Colors.transparent,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,12 +399,13 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
               color: Colors.transparent,
               child: InkWell(
                 onTap: widget.onTap,
-                borderRadius: BorderRadius.circular(14),
                 child: _buildPostContent(),
               ),
             ),
           _buildPostActions(),
           _buildSparkPreview(),
+          const SizedBox(height: 8),
+          Divider(height: 1, color: Color(0x14FFFFFF)),
         ],
       ),
     );
@@ -409,7 +426,6 @@ class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final VoidCallback? onLabelTap;
   final bool active;
   final Color? activeColor;
 
@@ -417,7 +433,6 @@ class _ActionButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
-    this.onLabelTap,
     this.active = false,
     this.activeColor,
   });
@@ -443,7 +458,7 @@ class _ActionButton extends StatelessWidget {
           ),
           const SizedBox(width: 2),
           InkWell(
-            onTap: onLabelTap ?? onTap,
+            onTap: onTap,
             borderRadius: BorderRadius.circular(8),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -615,14 +630,24 @@ class _MediaTile extends StatelessWidget {
     final tileWidth = fullWidth ? double.infinity : (width ?? height);
 
     return GestureDetector(
-      onTap: item.isVideo
-          ? null
-          : () => openSignedMedia(
-                context,
-                url: item.signedUrl,
-                isVideo: false,
-                title: 'PHOTO',
-              ),
+      onTap: () {
+        if (item.isVideo) {
+          openFullScreenVideoPlayer(
+            context,
+            url: item.signedUrl,
+            title: 'VIDEO',
+            loop: true,
+          );
+        } else {
+          openFullScreenImageViewer(
+            context,
+            items: [
+              FullScreenMediaItem(url: item.signedUrl, isVideo: false),
+            ],
+            title: 'PHOTO',
+          );
+        }
+      },
       onDoubleTap: onDoubleTapSpark,
       child: AnimatedBuilder(
         animation: sparkFlash,
@@ -654,11 +679,11 @@ class _MediaTile extends StatelessWidget {
                 width: tileWidth,
                 height: height,
                 borderRadius: BorderRadius.circular(fullWidth ? 0 : 12),
-                onTap: () => openSignedMedia(
+                onTap: () => openFullScreenVideoPlayer(
                   context,
                   url: item.signedUrl,
-                  isVideo: true,
                   title: 'VIDEO',
+                  loop: true,
                 ),
               )
             : SignedMediaThumbnail(

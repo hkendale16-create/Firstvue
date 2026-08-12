@@ -1,8 +1,9 @@
-enum PostIdentityKind { personal, business, community }
+enum PostIdentityKind { personal, business, professional, community }
 
 class PostIdentityOption {
   final PostIdentityKind kind;
   final String? businessId;
+  final String? professionalProfileId;
   final String? communityId;
   final String label;
   final String? subtitle;
@@ -10,6 +11,7 @@ class PostIdentityOption {
   const PostIdentityOption({
     required this.kind,
     this.businessId,
+    this.professionalProfileId,
     this.communityId,
     required this.label,
     this.subtitle,
@@ -31,6 +33,8 @@ class PostIdentityOption {
         return 'personal';
       case PostIdentityKind.business:
         return 'business:${businessId ?? ''}';
+      case PostIdentityKind.professional:
+        return 'professional:${professionalProfileId ?? ''}';
       case PostIdentityKind.community:
         return 'community:${communityId ?? ''}';
     }

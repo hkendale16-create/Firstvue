@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../navigation/firstvue_page_route.dart';
 import '../screens/full_screen_media_viewer.dart';

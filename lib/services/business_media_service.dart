@@ -184,6 +184,24 @@ class BusinessMediaService {
     );
   }
 
+  static Future<void> removeAvatar(String businessId) =>
+      _removeRoleImage(businessId, 'avatar');
+
+  static Future<void> removeCover(String businessId) =>
+      _removeRoleImage(businessId, 'cover');
+
+  static Future<void> _removeRoleImage(String businessId, String role) async {
+    final row = await _client
+        .from('business_media')
+        .select(_selectColumns)
+        .eq('business_id', businessId)
+        .eq('media_role', role)
+        .maybeSingle();
+    if (row == null) return;
+    final item = await _rowToItem(row, businessId);
+    await deleteMedia(item);
+  }
+
   static Future<void> _setRoleImage({
     required String businessId,
     required XFile file,
@@ -208,18 +226,95 @@ class BusinessMediaService {
       }
     } catch (_) {}
 
-    if (existing != null) {
-      await deleteMedia(existing);
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) {
+      throw const StorageException('Selected file is empty.');
+    }
+    if (bytes.length > _maxMediaBytes) {
+      throw const StorageException(
+        'Each photo or video must be 50 MB or smaller.',
+      );
     }
 
-    await _uploadSingle(
-      businessId: businessId,
-      file: file,
+    final mediaType = mediaTypeForFile(file);
+    final contentType = mimeTypeForFile(file, mediaType);
+    final upload = await MediaStorageService.uploadBytes(
+      bucket: MediaBucket.business,
+      bytes: bytes,
+      contentType: contentType,
+      fileName: file.name,
       index: 0,
-      sortOrder: 0,
-      mediaRole: role,
       subfolder: subfolder,
+      context: {'business_id': businessId},
     );
+
+    try {
+      final rpcName = role == 'avatar'
+          ? 'replace_business_avatar'
+          : 'replace_business_cover';
+      await _client.rpc(
+        rpcName,
+        params: {
+          'p_business_id': businessId,
+          'p_storage_path': upload.path,
+          'p_storage_provider': upload.provider.value,
+          'p_media_type': mediaType,
+        },
+      );
+    } catch (_) {
+      await _client
+          .from('business_media')
+          .delete()
+          .eq('business_id', businessId)
+          .eq('media_role', role);
+      try {
+        await _client.from('business_media').insert({
+          'business_id': businessId,
+          'storage_path': upload.path,
+          'storage_provider': upload.provider.value,
+          'media_type': mediaType,
+          'sort_order': 0,
+          'media_role': role,
+        });
+      } catch (error) {
+        final isDuplicate =
+            error is PostgrestException && error.code == '23505';
+        if (isDuplicate) {
+          await _client
+              .from('business_media')
+              .delete()
+              .eq('business_id', businessId)
+              .eq('media_role', role);
+          await _client.from('business_media').insert({
+            'business_id': businessId,
+            'storage_path': upload.path,
+            'storage_provider': upload.provider.value,
+            'media_type': mediaType,
+            'sort_order': 0,
+            'media_role': role,
+          });
+        } else {
+          await MediaStorageService.deleteObject(
+            bucket: MediaBucket.business,
+            path: upload.path,
+            provider: upload.provider,
+            context: {'business_id': businessId},
+          );
+          rethrow;
+        }
+      }
+    }
+
+    if (existing != null) {
+      try {
+        await MediaStorageService.deleteObject(
+          bucket: MediaBucket.business,
+          path: existing.storagePath,
+          provider: existing.storageProvider,
+          context: {'business_id': businessId},
+        );
+      } catch (_) {}
+    }
   }
 
   static Future<void> _uploadSingle({

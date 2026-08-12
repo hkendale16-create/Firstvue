@@ -9,7 +9,7 @@ import '../theme/firstvue_theme.dart';
 import 'community_news_post_card.dart';
 import 'community_news_post_detail_sheet.dart';
 import 'feed_comments_sheet.dart';
-import 'media_picker_sheet.dart';
+import 'profile_composer_media_actions.dart';
 import 'profile_recent_activity_section.dart';
 
 enum EntityFeedScope { user, business, professional, event, community }
@@ -180,12 +180,6 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
     }
   }
 
-  Future<void> _pickMedia() async {
-    final files = await showMediaPickerSheet(context);
-    if (files == null || files.isEmpty || !mounted) return;
-    setState(() => _attachedMedia = [..._attachedMedia, ...files]);
-  }
-
   Future<void> _sparkPost(int index) async {
     if (index < 0 || index >= _posts.length) return;
     final post = _posts[index];
@@ -258,18 +252,13 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
   }
 
   Widget _buildComposer() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF10151B),
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'POST AN UPDATE',
+            'CREATE',
             style: TextStyle(
               color: FirstVueColors.gold,
               fontWeight: FontWeight.bold,
@@ -300,16 +289,19 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
               style: const TextStyle(color: Colors.white54, fontSize: 12),
             ),
           ],
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Row(
             children: [
-              IconButton(
-                onPressed: _posting ? null : _pickMedia,
-                icon: const Icon(Icons.add_photo_alternate_outlined),
-                color: FirstVueColors.teal,
-                tooltip: 'Add photo or video',
+              Expanded(
+                child: ProfileComposerMediaActions(
+                  enabled: !_posting,
+                  onMediaPicked: (files) {
+                    setState(
+                      () => _attachedMedia = [..._attachedMedia, ...files],
+                    );
+                  },
+                ),
               ),
-              const Spacer(),
               FilledButton(
                 onPressed: _posting ? null : _submitPost,
                 style: FilledButton.styleFrom(

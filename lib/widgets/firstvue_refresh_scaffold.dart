@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/firstvue_feedback_sounds.dart';
 import '../theme/firstvue_theme.dart';
 
 /// App-wide pull-to-refresh wrapper with FirstVue teal/gold styling.
@@ -12,11 +13,13 @@ class FirstVueRefreshScaffold extends StatelessWidget {
     required this.onRefresh,
     required this.child,
     this.notificationPredicate,
+    this.playRefreshSound = true,
   });
 
   final Future<void> Function() onRefresh;
   final Widget child;
   final ScrollNotificationPredicate? notificationPredicate;
+  final bool playRefreshSound;
 
   /// Wraps [child] so [RefreshIndicator] can trigger even when content is short.
   static Widget alwaysScrollable({
@@ -45,7 +48,12 @@ class FirstVueRefreshScaffold extends StatelessWidget {
       color: FirstVueColors.teal,
       backgroundColor: FirstVueColors.surface,
       displacement: 40,
-      onRefresh: onRefresh,
+      onRefresh: () async {
+        await onRefresh();
+        if (playRefreshSound) {
+          await FirstVueFeedbackSounds.playRefresh(intentional: true);
+        }
+      },
       notificationPredicate:
           notificationPredicate ?? defaultScrollNotificationPredicate,
       child: child,
