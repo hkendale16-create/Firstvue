@@ -12,7 +12,7 @@ import 'feed_comments_sheet.dart';
 import 'media_picker_sheet.dart';
 import 'profile_recent_activity_section.dart';
 
-enum EntityFeedScope { user, business, professional, event }
+enum EntityFeedScope { user, business, professional, event, community }
 
 /// Posts + activity tabs for member, business, professional, and event profiles.
 class EntityProfileFeedSection extends StatefulWidget {
@@ -84,6 +84,9 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
       EntityFeedScope.event => widget.entityId == null
           ? const <CommunityNewsPost>[]
           : await CommunityNewsService.fetchPostsForEvent(widget.entityId!),
+      EntityFeedScope.community => widget.entityId == null
+          ? const <CommunityNewsPost>[]
+          : await CommunityNewsService.fetchPostsForCommunity(widget.entityId!),
       EntityFeedScope.user => widget.authorId != null
           ? await CommunityNewsService.fetchPostsByAuthor(widget.authorId!)
           : await CommunityNewsService.fetchMyPosts(),
@@ -127,6 +130,11 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
           EntityFeedScope.event => CommunityNewsService.createPost(
               text,
               eventId: widget.entityId,
+              files: _attachedMedia,
+            ),
+          EntityFeedScope.community => CommunityNewsService.createPost(
+              text,
+              communityId: widget.entityId,
               files: _attachedMedia,
             ),
           EntityFeedScope.user => CommunityNewsService.createPost(
@@ -244,7 +252,8 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
       EntityFeedScope.business => ProfileActivityScope.business,
       EntityFeedScope.professional => ProfileActivityScope.professional,
       EntityFeedScope.event => ProfileActivityScope.event,
-      EntityFeedScope.user => ProfileActivityScope.user,
+      EntityFeedScope.user || EntityFeedScope.community =>
+        ProfileActivityScope.user,
     };
   }
 

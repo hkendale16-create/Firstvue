@@ -5,6 +5,7 @@ import '../config/app_config.dart';
 import '../models/share_payload.dart';
 import '../services/community_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import 'auth_screen.dart';
@@ -29,6 +30,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
   List<CommunityMember> _members = const [];
   bool _loading = true;
   bool _actionLoading = false;
+  int _feedRefreshToken = 0;
 
   @override
   void initState() {
@@ -52,6 +54,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
       _community = community ?? _community;
       _members = members;
       _loading = false;
+      _feedRefreshToken++;
     });
   }
 
@@ -154,182 +157,201 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                   onRefresh: _load,
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                    padding: const EdgeInsets.fromLTRB(0, 8, 0, 32),
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              FirstVueColors.teal.withValues(alpha: .25),
-                              FirstVueColors.surface,
-                            ],
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                FirstVueColors.teal.withValues(alpha: .25),
+                                FirstVueColors.surface,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white.withValues(alpha: .08)),
                           ),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withValues(alpha: .08)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.groups_rounded,
-                                  color: FirstVueColors.teal.withValues(alpha: .95),
-                                  size: 36,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        community.name,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      if (community.locationLabel != null)
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.groups_rounded,
+                                    color: FirstVueColors.teal.withValues(alpha: .95),
+                                    size: 36,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
                                         Text(
-                                          community.locationLabel!,
-                                          style: const TextStyle(color: Colors.white54),
+                                          community.name,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
-                                    ],
+                                        if (community.locationLabel != null)
+                                          Text(
+                                            community.locationLabel!,
+                                            style: const TextStyle(color: Colors.white54),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (community.description?.trim().isNotEmpty == true) ...[
+                                const SizedBox(height: 14),
+                                Text(
+                                  community.description!.trim(),
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: .78),
+                                    height: 1.4,
                                   ),
                                 ),
                               ],
-                            ),
-                            if (community.description?.trim().isNotEmpty == true) ...[
-                              const SizedBox(height: 14),
+                              const SizedBox(height: 16),
                               Text(
-                                community.description!.trim(),
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: .78),
-                                  height: 1.4,
-                                ),
+                                '${community.memberCount} member${community.memberCount == 1 ? '' : 's'}',
+                                style: const TextStyle(color: FirstVueColors.gold, fontSize: 13),
                               ),
                             ],
-                            const SizedBox(height: 16),
-                            Text(
-                              '${community.memberCount} member${community.memberCount == 1 ? '' : 's'}',
-                              style: const TextStyle(color: FirstVueColors.gold, fontSize: 13),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: FilledButton(
-                              onPressed: _actionLoading ? null : _toggleJoin,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: community.isMember
-                                    ? FirstVueColors.surface
-                                    : FirstVueColors.coral,
-                                foregroundColor: Colors.white,
-                              ),
-                              child: Text(
-                                _actionLoading
-                                    ? '…'
-                                    : community.isMember
-                                        ? 'Leave group'
-                                        : 'Join group',
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: _actionLoading ? null : _toggleFollow,
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.white,
-                                side: BorderSide(
-                                  color: community.isFollowing
-                                      ? FirstVueColors.teal
-                                      : Colors.white.withValues(alpha: .25),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: _actionLoading ? null : _toggleJoin,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: community.isMember
+                                      ? FirstVueColors.surface
+                                      : FirstVueColors.coral,
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: Text(
+                                  _actionLoading
+                                      ? '…'
+                                      : community.isMember
+                                          ? 'Leave group'
+                                          : 'Join group',
                                 ),
                               ),
-                              child: Text(community.isFollowing ? 'Following' : 'Follow'),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 28),
-                      const Text(
-                        'GROUP FEED',
-                        style: TextStyle(
-                          color: FirstVueColors.gold,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: FirstVueColors.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white.withValues(alpha: .08)),
-                        ),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.dynamic_feed_outlined,
-                              color: Colors.white.withValues(alpha: .35),
-                              size: 36,
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              'Group posts coming soon',
-                              style: TextStyle(color: Colors.white.withValues(alpha: .55)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: _actionLoading ? null : _toggleFollow,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  side: BorderSide(
+                                    color: community.isFollowing
+                                        ? FirstVueColors.teal
+                                        : Colors.white.withValues(alpha: .25),
+                                  ),
+                                ),
+                                child: Text(community.isFollowing ? 'Following' : 'Follow'),
+                              ),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 28),
-                      const Text(
-                        'MEMBERS',
-                        style: TextStyle(
-                          color: FirstVueColors.gold,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 20),
+                        child: Text(
+                          'GROUP FEED',
+                          style: TextStyle(
+                            color: FirstVueColors.gold,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
-                      if (_members.isEmpty)
-                        const Text('No members yet.', style: TextStyle(color: Colors.white54))
-                      else
-                        ..._members.map(
-                          (member) => ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: CircleAvatar(
-                              backgroundColor: FirstVueColors.elevatedSurface,
-                              child: Text(
-                                member.displayName.isNotEmpty
-                                    ? member.displayName[0].toUpperCase()
-                                    : '?',
-                                style: const TextStyle(color: FirstVueColors.gold),
-                              ),
-                            ),
-                            title: Text(
-                              member.displayName,
-                              style: const TextStyle(color: Colors.white),
-                            ),
-                            subtitle: member.username != null
-                                ? Text(
-                                    '@${member.username}',
-                                    style: const TextStyle(color: Colors.white54),
-                                  )
-                                : null,
-                            trailing: member.role == 'admin'
-                                ? const Text('Admin', style: TextStyle(color: FirstVueColors.teal, fontSize: 12))
-                                : null,
+                      EntityProfileFeedSection(
+                        scope: EntityFeedScope.community,
+                        entityId: community.id,
+                        canPost: community.isMember ||
+                            community.creatorId ==
+                                Supabase.instance.client.auth.currentUser?.id,
+                        refreshToken: _feedRefreshToken,
+                        showHeader: false,
+                      ),
+                      const SizedBox(height: 28),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 20),
+                        child: Text(
+                          'MEMBERS',
+                          style: TextStyle(
+                            color: FirstVueColors.gold,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: _members.isEmpty
+                            ? const Text(
+                                'No members yet.',
+                                style: TextStyle(color: Colors.white54),
+                              )
+                            : Column(
+                                children: [
+                                  ..._members.map(
+                                    (member) => ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: CircleAvatar(
+                                        backgroundColor:
+                                            FirstVueColors.elevatedSurface,
+                                        child: Text(
+                                          member.displayName.isNotEmpty
+                                              ? member.displayName[0]
+                                                  .toUpperCase()
+                                              : '?',
+                                          style: const TextStyle(
+                                            color: FirstVueColors.gold,
+                                          ),
+                                        ),
+                                      ),
+                                      title: Text(
+                                        member.displayName,
+                                        style: const TextStyle(color: Colors.white),
+                                      ),
+                                      subtitle: member.username != null
+                                          ? Text(
+                                              '@${member.username}',
+                                              style: const TextStyle(
+                                                color: Colors.white54,
+                                              ),
+                                            )
+                                          : null,
+                                      trailing: member.role == 'admin'
+                                          ? const Text(
+                                              'Admin',
+                                              style: TextStyle(
+                                                color: FirstVueColors.teal,
+                                                fontSize: 12,
+                                              ),
+                                            )
+                                          : null,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
                     ],
                   ),
                 ),

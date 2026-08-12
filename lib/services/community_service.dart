@@ -49,7 +49,9 @@ class Community {
       isFollowing: isFollowing,
       createdAt: createdRaw is String
           ? DateTime.tryParse(createdRaw) ?? DateTime.now()
-          : DateTime.now(),
+          : createdRaw is DateTime
+              ? createdRaw
+              : DateTime.now(),
     );
   }
 }
@@ -105,7 +107,7 @@ class CommunityService {
       final rows = await _client
           .from('community_members')
           .select('community_id')
-          .eq('user_id', me.id);
+          .eq('profile_id', me.id);
       return rows.map((r) => r['community_id'] as String).toSet();
     } catch (_) {
       return {};
@@ -120,7 +122,7 @@ class CommunityService {
       final rows = await _client
           .from('community_follows')
           .select('community_id')
-          .eq('user_id', me.id);
+          .eq('profile_id', me.id);
       return rows.map((r) => r['community_id'] as String).toSet();
     } catch (_) {
       return {};
@@ -206,7 +208,7 @@ class CommunityService {
     try {
       await _client.from('community_members').insert({
         'community_id': row['id'],
-        'user_id': me.id,
+        'profile_id': me.id,
         'role': 'admin',
       });
     } catch (_) {}
@@ -223,7 +225,7 @@ class CommunityService {
     try {
       await _client.from('community_members').insert({
         'community_id': communityId,
-        'user_id': me.id,
+        'profile_id': me.id,
         'role': 'member',
       });
     } on PostgrestException catch (error) {
@@ -239,7 +241,7 @@ class CommunityService {
         .from('community_members')
         .delete()
         .eq('community_id', communityId)
-        .eq('user_id', me.id);
+        .eq('profile_id', me.id);
   }
 
   static Future<void> follow(String communityId) async {
@@ -251,7 +253,7 @@ class CommunityService {
     try {
       await _client.from('community_follows').insert({
         'community_id': communityId,
-        'user_id': me.id,
+        'profile_id': me.id,
       });
     } on PostgrestException catch (error) {
       if (error.code != '23505') rethrow;
@@ -266,7 +268,7 @@ class CommunityService {
         .from('community_follows')
         .delete()
         .eq('community_id', communityId)
-        .eq('user_id', me.id);
+        .eq('profile_id', me.id);
   }
 
   static Future<List<CommunityMember>> fetchMembers(
@@ -278,7 +280,7 @@ class CommunityService {
     try {
       final rows = await _client
           .from('community_members')
-          .select('user_id, role, joined_at, profiles(display_name, username)')
+          .select('profile_id, role, joined_at, profiles(display_name, username)')
           .eq('community_id', communityId)
           .order('joined_at', ascending: true)
           .limit(limit);
@@ -287,14 +289,16 @@ class CommunityService {
         final profile = row['profiles'] as Map<String, dynamic>?;
         final joinedRaw = row['joined_at'];
         return CommunityMember(
-          userId: row['user_id'] as String,
+          userId: row['profile_id'] as String,
           displayName:
               (profile?['display_name'] as String?) ?? 'FirstVue member',
           username: profile?['username'] as String?,
           role: (row['role'] as String?) ?? 'member',
           joinedAt: joinedRaw is String
               ? DateTime.tryParse(joinedRaw) ?? DateTime.now()
-              : DateTime.now(),
+              : joinedRaw is DateTime
+                  ? joinedRaw
+                  : DateTime.now(),
         );
       }).toList();
     } catch (_) {
@@ -312,7 +316,7 @@ class CommunityService {
       final memberRows = await _client
           .from('community_members')
           .select('community_id')
-          .eq('user_id', me.id)
+          .eq('profile_id', me.id)
           .limit(limit);
 
       final memberIds =
