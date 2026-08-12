@@ -180,7 +180,7 @@ class _ProfileMediaSectionState extends State<ProfileMediaSection> {
                         : const Icon(Icons.add_photo_alternate_outlined, size: 20),
                     tooltip: 'Add media',
                     style: IconButton.styleFrom(
-                      backgroundColor: const Color(0xFF10151B),
+                      backgroundColor: Theme.of(context).colorScheme.surface,
                       foregroundColor: const Color(0xFFD8B56A),
                     ),
                   ),

@@ -290,7 +290,7 @@ class _ProfileRecentActivitySectionState
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF10151B),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: Text(item.title, style: const TextStyle(color: Colors.white)),
         content: SingleChildScrollView(
           child: SocialRichText(

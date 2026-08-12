@@ -283,7 +283,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     if (!wasReposted) {
       final action = await showModalBottomSheet<String>(
         context: context,
-        backgroundColor: const Color(0xFF10151B),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
@@ -328,7 +328,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF10151B),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text('Add a comment'),
         content: TextField(
           controller: controller,
