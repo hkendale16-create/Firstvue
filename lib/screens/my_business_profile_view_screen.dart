@@ -92,7 +92,7 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
     final business = widget.business;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: FirstVueRefreshScaffold(
         onRefresh: _refresh,
         child: FutureBuilder<_BusinessViewData>(

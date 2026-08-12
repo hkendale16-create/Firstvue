@@ -43,9 +43,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final signedIn = Supabase.instance.client.auth.currentUser != null;
 
     return Scaffold(
-      backgroundColor: FirstVueColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: FirstVueColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
         title: const Text(
           'NOTIFICATIONS',

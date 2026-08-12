@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/firstvue_theme.dart';
 import '../navigation/firstvue_page_route.dart';
 
 import '../services/messaging_service.dart';
@@ -87,9 +88,9 @@ class _NewMessageScreenState extends State<NewMessageScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF080B0F),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
         title: const Text('NEW MESSAGE'),
         bottom: TabBar(
@@ -353,7 +354,7 @@ class _RecipientTile extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFF10151B),
+            color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: const Color(0xFFD8B56A).withValues(alpha: .2),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/firstvue_theme.dart';
 
 import '../services/professional_profiles_service.dart';
 import '../services/professional_showcase_service.dart';
@@ -365,7 +366,7 @@ class _CatalogImage extends StatelessWidget {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: const Color(0xFF151B22),
+          color: Theme.of(context).extension<FirstVuePalette>()?.elevatedSurface ?? FirstVueColors.elevatedSurface,
           borderRadius: BorderRadius.circular(13),
         ),
         child: const Icon(Icons.inventory_2_outlined, color: Color(0xFFD8B56A)),
@@ -400,7 +401,7 @@ class _EmptyShowcase extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(15),
     decoration: BoxDecoration(
-      color: const Color(0xFF10151B),
+      color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
       borderRadius: BorderRadius.circular(16),
     ),
     child: Text(message, style: const TextStyle(color: Colors.white54)),

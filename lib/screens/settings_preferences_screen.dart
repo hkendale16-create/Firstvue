@@ -84,11 +84,12 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: fv.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF080B0F),
-        foregroundColor: Colors.white,
+        backgroundColor: fv.background,
+        foregroundColor: fv.primaryText,
         title: const Text('Preferences'),
       ),
       body: _loading
@@ -139,13 +140,13 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                 const SizedBox(height: 8),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text(
+                  title: Text(
                     'Push notifications',
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(color: fv.primaryText),
                   ),
-                  subtitle: const Text(
+                  subtitle: Text(
                     'Messages, sparks, and community updates',
-                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                    style: TextStyle(color: fv.secondaryText, fontSize: 12),
                   ),
                   value: _prefs.notificationsEnabled,
                   activeThumbColor: FirstVueColors.teal,
@@ -164,13 +165,13 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                 const SizedBox(height: 8),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text(
+                  title: Text(
                     'Interaction sounds',
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(color: fv.primaryText),
                   ),
-                  subtitle: const Text(
+                  subtitle: Text(
                     'Subtle sounds when you spark posts',
-                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                    style: TextStyle(color: fv.secondaryText, fontSize: 12),
                   ),
                   value: _interactionSounds,
                   activeThumbColor: FirstVueColors.teal,
@@ -189,19 +190,19 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                 const SizedBox(height: 8),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text(
+                  title: Text(
                     'Floating messages bubble',
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(color: fv.primaryText),
                   ),
                   subtitle: Text(
                     _prefs.floatingBubbleVisible
                         ? 'Visible on home screen'
                         : 'Hidden — restore below',
-                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                    style: TextStyle(color: fv.secondaryText, fontSize: 12),
                   ),
                   trailing: _prefs.floatingBubbleVisible
                       ? const Icon(Icons.check_circle, color: FirstVueColors.teal)
-                      : const Icon(Icons.visibility_off_outlined, color: Colors.white38),
+                      : Icon(Icons.visibility_off_outlined, color: fv.tertiaryText),
                 ),
                 if (!_prefs.floatingBubbleVisible)
                   OutlinedButton.icon(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/firstvue_theme.dart';
 import '../navigation/firstvue_page_route.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -71,9 +72,9 @@ class _RentalsScreenState extends State<RentalsScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF080B0F),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -261,9 +262,9 @@ class _RentalAccessGateState extends State<_RentalAccessGate> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF080B0F),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -486,9 +487,9 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF080B0F),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
         title: const Text('POST A RENTAL'),
       ),
@@ -624,9 +625,9 @@ class MyRentalListingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF080B0F),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
         title: const Text('MY RENTAL LISTINGS'),
       ),
@@ -693,7 +694,7 @@ class _RentalCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF10151B),
+        color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: const Color(0xFFD8B56A).withValues(alpha: .16),

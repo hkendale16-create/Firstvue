@@ -36,9 +36,9 @@ class _MyBusinessesScreenState extends State<MyBusinessesScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFF080B0F),
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       surfaceTintColor: Colors.transparent,
       title: const Text('MY BUSINESS PROFILES'),
     ),
@@ -525,9 +525,9 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFF080B0F),
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       surfaceTintColor: Colors.transparent,
       title: Text(widget.business.name),
       bottom: TabBar(

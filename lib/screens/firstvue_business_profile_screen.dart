@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/firstvue_theme.dart';
 import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -63,11 +64,11 @@ class _FirstVueBusinessProfileScreenState
   Widget build(BuildContext context) {
     if (widget.previewDetails != null) {
       return Scaffold(
-        backgroundColor: const Color(0xFF080B0F),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: widget.hideAppBarBack
             ? null
             : AppBar(
-                backgroundColor: const Color(0xFF080B0F),
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
                 foregroundColor: Colors.white,
                 title: Text(
                   widget.previewDetails!.name,
@@ -87,11 +88,11 @@ class _FirstVueBusinessProfileScreenState
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: widget.hideAppBarBack
           ? null
           : AppBar(
-              backgroundColor: const Color(0xFF080B0F),
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               foregroundColor: Colors.white,
             ),
       body: FutureBuilder<PublicBusinessDetails>(
@@ -586,7 +587,7 @@ class _ReviewCard extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: const Color(0xFF10151B),
+      color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
       borderRadius: BorderRadius.circular(18),
       border: Border.all(color: Colors.white.withValues(alpha: .08)),
     ),
@@ -700,7 +701,7 @@ class _BusinessMediaGallery extends StatelessWidget {
                       width: 250,
                       height: 190,
                       child: ColoredBox(
-                        color: const Color(0xFF10151B),
+                        color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: const [
@@ -764,7 +765,7 @@ class _ProfileInfoCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF10151B),
+        color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white.withValues(alpha: .08)),
       ),

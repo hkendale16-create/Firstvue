@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/firstvue_theme.dart';
 
 import '../services/professional_profiles_service.dart';
 import '../widgets/admin_gate.dart';
@@ -119,7 +120,7 @@ class _ProfessionalApprovalCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF10151B),
+        color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: const Color(0xFFD8B56A).withValues(alpha: .3),

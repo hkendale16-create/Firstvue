@@ -516,7 +516,7 @@ class _SparkAvatarStripState extends State<_SparkAvatarStrip> {
                     left: i * 16.0,
                     child: CircleAvatar(
                       radius: 13,
-                      backgroundColor: FirstVueColors.background,
+                      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
                       child: ProfileAvatarThumbnail(
                         imageUrl: _users[i].avatarUrl,
                         displayName: _users[i].displayName,

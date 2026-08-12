@@ -43,7 +43,7 @@ class FirstVueRefreshScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return RefreshIndicator(
       color: FirstVueColors.teal,
-      backgroundColor: FirstVueColors.surface,
+      backgroundColor: context.fv.surface,
       displacement: 40,
       onRefresh: onRefresh,
       notificationPredicate:
