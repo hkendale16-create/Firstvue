@@ -29,6 +29,31 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
   bool _searching = false;
   bool _focused = false;
 
+  static InputDecoration _borderlessDecoration({
+    required String hintText,
+    required Widget? suffixIcon,
+  }) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide.none,
+    );
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: TextStyle(color: Colors.white.withValues(alpha: .4)),
+      prefixIcon: const Icon(Icons.search, color: FirstVueColors.teal),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: FirstVueColors.elevatedSurface,
+      border: border,
+      enabledBorder: border,
+      focusedBorder: border,
+      disabledBorder: border,
+      errorBorder: border,
+      focusedErrorBorder: border,
+      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -72,14 +97,19 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
       case SearchResultType.community:
       case SearchResultType.hashtag:
         _controller.text = result.label;
-        _openFullSearch();
+        _openFullSearch(initialQuery: result.label);
     }
   }
 
-  void _openFullSearch() {
+  void _openFullSearch({String? initialQuery}) {
     Navigator.push(
       context,
-      FirstVuePageRoute(builder: (_) => const SearchScreen()),
+      FirstVuePageRoute(
+        builder: (_) => SearchScreen(
+          initialQuery: initialQuery ?? _controller.text.trim(),
+          autofocus: initialQuery == null && _controller.text.trim().isEmpty,
+        ),
+      ),
     );
   }
 
@@ -96,10 +126,9 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
               controller: _controller,
               autofocus: widget.autofocus,
               style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
+              onSubmitted: (_) => _openFullSearch(),
+              decoration: _borderlessDecoration(
                 hintText: widget.hintText,
-                hintStyle: TextStyle(color: Colors.white.withValues(alpha: .4)),
-                prefixIcon: const Icon(Icons.search, color: FirstVueColors.teal),
                 suffixIcon: _searching
                     ? const Padding(
                         padding: EdgeInsets.all(12),
@@ -110,17 +139,10 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
                         ),
                       )
                     : IconButton(
-                        onPressed: _openFullSearch,
+                        onPressed: () => _openFullSearch(),
                         icon: const Icon(Icons.open_in_new, size: 18),
                         tooltip: 'Open search',
                       ),
-                filled: true,
-                fillColor: FirstVueColors.elevatedSurface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
           ),

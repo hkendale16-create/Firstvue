@@ -19,6 +19,16 @@ class EditProfileScreen extends StatefulWidget {
   State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
+class EditProfileSaveResult {
+  final String username;
+  final String displayName;
+
+  const EditProfileSaveResult({
+    required this.username,
+    required this.displayName,
+  });
+}
+
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameController = TextEditingController();
   final _usernameController = TextEditingController();
@@ -34,6 +44,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _showEmailOnProfile = false;
   String? _error;
   String? _usernameError;
+  String? _displayNameError;
   UsernameAvailability _usernameAvailability = UsernameAvailability.empty;
 
   @override
@@ -102,9 +113,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _saving = true;
       _error = null;
       _usernameError = null;
+      _displayNameError = null;
     });
 
     try {
+      final displayNameRaw = _nameController.text.trim();
+      final displayNameError =
+          UserProfileService.displayNameValidationMessage(displayNameRaw);
+      if (displayNameError != null) {
+        setState(() {
+          _saving = false;
+          _displayNameError = displayNameError;
+        });
+        return;
+      }
+
       final usernameRaw = _usernameController.text.trim();
       final validationError = UsernameService.validationMessage(usernameRaw);
       if (validationError != null) {
@@ -137,7 +160,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final savedHandle = await UsernameService.updateUsername(usernameRaw);
 
       await UserProfileService.updateExtendedProfile(
-        displayName: _nameController.text,
+        displayName: displayNameRaw,
         bio: _bioController.text,
         city: _cityController.text,
         state: _stateController.text,
@@ -149,7 +172,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile updated.')),
       );
-      Navigator.pop(context, savedHandle);
+      Navigator.pop(
+        context,
+        EditProfileSaveResult(
+          username: savedHandle,
+          displayName: displayNameRaw,
+        ),
+      );
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -348,6 +377,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     label: 'Display name',
                     hint: 'John Smith',
                     capitalization: TextCapitalization.words,
+                    error: _displayNameError,
+                    onChanged: (_) {
+                      if (_displayNameError != null) {
+                        setState(() => _displayNameError = null);
+                      }
+                    },
                   ),
                   const SizedBox(height: 6),
                   Text(

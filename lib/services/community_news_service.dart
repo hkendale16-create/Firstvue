@@ -154,15 +154,11 @@ class CommunityNewsService {
         visibility == 'public' ||
         (visibility == 'followers' && followsAuthor);
 
-    if (teaser && canViewFull && hasMedia) {
-      return '';
-    }
-
     if (teaser && !canViewFull && visibility == 'followers') {
       return 'Follow this member to see the full post.';
     }
 
-    if (teaser && canViewFull) {
+    if (teaser && canViewFull && hasMedia) {
       return '';
     }
 
@@ -287,18 +283,11 @@ class CommunityNewsService {
     required String? currentUserId,
   }) async {
     if (currentUserId == null || authorIds.isEmpty) return const {};
-    final others = authorIds.where((id) => id != currentUserId).toSet();
-    if (others.isEmpty) return const {};
-
-    final following = <String>{};
-    await Future.wait(
-      others.map((authorId) async {
-        if (await FollowService.isFollowing(authorId)) {
-          following.add(authorId);
-        }
-      }),
-    );
-    return following;
+    try {
+      return await FollowService.fetchFollowingIdsAmong(authorIds);
+    } catch (_) {
+      return const {};
+    }
   }
 
   static String normalizePostId(String raw) {

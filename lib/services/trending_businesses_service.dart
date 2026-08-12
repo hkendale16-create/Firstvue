@@ -5,6 +5,7 @@ import '../config/media_config.dart';
 import 'media_storage_service.dart';
 
 import 'location_service.dart';
+import 'user_preferences_service.dart';
 
 class TrendingBusiness {
   final String id;
@@ -78,7 +79,7 @@ class TrendingBusinessesService {
           .select(
             'id, name, services, verification_status, average_rating, '
             'popularity_score, demand_score, available_today, coming_soon, '
-            'business_locations(latitude, longitude, city)',
+            'business_locations(latitude, longitude, city, state)',
           )
           .eq('status', 'approved')
           .eq('coming_soon', true)
@@ -122,12 +123,12 @@ class TrendingBusinessesService {
   static const _businessSelect =
       'id, name, services, verification_status, average_rating, '
       'available_today, created_at, '
-      'business_locations(latitude, longitude, city)';
+      'business_locations(latitude, longitude, city, state)';
 
   static const _businessSelectRanked =
       'id, name, services, verification_status, average_rating, '
       'popularity_score, demand_score, available_today, created_at, '
-      'business_locations(latitude, longitude, city)';
+      'business_locations(latitude, longitude, city, state)';
 
   static Future<List<dynamic>> _fetchBusinessRows({
     required int limit,
@@ -168,6 +169,11 @@ class TrendingBusinessesService {
   ) async {
     if (rows.isEmpty) return const [];
 
+    final prefs = await UserPreferencesService.fetch();
+    final filteredRows = prefs.browseEverywhere
+        ? rows
+        : _filterRowsByPreferredLocation(rows, prefs);
+
     Position? position;
     try {
       position = await LocationService.getCurrentPosition();
@@ -176,7 +182,7 @@ class TrendingBusinessesService {
     }
 
     final scored = <({Map<String, dynamic> row, double score})>[];
-    for (final row in rows) {
+    for (final row in filteredRows) {
       final popularity = (row['popularity_score'] as num?)?.toDouble() ?? 0;
       final demand = (row['demand_score'] as num?)?.toDouble() ?? 0;
       var score = popularity + demand * 0.5;
@@ -211,6 +217,40 @@ class TrendingBusinessesService {
       } catch (_) {}
     }
     return businesses;
+  }
+
+  static List<dynamic> _filterRowsByPreferredLocation(
+    List<dynamic> rows,
+    UserPreferences prefs,
+  ) {
+    final city = prefs.locationCity?.trim().toLowerCase();
+    final state = prefs.locationState?.trim().toLowerCase();
+    if ((city == null || city.isEmpty) && (state == null || state.isEmpty)) {
+      return rows;
+    }
+
+    return rows.where((row) {
+      final locations = (row['business_locations'] as List?) ?? const [];
+      if (locations.isEmpty) return true;
+      for (final entry in locations) {
+        final location = entry as Map<String, dynamic>;
+        final locationCity = (location['city'] as String?)?.trim().toLowerCase();
+        final locationState =
+            (location['state'] as String?)?.trim().toLowerCase();
+        final cityMatches = city == null ||
+            city.isEmpty ||
+            locationCity == null ||
+            locationCity.contains(city) ||
+            city.contains(locationCity);
+        final stateMatches = state == null ||
+            state.isEmpty ||
+            locationState == null ||
+            locationState.contains(state) ||
+            state.contains(locationState);
+        if (cityMatches && stateMatches) return true;
+      }
+      return false;
+    }).toList();
   }
 
   static Future<TrendingBusiness?> _mapRowToTrendingBusiness(

@@ -401,15 +401,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await _handleAccountTap(null);
       return;
     }
-    final updated = await Navigator.push<String>(
+    final updated = await Navigator.push<EditProfileSaveResult>(
       context,
       FirstVuePageRoute(builder: (_) => const EditProfileScreen()),
     );
     if (!mounted) return;
     if (updated != null) {
-      if (updated.isNotEmpty) {
-        setState(() => _username = updated);
-      }
+      setState(() {
+        if (updated.username.isNotEmpty) {
+          _username = updated.username;
+        }
+        if (updated.displayName.isNotEmpty) {
+          _displayName = updated.displayName;
+        }
+      });
       await Future.wait([
         _loadDisplayName(),
         _loadProfileImages(),

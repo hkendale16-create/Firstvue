@@ -6,17 +6,20 @@ import 'user_profile_service.dart';
 class UserPreferences {
   final String? locationCity;
   final String? locationState;
+  final bool browseEverywhere;
   final bool notificationsEnabled;
   final bool floatingBubbleVisible;
 
   const UserPreferences({
     this.locationCity,
     this.locationState,
+    this.browseEverywhere = false,
     this.notificationsEnabled = true,
     this.floatingBubbleVisible = true,
   });
 
   String? get locationLabel {
+    if (browseEverywhere) return 'Everywhere';
     final parts = [locationCity, locationState]
         .whereType<String>()
         .where((p) => p.trim().isNotEmpty);
@@ -27,12 +30,14 @@ class UserPreferences {
   UserPreferences copyWith({
     String? locationCity,
     String? locationState,
+    bool? browseEverywhere,
     bool? notificationsEnabled,
     bool? floatingBubbleVisible,
   }) {
     return UserPreferences(
       locationCity: locationCity ?? this.locationCity,
       locationState: locationState ?? this.locationState,
+      browseEverywhere: browseEverywhere ?? this.browseEverywhere,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       floatingBubbleVisible:
           floatingBubbleVisible ?? this.floatingBubbleVisible,
@@ -47,6 +52,7 @@ class UserPreferencesService {
 
   static const _prefsCityKey = 'firstvue_pref_city';
   static const _prefsStateKey = 'firstvue_pref_state';
+  static const _prefsEverywhereKey = 'firstvue_pref_everywhere';
   static const _prefsNotificationsKey = 'firstvue_pref_notifications';
   static const _prefsBubbleKey = 'firstvue_pref_floating_bubble';
 
@@ -57,7 +63,7 @@ class UserPreferencesService {
         final row = await _client
             .from('user_preferences')
             .select(
-              'preferred_city, preferred_state, push_messages, show_floating_messages',
+              'preferred_city, preferred_state, browse_everywhere, push_messages, show_floating_messages',
             )
             .eq('profile_id', user.id)
             .maybeSingle();
@@ -66,6 +72,7 @@ class UserPreferencesService {
           final prefs = UserPreferences(
             locationCity: row['preferred_city'] as String?,
             locationState: row['preferred_state'] as String?,
+            browseEverywhere: row['browse_everywhere'] as bool? ?? false,
             notificationsEnabled: row['push_messages'] as bool? ?? true,
             floatingBubbleVisible:
                 row['show_floating_messages'] as bool? ?? true,
@@ -73,13 +80,39 @@ class UserPreferencesService {
           await _cacheLocally(prefs);
           return prefs;
         }
-      } catch (_) {}
+      } catch (_) {
+        try {
+          final row = await _client
+              .from('user_preferences')
+              .select(
+                'preferred_city, preferred_state, push_messages, show_floating_messages',
+              )
+              .eq('profile_id', user.id)
+              .maybeSingle();
+
+          if (row != null) {
+            final local = await _fetchFromLocal();
+            final prefs = UserPreferences(
+              locationCity: row['preferred_city'] as String?,
+              locationState: row['preferred_state'] as String?,
+              browseEverywhere: local.browseEverywhere,
+              notificationsEnabled: row['push_messages'] as bool? ?? true,
+              floatingBubbleVisible:
+                  row['show_floating_messages'] as bool? ?? true,
+            );
+            await _cacheLocally(prefs);
+            return prefs;
+          }
+        } catch (_) {}
+      }
 
       final profile = await UserProfileService.fetchProfile();
       if (profile?.city != null || profile?.state != null) {
+        final local = await _fetchFromLocal();
         final prefs = UserPreferences(
           locationCity: profile?.city,
           locationState: profile?.state,
+          browseEverywhere: local.browseEverywhere,
         );
         await _cacheLocally(prefs);
         return prefs;
@@ -94,6 +127,7 @@ class UserPreferencesService {
     return UserPreferences(
       locationCity: sp.getString(_prefsCityKey),
       locationState: sp.getString(_prefsStateKey),
+      browseEverywhere: sp.getBool(_prefsEverywhereKey) ?? false,
       notificationsEnabled: sp.getBool(_prefsNotificationsKey) ?? true,
       floatingBubbleVisible: sp.getBool(_prefsBubbleKey) ?? true,
     );
@@ -103,10 +137,15 @@ class UserPreferencesService {
     final sp = await SharedPreferences.getInstance();
     if (prefs.locationCity != null) {
       await sp.setString(_prefsCityKey, prefs.locationCity!);
+    } else {
+      await sp.remove(_prefsCityKey);
     }
     if (prefs.locationState != null) {
       await sp.setString(_prefsStateKey, prefs.locationState!);
+    } else {
+      await sp.remove(_prefsStateKey);
     }
+    await sp.setBool(_prefsEverywhereKey, prefs.browseEverywhere);
     await sp.setBool(_prefsNotificationsKey, prefs.notificationsEnabled);
     await sp.setBool(_prefsBubbleKey, prefs.floatingBubbleVisible);
   }
@@ -114,21 +153,30 @@ class UserPreferencesService {
   static Future<void> updateLocation({
     String? city,
     String? state,
+    bool? browseEverywhere,
   }) async {
     final user = _client.auth.currentUser;
     final trimmedCity = city?.trim();
     final trimmedState = state?.trim();
+    final everywhere = browseEverywhere ?? false;
 
     final sp = await SharedPreferences.getInstance();
-    if (trimmedCity != null && trimmedCity.isNotEmpty) {
-      await sp.setString(_prefsCityKey, trimmedCity);
-    } else {
+    if (everywhere) {
       await sp.remove(_prefsCityKey);
-    }
-    if (trimmedState != null && trimmedState.isNotEmpty) {
-      await sp.setString(_prefsStateKey, trimmedState);
-    } else {
       await sp.remove(_prefsStateKey);
+      await sp.setBool(_prefsEverywhereKey, true);
+    } else {
+      await sp.setBool(_prefsEverywhereKey, false);
+      if (trimmedCity != null && trimmedCity.isNotEmpty) {
+        await sp.setString(_prefsCityKey, trimmedCity);
+      } else {
+        await sp.remove(_prefsCityKey);
+      }
+      if (trimmedState != null && trimmedState.isNotEmpty) {
+        await sp.setString(_prefsStateKey, trimmedState);
+      } else {
+        await sp.remove(_prefsStateKey);
+      }
     }
 
     if (user == null) return;
@@ -136,11 +184,21 @@ class UserPreferencesService {
     try {
       await _client.from('user_preferences').upsert({
         'profile_id': user.id,
-        'preferred_city': trimmedCity,
-        'preferred_state': trimmedState,
+        'preferred_city': everywhere ? null : trimmedCity,
+        'preferred_state': everywhere ? null : trimmedState,
+        'browse_everywhere': everywhere,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
-    } catch (_) {}
+    } catch (_) {
+      try {
+        await _client.from('user_preferences').upsert({
+          'profile_id': user.id,
+          'preferred_city': everywhere ? null : trimmedCity,
+          'preferred_state': everywhere ? null : trimmedState,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        });
+      } catch (_) {}
+    }
   }
 
   static Future<void> updateNotificationsEnabled(bool enabled) async {

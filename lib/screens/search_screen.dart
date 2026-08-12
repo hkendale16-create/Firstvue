@@ -10,7 +10,14 @@ import 'barber_results_screen.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  final String? initialQuery;
+  final bool autofocus;
+
+  const SearchScreen({
+    super.key,
+    this.initialQuery,
+    this.autofocus = false,
+  });
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -25,7 +32,14 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
+    final initial = widget.initialQuery?.trim();
+    if (initial != null && initial.isNotEmpty) {
+      _searchController.text = initial;
+    }
     _searchController.addListener(_onQueryChanged);
+    if (initial != null && initial.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _onQueryChanged());
+    }
   }
 
   Future<void> _onQueryChanged() async {
@@ -98,14 +112,21 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: FirstVueRefreshScaffold(
-        onRefresh: _refresh,
-        child: FirstVueRefreshScaffold.alwaysScrollable(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+    return Scaffold(
+      backgroundColor: FirstVueColors.background,
+      appBar: AppBar(
+        backgroundColor: FirstVueColors.background,
+        foregroundColor: Colors.white,
+        title: const Text('Search'),
+      ),
+      body: SafeArea(
+        child: FirstVueRefreshScaffold(
+          onRefresh: _refresh,
+          child: FirstVueRefreshScaffold.alwaysScrollable(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             const Text(
               'SEARCH',
               style: TextStyle(
@@ -135,9 +156,15 @@ class _SearchScreenState extends State<SearchScreen> {
                 fillColor: const Color(0xFF151B22),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide(
-                    color: const Color(0xFFD8B56A).withValues(alpha: .25),
-                  ),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide.none,
                 ),
               ),
               items: DiscoveryCategory.values
@@ -153,26 +180,30 @@ class _SearchScreenState extends State<SearchScreen> {
               },
             ),
             const SizedBox(height: 14),
-            Container(
-              height: 58,
-              decoration: BoxDecoration(
-                color: const Color(0xFF151B22),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: const Color(0xFFD8B56A).withValues(alpha: .25),
+            TextField(
+              controller: _searchController,
+              autofocus: widget.autofocus,
+              onSubmitted: _search,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Search @handles, places, #tags…',
+                hintStyle: const TextStyle(color: Colors.white38),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFFD8B56A)),
+                filled: true,
+                fillColor: const Color(0xFF151B22),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide.none,
                 ),
-              ),
-              child: TextField(
-                controller: _searchController,
-                onSubmitted: _search,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  hintText: 'Search @handles, places, #tags…',
-                  hintStyle: TextStyle(color: Colors.white38),
-                  prefixIcon: Icon(Icons.search, color: Color(0xFFD8B56A)),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 17),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide.none,
                 ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 17),
               ),
             ),
             if (_searching)
@@ -273,6 +304,7 @@ class _SearchScreenState extends State<SearchScreen> {
           ],
         ),
         ),
+      ),
       ),
     );
   }

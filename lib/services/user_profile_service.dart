@@ -97,6 +97,19 @@ class UserProfileService {
     );
   }
 
+  /// Same length/character rules as @handles, but duplicates are allowed.
+  static String? displayNameValidationMessage(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      return 'Display name cannot be empty.';
+    }
+    final normalized = trimmed.toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]'), '');
+    if (normalized.length < 3 || normalized.length > 30) {
+      return 'Display names must be 3–30 characters using letters, numbers, and underscores.';
+    }
+    return null;
+  }
+
   static Future<void> updateDisplayName(String displayName) async {
     final user = _client.auth.currentUser;
     if (user == null) {
@@ -104,8 +117,9 @@ class UserProfileService {
     }
 
     final trimmed = displayName.trim();
-    if (trimmed.isEmpty) {
-      throw ArgumentError('Display name cannot be empty.');
+    final validationError = displayNameValidationMessage(trimmed);
+    if (validationError != null) {
+      throw ArgumentError(validationError);
     }
 
     await _upsertProfile(user.id, {'display_name': trimmed});
@@ -129,8 +143,9 @@ class UserProfileService {
 
     if (displayName != null) {
       final trimmed = displayName.trim();
-      if (trimmed.isEmpty) {
-        throw ArgumentError('Display name cannot be empty.');
+      final validationError = displayNameValidationMessage(trimmed);
+      if (validationError != null) {
+        throw ArgumentError(validationError);
       }
       updates['display_name'] = trimmed;
     }
@@ -158,20 +173,6 @@ class UserProfileService {
     String userId,
     Map<String, dynamic> fields,
   ) async {
-    try {
-      if (fields.containsKey('display_name')) {
-        await _client.rpc(
-          'ensure_user_profile',
-          params: {'display_name': fields['display_name']},
-        );
-        final rest = Map<String, dynamic>.from(fields)..remove('display_name');
-        if (rest.length > 1) {
-          await _client.from('profiles').update(rest).eq('id', userId);
-        }
-        return;
-      }
-    } catch (_) {}
-
     await _client.from('profiles').upsert({
       'id': userId,
       ...fields,

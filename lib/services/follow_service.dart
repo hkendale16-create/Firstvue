@@ -201,19 +201,32 @@ class FollowService {
   }
 
   static Future<bool> isFollowing(String profileId) async {
+    final following = await fetchFollowingIdsAmong([profileId]);
+    return following.contains(profileId);
+  }
+
+  /// Batch follow lookup for feed rendering (one query instead of N).
+  static Future<Set<String>> fetchFollowingIdsAmong(
+    List<String> profileIds,
+  ) async {
     final me = _client.auth.currentUser;
-    if (me == null || me.id == profileId) return false;
+    if (me == null || profileIds.isEmpty) return const {};
+
+    final targets = profileIds
+        .where((id) => id.trim().isNotEmpty && id != me.id)
+        .toSet()
+        .toList();
+    if (targets.isEmpty) return const {};
 
     try {
-      final row = await _client
+      final rows = await _client
           .from('profile_follows')
-          .select('follower_id')
+          .select('following_id')
           .eq('follower_id', me.id)
-          .eq('following_id', profileId)
-          .maybeSingle();
-      return row != null;
+          .inFilter('following_id', targets);
+      return rows.map((row) => row['following_id'] as String).toSet();
     } catch (_) {
-      return false;
+      return const {};
     }
   }
 
