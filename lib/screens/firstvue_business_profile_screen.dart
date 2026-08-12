@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/approved_businesses_service.dart';
 import '../services/business_media_service.dart';
 import '../services/business_reviews_service.dart';
+import '../services/business_social_links_service.dart';
 import '../services/messaging_service.dart';
+import '../widgets/social_platform_icon.dart';
 import 'auth_screen.dart';
 import 'conversation_screen.dart';
+import 'meet_the_owner_screen.dart';
 
 class FirstVueBusinessProfileScreen extends StatelessWidget {
   final String businessId;
@@ -122,6 +126,15 @@ class _BusinessProfileContent extends StatelessWidget {
                   businessId: details.id,
                   businessName: details.name,
                 ),
+                const SizedBox(height: 12),
+                _MeetOwnerButton(
+                  businessId: details.id,
+                  businessName: details.name,
+                ),
+                const SizedBox(height: 22),
+                const _ProfileSectionTitle('SOCIAL LINKS'),
+                const SizedBox(height: 10),
+                _BusinessSocialLinksSection(businessId: details.id),
                 const SizedBox(height: 22),
                 const _ProfileSectionTitle('ABOUT'),
                 const SizedBox(height: 10),
@@ -681,6 +694,124 @@ class _MessageOwnerButtonState extends State<_MessageOwnerButton> {
           padding: const EdgeInsets.symmetric(vertical: 14),
         ),
       ),
+    );
+  }
+}
+
+class _MeetOwnerButton extends StatefulWidget {
+  final String businessId;
+  final String businessName;
+
+  const _MeetOwnerButton({
+    required this.businessId,
+    required this.businessName,
+  });
+
+  @override
+  State<_MeetOwnerButton> createState() => _MeetOwnerButtonState();
+}
+
+class _MeetOwnerButtonState extends State<_MeetOwnerButton> {
+  bool _loading = false;
+
+  Future<void> _openMeetOwner() async {
+    setState(() => _loading = true);
+    try {
+      final ownerId = await MessagingService.fetchBusinessOwnerId(
+        widget.businessId,
+      );
+      if (ownerId == null) throw StateError('missing owner');
+      final profile = await Supabase.instance.client
+          .from('profiles')
+          .select('display_name')
+          .eq('id', ownerId)
+          .maybeSingle();
+      final ownerName =
+          (profile?['display_name'] as String?) ?? 'Business owner';
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MeetTheOwnerScreen(
+            businessId: widget.businessId,
+            businessName: widget.businessName,
+            ownerId: ownerId,
+            ownerName: ownerName,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Meet the owner is unavailable right now.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        onPressed: _loading ? null : _openMeetOwner,
+        icon: _loading
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.person_outline),
+        label: const Text('MEET THE OWNER'),
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFFD8B56A),
+          foregroundColor: Colors.black,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+        ),
+      ),
+    );
+  }
+}
+
+class _BusinessSocialLinksSection extends StatelessWidget {
+  final String businessId;
+
+  const _BusinessSocialLinksSection({required this.businessId});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<BusinessSocialLink>>(
+      future: BusinessSocialLinksService.fetchForBusiness(businessId),
+      builder: (context, snapshot) {
+        final links = snapshot.data ?? const [];
+        if (links.isEmpty) {
+          return const _ProfileInfoCard(
+            icon: Icons.link_off_outlined,
+            text: 'The owner has not added social links yet.',
+          );
+        }
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: links.map((link) {
+            return ActionChip(
+              avatar: Icon(
+                socialPlatformIcon(link.platform),
+                color: socialPlatformColor(link.platform),
+                size: 18,
+              ),
+              label: Text(link.platform),
+              onPressed: () async {
+                final uri = Uri.tryParse(link.url);
+                if (uri == null) return;
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              },
+            );
+          }).toList(),
+        );
+      },
     );
   }
 }

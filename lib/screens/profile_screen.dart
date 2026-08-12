@@ -81,41 +81,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 25),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFF10151B),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _handleAccountTap(user),
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: const Color(0xFF78B9BE).withValues(alpha: .28),
+              child: Ink(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10151B),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: const Color(0xFF78B9BE).withValues(alpha: .28),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    const CircleAvatar(
+                      radius: 34,
+                      backgroundColor: Color(0xFF241D22),
+                      child: Icon(
+                        Icons.person_outline,
+                        color: Color(0xFF78B9BE),
+                        size: 36,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      displayName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      email ?? 'Tap to sign in and create your FirstVue profile',
+                      style: const TextStyle(color: Colors.white54),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            child: Column(
-              children: [
-                const CircleAvatar(
-                  radius: 34,
-                  backgroundColor: Color(0xFF241D22),
-                  child: Icon(
-                    Icons.person_outline,
-                    color: Color(0xFF78B9BE),
-                    size: 36,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  displayName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  email ?? 'Sign in to create your FirstVue profile',
-                  style: const TextStyle(color: Colors.white54),
-                ),
-              ],
             ),
           ),
           const SizedBox(height: 26),

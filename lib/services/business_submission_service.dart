@@ -169,16 +169,18 @@ class BusinessSubmissionService {
     required String city,
     required String state,
     required String zip,
+    bool comingSoon = false,
   }) async {
     final serviceList = services
         .split(',')
         .map((value) => value.trim())
         .where((value) => value.isNotEmpty)
         .toList();
-    await _client
-        .from('businesses')
-        .update({'description': description, 'services': serviceList})
-        .eq('id', business.id);
+    await _client.from('businesses').update({
+      'description': description,
+      'services': serviceList,
+      'coming_soon': comingSoon,
+    }).eq('id', business.id);
     final existing = await _client
         .from('business_locations')
         .select('id')
@@ -200,6 +202,19 @@ class BusinessSubmissionService {
           .from('business_locations')
           .update(location)
           .eq('id', existing['id'] as String);
+    }
+  }
+
+  static Future<bool> fetchComingSoon(String businessId) async {
+    try {
+      final row = await _client
+          .from('businesses')
+          .select('coming_soon')
+          .eq('id', businessId)
+          .maybeSingle();
+      return (row?['coming_soon'] as bool?) ?? false;
+    } catch (_) {
+      return false;
     }
   }
 }

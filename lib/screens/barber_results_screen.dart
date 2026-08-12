@@ -27,7 +27,7 @@ enum DiscoveryCategory {
     DiscoveryCategory.barbershops => 'BARBERSHOPS & SUITES',
     DiscoveryCategory.beautyProfessionals => 'BEAUTY PROFESSIONALS',
     DiscoveryCategory.beautyStudios => 'BEAUTY STUDIOS',
-    DiscoveryCategory.restaurants => 'RESTAURANTS',
+    DiscoveryCategory.restaurants => 'FINE AND DINE',
     DiscoveryCategory.otherServices => 'OTHER SERVICES',
   };
 

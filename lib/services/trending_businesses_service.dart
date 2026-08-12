@@ -43,6 +43,71 @@ class TrendingBusinessesService {
   static Future<List<TrendingBusiness>> fetchTrendingNearYou({
     int limit = 8,
   }) async {
+    return _fetchRanked(
+      limit: limit,
+      orderByPopularity: true,
+    );
+  }
+
+  static Future<List<TrendingBusiness>> fetchNewNearYou({int limit = 8}) async {
+    final rows = await _client
+        .from('businesses')
+        .select(
+          'id, name, services, verification_status, average_rating, '
+          'popularity_score, demand_score, available_today, created_at, '
+          'business_locations(latitude, longitude, city)',
+        )
+        .eq('status', 'approved')
+        .order('created_at', ascending: false)
+        .limit(limit * 2);
+    return _mapRowsWithLocation(rows, limit);
+  }
+
+  static Future<List<TrendingBusiness>> fetchRecommendedNearYou({
+    int limit = 8,
+  }) async {
+    return _fetchRanked(limit: limit, orderByPopularity: true);
+  }
+
+  static Future<List<TrendingBusiness>> fetchComingSoonNearYou({
+    int limit = 8,
+  }) async {
+    try {
+      final rows = await _client
+          .from('businesses')
+          .select(
+            'id, name, services, verification_status, average_rating, '
+            'popularity_score, demand_score, available_today, coming_soon, '
+            'business_locations(latitude, longitude, city)',
+          )
+          .eq('status', 'approved')
+          .eq('coming_soon', true)
+          .order('created_at', ascending: false)
+          .limit(limit * 2);
+      return _mapRowsWithLocation(rows, limit);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<bool> hasComingSoonBusinesses() async {
+    try {
+      final rows = await _client
+          .from('businesses')
+          .select('id')
+          .eq('status', 'approved')
+          .eq('coming_soon', true)
+          .limit(1);
+      return rows.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<List<TrendingBusiness>> _fetchRanked({
+    required int limit,
+    required bool orderByPopularity,
+  }) async {
     final rows = await _client
         .from('businesses')
         .select(
@@ -55,6 +120,13 @@ class TrendingBusinessesService {
         .order('demand_score', ascending: false)
         .limit(limit * 2);
 
+    return _mapRowsWithLocation(rows, limit);
+  }
+
+  static Future<List<TrendingBusiness>> _mapRowsWithLocation(
+    List<dynamic> rows,
+    int limit,
+  ) async {
     if (rows.isEmpty) return const [];
 
     Position? position;

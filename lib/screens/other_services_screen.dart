@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/firstvue_theme.dart';
 import 'ai_search_screen.dart';
 import 'barber_results_screen.dart';
-import 'search_screen.dart';
+import 'browse_all_services_screen.dart';
 
 class OtherServicesScreen extends StatelessWidget {
   const OtherServicesScreen({super.key});
@@ -40,7 +40,9 @@ class OtherServicesScreen extends StatelessWidget {
                 'Search verified businesses by name, city, state, or ZIP.',
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const SearchScreen()),
+              MaterialPageRoute(
+                builder: (_) => const BrowseAllServicesScreen(),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -70,21 +72,6 @@ class OtherServicesScreen extends StatelessWidget {
               MaterialPageRoute(
                 builder: (_) => const AiSearchScreen(
                   initialPrompt: 'Find trusted local services near me',
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _ServicePathCard(
-            icon: Icons.local_activity_outlined,
-            accent: FirstVueColors.teal,
-            title: 'THINGS TO DO',
-            description: 'Experiences, events, and activities nearby.',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const AiSearchScreen(
-                  initialPrompt: 'Things to do near me tonight',
                 ),
               ),
             ),

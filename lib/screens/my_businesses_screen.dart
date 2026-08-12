@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/business_media_service.dart';
+import '../services/business_social_links_service.dart';
 import '../services/business_submission_service.dart';
 
 class MyBusinessesScreen extends StatefulWidget {
@@ -122,12 +123,35 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
   final _zip = TextEditingController();
   bool _saving = false;
   bool _uploading = false;
+  bool _comingSoon = false;
+  final _instagram = TextEditingController();
+  final _facebook = TextEditingController();
+  final _youtube = TextEditingController();
   late Future<List<BusinessMediaItem>> _media;
   @override
   void initState() {
     super.initState();
     _media = BusinessMediaService.fetchMedia(widget.business.id);
     _loadLocation();
+    _loadExtras();
+  }
+
+  Future<void> _loadExtras() async {
+    final comingSoon = await BusinessSubmissionService.fetchComingSoon(
+      widget.business.id,
+    );
+    final links = await BusinessSocialLinksService.fetchForBusiness(
+      widget.business.id,
+    );
+    if (!mounted) return;
+    _comingSoon = comingSoon;
+    for (final link in links) {
+      final platform = link.platform.toLowerCase();
+      if (platform.contains('instagram')) _instagram.text = link.url;
+      if (platform.contains('facebook')) _facebook.text = link.url;
+      if (platform.contains('youtube')) _youtube.text = link.url;
+    }
+    setState(() {});
   }
 
   Future<void> _loadLocation() async {
@@ -150,6 +174,9 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
     _city.dispose();
     _state.dispose();
     _zip.dispose();
+    _instagram.dispose();
+    _facebook.dispose();
+    _youtube.dispose();
     super.dispose();
   }
 
@@ -164,6 +191,21 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
         city: _city.text.trim(),
         state: _state.text.trim(),
         zip: _zip.text.trim(),
+        comingSoon: _comingSoon,
+      );
+      final links = <({String platform, String url})>[];
+      if (_instagram.text.trim().isNotEmpty) {
+        links.add((platform: 'Instagram', url: _instagram.text.trim()));
+      }
+      if (_facebook.text.trim().isNotEmpty) {
+        links.add((platform: 'Facebook', url: _facebook.text.trim()));
+      }
+      if (_youtube.text.trim().isNotEmpty) {
+        links.add((platform: 'YouTube', url: _youtube.text.trim()));
+      }
+      await BusinessSocialLinksService.replaceLinks(
+        businessId: widget.business.id,
+        links: links,
       );
       if (!mounted) return;
       Navigator.pop(context);
@@ -253,6 +295,27 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
           label: 'Services (separate with commas)',
           lines: 2,
         ),
+        const SizedBox(height: 12),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text(
+            'Mark as coming soon',
+            style: TextStyle(color: Colors.white),
+          ),
+          subtitle: const Text(
+            'Shows your business in the Coming Soon tab when enabled.',
+            style: TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+          value: _comingSoon,
+          activeThumbColor: const Color(0xFFD8B56A),
+          onChanged: (value) => setState(() => _comingSoon = value),
+        ),
+        const SizedBox(height: 12),
+        _Field(controller: _instagram, label: 'Instagram URL'),
+        const SizedBox(height: 12),
+        _Field(controller: _facebook, label: 'Facebook URL'),
+        const SizedBox(height: 12),
+        _Field(controller: _youtube, label: 'YouTube URL'),
         const SizedBox(height: 12),
         _Field(controller: _address, label: 'Street address'),
         const SizedBox(height: 12),

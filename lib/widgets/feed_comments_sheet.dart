@@ -41,6 +41,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
   final _controller = TextEditingController();
   late Future<List<FeedComment>> _commentsFuture;
   bool _posting = false;
+  String? _replyParentId;
 
   @override
   void initState() {
@@ -55,7 +56,9 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
   }
 
   Future<void> _refresh() async {
-    setState(() => _commentsFuture = FeedCommentsService.fetchComments(widget.mediaId));
+    setState(
+      () => _commentsFuture = FeedCommentsService.fetchComments(widget.mediaId),
+    );
     await _commentsFuture;
   }
 
@@ -75,8 +78,10 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
       await FeedCommentsService.postComment(
         mediaId: widget.mediaId,
         body: text,
+        parentId: _replyParentId,
       );
       _controller.clear();
+      _replyParentId = null;
       await _refresh();
     } catch (_) {
       if (mounted) {
@@ -87,6 +92,10 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
     } finally {
       if (mounted) setState(() => _posting = false);
     }
+  }
+
+  List<FeedComment> _repliesFor(List<FeedComment> all, String parentId) {
+    return all.where((comment) => comment.parentId == parentId).toList();
   }
 
   @override
@@ -150,7 +159,9 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
                       );
                     }
                     final comments = snapshot.data!;
-                    if (comments.isEmpty) {
+                    final topLevel =
+                        comments.where((comment) => comment.parentId == null).toList();
+                    if (topLevel.isEmpty) {
                       return ListView(
                         controller: scrollController,
                         children: const [
@@ -167,34 +178,34 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
                     return ListView.separated(
                       controller: scrollController,
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                      itemCount: comments.length,
+                      itemCount: topLevel.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (context, index) {
-                        final comment = comments[index];
-                        return Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF151B22),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                comment.authorName,
-                                style: const TextStyle(
-                                  color: Color(0xFFD8B56A),
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                comment.body,
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ],
-                          ),
+                        final comment = topLevel[index];
+                        final replies = _repliesFor(comments, comment.id);
+                        return _CommentBlock(
+                          comment: comment,
+                          replies: replies,
+                          onSpark: () async {
+                            await FeedCommentsService.toggleSpark(comment);
+                            await _refresh();
+                          },
+                          onReply: () {
+                            setState(() {
+                              _replyParentId = comment.id;
+                              _controller.text = '@${comment.authorName} ';
+                            });
+                          },
+                          onSparkReply: (reply) async {
+                            await FeedCommentsService.toggleSpark(reply);
+                            await _refresh();
+                          },
+                          onReplyToReply: (reply) {
+                            setState(() {
+                              _replyParentId = reply.id;
+                              _controller.text = '@${reply.authorName} ';
+                            });
+                          },
                         );
                       },
                     );
@@ -212,7 +223,9 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
                           controller: _controller,
                           style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
-                            hintText: 'Add a comment...',
+                            hintText: _replyParentId == null
+                                ? 'Add a comment...'
+                                : 'Write a reply...',
                             hintStyle: TextStyle(
                               color: Colors.white.withValues(alpha: .38),
                             ),
@@ -242,6 +255,100 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _CommentBlock extends StatelessWidget {
+  final FeedComment comment;
+  final List<FeedComment> replies;
+  final VoidCallback onSpark;
+  final VoidCallback onReply;
+  final Future<void> Function(FeedComment reply) onSparkReply;
+  final void Function(FeedComment reply) onReplyToReply;
+
+  const _CommentBlock({
+    required this.comment,
+    required this.replies,
+    required this.onSpark,
+    required this.onReply,
+    required this.onSparkReply,
+    required this.onReplyToReply,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _CommentTile(
+          comment: comment,
+          onSpark: onSpark,
+          onReply: onReply,
+        ),
+        ...replies.map(
+          (reply) => Padding(
+            padding: const EdgeInsets.only(left: 18, top: 8),
+            child: _CommentTile(
+              comment: reply,
+              onSpark: () => onSparkReply(reply),
+              onReply: () => onReplyToReply(reply),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CommentTile extends StatelessWidget {
+  final FeedComment comment;
+  final VoidCallback onSpark;
+  final VoidCallback onReply;
+
+  const _CommentTile({
+    required this.comment,
+    required this.onSpark,
+    required this.onReply,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF151B22),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            comment.authorName,
+            style: const TextStyle(
+              color: Color(0xFFD8B56A),
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(comment.body, style: const TextStyle(color: Colors.white)),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: onSpark,
+                icon: Icon(
+                  comment.sparkedByMe ? Icons.bolt_rounded : Icons.bolt_outlined,
+                  size: 18,
+                ),
+                label: Text('${comment.sparkCount} sparks'),
+              ),
+              TextButton(onPressed: onReply, child: const Text('Reply')),
+            ],
+          ),
+        ],
       ),
     );
   }

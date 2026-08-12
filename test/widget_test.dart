@@ -7,7 +7,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      'firstvue_welcome_v1_seen': true,
+      'firstvue_tutorial_v1_completed': true,
+    });
     await Supabase.initialize(
       url: SupabaseConfig.url,
       publishableKey: SupabaseConfig.publishableKey,
@@ -16,11 +19,17 @@ void main() {
 
   testWidgets('FirstVue home screen renders', (tester) async {
     await tester.pumpWidget(const FirstVueApp());
-    await tester.pump();
+    await tester.pumpAndSettle();
+
+    final homeNav = find.text('HOME');
+    await tester.ensureVisible(homeNav);
+    await tester.tap(homeNav);
+    await tester.pumpAndSettle();
 
     expect(find.text('FIRSTVUE'), findsOneWidget);
     expect(find.text('EXPLORE'), findsOneWidget);
-    expect(find.text('BEAUTY'), findsOneWidget);
-    expect(find.text('AVAILABLE RENTS'), findsOneWidget);
+    expect(find.text('BARBER & BEAUTY'), findsOneWidget);
+    expect(find.text('AVAILABLE RENTALS'), findsOneWidget);
+    expect(find.text('THINGS TO DO'), findsOneWidget);
   });
 }

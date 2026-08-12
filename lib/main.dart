@@ -8,15 +8,20 @@ import 'screens/beauty_discovery_screen.dart';
 import 'screens/discovery_feed_screen.dart';
 import 'screens/other_services_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/notifications_screen.dart';
 import 'screens/rentals_screen.dart';
 import 'screens/saved_screen.dart';
 import 'screens/search_screen.dart';
+import 'screens/things_to_do_screen.dart';
 import 'screens/firstvue_business_profile_screen.dart';
+import 'services/activity_notifications_service.dart';
 import 'services/deep_link_service.dart';
-import 'services/trending_businesses_service.dart';
+import 'services/notification_service.dart';
+import 'services/recommendations_service.dart';
 import 'theme/firstvue_theme.dart';
 import 'widgets/firstvue_bottom_nav.dart';
 import 'widgets/firstvue_onboarding.dart';
+import 'widgets/home_discovery_section.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -26,6 +31,7 @@ Future<void> main() async {
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.publishableKey,
   );
+  await NotificationService.initialize();
   runApp(const FirstVueApp());
 }
 
@@ -70,26 +76,31 @@ class _ExploreCategory {
 }
 
 class _FirstVueHomeState extends State<FirstVueHome> {
-  int selectedIndex = 0;
-  List<TrendingBusiness> _trendingBusinesses = [];
-  bool _trendingLoading = true;
-  String? _trendingError;
+  int selectedIndex = 2;
+  int _notificationBadge = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadTrending();
     _openInitialBusinessLink();
     _listenForDeepLinks();
     _showBillingResultIfNeeded();
+    _refreshNotificationBadge();
+    ActivityNotificationsService.listenForPushDelivery();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) showFirstLaunchExperience(context);
     });
   }
 
+  Future<void> _refreshNotificationBadge() async {
+    final count = await ActivityNotificationsService.unreadCount();
+    if (mounted) setState(() => _notificationBadge = count);
+  }
+
   @override
   void dispose() {
     DeepLinkService.dispose();
+    ActivityNotificationsService.disposeListener();
     super.dispose();
   }
 
@@ -126,46 +137,18 @@ class _FirstVueHomeState extends State<FirstVueHome> {
     });
   }
 
-  Future<void> _loadTrending() async {
-    setState(() {
-      _trendingLoading = true;
-      _trendingError = null;
-    });
-    try {
-      final businesses = await TrendingBusinessesService.fetchTrendingNearYou();
-      if (!mounted) return;
-      setState(() {
-        _trendingBusinesses = businesses;
-        _trendingLoading = false;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _trendingLoading = false;
-        _trendingError = 'Trending businesses are unavailable right now.';
-      });
-    }
-  }
-
-  Future<void> _openInitialBusinessLink() async {
-    final businessId =
-        AppConfig.initialBusinessIdFromUri() ??
-        await DeepLinkService.initialBusinessId();
-    if (businessId == null) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _openBusinessProfile(businessId);
-    });
-  }
+  void _goHome() => setState(() => selectedIndex = 0);
 
   List<_ExploreCategory> _exploreCategories(BuildContext context) {
     return [
       _ExploreCategory(
-        title: 'BEAUTY',
+        title: 'BARBER & BEAUTY',
         subtitle: 'Barbers, salons & stylists',
         imagePath: 'assets/images/explore_beauty.jpg',
         accent: FirstVueColors.coral,
         icon: Icons.auto_awesome_rounded,
         onTap: () {
+          RecommendationsService.recordCategoryVisit('beauty');
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -175,25 +158,13 @@ class _FirstVueHomeState extends State<FirstVueHome> {
         },
       ),
       _ExploreCategory(
-        title: 'AVAILABLE RENTS',
-        subtitle: 'Booths & suite spaces',
+        title: 'FINE AND DINE',
+        subtitle: 'Restaurants & dining',
         imagePath: 'assets/images/explore_rentals.jpg',
-        accent: FirstVueColors.teal,
-        icon: Icons.key_outlined,
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const RentalsScreen()),
-          );
-        },
-      ),
-      _ExploreCategory(
-        title: 'RESTAURANTS',
-        subtitle: 'Dine & discover',
-        imagePath: 'assets/images/explore_things_to_do.jpg',
         accent: FirstVueColors.gold,
         icon: Icons.restaurant_rounded,
         onTap: () {
+          RecommendationsService.recordCategoryVisit('restaurant');
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -205,12 +176,41 @@ class _FirstVueHomeState extends State<FirstVueHome> {
         },
       ),
       _ExploreCategory(
+        title: 'AVAILABLE RENTALS',
+        subtitle: 'Booths & suite spaces',
+        imagePath: 'assets/images/explore_rentals.jpg',
+        accent: FirstVueColors.teal,
+        icon: Icons.key_outlined,
+        onTap: () {
+          RecommendationsService.recordCategoryVisit('rentals');
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const RentalsScreen()),
+          );
+        },
+      ),
+      _ExploreCategory(
+        title: 'THINGS TO DO',
+        subtitle: 'Events, experiences & activities',
+        imagePath: 'assets/images/explore_things_to_do.jpg',
+        accent: FirstVueColors.coral,
+        icon: Icons.local_activity_outlined,
+        onTap: () {
+          RecommendationsService.recordCategoryVisit('events');
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ThingsToDoScreen()),
+          );
+        },
+      ),
+      _ExploreCategory(
         title: 'OTHER SERVICES',
         subtitle: 'Home, auto & more',
-        imagePath: 'assets/images/explore_things_to_do.jpg',
+        imagePath: 'assets/images/explore_barbershops.jpg',
         accent: FirstVueColors.teal,
         icon: Icons.home_repair_service_outlined,
         onTap: () {
+          RecommendationsService.recordCategoryVisit('services');
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -220,6 +220,16 @@ class _FirstVueHomeState extends State<FirstVueHome> {
         },
       ),
     ];
+  }
+
+  Future<void> _openInitialBusinessLink() async {
+    final businessId =
+        AppConfig.initialBusinessIdFromUri() ??
+        await DeepLinkService.initialBusinessId();
+    if (businessId == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _openBusinessProfile(businessId);
+    });
   }
 
   void _openProfile() {
@@ -245,35 +255,47 @@ class _FirstVueHomeState extends State<FirstVueHome> {
                 children: [
                   _HomeProfileAvatar(onTap: _openProfile),
                   Expanded(
-                    child: Column(
-                      children: [
-                        const Text(
-                          'FIRSTVUE',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'CormorantGaramond',
-                            color: FirstVueColors.gold,
-                            fontSize: 32,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 3,
+                    child: GestureDetector(
+                      onTap: _goHome,
+                      behavior: HitTestBehavior.opaque,
+                      child: Column(
+                        children: [
+                          const Text(
+                            'FIRSTVUE',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontFamily: 'CormorantGaramond',
+                              color: FirstVueColors.gold,
+                              fontSize: 32,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 3,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'SEE FIRST. BOOK FIRST.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: FirstVueColors.gold.withValues(alpha: .62),
-                            fontSize: 9.5,
-                            letterSpacing: 2.2,
-                            fontWeight: FontWeight.w500,
+                          const SizedBox(height: 4),
+                          Text(
+                            'SEE FIRST. BOOK FIRST.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: FirstVueColors.gold.withValues(alpha: .62),
+                              fontSize: 9.5,
+                              letterSpacing: 2.2,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   IconButton(
-                    onPressed: () {},
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const NotificationsScreen(),
+                        ),
+                      );
+                      await _refreshNotificationBadge();
+                    },
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                     icon: Stack(
@@ -290,8 +312,10 @@ class _FirstVueHomeState extends State<FirstVueHome> {
                           child: Container(
                             width: 8,
                             height: 8,
-                            decoration: const BoxDecoration(
-                              color: FirstVueColors.coral,
+                            decoration: BoxDecoration(
+                              color: _notificationBadge > 0
+                                  ? FirstVueColors.coral
+                                  : Colors.transparent,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -392,77 +416,10 @@ class _FirstVueHomeState extends State<FirstVueHome> {
 
               const SizedBox(height: 30),
 
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'TRENDING NEAR YOU',
-                      style: TextStyle(
-                        color: FirstVueColors.ivory,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.4,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => setState(() => selectedIndex = 2),
-                    style: TextButton.styleFrom(
-                      foregroundColor: FirstVueColors.coral,
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text(
-                      'VIEW ALL  >',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: .8,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
+              HomeDiscoverySection(
+                onViewAllVue: () => setState(() => selectedIndex = 2),
               ),
-
-              const SizedBox(height: 14),
-
-              if (_trendingLoading)
-                const SizedBox(
-                  height: 248,
-                  child: Center(
-                    child: CircularProgressIndicator(color: FirstVueColors.teal),
-                  ),
-                )
-              else if (_trendingBusinesses.isNotEmpty)
-                SizedBox(
-                  height: 248,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _trendingBusinesses.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 12),
-                    itemBuilder: (context, index) {
-                      final business = _trendingBusinesses[index];
-                      final accent = index.isEven
-                          ? FirstVueColors.teal
-                          : FirstVueColors.coral;
-                      return _TrendingPortraitCard(
-                        business: business,
-                        accent: accent,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => FirstVueBusinessProfileScreen(
-                              businessId: business.id,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                )
-              else
-                _TrendingEmptyCard(message: _trendingError),
+              const YouMightLikeSection(),
               const SizedBox(height: 12),
             ],
           ),
@@ -547,200 +504,6 @@ class _HomeProfileAvatar extends StatelessWidget {
                 color: FirstVueColors.teal,
                 size: 24,
               ),
-      ),
-    );
-  }
-}
-
-class _TrendingPortraitCard extends StatelessWidget {
-  final TrendingBusiness business;
-  final Color accent;
-  final VoidCallback onTap;
-
-  const _TrendingPortraitCard({
-    required this.business,
-    required this.accent,
-    required this.onTap,
-  });
-
-  String get _category =>
-      business.services.isNotEmpty ? business.services.first : 'Verified';
-
-  String get _ratingText {
-    if (business.rating <= 0) return 'New';
-    final reviews = business.reviewCount > 0 ? ' (${business.reviewCount})' : '';
-    return '${business.rating.toStringAsFixed(1)}$reviews';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Ink(
-          width: 156,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: accent.withValues(alpha: .42)),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(17),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                business.imageUrl != null
-                    ? Image.network(
-                        business.imageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Image.asset(
-                          'assets/images/explore_barbershops.jpg',
-                          fit: BoxFit.cover,
-                        ),
-                      )
-                    : Image.asset(
-                        'assets/images/explore_barbershops.jpg',
-                        fit: BoxFit.cover,
-                      ),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      stops: const [0.45, 0.75, 1.0],
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: .35),
-                        Colors.black.withValues(alpha: .88),
-                      ],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: Icon(
-                    Icons.bookmark_border_rounded,
-                    color: Colors.white.withValues(alpha: .85),
-                    size: 20,
-                  ),
-                ),
-                Positioned(
-                  left: 12,
-                  right: 12,
-                  bottom: 12,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              business.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                          if (business.verified)
-                            Icon(
-                              Icons.verified_rounded,
-                              color: FirstVueColors.teal.withValues(alpha: .95),
-                              size: 16,
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        _category,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: .72),
-                          fontSize: 11,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.star_rounded,
-                            color: FirstVueColors.gold,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            _ratingText,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          if (business.distanceMiles != null) ...[
-                            const SizedBox(width: 8),
-                            Icon(
-                              Icons.location_on_outlined,
-                              color: Colors.white.withValues(alpha: .65),
-                              size: 12,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              '${business.distanceMiles!.toStringAsFixed(1)} mi',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: .72),
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TrendingEmptyCard extends StatelessWidget {
-  final String? message;
-
-  const _TrendingEmptyCard({this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 168,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: FirstVueColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: .07)),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.trending_up_rounded, color: FirstVueColors.teal),
-          const SizedBox(height: 10),
-          Text(
-            message ??
-                'Approved businesses will appear here once owners publish on FirstVue.',
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white54, fontSize: 13),
-          ),
-        ],
       ),
     );
   }
