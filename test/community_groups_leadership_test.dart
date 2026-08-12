@@ -58,19 +58,36 @@ void main() {
         'description': 'Local hub for Atlanta groups',
         'category': 'City',
         'image_url': null,
+        'cover_url': 'https://example.com/cover.png',
         'city': 'Atlanta',
         'state': 'GA',
         'postal_code': '30301',
         'rules': null,
         'visibility': 'public',
         'created_by_profile_id': 'p1',
+        'leader_user_id': 'p1',
+        'status': 'active',
         'follower_count': 3,
         'created_at': '2026-08-01T00:00:00.000Z',
       });
 
       expect(hub.name, 'Atlanta Community');
       expect(hub.createdByProfileId, 'p1');
+      expect(hub.leaderUserId, 'p1');
+      expect(hub.coverUrl, 'https://example.com/cover.png');
+      expect(hub.status, 'active');
       expect(hub.locationLabel, 'Atlanta, GA');
+    });
+
+    test('fromRow falls back leaderUserId to created_by when missing', () {
+      final hub = CommunityHub.fromRow({
+        'id': 'h2',
+        'name': 'Legacy Hub',
+        'created_by_profile_id': 'creator-1',
+        'created_at': '2026-08-01T00:00:00.000Z',
+      });
+      expect(hub.leaderUserId, 'creator-1');
+      expect(hub.status, 'active');
     });
   });
 

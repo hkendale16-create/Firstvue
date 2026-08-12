@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'activity_notifications_service.dart';
 import 'community_news_media_service.dart';
+import 'community_service.dart';
 import 'follow_service.dart';
 import 'post_metadata_service.dart';
 import 'saved_items_service.dart';
@@ -24,6 +25,9 @@ class CommunityNewsPost {
   final String authorName;
   final String? authorUsername;
   final String? businessName;
+  final String? communityId;
+  final String? communityName;
+  final String? communityImageUrl;
   final DateTime createdAt;
   final bool isMine;
   final int sparkCount;
@@ -40,6 +44,9 @@ class CommunityNewsPost {
     required this.authorName,
     this.authorUsername,
     required this.businessName,
+    this.communityId,
+    this.communityName,
+    this.communityImageUrl,
     required this.createdAt,
     required this.isMine,
     required this.sparkCount,
@@ -59,6 +66,9 @@ class CommunityNewsPost {
     String? authorName,
     String? authorUsername,
     String? businessName,
+    String? communityId,
+    String? communityName,
+    String? communityImageUrl,
     DateTime? createdAt,
     bool? isMine,
     int? sparkCount,
@@ -75,6 +85,9 @@ class CommunityNewsPost {
       authorName: authorName ?? this.authorName,
       authorUsername: authorUsername ?? this.authorUsername,
       businessName: businessName ?? this.businessName,
+      communityId: communityId ?? this.communityId,
+      communityName: communityName ?? this.communityName,
+      communityImageUrl: communityImageUrl ?? this.communityImageUrl,
       createdAt: createdAt ?? this.createdAt,
       isMine: isMine ?? this.isMine,
       sparkCount: sparkCount ?? this.sparkCount,
@@ -98,8 +111,10 @@ class CommunityNewsService {
   static const _postColumnsBase =
       'id, body, created_at, author_id, business_id, community_id';
 
-  /// Filters must run *after* `.select()` — discarding the ordered builder
-  /// before select breaks Home / Community feed loading (PostgREST 400).
+  /// Builds a select query with filters applied *after* `.select()`.
+  ///
+  /// Calling `.order` / `.eq` / `.limit` on the pre-select builder (and
+  /// discarding the returned filter builder) breaks feed loading.
   static Future<List<dynamic>> _selectPosts(
     dynamic Function(dynamic query) configure,
   ) async {
@@ -122,20 +137,6 @@ class CommunityNewsService {
         return await run(_postColumnsBase);
       }
     }
-  }
-
-  static void logFeedError(Object error, {String context = 'NewsFeed'}) {
-    if (error is PostgrestException) {
-      // ignore: avoid_print
-      print(
-        '[$context] PostgrestException '
-        'code=${error.code} message=${error.message} '
-        'details=${error.details} hint=${error.hint}',
-      );
-      return;
-    }
-    // ignore: avoid_print
-    print('[$context] $error');
   }
 
   static Future<Map<String, dynamic>> _insertPostReturning(
@@ -193,40 +194,97 @@ class CommunityNewsService {
 
   static Future<List<CommunityNewsPost>> fetchPosts({int limit = 20}) async {
     final me = _client.auth.currentUser?.id;
+    // RLS returns approved posts plus the signed-in author's own posts.
+    final rows = await _selectPosts(
+      (query) => query.order('created_at', ascending: false).limit(limit),
+    );
+
+    return _mapPostRows(rows, currentUserId: me);
+  }
+
+  /// Ranked Home/main Newsfeed (recency + unseen + relevance + controlled variance).
+  static Future<List<CommunityNewsPost>> fetchRankedMainFeed({
+    int limit = 30,
+    double? seed,
+  }) async {
+    final me = _client.auth.currentUser?.id;
+    if (me == null) return const [];
+
     try {
-      final rows = await _selectPosts(
-        (query) => query.order('created_at', ascending: false).limit(limit),
+      final result = await _client.rpc(
+        'fetch_ranked_main_feed',
+        params: {
+          'p_limit': limit,
+          'p_seed': seed,
+        },
       );
-      return await _mapPostRows(rows, currentUserId: me);
-    } catch (error) {
-      logFeedError(error, context: 'HomeNewsFeed.fetchPosts');
-      return const [];
+      if (result is! List || result.isEmpty) return const [];
+      return _mapPostRows(result, currentUserId: me);
+    } catch (_) {
+      // Fall back to chronological main feed if ranking RPC is unavailable.
+      return fetchPosts(limit: limit);
     }
   }
 
-  /// Community Feed — posts attached to a community/group (`community_id`).
-  static Future<List<CommunityNewsPost>> fetchCommunityFeedPosts({
-    int limit = 20,
+  /// Umbrella Community feed: Group posts referenced by `community_feed_posts`.
+  ///
+  /// Mapped posts keep the source Group's name/image on
+  /// [CommunityNewsPost.communityName] / [communityImageUrl] so UI can show
+  /// "[User] in [Group]".
+  static Future<List<CommunityNewsPost>> fetchHubCommunityFeed(
+    String hubId, {
+    int limit = 30,
   }) async {
+    if (hubId.trim().isEmpty) return const [];
     final me = _client.auth.currentUser?.id;
+
     try {
-      final rows = await _selectPosts(
-        (query) => query
-            .not('community_id', 'is', null)
-            .order('created_at', ascending: false)
-            .limit(limit),
-      );
-      final mapped = await _mapPostRows(rows, currentUserId: me);
-      if (mapped.isNotEmpty) return mapped;
-      // Soft fallback so the Community block is not empty on older data.
-      return fetchPosts(limit: limit);
-    } catch (error) {
-      logFeedError(error, context: 'CommunityFeed.fetchPosts');
-      try {
-        return await fetchPosts(limit: limit);
-      } catch (_) {
-        return const [];
+      final feedRows = await _client
+          .from('community_feed_posts')
+          .select('id, community_id, group_id, source_post_id, created_at')
+          .eq('community_id', hubId)
+          .isFilter('removed_from_community_at', null)
+          .order('created_at', ascending: false)
+          .limit(limit);
+
+      if (feedRows.isEmpty) return const [];
+
+      final sourceIds = <String>[];
+      final groupBySource = <String, String>{};
+      for (final row in feedRows) {
+        final sourceId = row['source_post_id'] as String?;
+        final groupId = row['group_id'] as String?;
+        if (sourceId == null) continue;
+        sourceIds.add(sourceId);
+        if (groupId != null) groupBySource[sourceId] = groupId;
       }
+      if (sourceIds.isEmpty) return const [];
+
+      final postRows = await _selectPosts(
+        (query) => query.inFilter('id', sourceIds),
+      );
+      if (postRows.isEmpty) return const [];
+
+      // Preserve community_feed_posts ordering.
+      final byId = <String, Map<String, dynamic>>{
+        for (final row in postRows)
+          if (row['id'] is String) row['id'] as String: Map<String, dynamic>.from(row as Map),
+      };
+      final ordered = <Map<String, dynamic>>[];
+      for (final id in sourceIds) {
+        final row = byId[id];
+        if (row == null) continue;
+        // Ensure group context is present for mapping "[User] in [Group]".
+        final groupId = groupBySource[id];
+        if (groupId != null && row['community_id'] == null) {
+          row['community_id'] = groupId;
+        }
+        ordered.add(row);
+      }
+
+      return _mapPostRows(ordered, currentUserId: me);
+    } catch (_) {
+      return const [];
     }
   }
 
@@ -283,6 +341,7 @@ class CommunityNewsService {
     final authorUsernames = await _fetchProfileUsernames(authorIds);
     final businessNames = await _fetchBusinessNames(businessIds);
     final communityNames = await _fetchCommunityNames(communityIds);
+    final communityImages = await _fetchCommunityImages(communityIds);
     final professionalNames = await _fetchProfessionalNames(professionalIds);
     final eventTitles = await _fetchEventTitles(eventIds);
     final sparkCounts = await _fetchSparkCounts(postIds);
@@ -303,52 +362,95 @@ class CommunityNewsService {
       currentUserId: currentUserId,
     );
 
-    return rows.map((row) {
-      final id = row['id'] as String;
-      final authorId = row['author_id'] as String;
-      final businessId = row['business_id'] as String?;
-      final communityId = row['community_id'] as String?;
-      final professionalProfileId = row['professional_profile_id'] as String?;
-      final eventId = row['event_id'] as String?;
-      final visibility = (row['visibility'] as String?) ?? 'public';
-      final createdRaw = row['created_at'];
-      final createdAt = createdRaw is String
-          ? DateTime.tryParse(createdRaw) ?? DateTime.now()
-          : DateTime.now();
-      final contextName = businessId != null
-          ? businessNames[businessId]
-          : professionalProfileId != null
-              ? professionalNames[professionalProfileId]
-              : eventId != null
-                  ? eventTitles[eventId]
-                  : (communityId != null ? communityNames[communityId] : null);
-      final media = mediaByPost[id] ?? const [];
-      final isMine = authorId == currentUserId;
-      final followsAuthor = followingAuthors.contains(authorId);
-      final rawBody = (row['body'] as String?) ?? '';
-      final body = resolveDisplayBody(
-        rawBody: rawBody,
-        visibility: visibility,
-        isMine: isMine,
-        followsAuthor: followsAuthor,
-        hasMedia: media.isNotEmpty,
-      );
-      return CommunityNewsPost(
-        id: id,
-        body: body,
-        authorId: authorId,
-        authorName: authorNames[authorId] ?? 'FirstVue member',
-        authorUsername: authorUsernames[authorId],
-        businessName: contextName,
-        createdAt: createdAt,
-        isMine: isMine,
-        sparkCount: sparkCounts[id] ?? 0,
-        sparkedByMe: mySparks.contains(id),
-        savedByMe: mySaves.contains(id),
-        visibility: visibility,
-        media: media,
-      );
-    }).toList();
+    final posts = <CommunityNewsPost>[];
+    for (final row in rows) {
+      try {
+        final id = row['id'] as String?;
+        final authorId = row['author_id'] as String?;
+        if (id == null || authorId == null) continue;
+
+        final businessId = row['business_id'] as String?;
+        final communityId = row['community_id'] as String?;
+        final professionalProfileId = row['professional_profile_id'] as String?;
+        final eventId = row['event_id'] as String?;
+        final visibility = (row['visibility'] as String?) ?? 'public';
+        final createdRaw = row['created_at'];
+        final createdAt = createdRaw is String
+            ? DateTime.tryParse(createdRaw) ?? DateTime.now()
+            : createdRaw is DateTime
+                ? createdRaw
+                : DateTime.now();
+        final contextName = businessId != null
+            ? businessNames[businessId]
+            : professionalProfileId != null
+                ? professionalNames[professionalProfileId]
+                : eventId != null
+                    ? eventTitles[eventId]
+                    : (communityId != null
+                        ? communityNames[communityId]
+                        : null);
+        final media = mediaByPost[id] ?? const [];
+        final isMine = authorId == currentUserId;
+        final followsAuthor = followingAuthors.contains(authorId);
+        final rawBody = (row['body'] as String?) ?? '';
+        final body = resolveDisplayBody(
+          rawBody: rawBody,
+          visibility: visibility,
+          isMine: isMine,
+          followsAuthor: followsAuthor,
+          hasMedia: media.isNotEmpty,
+        );
+        posts.add(
+          CommunityNewsPost(
+            id: id,
+            body: body,
+            authorId: authorId,
+            authorName: authorNames[authorId] ?? 'FirstVue member',
+            authorUsername: authorUsernames[authorId],
+            businessName: contextName,
+            communityId: communityId,
+            communityName:
+                communityId == null ? null : communityNames[communityId],
+            communityImageUrl:
+                communityId == null ? null : communityImages[communityId],
+            createdAt: createdAt,
+            isMine: isMine,
+            sparkCount: sparkCounts[id] ?? 0,
+            sparkedByMe: mySparks.contains(id),
+            savedByMe: mySaves.contains(id),
+            visibility: visibility,
+            media: media,
+          ),
+        );
+      } catch (error) {
+        assert(() {
+          // ignore: avoid_print
+          print('Skipping malformed news post row: $error');
+          return true;
+        }());
+      }
+    }
+    return posts;
+  }
+
+  static Future<Map<String, String>> _fetchCommunityImages(
+    List<String> communityIds,
+  ) async {
+    if (communityIds.isEmpty) return const {};
+    try {
+      final rows = await _client
+          .from('communities')
+          .select('id, image_url')
+          .inFilter('id', communityIds);
+      return {
+        for (final row in rows)
+          if (row['image_url'] is String &&
+              (row['image_url'] as String).trim().isNotEmpty)
+            row['id'] as String: row['image_url'] as String,
+      };
+    } catch (_) {
+      return const {};
+    }
   }
 
   static Future<Set<String>> _followingAuthorIds(
@@ -680,6 +782,8 @@ class CommunityNewsService {
     final insertedProfessionalId = row['professional_profile_id'] as String?;
     final insertedEventId = row['event_id'] as String?;
     String? contextName;
+    String? communityName;
+    String? communityImageUrl;
     if (insertedBusinessId != null) {
       contextName =
           (await _fetchBusinessNames([insertedBusinessId]))[insertedBusinessId];
@@ -690,8 +794,10 @@ class CommunityNewsService {
       contextName =
           (await _fetchEventTitles([insertedEventId]))[insertedEventId];
     } else if (insertedCommunityId != null) {
-      contextName =
-          (await _fetchCommunityNames([insertedCommunityId]))[insertedCommunityId];
+      communityName = (await _fetchCommunityNames([insertedCommunityId]))[
+          insertedCommunityId];
+      communityImageUrl = (await _fetchCommunityImages([insertedCommunityId]))[
+          insertedCommunityId];
     }
 
     final post = CommunityNewsPost(
@@ -701,6 +807,9 @@ class CommunityNewsService {
       authorName: authorNames[me.id] ?? 'FirstVue member',
       authorUsername: authorUsernames[me.id],
       businessName: contextName,
+      communityId: insertedCommunityId,
+      communityName: communityName,
+      communityImageUrl: communityImageUrl,
       createdAt: DateTime.parse(row['created_at'] as String),
       isMine: true,
       sparkCount: 0,
@@ -748,7 +857,7 @@ class CommunityNewsService {
             .limit(limit),
       );
 
-      return await _mapPostRows(rows, currentUserId: me);
+      return _mapPostRows(rows, currentUserId: me);
     } catch (_) {
       return const [];
     }
@@ -767,7 +876,7 @@ class CommunityNewsService {
             .order('created_at', ascending: false)
             .limit(limit),
       );
-      return await _mapPostRows(rows, currentUserId: me);
+      return _mapPostRows(rows, currentUserId: me);
     } catch (_) {
       return const [];
     }
@@ -786,7 +895,7 @@ class CommunityNewsService {
             .order('created_at', ascending: false)
             .limit(limit),
       );
-      return await _mapPostRows(rows, currentUserId: me);
+      return _mapPostRows(rows, currentUserId: me);
     } catch (_) {
       return const [];
     }
@@ -805,7 +914,51 @@ class CommunityNewsService {
             .order('created_at', ascending: false)
             .limit(limit),
       );
-      return await _mapPostRows(rows, currentUserId: me);
+      return _mapPostRows(rows, currentUserId: me);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<List<CommunityNewsPost>> fetchPostsForCommunity(
+    String communityId, {
+    int limit = 20,
+  }) async {
+    if (communityId.trim().isEmpty) return const [];
+    final me = _client.auth.currentUser?.id;
+    try {
+      final rows = await _selectPosts(
+        (query) => query
+            .eq('community_id', communityId)
+            .order('created_at', ascending: false)
+            .limit(limit),
+      );
+      return _mapPostRows(rows, currentUserId: me);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Posts from communities the signed-in user joined or follows.
+  /// Separate from the broad Home News Feed (`fetchPosts`).
+  static Future<List<CommunityNewsPost>> fetchCommunityFeed({
+    int limit = 20,
+  }) async {
+    final me = _client.auth.currentUser?.id;
+    if (me == null) return const [];
+
+    try {
+      final communityIds =
+          await CommunityService.fetchMyCommunityFeedIds();
+      if (communityIds.isEmpty) return const [];
+
+      final rows = await _selectPosts(
+        (query) => query
+            .inFilter('community_id', communityIds.toList())
+            .order('created_at', ascending: false)
+            .limit(limit),
+      );
+      return _mapPostRows(rows, currentUserId: me);
     } catch (_) {
       return const [];
     }
@@ -956,30 +1109,12 @@ class CommunityNewsService {
 
       final profiles = await _client
           .from('profiles')
-          .select('id, display_name, username')
+          .select('id, display_name, username, avatar_url')
           .inFilter('id', ids);
 
       final byId = {
         for (final row in profiles) row['id'] as String: row,
       };
-
-      // Avatars are in profile_media, not profiles.avatar_url.
-      final avatarById = <String, String>{};
-      try {
-        final mediaRows = await _client
-            .from('profile_media')
-            .select('profile_id, storage_path')
-            .inFilter('profile_id', ids)
-            .eq('media_role', 'avatar');
-        for (final row in mediaRows) {
-          final profileId = row['profile_id'] as String?;
-          final path = row['storage_path'] as String?;
-          if (profileId == null || path == null || path.isEmpty) continue;
-          avatarById[profileId] = path;
-        }
-      } catch (_) {
-        // profile_media / media_role may be missing on older DBs.
-      }
 
       return ids.map((id) {
         final row = byId[id];
@@ -990,7 +1125,7 @@ class CommunityNewsService {
           id: id,
           displayName: (row['display_name'] as String?) ?? 'FirstVue member',
           username: row['username'] as String?,
-          avatarUrl: avatarById[id],
+          avatarUrl: row['avatar_url'] as String?,
         );
       }).toList();
     } catch (_) {
