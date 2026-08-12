@@ -10,6 +10,8 @@ import 'community_news_post_card.dart';
 import 'community_news_post_detail_sheet.dart';
 import 'feed_comments_sheet.dart';
 import 'media_picker_sheet.dart';
+import 'local_media_thumbnail.dart';
+import 'profile_photo_actions.dart';
 import 'profile_recent_activity_section.dart';
 
 enum EntityFeedScope { user, business, professional, event }
@@ -288,8 +290,44 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
           if (_attachedMedia.isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(
-              '${_attachedMedia.length} file${_attachedMedia.length == 1 ? '' : 's'} attached',
+              '${_attachedMedia.length} file${_attachedMedia.length == 1 ? '' : 's'} attached — tap to change',
               style: const TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 72,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _attachedMedia.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final file = _attachedMedia[index];
+                  return LocalMediaThumbnail(
+                    file: file,
+                    size: 72,
+                    onTap: () async {
+                      final next = await runAttachedMediaEditFlow(
+                        context,
+                        current: file,
+                      );
+                      if (!mounted) return;
+                      setState(() {
+                        if (next == null) {
+                          _attachedMedia = [
+                            for (var i = 0; i < _attachedMedia.length; i++)
+                              if (i != index) _attachedMedia[i],
+                          ];
+                        } else {
+                          _attachedMedia = [
+                            for (var i = 0; i < _attachedMedia.length; i++)
+                              if (i == index) next else _attachedMedia[i],
+                          ];
+                        }
+                      });
+                    },
+                  );
+                },
+              ),
             ),
           ],
           const SizedBox(height: 10),
@@ -299,7 +337,7 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
                 onPressed: _posting ? null : _pickMedia,
                 icon: const Icon(Icons.add_photo_alternate_outlined),
                 color: FirstVueColors.teal,
-                tooltip: 'Add photo or video',
+                tooltip: 'Add or change photo or video',
               ),
               const Spacer(),
               FilledButton(

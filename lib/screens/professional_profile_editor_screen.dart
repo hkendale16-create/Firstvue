@@ -3,6 +3,7 @@ import '../navigation/firstvue_page_route.dart';
 import '../widgets/editable_media_grid.dart';
 import '../widgets/entity_profile_media_editor.dart';
 import '../widgets/media_picker_sheet.dart';
+import '../widgets/profile_photo_actions.dart';
 
 import '../services/professional_media_service.dart';
 import '../services/professional_profiles_service.dart';
@@ -120,22 +121,50 @@ class _ProfessionalProfileEditorScreenState
       _showMessage('Save your profile before adding photos.');
       return;
     }
-    final files = await showImagePickerSheet(context);
-    if (files == null || files.isEmpty || !mounted) return;
-    setState(() => _profileMediaUpdating = true);
-    try {
-      await ProfessionalMediaService.setCover(
-        professionalProfileId: profile.id,
-        file: files.first,
-      );
-      _profileImages =
-          await ProfessionalMediaService.fetchProfileImages(profile.id);
-      if (mounted) _showMessage('Cover photo updated.');
-    } catch (_) {
-      if (mounted) _showMessage('Unable to update cover photo.');
-    } finally {
-      if (mounted) setState(() => _profileMediaUpdating = false);
-    }
+    if (_profileMediaUpdating) return;
+    final existing = _profileImages.cover;
+    await runProfilePhotoEditFlow(
+      context: context,
+      kindLabel: 'cover photo',
+      hasExisting: existing != null,
+      existingUrl: existing?.signedUrl,
+      existingIsVideo: existing?.isVideo ?? false,
+      onChange: (file) async {
+        setState(() => _profileMediaUpdating = true);
+        try {
+          await ProfessionalMediaService.setCover(
+            professionalProfileId: profile.id,
+            file: file,
+          );
+          _profileImages =
+              await ProfessionalMediaService.fetchProfileImages(profile.id);
+          if (mounted) {
+            setState(() {});
+            _showMessage('Cover photo updated.');
+          }
+        } catch (_) {
+          if (mounted) _showMessage('Unable to update cover photo.');
+        } finally {
+          if (mounted) setState(() => _profileMediaUpdating = false);
+        }
+      },
+      onRemove: () async {
+        setState(() => _profileMediaUpdating = true);
+        try {
+          await ProfessionalMediaService.removeCover(profile.id);
+          _profileImages =
+              await ProfessionalMediaService.fetchProfileImages(profile.id);
+          if (mounted) {
+            setState(() {});
+            _showMessage('Cover photo removed.');
+          }
+        } catch (_) {
+          if (mounted) _showMessage('Unable to remove cover photo.');
+        } finally {
+          if (mounted) setState(() => _profileMediaUpdating = false);
+        }
+      },
+    );
   }
 
   Future<void> _changeAvatar() async {
@@ -144,22 +173,51 @@ class _ProfessionalProfileEditorScreenState
       _showMessage('Save your profile before adding photos.');
       return;
     }
-    final files = await showImagePickerSheet(context);
-    if (files == null || files.isEmpty || !mounted) return;
-    setState(() => _profileMediaUpdating = true);
-    try {
-      await ProfessionalMediaService.setAvatar(
-        professionalProfileId: profile.id,
-        file: files.first,
-      );
-      _profileImages =
-          await ProfessionalMediaService.fetchProfileImages(profile.id);
-      if (mounted) _showMessage('Profile photo updated.');
-    } catch (_) {
-      if (mounted) _showMessage('Unable to update profile photo.');
-    } finally {
-      if (mounted) setState(() => _profileMediaUpdating = false);
-    }
+    if (_profileMediaUpdating) return;
+    final existing = _profileImages.avatar;
+    await runProfilePhotoEditFlow(
+      context: context,
+      kindLabel: 'profile photo',
+      hasExisting: existing != null,
+      existingUrl: existing?.signedUrl,
+      existingIsVideo: existing?.isVideo ?? false,
+      allowVideo: true,
+      onChange: (file) async {
+        setState(() => _profileMediaUpdating = true);
+        try {
+          await ProfessionalMediaService.setAvatar(
+            professionalProfileId: profile.id,
+            file: file,
+          );
+          _profileImages =
+              await ProfessionalMediaService.fetchProfileImages(profile.id);
+          if (mounted) {
+            setState(() {});
+            _showMessage('Profile photo updated.');
+          }
+        } catch (_) {
+          if (mounted) _showMessage('Unable to update profile photo.');
+        } finally {
+          if (mounted) setState(() => _profileMediaUpdating = false);
+        }
+      },
+      onRemove: () async {
+        setState(() => _profileMediaUpdating = true);
+        try {
+          await ProfessionalMediaService.removeAvatar(profile.id);
+          _profileImages =
+              await ProfessionalMediaService.fetchProfileImages(profile.id);
+          if (mounted) {
+            setState(() {});
+            _showMessage('Profile photo removed.');
+          }
+        } catch (_) {
+          if (mounted) _showMessage('Unable to remove profile photo.');
+        } finally {
+          if (mounted) setState(() => _profileMediaUpdating = false);
+        }
+      },
+    );
   }
 
   Future<void> _addMedia() async {
@@ -258,6 +316,7 @@ class _ProfessionalProfileEditorScreenState
                     EntityProfileMediaEditor(
                       avatarUrl: _profileImages.avatar?.signedUrl,
                       coverUrl: _profileImages.cover?.signedUrl,
+                      avatarIsVideo: _profileImages.avatar?.isVideo ?? false,
                       updating: _profileMediaUpdating,
                       placeholderIcon: Icons.badge_outlined,
                       onChangeCover: _changeCover,
