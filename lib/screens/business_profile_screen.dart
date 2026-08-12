@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/firstvue_theme.dart';
 
 import '../services/saved_businesses_store.dart';
 
@@ -63,14 +64,14 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
 
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             expandedHeight: 280,
             pinned: true,
-            backgroundColor: const Color(0xFF080B0F),
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
 
             leading: Container(
               margin: const EdgeInsets.all(8),
@@ -362,7 +363,7 @@ class _PrototypeRoutePreview extends StatelessWidget {
       child: Container(
         height: 186,
         decoration: BoxDecoration(
-          color: const Color(0xFF10151B),
+          color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
           border: Border.all(
             color: const Color(0xFFD8B56A).withValues(alpha: .2),
           ),
@@ -555,7 +556,7 @@ class ServiceRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
       decoration: BoxDecoration(
-        color: const Color(0xFF10151B),
+        color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: Colors.white.withValues(alpha: .06)),
       ),
@@ -594,7 +595,7 @@ class ReviewCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF10151B),
+        color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
         borderRadius: BorderRadius.circular(17),
         border: Border.all(color: Colors.white.withValues(alpha: .06)),
       ),

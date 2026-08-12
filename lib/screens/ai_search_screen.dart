@@ -34,10 +34,10 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFF080B0F),
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(
       title: const Text('ASK FIRSTVUE'),
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     ),
     body: Padding(
       padding: const EdgeInsets.all(20),

@@ -17,6 +17,7 @@ class FirstVueBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final fv = context.fv;
 
     return SizedBox(
       height: 78 + bottomInset,
@@ -28,9 +29,9 @@ class FirstVueBottomNav extends StatelessWidget {
             height: 68 + bottomInset,
             padding: EdgeInsets.only(bottom: bottomInset),
             decoration: BoxDecoration(
-              color: FirstVueColors.background.withValues(alpha: .96),
+              color: fv.navBar.withValues(alpha: .96),
               border: Border(
-                top: BorderSide(color: Colors.white.withValues(alpha: .06)),
+                top: BorderSide(color: fv.divider),
               ),
             ),
             child: Row(
@@ -103,7 +104,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? selectedColor : FirstVueColors.mutedIcon;
+    final color = selected ? selectedColor : context.fv.mutedIcon;
 
     return Expanded(
       child: InkWell(
@@ -137,6 +138,7 @@ class _VueCenterTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -151,7 +153,7 @@ class _VueCenterTab extends StatelessWidget {
               height: 64,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: FirstVueColors.background,
+                color: fv.background,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: selected
@@ -190,7 +192,7 @@ class _VueCenterTab extends StatelessWidget {
             Text(
               'VUE',
               style: TextStyle(
-                color: selected ? FirstVueColors.gold : FirstVueColors.mutedIcon,
+                color: selected ? FirstVueColors.gold : fv.mutedIcon,
                 fontSize: 9,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.1,

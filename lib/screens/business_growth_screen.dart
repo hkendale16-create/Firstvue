@@ -70,10 +70,10 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: FirstVueColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('FIRSTVUE FOR BUSINESS'),
-        backgroundColor: FirstVueColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         actions: [
           IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
         ],

@@ -16,6 +16,7 @@ import '../screens/my_businesses_screen.dart';
 import '../screens/my_professional_profile_view_screen.dart';
 import '../screens/rental_inquiries_screen.dart';
 import '../screens/rentals_screen.dart';
+import '../screens/appearance_settings_screen.dart';
 import '../screens/settings_preferences_screen.dart';
 import '../services/admin_auth_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -78,9 +79,10 @@ class _FirstVueSettingsDrawerState extends State<FirstVueSettingsDrawer> {
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
+    final fv = context.fv;
 
     return Drawer(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: fv.background,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.horizontal(left: Radius.circular(20)),
       ),
@@ -103,7 +105,7 @@ class _FirstVueSettingsDrawerState extends State<FirstVueSettingsDrawer> {
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close, color: Colors.white54),
+                  icon: Icon(Icons.close, color: fv.tertiaryText),
                 ),
               ],
             ),
@@ -174,6 +176,12 @@ class _FirstVueSettingsDrawerState extends State<FirstVueSettingsDrawer> {
               title: 'Preferences',
               children: [
                 _SettingsTile(
+                  icon: Icons.palette_outlined,
+                  title: 'Appearance',
+                  subtitle: 'Light, Dark, or System Default',
+                  onTap: () => _open(const AppearanceSettingsScreen()),
+                ),
+                _SettingsTile(
                   icon: Icons.tune_outlined,
                   title: 'Location & notifications',
                   subtitle: 'City, alerts & floating messages bubble',
@@ -243,8 +251,8 @@ class _FirstVueSettingsDrawerState extends State<FirstVueSettingsDrawer> {
                   icon: const Icon(Icons.logout, size: 18),
                   label: const Text('Sign out'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white70,
-                    side: BorderSide(color: Colors.white.withValues(alpha: .2)),
+                    foregroundColor: fv.secondaryText,
+                    side: BorderSide(color: fv.borderSubtle),
                   ),
                 ),
               ),
@@ -268,6 +276,7 @@ class _SettingsGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
       child: Column(
@@ -278,7 +287,7 @@ class _SettingsGroup extends StatelessWidget {
             child: Text(
               title.toUpperCase(),
               style: TextStyle(
-                color: titleColor ?? Colors.white54,
+                color: titleColor ?? fv.tertiaryText,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.2,
                 fontSize: 12,
@@ -287,9 +296,9 @@ class _SettingsGroup extends StatelessWidget {
           ),
           Container(
             decoration: BoxDecoration(
-              color: const Color(0xFF10151B),
+              color: fv.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withValues(alpha: .07)),
+              border: Border.all(color: fv.borderSubtle),
             ),
             child: Column(
               children: [
@@ -299,7 +308,7 @@ class _SettingsGroup extends StatelessWidget {
                     Divider(
                       height: 1,
                       indent: 56,
-                      color: Colors.white.withValues(alpha: .08),
+                      color: fv.divider,
                     ),
                 ],
               ],
@@ -326,6 +335,7 @@ class _SettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -343,8 +353,8 @@ class _SettingsTile extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: fv.primaryText,
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                       ),
@@ -353,8 +363,8 @@ class _SettingsTile extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         subtitle!,
-                        style: const TextStyle(
-                          color: Colors.white54,
+                        style: TextStyle(
+                          color: fv.secondaryText,
                           fontSize: 12,
                         ),
                       ),
@@ -363,7 +373,7 @@ class _SettingsTile extends StatelessWidget {
                 ),
               ),
               if (onTap != null)
-                const Icon(Icons.chevron_right, color: Colors.white38, size: 20),
+                Icon(Icons.chevron_right, color: fv.tertiaryText, size: 20),
             ],
           ),
         ),

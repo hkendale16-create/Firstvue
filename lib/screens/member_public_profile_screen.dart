@@ -394,9 +394,9 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF080B0F),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         foregroundColor: Colors.white,
         title: Text(_title, style: const TextStyle(fontSize: 16)),
       ),
@@ -491,7 +491,7 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10151B),
+                  color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.white.withValues(alpha: .08)),
                 ),

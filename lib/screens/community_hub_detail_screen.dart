@@ -455,9 +455,9 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
     final hub = _hub;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF080B0F),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         foregroundColor: Colors.white,
         title: Text(hub?.name ?? 'Community'),
         actions: [

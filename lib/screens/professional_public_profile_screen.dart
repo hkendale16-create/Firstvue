@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/firstvue_theme.dart';
 import 'package:flutter/services.dart';
 
 import '../services/professional_media_service.dart';
@@ -54,9 +55,9 @@ class _ProfessionalPublicProfileScreenState
     ].where((part) => part.isNotEmpty).join(', ');
 
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF080B0F),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         foregroundColor: Colors.white,
         title: Text(profile.displayName, style: const TextStyle(fontSize: 16)),
       ),
@@ -136,7 +137,7 @@ class _ProfessionalPublicProfileScreenState
                                 vertical: 9,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF151B22),
+                                color: Theme.of(context).extension<FirstVuePalette>()?.elevatedSurface ?? FirstVueColors.elevatedSurface,
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                   color: const Color(
@@ -159,7 +160,7 @@ class _ProfessionalPublicProfileScreenState
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF10151B),
+                      color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
                         color:
@@ -339,7 +340,7 @@ class _ProfessionalPublicProfileScreenState
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF10151B),
+                      color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
                         color: Colors.white.withValues(alpha: .08),
@@ -463,7 +464,7 @@ class _ShowcaseCard extends StatelessWidget {
     margin: const EdgeInsets.only(bottom: 10),
     padding: const EdgeInsets.all(15),
     decoration: BoxDecoration(
-      color: const Color(0xFF10151B),
+      color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: Colors.white.withValues(alpha: .08)),
     ),
@@ -500,7 +501,7 @@ class _CatalogCard extends StatelessWidget {
     margin: const EdgeInsets.only(bottom: 10),
     clipBehavior: Clip.antiAlias,
     decoration: BoxDecoration(
-      color: const Color(0xFF10151B),
+      color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: Colors.white.withValues(alpha: .08)),
     ),
