@@ -9,6 +9,7 @@ import '../models/post_identity.dart';
 import '../services/community_news_service.dart';
 import '../services/post_identity_service.dart';
 import '../services/post_identity_store.dart';
+import '../services/interaction_preferences_service.dart';
 import '../services/repost_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../utils/app_environment.dart';
@@ -115,12 +116,16 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     });
     try {
       final posts = await CommunityNewsService.fetchPosts();
-      final reposted = await RepostService.fetchMyRepostedIds(
-        posts.map((p) => p.id).toList(),
-      );
+      final postIds = posts.map((p) => p.id).toList();
+      final reposted = await RepostService.fetchMyRepostedIds(postIds);
+      final repostCounts = await RepostService.fetchRepostCounts(postIds);
       if (!mounted) return;
       setState(() {
-        _posts = posts;
+        _posts = posts
+            .map(
+              (p) => p.copyWith(repostCount: repostCounts[p.id] ?? 0),
+            )
+            .toList();
         _repostedPostIds = reposted;
         _loadingPosts = false;
         _loadError = null;
@@ -286,9 +291,10 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     if (index < 0 || index >= _posts.length) return;
     final post = _posts[index];
     final previous = post;
+    final willSpark = !post.sparkedByMe;
     final optimistic = post.copyWith(
-      sparkedByMe: !post.sparkedByMe,
-      sparkCount: post.sparkCount + (post.sparkedByMe ? -1 : 1),
+      sparkedByMe: willSpark,
+      sparkCount: post.sparkCount + (willSpark ? 1 : -1),
     );
 
     setState(() {
@@ -297,6 +303,10 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
           if (i == index) optimistic else _posts[i],
       ];
     });
+
+    if (willSpark) {
+      await InteractionPreferencesService.playSparkFeedback(fromUserTap: true);
+    }
 
     try {
       final updated = await CommunityNewsService.toggleSpark(post);
@@ -338,6 +348,87 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     final post = _posts[index];
     final wasReposted = _repostedPostIds.contains(post.id);
 
+    if (!wasReposted) {
+      final action = await showModalBottomSheet<String>(
+        context: context,
+        backgroundColor: const Color(0xFF10151B),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.repeat, color: FirstVueColors.teal),
+                title: const Text('Repost', style: TextStyle(color: Colors.white)),
+                onTap: () => Navigator.pop(ctx, 'repost'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.edit_note, color: FirstVueColors.gold),
+                title: const Text(
+                  'Repost with comment',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () => Navigator.pop(ctx, 'comment'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (action == null || !mounted) return;
+
+      String? comment;
+      if (action == 'comment') {
+        comment = await _promptRepostComment();
+        if (comment == null) return;
+      }
+
+      await _applyRepost(index, post, wasReposted: false, comment: comment);
+      return;
+    }
+
+    await _applyRepost(index, post, wasReposted: true);
+  }
+
+  Future<String?> _promptRepostComment() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF10151B),
+        title: const Text('Add a comment'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 3,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Say something about this post…',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Repost'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
+  }
+
+  Future<void> _applyRepost(
+    int index,
+    CommunityNewsPost post, {
+    required bool wasReposted,
+    String? comment,
+  }) async {
     setState(() {
       if (wasReposted) {
         _repostedPostIds =
@@ -351,6 +442,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
       await RepostService.toggleRepost(
         post.id,
         currentlyReposted: wasReposted,
+        comment: comment,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

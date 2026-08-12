@@ -246,83 +246,48 @@ class FollowService {
   static Future<List<FollowProfile>> fetchFollowers(
     String profileId, {
     int limit = 50,
+    int offset = 0,
   }) async {
     if (profileId.trim().isEmpty) return const [];
-
-    try {
-      final rows = await _client
-          .from('profile_follows')
-          .select('follower_id, profiles!profile_follows_follower_id_fkey(id, display_name, username, avatar_url)')
-          .eq('following_id', profileId)
-          .limit(limit);
-
-      return rows.map((row) {
-        final profile = row['profiles'] as Map<String, dynamic>?;
-        if (profile != null) return FollowProfile.fromRow(profile);
-        return FollowProfile(
-          id: row['follower_id'] as String,
-          displayName: 'FirstVue member',
-        );
-      }).toList();
-    } catch (_) {
-      return _fetchFollowersFallback(profileId, limit: limit);
-    }
-  }
-
-  static Future<List<FollowProfile>> _fetchFollowersFallback(
-    String profileId, {
-    int limit = 50,
-  }) async {
-    try {
-      final rows = await _client
-          .from('profile_follows')
-          .select('follower_id')
-          .eq('following_id', profileId)
-          .limit(limit);
-      final ids = rows.map((r) => r['follower_id'] as String).toList();
-      return _fetchProfilesByIds(ids);
-    } catch (_) {
-      return const [];
-    }
+    return _fetchFollowProfiles(
+      profileId: profileId,
+      column: 'follower_id',
+      filterColumn: 'following_id',
+      limit: limit,
+      offset: offset,
+    );
   }
 
   static Future<List<FollowProfile>> fetchFollowing(
     String profileId, {
     int limit = 50,
+    int offset = 0,
   }) async {
     if (profileId.trim().isEmpty) return const [];
-
-    try {
-      final rows = await _client
-          .from('profile_follows')
-          .select('following_id, profiles!profile_follows_following_id_fkey(id, display_name, username, avatar_url)')
-          .eq('follower_id', profileId)
-          .limit(limit);
-
-      return rows.map((row) {
-        final profile = row['profiles'] as Map<String, dynamic>?;
-        if (profile != null) return FollowProfile.fromRow(profile);
-        return FollowProfile(
-          id: row['following_id'] as String,
-          displayName: 'FirstVue member',
-        );
-      }).toList();
-    } catch (_) {
-      return _fetchFollowingFallback(profileId, limit: limit);
-    }
+    return _fetchFollowProfiles(
+      profileId: profileId,
+      column: 'following_id',
+      filterColumn: 'follower_id',
+      limit: limit,
+      offset: offset,
+    );
   }
 
-  static Future<List<FollowProfile>> _fetchFollowingFallback(
-    String profileId, {
-    int limit = 50,
+  static Future<List<FollowProfile>> _fetchFollowProfiles({
+    required String profileId,
+    required String column,
+    required String filterColumn,
+    required int limit,
+    required int offset,
   }) async {
     try {
       final rows = await _client
           .from('profile_follows')
-          .select('following_id')
-          .eq('follower_id', profileId)
-          .limit(limit);
-      final ids = rows.map((r) => r['following_id'] as String).toList();
+          .select(column)
+          .eq(filterColumn, profileId)
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+      final ids = rows.map((row) => row[column] as String).toList();
       return _fetchProfilesByIds(ids);
     } catch (_) {
       return const [];
@@ -338,7 +303,11 @@ class FollowService {
           .from('profiles')
           .select('id, display_name, username, avatar_url')
           .inFilter('id', ids);
-      return rows.map(FollowProfile.fromRow).toList();
+      final byId = {
+        for (final row in rows)
+          row['id'] as String: FollowProfile.fromRow(row),
+      };
+      return ids.map((id) => byId[id]).whereType<FollowProfile>().toList();
     } catch (_) {
       return const [];
     }

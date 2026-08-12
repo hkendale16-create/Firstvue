@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/profile_media_service.dart';
+import '../services/profile_privacy_service.dart';
 import '../services/user_profile_service.dart';
 import '../services/username_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../utils/profile_video_validator.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/location_autocomplete_field.dart';
 import '../widgets/media_picker_sheet.dart';
-import '../widgets/signed_media_viewer.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -21,12 +22,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameController = TextEditingController();
   final _usernameController = TextEditingController();
   final _bioController = TextEditingController();
+  final _websiteController = TextEditingController();
   final _cityController = TextEditingController();
   final _stateController = TextEditingController();
+
   ProfileImageSet _images = const ProfileImageSet();
   bool _loading = true;
   bool _saving = false;
   bool _mediaUpdating = false;
+  bool _showEmailOnProfile = false;
   String? _error;
   String? _usernameError;
 
@@ -41,6 +45,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController.dispose();
     _usernameController.dispose();
     _bioController.dispose();
+    _websiteController.dispose();
     _cityController.dispose();
     _stateController.dispose();
     super.dispose();
@@ -63,6 +68,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       final profile = await UserProfileService.fetchProfile();
       final images = await ProfileMediaService.fetchProfileImages();
+      final showEmail = await ProfilePrivacyService.showEmailOnProfile();
       if (!mounted) return;
       _nameController.text =
           (profile?.displayName?.trim().isNotEmpty == true
@@ -72,10 +78,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           '';
       _usernameController.text = profile?.username ?? '';
       _bioController.text = profile?.bio ?? '';
+      _websiteController.text = profile?.website ?? '';
       _cityController.text = profile?.city ?? '';
       _stateController.text = profile?.state ?? '';
       setState(() {
         _images = images;
+        _showEmailOnProfile = showEmail;
         _loading = false;
       });
     } catch (_) {
@@ -128,7 +136,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         bio: _bioController.text,
         city: _cityController.text,
         state: _stateController.text,
+        website: _websiteController.text,
       );
+      await ProfilePrivacyService.setShowEmailOnProfile(_showEmailOnProfile);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -146,22 +156,41 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  Future<void> _changeAvatar() async {
-    final files = await showImagePickerSheet(context);
+  Future<void> _changeAvatar({required bool allowVideo}) async {
+    final files = allowVideo
+        ? await showMediaPickerSheet(context)
+        : await showImagePickerSheet(context);
     if (files == null || files.isEmpty || !mounted) return;
+
+    final validationError = await validateProfileVideoFile(files.first);
+    if (validationError != null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(validationError)),
+        );
+      }
+      return;
+    }
+
     setState(() => _mediaUpdating = true);
     try {
       await ProfileMediaService.setAvatar(files.first);
       _images = await ProfileMediaService.fetchProfileImages();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile photo updated.')),
+          SnackBar(
+            content: Text(
+              _images.avatar?.isVideo == true
+                  ? 'Profile video updated.'
+                  : 'Profile photo updated.',
+            ),
+          ),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to update profile photo.')),
+          const SnackBar(content: Text('Unable to update profile media.')),
         );
       }
     } finally {
@@ -192,14 +221,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  void _previewImage({required String? url, required bool isVideo, required String title}) {
-    if (url == null || url.isEmpty) return;
-    openSignedMedia(context, url: url, isVideo: isVideo, title: title);
-  }
-
   @override
   Widget build(BuildContext context) {
     final email = Supabase.instance.client.auth.currentUser?.email ?? '';
+    final handlePreview = _usernameController.text.trim();
 
     return Scaffold(
       backgroundColor: const Color(0xFF080B0F),
@@ -207,6 +232,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         backgroundColor: const Color(0xFF080B0F),
         foregroundColor: Colors.white,
         title: const Text('Edit profile'),
+        actions: [
+          TextButton(
+            onPressed: _saving || _mediaUpdating ? null : _save,
+            child: Text(
+              _saving ? 'Saving…' : 'Save',
+              style: const TextStyle(color: FirstVueColors.gold),
+            ),
+          ),
+        ],
       ),
       body: _loading
           ? const Center(
@@ -222,10 +256,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     Text(_error!, style: const TextStyle(color: FirstVueColors.coral)),
                     const SizedBox(height: 12),
                   ],
+                  _PreviewCard(
+                    name: _nameController.text,
+                    handle: handlePreview.isEmpty ? null : handlePreview,
+                    bio: _bioController.text,
+                    avatarUrl: _images.avatar?.signedUrl,
+                    avatarIsVideo: _images.avatar?.isVideo ?? false,
+                  ),
+                  const SizedBox(height: 20),
+                  _SectionHeader(title: 'Media'),
                   GestureDetector(
                     onTap: _mediaUpdating ? null : _changeCover,
                     child: Container(
-                      height: 140,
+                      height: 130,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16),
                         gradient: _images.cover == null
@@ -242,108 +285,79 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                       child: Align(
                         alignment: Alignment.bottomRight,
-                        child: Padding(
-                          padding: const EdgeInsets.all(10),
-                          child: TextButton.icon(
-                            onPressed: _mediaUpdating ? null : _changeCover,
-                            icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                            label: const Text('Cover'),
-                          ),
+                        child: TextButton.icon(
+                          onPressed: _mediaUpdating ? null : _changeCover,
+                          icon: const Icon(Icons.photo_camera_outlined, size: 18),
+                          label: const Text('Cover'),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
                   Row(
                     children: [
                       GestureDetector(
-                        onTap: _mediaUpdating ? null : _changeAvatar,
+                        onTap: _mediaUpdating ? null : () => _changeAvatar(allowVideo: true),
                         child: CircleAvatar(
-                          radius: 42,
+                          radius: 40,
                           backgroundColor: const Color(0xFF241D22),
-                          backgroundImage: _images.avatar != null
+                          backgroundImage: _images.avatar != null && !_images.avatar!.isVideo
                               ? NetworkImage(_images.avatar!.signedUrl)
                               : null,
                           child: _images.avatar == null
-                              ? const Icon(Icons.person, color: FirstVueColors.teal, size: 36)
-                              : null,
+                              ? const Icon(Icons.person, color: FirstVueColors.teal, size: 34)
+                              : (_images.avatar!.isVideo
+                                  ? const Icon(Icons.videocam, color: FirstVueColors.teal)
+                                  : null),
                         ),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             OutlinedButton(
-                              onPressed: _mediaUpdating ? null : _changeAvatar,
-                              child: const Text('Change photo'),
+                              onPressed: _mediaUpdating
+                                  ? null
+                                  : () => _changeAvatar(allowVideo: false),
+                              child: const Text('Photo'),
                             ),
-                            if (_images.avatar != null)
-                              TextButton(
-                                onPressed: () => _previewImage(
-                                  url: _images.avatar!.signedUrl,
-                                  isVideo: _images.avatar!.isVideo,
-                                  title: 'PROFILE PHOTO',
-                                ),
-                                child: const Text('Preview photo'),
-                              ),
+                            const SizedBox(height: 8),
+                            OutlinedButton(
+                              onPressed: _mediaUpdating
+                                  ? null
+                                  : () => _changeAvatar(allowVideo: true),
+                              child: Text('Video (≤${profileVideoMaxSeconds}s)'),
+                            ),
                           ],
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 24),
-                  TextField(
+                  _SectionHeader(title: 'Identity'),
+                  _field(
                     controller: _nameController,
-                    style: const TextStyle(color: Colors.white),
-                    textCapitalization: TextCapitalization.words,
-                    decoration: InputDecoration(
-                      labelText: 'Display name',
-                      labelStyle: const TextStyle(color: Colors.white54),
-                      filled: true,
-                      fillColor: FirstVueColors.surface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
+                    label: 'Display name',
+                    capitalization: TextCapitalization.words,
                   ),
                   const SizedBox(height: 12),
-                  TextField(
+                  _field(
                     controller: _usernameController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Username',
-                      hintText: 'your_handle',
-                      prefixText: '@',
-                      prefixStyle: const TextStyle(color: FirstVueColors.teal),
-                      labelStyle: const TextStyle(color: Colors.white54),
-                      errorText: _usernameError,
-                      filled: true,
-                      fillColor: FirstVueColors.surface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
+                    label: 'Username',
+                    hint: 'your_handle',
+                    prefix: '@',
+                    error: _usernameError,
+                    onChanged: (_) => setState(() {}),
                   ),
                   const SizedBox(height: 12),
-                  TextField(
+                  _field(
                     controller: _bioController,
-                    style: const TextStyle(color: Colors.white),
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      labelText: 'Bio',
-                      labelStyle: const TextStyle(color: Colors.white54),
-                      filled: true,
-                      fillColor: FirstVueColors.surface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
+                    label: 'Bio',
+                    maxLines: 4,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 24),
+                  _SectionHeader(title: 'Location & links'),
                   LocationAutocompleteField(
                     controller: _cityController,
                     label: 'City',
@@ -356,9 +370,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     type: LocationFieldType.state,
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    email,
-                    style: const TextStyle(color: Colors.white38, fontSize: 13),
+                  _field(
+                    controller: _websiteController,
+                    label: 'Website',
+                    hint: 'https://',
+                    keyboard: TextInputType.url,
+                  ),
+                  const SizedBox(height: 24),
+                  _SectionHeader(title: 'Privacy'),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                      'Show email on profile',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    subtitle: Text(
+                      email.isEmpty ? 'No email on file' : email,
+                      style: const TextStyle(color: Colors.white38, fontSize: 13),
+                    ),
+                    value: _showEmailOnProfile,
+                    activeThumbColor: FirstVueColors.gold,
+                    onChanged: (value) => setState(() => _showEmailOnProfile = value),
                   ),
                   const SizedBox(height: 28),
                   FilledButton(
@@ -373,6 +405,140 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _field({
+    required TextEditingController controller,
+    required String label,
+    String? hint,
+    String? prefix,
+    String? error,
+    int maxLines = 1,
+    TextCapitalization capitalization = TextCapitalization.none,
+    TextInputType keyboard = TextInputType.text,
+    ValueChanged<String>? onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      style: const TextStyle(color: Colors.white),
+      maxLines: maxLines,
+      keyboardType: keyboard,
+      textCapitalization: capitalization,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixText: prefix,
+        prefixStyle: const TextStyle(color: FirstVueColors.teal),
+        labelStyle: const TextStyle(color: Colors.white54),
+        errorText: error,
+        filled: true,
+        fillColor: FirstVueColors.surface,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          color: FirstVueColors.teal.withValues(alpha: .9),
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
+class _PreviewCard extends StatelessWidget {
+  final String name;
+  final String? handle;
+  final String bio;
+  final String? avatarUrl;
+  final bool avatarIsVideo;
+
+  const _PreviewCard({
+    required this.name,
+    this.handle,
+    required this.bio,
+    this.avatarUrl,
+    this.avatarIsVideo = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: FirstVueColors.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: const Color(0xFF241D22),
+            backgroundImage: avatarUrl != null && !avatarIsVideo
+                ? NetworkImage(avatarUrl!)
+                : null,
+            child: avatarUrl == null
+                ? const Icon(Icons.person, color: FirstVueColors.teal)
+                : (avatarIsVideo
+                    ? const Icon(Icons.videocam, color: FirstVueColors.teal, size: 20)
+                    : null),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name.trim().isEmpty ? 'Your name' : name.trim(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+                if (handle != null && handle!.isNotEmpty)
+                  Text(
+                    '@$handle',
+                    style: const TextStyle(color: FirstVueColors.teal, fontSize: 13),
+                  ),
+                if (bio.trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    bio.trim(),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: .65),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

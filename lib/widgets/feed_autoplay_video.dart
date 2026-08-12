@@ -38,7 +38,15 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
   bool _playing = false;
   bool _previewFinished = false;
   Timer? _previewTimer;
+  bool _muted = true;
   bool _isMostlyVisible = false;
+
+  void _toggleMute() {
+    final controller = _controller;
+    if (controller == null || !_ready) return;
+    setState(() => _muted = !_muted);
+    controller.setVolume(_muted ? 0 : 1);
+  }
 
   @override
   void initState() {
@@ -63,7 +71,7 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
     try {
       await controller.initialize();
       await controller.setLooping(true);
-      await controller.setVolume(0);
+      await controller.setVolume(_muted ? 0 : 1);
       if (!mounted || _controller != controller) {
         await controller.dispose();
         return;
@@ -219,6 +227,30 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
                   _previewFinished ? Icons.replay_rounded : Icons.play_arrow_rounded,
                   color: Colors.white,
                   size: 36,
+                ),
+              ),
+            ),
+          ),
+        if (_playing && !_previewFinished)
+          Positioned(
+            right: 8,
+            bottom: 8,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _toggleMute,
+                borderRadius: BorderRadius.circular(999),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: .55),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  ),
                 ),
               ),
             ),

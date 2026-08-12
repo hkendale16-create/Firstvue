@@ -1,6 +1,8 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'user_profile_service.dart';
+
 class UserPreferences {
   final String? locationCity;
   final String? locationState;
@@ -55,24 +57,33 @@ class UserPreferencesService {
         final row = await _client
             .from('user_preferences')
             .select(
-              'location_city, location_state, notifications_enabled, floating_bubble_visible',
+              'preferred_city, preferred_state, push_messages, show_floating_messages',
             )
-            .eq('user_id', user.id)
+            .eq('profile_id', user.id)
             .maybeSingle();
 
         if (row != null) {
           final prefs = UserPreferences(
-            locationCity: row['location_city'] as String?,
-            locationState: row['location_state'] as String?,
-            notificationsEnabled:
-                row['notifications_enabled'] as bool? ?? true,
+            locationCity: row['preferred_city'] as String?,
+            locationState: row['preferred_state'] as String?,
+            notificationsEnabled: row['push_messages'] as bool? ?? true,
             floatingBubbleVisible:
-                row['floating_bubble_visible'] as bool? ?? true,
+                row['show_floating_messages'] as bool? ?? true,
           );
           await _cacheLocally(prefs);
           return prefs;
         }
       } catch (_) {}
+
+      final profile = await UserProfileService.fetchProfile();
+      if (profile?.city != null || profile?.state != null) {
+        final prefs = UserPreferences(
+          locationCity: profile?.city,
+          locationState: profile?.state,
+        );
+        await _cacheLocally(prefs);
+        return prefs;
+      }
     }
 
     return _fetchFromLocal();
@@ -124,9 +135,9 @@ class UserPreferencesService {
 
     try {
       await _client.from('user_preferences').upsert({
-        'user_id': user.id,
-        'location_city': trimmedCity,
-        'location_state': trimmedState,
+        'profile_id': user.id,
+        'preferred_city': trimmedCity,
+        'preferred_state': trimmedState,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
     } catch (_) {}
@@ -141,8 +152,8 @@ class UserPreferencesService {
 
     try {
       await _client.from('user_preferences').upsert({
-        'user_id': user.id,
-        'notifications_enabled': enabled,
+        'profile_id': user.id,
+        'push_messages': enabled,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
     } catch (_) {}
@@ -157,8 +168,8 @@ class UserPreferencesService {
 
     try {
       await _client.from('user_preferences').upsert({
-        'user_id': user.id,
-        'floating_bubble_visible': visible,
+        'profile_id': user.id,
+        'show_floating_messages': visible,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
     } catch (_) {}

@@ -28,6 +28,7 @@ class CommunityNewsPost {
   final int sparkCount;
   final bool sparkedByMe;
   final bool savedByMe;
+  final int repostCount;
   final List<CommunityNewsMediaItem> media;
 
   const CommunityNewsPost({
@@ -42,6 +43,7 @@ class CommunityNewsPost {
     required this.sparkCount,
     required this.sparkedByMe,
     required this.savedByMe,
+    this.repostCount = 0,
     this.media = const [],
   });
 
@@ -59,6 +61,7 @@ class CommunityNewsPost {
     int? sparkCount,
     bool? sparkedByMe,
     bool? savedByMe,
+    int? repostCount,
     List<CommunityNewsMediaItem>? media,
   }) {
     return CommunityNewsPost(
@@ -73,6 +76,7 @@ class CommunityNewsPost {
       sparkCount: sparkCount ?? this.sparkCount,
       sparkedByMe: sparkedByMe ?? this.sparkedByMe,
       savedByMe: savedByMe ?? this.savedByMe,
+      repostCount: repostCount ?? this.repostCount,
       media: media ?? this.media,
     );
   }
@@ -602,6 +606,62 @@ class CommunityNewsService {
       sparkCount: post.sparkCount + 1,
     );
   }
+
+  static Future<List<SparkUser>> fetchSparkUsers(
+    String postId, {
+    int limit = 30,
+    int offset = 0,
+  }) async {
+    if (postId.trim().isEmpty) return const [];
+    try {
+      final rows = await _client
+          .from('community_news_post_sparks')
+          .select('user_id')
+          .eq('post_id', postId)
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+      final ids = rows.map((row) => row['user_id'] as String).toList();
+      if (ids.isEmpty) return const [];
+
+      final profiles = await _client
+          .from('profiles')
+          .select('id, display_name, username, avatar_url')
+          .inFilter('id', ids);
+
+      final byId = {
+        for (final row in profiles) row['id'] as String: row,
+      };
+
+      return ids.map((id) {
+        final row = byId[id];
+        if (row == null) {
+          return SparkUser(id: id, displayName: 'FirstVue member');
+        }
+        return SparkUser(
+          id: id,
+          displayName: (row['display_name'] as String?) ?? 'FirstVue member',
+          username: row['username'] as String?,
+          avatarUrl: row['avatar_url'] as String?,
+        );
+      }).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+}
+
+class SparkUser {
+  final String id;
+  final String displayName;
+  final String? username;
+  final String? avatarUrl;
+
+  const SparkUser({
+    required this.id,
+    required this.displayName,
+    this.username,
+    this.avatarUrl,
+  });
 }
 
 class CommunityNewsMediaUploadException implements Exception {

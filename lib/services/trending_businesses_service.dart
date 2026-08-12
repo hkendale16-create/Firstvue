@@ -52,17 +52,15 @@ class TrendingBusinessesService {
   }
 
   static Future<List<TrendingBusiness>> fetchNewNearYou({int limit = 8}) async {
-    final rows = await _client
-        .from('businesses')
-        .select(
-          'id, name, services, verification_status, average_rating, '
-          'popularity_score, demand_score, available_today, created_at, '
-          'business_locations(latitude, longitude, city)',
-        )
-        .eq('status', 'approved')
-        .order('created_at', ascending: false)
-        .limit(limit * 2);
-    return _mapRowsWithLocation(rows, limit);
+    try {
+      final rows = await _fetchBusinessRows(
+        limit: limit,
+        orderByCreatedAt: true,
+      );
+      return _mapRowsWithLocation(rows, limit);
+    } catch (_) {
+      return const [];
+    }
   }
 
   static Future<List<TrendingBusiness>> fetchRecommendedNearYou({
@@ -110,19 +108,58 @@ class TrendingBusinessesService {
     required int limit,
     required bool orderByPopularity,
   }) async {
-    final rows = await _client
-        .from('businesses')
-        .select(
-          'id, name, services, verification_status, average_rating, '
-          'popularity_score, demand_score, available_today, '
-          'business_locations(latitude, longitude, city)',
-        )
-        .eq('status', 'approved')
-        .order('popularity_score', ascending: false)
-        .order('demand_score', ascending: false)
-        .limit(limit * 2);
+    try {
+      final rows = await _fetchBusinessRows(
+        limit: limit,
+        orderByPopularity: orderByPopularity,
+      );
+      return _mapRowsWithLocation(rows, limit);
+    } catch (_) {
+      return const [];
+    }
+  }
 
-    return _mapRowsWithLocation(rows, limit);
+  static const _businessSelect =
+      'id, name, services, verification_status, average_rating, '
+      'available_today, created_at, '
+      'business_locations(latitude, longitude, city)';
+
+  static const _businessSelectRanked =
+      'id, name, services, verification_status, average_rating, '
+      'popularity_score, demand_score, available_today, created_at, '
+      'business_locations(latitude, longitude, city)';
+
+  static Future<List<dynamic>> _fetchBusinessRows({
+    required int limit,
+    bool orderByPopularity = false,
+    bool orderByCreatedAt = false,
+  }) async {
+    try {
+      final base = _client
+          .from('businesses')
+          .select(_businessSelectRanked)
+          .eq('status', 'approved');
+      if (orderByCreatedAt) {
+        return await base
+            .order('created_at', ascending: false)
+            .limit(limit * 2);
+      }
+      return await base
+          .order('popularity_score', ascending: false)
+          .order('demand_score', ascending: false)
+          .limit(limit * 2);
+    } catch (_) {
+      final base = _client
+          .from('businesses')
+          .select(_businessSelect)
+          .eq('status', 'approved');
+      if (orderByCreatedAt || orderByPopularity) {
+        return await base
+            .order('created_at', ascending: false)
+            .limit(limit * 2);
+      }
+      return await base.limit(limit * 2);
+    }
   }
 
   static Future<List<TrendingBusiness>> _mapRowsWithLocation(
@@ -168,8 +205,10 @@ class TrendingBusinessesService {
 
     final businesses = <TrendingBusiness>[];
     for (final row in topRows) {
-      final business = await _mapRowToTrendingBusiness(row, position);
-      if (business != null) businesses.add(business);
+      try {
+        final business = await _mapRowToTrendingBusiness(row, position);
+        if (business != null) businesses.add(business);
+      } catch (_) {}
     }
     return businesses;
   }
@@ -186,21 +225,28 @@ class TrendingBusinessesService {
         .eq('business_id', businessId)
         .eq('status', 'approved');
 
-    final mediaRow = await _client
-        .from('business_media')
-        .select('storage_path, thumbnail_path, storage_provider, media_type')
-        .eq('business_id', businessId)
-        .eq('featured_for_trending', true)
-        .maybeSingle();
+    Map<String, dynamic>? fallbackMediaRow;
+    try {
+      final mediaRow = await _client
+          .from('business_media')
+          .select('storage_path, thumbnail_path, storage_provider, media_type')
+          .eq('business_id', businessId)
+          .eq('featured_for_trending', true)
+          .maybeSingle();
 
-    final fallbackMediaRow = mediaRow ??
-        await _client
-            .from('business_media')
-            .select('storage_path, thumbnail_path, storage_provider, media_type')
-            .eq('business_id', businessId)
-            .order('created_at', ascending: false)
-            .limit(1)
-            .maybeSingle();
+      fallbackMediaRow = mediaRow ??
+          await _client
+              .from('business_media')
+              .select(
+                'storage_path, thumbnail_path, storage_provider, media_type',
+              )
+              .eq('business_id', businessId)
+              .order('created_at', ascending: false)
+              .limit(1)
+              .maybeSingle();
+    } catch (_) {
+      fallbackMediaRow = null;
+    }
 
     String? imageUrl;
     var featuredIsVideo = false;

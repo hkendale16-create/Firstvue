@@ -136,9 +136,9 @@ class SearchAutocompleteService {
     try {
       final rows = await _client
           .from('hashtags')
-          .select('id, tag, post_count')
+          .select('id, tag, use_count')
           .ilike('tag', '$tag%')
-          .order('post_count', ascending: false)
+          .order('use_count', ascending: false)
           .limit(6);
 
       return rows
@@ -146,7 +146,7 @@ class SearchAutocompleteService {
             (row) => SearchAutocompleteResult(
               id: row['id'] as String,
               label: '#${row['tag']}',
-              subtitle: '${row['post_count'] ?? 0} posts',
+              subtitle: '${row['use_count'] ?? 0} posts',
               type: SearchResultType.hashtag,
             ),
           )

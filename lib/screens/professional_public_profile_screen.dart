@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../services/professional_media_service.dart';
 import '../services/professional_profiles_service.dart';
 import '../services/professional_showcase_service.dart';
+import '../widgets/firstvue_inline_search_bar.dart';
 
 class ProfessionalPublicProfileScreen extends StatelessWidget {
   final ProfessionalProfile profile;
@@ -106,6 +107,11 @@ class ProfessionalPublicProfileScreen extends StatelessWidget {
                       ],
                     ),
                   ],
+                  const SizedBox(height: 18),
+                  const FirstVueInlineSearchBar(
+                    padding: EdgeInsets.zero,
+                    hintText: 'Search professionals, events, #tags…',
+                  ),
                   const SizedBox(height: 28),
                   const _ProfileHeading('ABOUT'),
                   const SizedBox(height: 10),

@@ -12,6 +12,7 @@ import '../services/messaging_service.dart';
 import '../widgets/profile_recent_activity_section.dart';
 import '../widgets/social_platform_icon.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/firstvue_inline_search_bar.dart';
 import 'auth_screen.dart';
 import 'conversation_screen.dart';
 import 'meet_the_owner_screen.dart';
@@ -231,6 +232,11 @@ class _BusinessProfileContent extends StatelessWidget {
                     color: Color(0xFFD8B56A),
                     fontWeight: FontWeight.w600,
                   ),
+                ),
+                const SizedBox(height: 22),
+                const FirstVueInlineSearchBar(
+                  padding: EdgeInsets.zero,
+                  hintText: 'Search businesses, people, #tags…',
                 ),
                 const SizedBox(height: 22),
                 const _ProfileSectionTitle('FIRSTVUE VERIFICATION'),

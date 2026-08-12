@@ -9,7 +9,6 @@ import 'screens/discovery_feed_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/saved_screen.dart';
-import 'screens/search_screen.dart';
 import 'screens/explore_screen.dart';
 import 'screens/whats_now_screen.dart';
 import 'screens/firstvue_business_profile_screen.dart';
@@ -28,6 +27,9 @@ import 'widgets/floating_messages_bubble.dart';
 import 'widgets/home_communities_section.dart';
 import 'widgets/home_discovery_section.dart';
 import 'widgets/home_news_feed_section.dart';
+import 'widgets/firstvue_inline_search_bar.dart';
+import 'widgets/home_city_chip.dart';
+import 'services/profile_media_service.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -70,6 +72,8 @@ class _FirstVueHomeState extends State<FirstVueHome> {
   int _notificationBadge = 0;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _messagesBubbleKey = GlobalKey<FloatingMessagesBubbleState>();
+  final _cityChipKey = GlobalKey<HomeCityChipState>();
+  final _homeAvatarKey = GlobalKey<_HomeProfileAvatarState>();
 
   @override
   void initState() {
@@ -194,7 +198,9 @@ class _FirstVueHomeState extends State<FirstVueHome> {
   }
 
   Future<void> _refreshHomeTab() async {
-    setState(() => _homeRefreshToken++);
+    await _cityChipKey.currentState?.reload();
+    await _homeAvatarKey.currentState?.reload();
+    if (mounted) setState(() => _homeRefreshToken++);
   }
 
   @override
@@ -222,7 +228,11 @@ class _FirstVueHomeState extends State<FirstVueHome> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _HomeProfileAvatar(onTap: _openProfile),
+                  _HomeProfileAvatar(
+                    key: _homeAvatarKey,
+                    refreshToken: _homeRefreshToken,
+                    onTap: _openProfile,
+                  ),
                   Expanded(
                     child: GestureDetector(
                       onTap: _goHome,
@@ -306,54 +316,17 @@ class _FirstVueHomeState extends State<FirstVueHome> {
                 ],
               ),
 
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
 
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      FirstVuePageRoute(builder: (_) => const SearchScreen()),
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(24),
-                  child: Ink(
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: FirstVueColors.elevatedSurface,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: FirstVueColors.teal.withValues(alpha: .28),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.location_on_outlined,
-                          color: FirstVueColors.teal.withValues(alpha: .9),
-                          size: 18,
-                        ),
-                        const SizedBox(width: 6),
-                        const Text(
-                          'Atlanta, GA',
-                          style: TextStyle(
-                            color: FirstVueColors.ivory,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          color: Colors.white.withValues(alpha: .55),
-                          size: 20,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              const FirstVueInlineSearchBar(
+                padding: EdgeInsets.zero,
+              ),
+
+              const SizedBox(height: 14),
+
+              HomeCityChip(
+                key: _cityChipKey,
+                onLocationChanged: _refreshHomeTab,
               ),
 
               const SizedBox(height: 24),
@@ -469,21 +442,62 @@ class _FirstVueHomeState extends State<FirstVueHome> {
 
       bottomNavigationBar: FirstVueBottomNav(
         selectedIndex: selectedIndex,
-        onSelected: (index) => setState(() {
-          selectedIndex = index;
-          if (index == 4) _profileRefreshToken++;
-        }),
+        onSelected: (index) {
+          setState(() {
+            selectedIndex = index;
+            if (index == 4) _profileRefreshToken++;
+            if (index == 0) {
+              _homeAvatarKey.currentState?.reload();
+            }
+          });
+        },
       ),
     );
   }
 }
 
-class _HomeProfileAvatar extends StatelessWidget {
+class _HomeProfileAvatar extends StatefulWidget {
   final VoidCallback onTap;
+  final int refreshToken;
 
-  const _HomeProfileAvatar({required this.onTap});
+  const _HomeProfileAvatar({
+    super.key,
+    required this.onTap,
+    this.refreshToken = 0,
+  });
 
-  String? _avatarUrl(User? user) {
+  @override
+  State<_HomeProfileAvatar> createState() => _HomeProfileAvatarState();
+}
+
+class _HomeProfileAvatarState extends State<_HomeProfileAvatar> {
+  String? _avatarUrl;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    reload();
+  }
+
+  @override
+  void didUpdateWidget(covariant _HomeProfileAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      reload();
+    }
+  }
+
+  Future<void> reload() async {
+    final images = await ProfileMediaService.fetchProfileImages();
+    if (!mounted) return;
+    setState(() {
+      _avatarUrl = images.avatar?.signedUrl;
+      _loading = false;
+    });
+  }
+
+  String? _fallbackAvatarUrl(User? user) {
     if (user == null) return null;
     final metadata = user.userMetadata;
     if (metadata == null) return null;
@@ -495,10 +509,10 @@ class _HomeProfileAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
-    final avatarUrl = _avatarUrl(user);
+    final avatarUrl = _avatarUrl ?? _fallbackAvatarUrl(user);
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         width: 44,
         height: 44,
@@ -513,13 +527,24 @@ class _HomeProfileAvatar extends StatelessWidget {
           ],
         ),
         child: ClipOval(
-          child: avatarUrl != null
-              ? Image.network(
-                  avatarUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => _placeholder(user),
+          child: _loading
+              ? const ColoredBox(
+                  color: FirstVueColors.surface,
+                  child: Center(
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
                 )
-              : _placeholder(user),
+              : avatarUrl != null
+                  ? Image.network(
+                      avatarUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => _placeholder(user),
+                    )
+                  : _placeholder(user),
         ),
       ),
     );

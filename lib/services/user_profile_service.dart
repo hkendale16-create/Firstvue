@@ -7,6 +7,7 @@ class UserProfile {
   final String? bio;
   final String? city;
   final String? state;
+  final String? website;
 
   const UserProfile({
     required this.id,
@@ -15,6 +16,7 @@ class UserProfile {
     this.bio,
     this.city,
     this.state,
+    this.website,
   });
 
   String? get locationLabel {
@@ -62,7 +64,7 @@ class UserProfileService {
     try {
       final row = await _client
           .from('profiles')
-          .select('id, display_name, username, bio, city, state')
+          .select('id, display_name, username, bio, city, state, website')
           .eq('id', profileId)
           .maybeSingle();
       if (row == null) return null;
@@ -74,6 +76,7 @@ class UserProfileService {
         bio: row['bio'] as String?,
         city: row['city'] as String?,
         state: row['state'] as String?,
+        website: row['website'] as String?,
       );
     } catch (_) {
       return null;
@@ -100,6 +103,7 @@ class UserProfileService {
     String? bio,
     String? city,
     String? state,
+    String? website,
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) {
@@ -132,6 +136,10 @@ class UserProfileService {
 
     if (state != null) {
       updates['state'] = state.trim().isEmpty ? null : state.trim();
+    }
+
+    if (website != null) {
+      updates['website'] = website.trim().isEmpty ? null : website.trim();
     }
 
     await _upsertProfile(user.id, updates);

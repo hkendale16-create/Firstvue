@@ -4,6 +4,8 @@ import '../services/community_news_media_service.dart';
 import '../services/community_news_service.dart';
 import '../services/profile_activity_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'spark_users_sheet.dart';
+import 'profile_avatar_thumbnail.dart';
 import 'social_rich_text.dart';
 import 'feed_autoplay_video.dart';
 import 'signed_media_viewer.dart';
@@ -260,11 +262,13 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
                 icon: post.sparkedByMe
                     ? Icons.bolt_rounded
                     : Icons.bolt_outlined,
-                label:
-                    post.sparkCount > 0 ? '${post.sparkCount}' : 'Spark',
+                label: post.sparkCount > 0 ? '${post.sparkCount}' : 'Spark',
                 active: post.sparkedByMe,
                 activeColor: FirstVueColors.gold,
                 onTap: widget.onSpark!,
+                onLabelTap: post.sparkCount > 0
+                    ? () => SparkUsersSheet.show(context, postId: post.id)
+                    : null,
               ),
             ),
           if (widget.onComment != null)
@@ -281,7 +285,11 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
                 icon: widget.repostedByMe
                     ? Icons.repeat_rounded
                     : Icons.repeat_outlined,
-                label: widget.repostedByMe ? 'Reposted' : 'Repost',
+                label: widget.repostedByMe
+                    ? 'Reposted'
+                    : (post.repostCount > 0
+                        ? 'Repost · ${post.repostCount}'
+                        : 'Repost'),
                 active: widget.repostedByMe,
                 activeColor: FirstVueColors.teal,
                 onTap: widget.onRepost!,
@@ -322,6 +330,7 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
             ),
           ),
           _buildPostActions(),
+          _buildSparkPreview(),
           const SizedBox(height: 14),
           Divider(height: 1, color: Colors.white.withValues(alpha: .08)),
         ],
@@ -352,11 +361,20 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
               ),
             ),
           _buildPostActions(),
+          _buildSparkPreview(),
         ],
       ),
     );
 
     return card;
+  }
+
+  Widget _buildSparkPreview() {
+    if (post.sparkCount <= 0) return const SizedBox.shrink();
+    return Padding(
+      padding: EdgeInsets.fromLTRB(_isTimeline ? 0 : 14, 0, _isTimeline ? 0 : 14, 4),
+      child: _SparkAvatarStrip(postId: post.id, total: post.sparkCount),
+    );
   }
 }
 
@@ -364,6 +382,7 @@ class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final VoidCallback? onLabelTap;
   final bool active;
   final Color? activeColor;
 
@@ -371,6 +390,7 @@ class _ActionButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.onLabelTap,
     this.active = false,
     this.activeColor,
   });
@@ -381,19 +401,26 @@ class _ActionButton extends StatelessWidget {
         ? (activeColor ?? FirstVueColors.gold)
         : Colors.white.withValues(alpha: .65);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 20, color: color),
-              const SizedBox(width: 6),
-              Text(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Icon(icon, size: 20, color: color),
+            ),
+          ),
+          const SizedBox(width: 2),
+          InkWell(
+            onTap: onLabelTap ?? onTap,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Text(
                 label,
                 style: TextStyle(
                   color: color,
@@ -401,9 +428,90 @@ class _ActionButton extends StatelessWidget {
                   fontSize: 13,
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SparkAvatarStrip extends StatefulWidget {
+  final String postId;
+  final int total;
+
+  const _SparkAvatarStrip({required this.postId, required this.total});
+
+  @override
+  State<_SparkAvatarStrip> createState() => _SparkAvatarStripState();
+}
+
+class _SparkAvatarStripState extends State<_SparkAvatarStrip> {
+  List<SparkUser> _users = const [];
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final users = await CommunityNewsService.fetchSparkUsers(
+      widget.postId,
+      limit: 6,
+    );
+    if (!mounted) return;
+    setState(() {
+      _users = users;
+      _loaded = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded || _users.isEmpty) return const SizedBox.shrink();
+
+    final extra = widget.total > _users.length ? widget.total - _users.length : 0;
+
+    return GestureDetector(
+      onTap: () => SparkUsersSheet.show(context, postId: widget.postId),
+      child: Row(
+        children: [
+          SizedBox(
+            height: 26,
+            width: 26 + (_users.length - 1) * 16.0 + (extra > 0 ? 16 : 0),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                for (var i = 0; i < _users.length; i++)
+                  Positioned(
+                    left: i * 16.0,
+                    child: CircleAvatar(
+                      radius: 13,
+                      backgroundColor: FirstVueColors.background,
+                      child: ProfileAvatarThumbnail(
+                        imageUrl: _users[i].avatarUrl,
+                        displayName: _users[i].displayName,
+                        radius: 11,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (extra > 0) ...[
+            const SizedBox(width: 6),
+            Text(
+              '+$extra',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: .55),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

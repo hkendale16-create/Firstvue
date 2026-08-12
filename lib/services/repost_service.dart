@@ -35,8 +35,8 @@ class RepostService {
       final row = await _client
           .from('post_reposts')
           .select('id')
-          .eq('user_id', me.id)
-          .eq('post_id', postId)
+          .eq('reposter_id', me.id)
+          .eq('original_post_id', postId)
           .maybeSingle();
       return row != null;
     } catch (_) {
@@ -50,10 +50,28 @@ class RepostService {
       final rows = await _client
           .from('post_reposts')
           .select('id')
-          .eq('post_id', postId);
+          .eq('original_post_id', postId);
       return rows.length;
     } catch (_) {
       return 0;
+    }
+  }
+
+  static Future<Map<String, int>> fetchRepostCounts(List<String> postIds) async {
+    if (postIds.isEmpty) return {};
+    try {
+      final rows = await _client
+          .from('post_reposts')
+          .select('original_post_id')
+          .inFilter('original_post_id', postIds);
+      final counts = <String, int>{};
+      for (final row in rows) {
+        final id = row['original_post_id'] as String;
+        counts[id] = (counts[id] ?? 0) + 1;
+      }
+      return counts;
+    } catch (_) {
+      return {};
     }
   }
 
@@ -64,26 +82,36 @@ class RepostService {
     try {
       final rows = await _client
           .from('post_reposts')
-          .select('post_id')
-          .eq('user_id', me.id)
-          .inFilter('post_id', postIds);
-      return rows.map((row) => row['post_id'] as String).toSet();
+          .select('original_post_id')
+          .eq('reposter_id', me.id)
+          .inFilter('original_post_id', postIds);
+      return rows.map((row) => row['original_post_id'] as String).toSet();
     } catch (_) {
       return {};
     }
   }
 
-  static Future<void> repost(String postId) async {
+  static Future<void> repost(
+    String postId, {
+    String? comment,
+  }) async {
     final me = _client.auth.currentUser;
     if (me == null) throw const AuthException('Sign in to repost.');
 
     await _ensureProfile(me);
 
+    final payload = <String, dynamic>{
+      'original_post_id': postId,
+      'reposter_id': me.id,
+      'reposter_identity_type': 'personal',
+    };
+    final trimmedComment = comment?.trim();
+    if (trimmedComment != null && trimmedComment.isNotEmpty) {
+      payload['comment'] = trimmedComment;
+    }
+
     try {
-      await _client.from('post_reposts').insert({
-        'user_id': me.id,
-        'post_id': postId,
-      });
+      await _client.from('post_reposts').insert(payload);
     } on PostgrestException catch (error) {
       if (error.code != '23505') rethrow;
     }
@@ -96,16 +124,20 @@ class RepostService {
     await _client
         .from('post_reposts')
         .delete()
-        .eq('user_id', me.id)
-        .eq('post_id', postId);
+        .eq('reposter_id', me.id)
+        .eq('original_post_id', postId);
   }
 
-  static Future<bool> toggleRepost(String postId, {required bool currentlyReposted}) async {
+  static Future<bool> toggleRepost(
+    String postId, {
+    required bool currentlyReposted,
+    String? comment,
+  }) async {
     if (currentlyReposted) {
       await undoRepost(postId);
       return false;
     }
-    await repost(postId);
+    await repost(postId, comment: comment);
     return true;
   }
 }

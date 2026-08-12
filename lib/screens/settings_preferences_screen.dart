@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/user_preferences_service.dart';
+import '../services/interaction_preferences_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/location_autocomplete_field.dart';
 
@@ -18,6 +19,7 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
   UserPreferences _prefs = const UserPreferences();
   bool _loading = true;
   bool _saving = false;
+  bool _interactionSounds = true;
 
   @override
   void initState() {
@@ -35,11 +37,13 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final prefs = await UserPreferencesService.fetch();
+    final sounds = await InteractionPreferencesService.interactionSoundsEnabled();
     if (!mounted) return;
     _cityController.text = prefs.locationCity ?? '';
     _stateController.text = prefs.locationState ?? '';
     setState(() {
       _prefs = prefs;
+      _interactionSounds = sounds;
       _loading = false;
     });
   }
@@ -70,6 +74,12 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Messages bubble restored.')),
     );
+  }
+
+  Future<void> _toggleInteractionSounds(bool value) async {
+    await InteractionPreferencesService.setInteractionSoundsEnabled(value);
+    if (!mounted) return;
+    setState(() => _interactionSounds = value);
   }
 
   @override
@@ -140,6 +150,31 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                   value: _prefs.notificationsEnabled,
                   activeThumbColor: FirstVueColors.teal,
                   onChanged: _toggleNotifications,
+                ),
+                const SizedBox(height: 28),
+                const Text(
+                  'INTERACTIONS',
+                  style: TextStyle(
+                    color: FirstVueColors.gold,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Interaction sounds',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  subtitle: const Text(
+                    'Subtle sounds when you spark posts',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  value: _interactionSounds,
+                  activeThumbColor: FirstVueColors.teal,
+                  onChanged: _toggleInteractionSounds,
                 ),
                 const SizedBox(height: 28),
                 const Text(
