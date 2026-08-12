@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
+import '../feed/firstvue_feed_service.dart';
 import '../models/share_payload.dart';
 import '../services/community_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../widgets/firstvue_feed.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import 'auth_screen.dart';
@@ -258,37 +260,12 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                         ],
                       ),
                       const SizedBox(height: 28),
-                      const Text(
-                        'GROUP FEED',
-                        style: TextStyle(
-                          color: FirstVueColors.gold,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: FirstVueColors.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white.withValues(alpha: .08)),
-                        ),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.dynamic_feed_outlined,
-                              color: Colors.white.withValues(alpha: .35),
-                              size: 36,
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              'Group posts coming soon',
-                              style: TextStyle(color: Colors.white.withValues(alpha: .55)),
-                            ),
-                          ],
-                        ),
+                      FirstVueFeed(
+                        scope: FirstVueFeedScope.group,
+                        entityId: community.id,
+                        title: 'GROUP FEED',
+                        emptyMessage: 'No posts yet',
+                        enablePagination: true,
                       ),
                       const SizedBox(height: 28),
                       const Text(
