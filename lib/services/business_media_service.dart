@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/media_config.dart';
 import 'media_type_helpers.dart';
 import 'media_storage_service.dart';
+import 'role_media_replace.dart';
 
 class BusinessMediaItem {
   final String id;
@@ -191,15 +192,16 @@ class BusinessMediaService {
       _removeRoleImage(businessId, 'cover');
 
   static Future<void> _removeRoleImage(String businessId, String role) async {
-    final row = await _client
+    final rows = await _client
         .from('business_media')
         .select(_selectColumns)
         .eq('business_id', businessId)
         .eq('media_role', role)
-        .maybeSingle();
-    if (row == null) return;
-    final item = await _rowToItem(row, businessId);
-    await deleteMedia(item);
+        .order('created_at', ascending: false);
+    for (final row in List<Map<String, dynamic>>.from(rows as List)) {
+      final item = await _rowToItem(row, businessId);
+      await deleteMedia(item);
+    }
   }
 
   static Future<void> _setRoleImage({
@@ -213,35 +215,25 @@ class BusinessMediaService {
       throw const AuthException('Sign in before updating profile photos.');
     }
 
-    BusinessMediaItem? existing;
-    try {
-      final row = await _client
-          .from('business_media')
-          .select(_selectColumns)
-          .eq('business_id', businessId)
-          .eq('media_role', role)
-          .maybeSingle();
-      if (row != null) {
-        existing = await _rowToItem(row, businessId);
-      }
-    } catch (_) {}
+    final existingRows = await _client
+        .from('business_media')
+        .select(_selectColumns)
+        .eq('business_id', businessId)
+        .eq('media_role', role)
+        .order('created_at', ascending: false);
+    final existingPaths = <String>{
+      for (final row in List<Map<String, dynamic>>.from(existingRows as List))
+        row['storage_path'] as String,
+    };
 
-    final bytes = await file.readAsBytes();
-    if (bytes.isEmpty) {
-      throw const StorageException('Selected file is empty.');
-    }
-    if (bytes.length > _maxMediaBytes) {
-      throw const StorageException(
-        'Each photo or video must be 50 MB or smaller.',
-      );
-    }
-
-    final mediaType = mediaTypeForFile(file);
-    final contentType = mimeTypeForFile(file, mediaType);
+    final validated = await RoleMediaReplace.readValidatedBytes(
+      file,
+      maxBytes: _maxMediaBytes,
+    );
     final upload = await MediaStorageService.uploadBytes(
       bucket: MediaBucket.business,
-      bytes: bytes,
-      contentType: contentType,
+      bytes: validated.bytes,
+      contentType: validated.contentType,
       fileName: file.name,
       index: 0,
       subfolder: subfolder,
@@ -258,10 +250,19 @@ class BusinessMediaService {
           'p_business_id': businessId,
           'p_storage_path': upload.path,
           'p_storage_provider': upload.provider.value,
-          'p_media_type': mediaType,
+          'p_media_type': validated.mediaType,
         },
       );
-    } catch (_) {
+    } on PostgrestException catch (error) {
+      if (!RoleMediaReplace.isMissingRpc(error)) {
+        await MediaStorageService.deleteObject(
+          bucket: MediaBucket.business,
+          path: upload.path,
+          provider: upload.provider,
+          context: {'business_id': businessId},
+        );
+        rethrow;
+      }
       await _client
           .from('business_media')
           .delete()
@@ -272,14 +273,12 @@ class BusinessMediaService {
           'business_id': businessId,
           'storage_path': upload.path,
           'storage_provider': upload.provider.value,
-          'media_type': mediaType,
+          'media_type': validated.mediaType,
           'sort_order': 0,
           'media_role': role,
         });
-      } catch (error) {
-        final isDuplicate =
-            error is PostgrestException && error.code == '23505';
-        if (isDuplicate) {
+      } catch (fallbackError) {
+        if (RoleMediaReplace.isUniqueViolation(fallbackError)) {
           await _client
               .from('business_media')
               .delete()
@@ -289,7 +288,7 @@ class BusinessMediaService {
             'business_id': businessId,
             'storage_path': upload.path,
             'storage_provider': upload.provider.value,
-            'media_type': mediaType,
+            'media_type': validated.mediaType,
             'sort_order': 0,
             'media_role': role,
           });
@@ -303,14 +302,23 @@ class BusinessMediaService {
           rethrow;
         }
       }
+    } catch (_) {
+      await MediaStorageService.deleteObject(
+        bucket: MediaBucket.business,
+        path: upload.path,
+        provider: upload.provider,
+        context: {'business_id': businessId},
+      );
+      rethrow;
     }
 
-    if (existing != null) {
+    for (final path in existingPaths) {
+      if (path == upload.path) continue;
       try {
         await MediaStorageService.deleteObject(
           bucket: MediaBucket.business,
-          path: existing.storagePath,
-          provider: existing.storageProvider,
+          path: path,
+          provider: MediaStorageProvider.supabase,
           context: {'business_id': businessId},
         );
       } catch (_) {}
@@ -370,12 +378,14 @@ class BusinessMediaService {
   }
 
   static Future<void> deleteMedia(BusinessMediaItem media) async {
-    await MediaStorageService.deleteObject(
-      bucket: MediaBucket.business,
-      path: media.storagePath,
-      provider: media.storageProvider,
-    );
     await _client.from('business_media').delete().eq('id', media.id);
+    try {
+      await MediaStorageService.deleteObject(
+        bucket: MediaBucket.business,
+        path: media.storagePath,
+        provider: media.storageProvider,
+      );
+    } catch (_) {}
   }
 
   static Future<void> setFeaturedForTrending({

@@ -17,10 +17,22 @@ Future<List<XFile>?> showMediaPickerSheet(
 
 Future<List<XFile>?> showImagePickerSheet(BuildContext context) {
   final picker = ImagePicker();
+  final fv = context.fv;
+  // Media overlays stay intentionally dark for contrast over imagery.
+  final sheetBg = context.isDarkTheme
+      ? fv.surface
+      : const Color(0xFF10151B);
+  final titleColor =
+      context.isDarkTheme ? fv.primaryText : FirstVuePalette.dark.primaryText;
+  final subtitleColor =
+      context.isDarkTheme ? fv.secondaryText : FirstVuePalette.dark.secondaryText;
+  final labelColor =
+      context.isDarkTheme ? fv.primaryText : FirstVuePalette.dark.primaryText;
+
   return showModalBottomSheet<List<XFile>>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: const Color(0xFF10151B),
+    backgroundColor: sheetBg,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -30,18 +42,18 @@ Future<List<XFile>?> showImagePickerSheet(BuildContext context) {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               'CHOOSE A PHOTO',
               style: TextStyle(
-                color: Colors.white,
+                color: titleColor,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.1,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'JPEG, PNG, WebP, GIF, or HEIC — up to 50 MB.',
-              style: TextStyle(color: Colors.white54, fontSize: 12),
+              style: TextStyle(color: subtitleColor, fontSize: 12),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 14),
@@ -49,6 +61,7 @@ Future<List<XFile>?> showImagePickerSheet(BuildContext context) {
               icon: Icons.photo_library_outlined,
               iconColor: FirstVueColors.gold,
               label: 'Photo from gallery',
+              labelColor: labelColor,
               onTap: () async {
                 final photo = await picker.pickImage(
                   source: ImageSource.gallery,
@@ -66,6 +79,7 @@ Future<List<XFile>?> showImagePickerSheet(BuildContext context) {
               icon: Icons.photo_camera_outlined,
               iconColor: FirstVueColors.teal,
               label: 'Take a photo',
+              labelColor: labelColor,
               onTap: () async {
                 final photo = await picker.pickImage(
                   source: ImageSource.camera,
@@ -88,10 +102,21 @@ Future<List<XFile>?> showImagePickerSheet(BuildContext context) {
 
 Future<List<XFile>?> _showFullMediaPicker(BuildContext context) {
   final picker = ImagePicker();
+  final fv = context.fv;
+  final sheetBg = context.isDarkTheme
+      ? fv.surface
+      : const Color(0xFF10151B);
+  final titleColor =
+      context.isDarkTheme ? fv.primaryText : FirstVuePalette.dark.primaryText;
+  final subtitleColor =
+      context.isDarkTheme ? fv.secondaryText : FirstVuePalette.dark.secondaryText;
+  final labelColor =
+      context.isDarkTheme ? fv.primaryText : FirstVuePalette.dark.primaryText;
+
   return showModalBottomSheet<List<XFile>>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: const Color(0xFF10151B),
+    backgroundColor: sheetBg,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -101,18 +126,18 @@ Future<List<XFile>?> _showFullMediaPicker(BuildContext context) {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               'ADD PHOTOS OR VIDEOS',
               style: TextStyle(
-                color: Colors.white,
+                color: titleColor,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.1,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'JPEG, PNG, WebP, GIF, HEIC, MP4, MOV, and more — up to 50 MB each.',
-              style: TextStyle(color: Colors.white54, fontSize: 12),
+              style: TextStyle(color: subtitleColor, fontSize: 12),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 14),
@@ -120,6 +145,7 @@ Future<List<XFile>?> _showFullMediaPicker(BuildContext context) {
               icon: Icons.photo_library_outlined,
               iconColor: FirstVueColors.gold,
               label: 'Photos from gallery',
+              labelColor: labelColor,
               onTap: () async {
                 final photos = await picker.pickMultiImage(imageQuality: 90);
                 if (sheetContext.mounted) {
@@ -131,8 +157,10 @@ Future<List<XFile>?> _showFullMediaPicker(BuildContext context) {
               icon: Icons.videocam_outlined,
               iconColor: FirstVueColors.teal,
               label: 'Video from gallery',
+              labelColor: labelColor,
               onTap: () async {
-                final video = await picker.pickVideo(source: ImageSource.gallery);
+                final video =
+                    await picker.pickVideo(source: ImageSource.gallery);
                 if (sheetContext.mounted) {
                   Navigator.pop(
                     sheetContext,
@@ -143,8 +171,9 @@ Future<List<XFile>?> _showFullMediaPicker(BuildContext context) {
             ),
             _PickerButton(
               icon: Icons.perm_media_outlined,
-              iconColor: const Color(0xFFE5C16F),
+              iconColor: FirstVueColors.gold,
               label: 'Photos & videos (all types)',
+              labelColor: labelColor,
               onTap: () async {
                 final media = await picker.pickMultipleMedia(imageQuality: 90);
                 if (sheetContext.mounted) {
@@ -163,12 +192,14 @@ class _PickerButton extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String label;
+  final Color labelColor;
   final VoidCallback onTap;
 
   const _PickerButton({
     required this.icon,
     required this.iconColor,
     required this.label,
+    required this.labelColor,
     required this.onTap,
   });
 
@@ -190,7 +221,7 @@ class _PickerButton extends StatelessWidget {
                 Expanded(
                   child: Text(
                     label,
-                    style: const TextStyle(color: Colors.white, fontSize: 15),
+                    style: TextStyle(color: labelColor, fontSize: 15),
                   ),
                 ),
               ],

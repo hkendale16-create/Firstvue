@@ -17,6 +17,8 @@ import '../screens/my_professional_profile_view_screen.dart';
 import '../screens/rental_inquiries_screen.dart';
 import '../screens/rentals_screen.dart';
 import '../screens/appearance_settings_screen.dart';
+import '../screens/entity_settings_screen.dart';
+import '../screens/privacy_settings_screen.dart';
 import '../screens/settings_preferences_screen.dart';
 import '../services/admin_auth_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -113,6 +115,22 @@ class _FirstVueSettingsDrawerState extends State<FirstVueSettingsDrawer> {
             _SettingsGroup(
               title: 'Your profile',
               children: [
+                _SettingsTile(
+                  icon: Icons.settings_suggest_outlined,
+                  title: 'Entity settings',
+                  subtitle: 'Profile, media, privacy, groups & more',
+                  onTap: user == null
+                      ? _handleAccount
+                      : () => _open(const EntitySettingsScreen()),
+                ),
+                _SettingsTile(
+                  icon: Icons.lock_outline,
+                  title: 'Privacy',
+                  subtitle: 'Visibility & field controls',
+                  onTap: user == null
+                      ? _handleAccount
+                      : () => _open(const PrivacySettingsScreen()),
+                ),
                 _SettingsTile(
                   icon: Icons.how_to_reg_outlined,
                   title: 'Get verified',

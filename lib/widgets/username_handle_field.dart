@@ -104,9 +104,9 @@ class _UsernameHandleFieldState extends State<UsernameHandleField> {
           Icons.error_outline,
           color: FirstVueColors.coral,
         ),
-      UsernameAvailability.error => const Icon(
+      UsernameAvailability.error => Icon(
           Icons.warning_amber_outlined,
-          color: Colors.white38,
+          color: context.fv.tertiaryText,
         ),
       _ => null,
     };
@@ -135,31 +135,42 @@ class _UsernameHandleFieldState extends State<UsernameHandleField> {
       UsernameAvailability.available => FirstVueColors.teal,
       UsernameAvailability.taken => FirstVueColors.coral,
       UsernameAvailability.invalid => FirstVueColors.coral,
-      _ => Colors.white38,
+      _ => context.fv.tertiaryText,
     };
   }
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextField(
           controller: widget.controller,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: fv.primaryText),
           decoration: InputDecoration(
             labelText: '@handle',
             hintText: 'your_unique_tag',
             prefixText: '@',
             prefixStyle: const TextStyle(color: FirstVueColors.teal),
-            labelStyle: const TextStyle(color: Colors.white54),
+            labelStyle: TextStyle(color: fv.secondaryText),
             errorText: widget.errorText,
             suffixIcon: _suffixIcon(),
             filled: true,
-            fillColor: FirstVueColors.surface,
+            fillColor: fv.inputFill,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: fv.borderSubtle),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: FirstVueColors.teal.withValues(alpha: .55),
+              ),
             ),
           ),
         ),

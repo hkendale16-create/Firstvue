@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/media_config.dart';
 import 'media_storage_service.dart';
 import 'media_type_helpers.dart';
+import 'role_media_replace.dart';
 
 class ProfileMediaItem {
   final String id;
@@ -216,41 +217,38 @@ class ProfileMediaService {
 
   static Future<void> removeCover() => _removeRoleImage('cover');
 
+  static Future<List<Map<String, dynamic>>> _roleRows(
+    String profileId,
+    String role,
+  ) async {
+    final rows = await _client
+        .from('profile_media')
+        .select(_selectColumns)
+        .eq('profile_id', profileId)
+        .eq('media_role', role)
+        .order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(rows as List);
+  }
+
   static Future<void> _setRoleImage(
     String userId,
     XFile file, {
     required String role,
     required String subfolder,
   }) async {
-    ProfileMediaItem? existing;
-    try {
-      final row = await _client
-          .from('profile_media')
-          .select(_selectColumns)
-          .eq('profile_id', userId)
-          .eq('media_role', role)
-          .maybeSingle();
-      if (row != null) {
-        existing = await _rowToItem(row, userId);
-      }
-    } catch (_) {}
+    final existingRows = await _roleRows(userId, role);
+    final existingPaths = <String>{
+      for (final row in existingRows) row['storage_path'] as String,
+    };
 
-    final bytes = await file.readAsBytes();
-    if (bytes.isEmpty) {
-      throw const StorageException('Selected file is empty.');
-    }
-    if (bytes.length > _maxMediaBytes) {
-      throw const StorageException(
-        'Each photo or video must be 50 MB or smaller.',
-      );
-    }
-
-    final mediaType = mediaTypeForFile(file);
-    final contentType = mimeTypeForFile(file, mediaType);
+    final validated = await RoleMediaReplace.readValidatedBytes(
+      file,
+      maxBytes: _maxMediaBytes,
+    );
     final upload = await MediaStorageService.uploadBytes(
       bucket: MediaBucket.profile,
-      bytes: bytes,
-      contentType: contentType,
+      bytes: validated.bytes,
+      contentType: validated.contentType,
       fileName: file.name,
       index: 0,
       subfolder: subfolder,
@@ -266,30 +264,36 @@ class ProfileMediaService {
           'p_profile_id': userId,
           'p_storage_path': upload.path,
           'p_storage_provider': upload.provider.value,
-          'p_media_type': mediaType,
+          'p_media_type': validated.mediaType,
         },
       );
-    } catch (error) {
-      // Fallback for environments where the RPC is not yet applied:
-      // delete-then-insert with one retry on unique violations.
+    } on PostgrestException catch (error) {
+      // Only use delete+insert when the atomic RPC is missing.
+      if (!RoleMediaReplace.isMissingRpc(error)) {
+        await MediaStorageService.deleteObject(
+          bucket: MediaBucket.profile,
+          path: upload.path,
+          provider: upload.provider,
+          context: {'profile_id': userId},
+        );
+        rethrow;
+      }
+      await _client
+          .from('profile_media')
+          .delete()
+          .eq('profile_id', userId)
+          .eq('media_role', role);
       try {
-        await _client
-            .from('profile_media')
-            .delete()
-            .eq('profile_id', userId)
-            .eq('media_role', role);
         await _client.from('profile_media').insert({
           'profile_id': userId,
           'storage_path': upload.path,
           'storage_provider': upload.provider.value,
-          'media_type': mediaType,
+          'media_type': validated.mediaType,
           'sort_order': 0,
           'media_role': role,
         });
       } catch (fallbackError) {
-        final isDuplicate = fallbackError is PostgrestException &&
-            fallbackError.code == '23505';
-        if (isDuplicate) {
+        if (RoleMediaReplace.isUniqueViolation(fallbackError)) {
           await _client
               .from('profile_media')
               .delete()
@@ -299,7 +303,7 @@ class ProfileMediaService {
             'profile_id': userId,
             'storage_path': upload.path,
             'storage_provider': upload.provider.value,
-            'media_type': mediaType,
+            'media_type': validated.mediaType,
             'sort_order': 0,
             'media_role': role,
           });
@@ -313,18 +317,23 @@ class ProfileMediaService {
           rethrow;
         }
       }
-      // Prefer original error context when both fail.
-      if (error is PostgrestException && error.code != 'PGRST202') {
-        // RPC existed but failed for another reason — still keep inserted row.
-      }
+    } catch (error) {
+      await MediaStorageService.deleteObject(
+        bucket: MediaBucket.profile,
+        path: upload.path,
+        provider: upload.provider,
+        context: {'profile_id': userId},
+      );
+      rethrow;
     }
 
-    if (existing != null) {
+    for (final path in existingPaths) {
+      if (path == upload.path) continue;
       try {
         await MediaStorageService.deleteObject(
           bucket: MediaBucket.profile,
-          path: existing.storagePath,
-          provider: existing.storageProvider,
+          path: path,
+          provider: MediaStorageProvider.supabase,
           context: {'profile_id': userId},
         );
       } catch (_) {}
@@ -337,18 +346,10 @@ class ProfileMediaService {
       throw const AuthException('Sign in to remove this photo.');
     }
 
-    try {
-      final row = await _client
-          .from('profile_media')
-          .select(_selectColumns)
-          .eq('profile_id', user.id)
-          .eq('media_role', role)
-          .maybeSingle();
-      if (row == null) return;
+    final rows = await _roleRows(user.id, role);
+    for (final row in rows) {
       final item = await _rowToItem(row, user.id);
       await deleteMedia(item);
-    } catch (_) {
-      rethrow;
     }
   }
 
@@ -405,12 +406,60 @@ class ProfileMediaService {
   }
 
   static Future<void> deleteMedia(ProfileMediaItem media) async {
-    await MediaStorageService.deleteObject(
-      bucket: MediaBucket.profile,
-      path: media.storagePath,
-      provider: media.storageProvider,
-    );
     await _client.from('profile_media').delete().eq('id', media.id);
+    try {
+      await MediaStorageService.deleteObject(
+        bucket: MediaBucket.profile,
+        path: media.storagePath,
+        provider: media.storageProvider,
+      );
+    } catch (_) {}
+  }
+
+  /// Batch-resolve avatar signed URLs for list UIs (profiles.avatar_url DNE).
+  static Future<Map<String, String>> fetchAvatarUrlsForProfiles(
+    Iterable<String> profileIds,
+  ) async {
+    final ids = profileIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+    if (ids.isEmpty) return const {};
+
+    try {
+      final rows = await _client.rpc(
+        'fetch_profile_avatars',
+        params: {'p_profile_ids': ids},
+      );
+      final out = <String, String>{};
+      for (final row in List<Map<String, dynamic>>.from(rows as List)) {
+        final profileId = row['profile_id'] as String?;
+        final path = row['storage_path'] as String?;
+        if (profileId == null || path == null) continue;
+        final provider = MediaStorageProvider.parse(
+          row['storage_provider'] as String?,
+        );
+        try {
+          out[profileId] = await MediaStorageService.createReadUrl(
+            bucket: MediaBucket.profile,
+            path: path,
+            provider: provider,
+            context: {'profile_id': profileId},
+          );
+        } catch (_) {}
+      }
+      return out;
+    } catch (_) {
+      // Fallback when RPC is not applied yet.
+      final out = <String, String>{};
+      for (final id in ids) {
+        final images = await fetchProfileImagesForUser(id);
+        final url = images.avatar?.signedUrl;
+        if (url != null) out[id] = url;
+      }
+      return out;
+    }
   }
 
   static Future<void> setFeaturedForTrending(String mediaId) async {
