@@ -116,7 +116,8 @@ class ProfileActivityService {
 
   static Future<List<ProfileActivityItem>> _mapNewsPostRows(
     List<dynamic> rows, {
-    required String titleForRow(Map<String, dynamic> row, String? businessName),
+    required String Function(Map<String, dynamic> row, String? businessName)
+        titleForRow,
   }) async {
     if (rows.isEmpty) return const [];
 
