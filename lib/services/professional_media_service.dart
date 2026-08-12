@@ -192,6 +192,9 @@ class ProfessionalMediaService {
     );
   }
 
+  /// First avatar/cover uses INSERT. Later changes UPDATE the existing role
+  /// row so `professional_media_one_avatar_idx` / cover unique indexes stay
+  /// intact. Never depends on signed-URL hydration to find the existing row.
   static Future<void> _setRoleImage({
     required String professionalProfileId,
     required XFile file,
@@ -203,31 +206,105 @@ class ProfessionalMediaService {
       throw const AuthException('Sign in before updating profile photos.');
     }
 
-    ProfessionalMediaItem? existing;
+    Map<String, dynamic>? existingRow;
     try {
-      final row = await _client
+      existingRow = await _client
           .from('professional_media')
-          .select(_selectColumns)
+          .select('id, storage_path, storage_provider')
           .eq('professional_profile_id', professionalProfileId)
           .eq('media_role', role)
           .maybeSingle();
-      if (row != null) {
-        existing = await _rowToItem(row, professionalProfileId);
-      }
-    } catch (_) {}
-
-    if (existing != null) {
-      await deleteMedia(existing);
+    } catch (_) {
+      existingRow = null;
     }
 
-    await _uploadSingle(
-      professionalProfileId: professionalProfileId,
-      file: file,
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) {
+      throw const StorageException('Selected file is empty.');
+    }
+    if (bytes.length > _maxMediaBytes) {
+      throw const StorageException(
+        'Each photo or video must be 50 MB or smaller.',
+      );
+    }
+
+    final mediaType = mediaTypeForFile(file);
+    final contentType = mimeTypeForFile(file, mediaType);
+    final upload = await MediaStorageService.uploadBytes(
+      bucket: MediaBucket.professional,
+      bytes: bytes,
+      contentType: contentType,
+      fileName: file.name,
       index: 0,
-      sortOrder: 0,
-      mediaRole: role,
       subfolder: subfolder,
+      context: {'professional_profile_id': professionalProfileId},
     );
+
+    final payload = {
+      'storage_path': upload.path,
+      'storage_provider': upload.provider.value,
+      'media_type': mediaType,
+      'sort_order': 0,
+      'media_role': role,
+    };
+
+    try {
+      if (existingRow == null) {
+        try {
+          await _client.from('professional_media').insert({
+            'professional_profile_id': professionalProfileId,
+            ...payload,
+          });
+        } on PostgrestException catch (error) {
+          if (error.code != '23505') rethrow;
+          final raced = await _client
+              .from('professional_media')
+              .select('id, storage_path, storage_provider')
+              .eq('professional_profile_id', professionalProfileId)
+              .eq('media_role', role)
+              .maybeSingle();
+          if (raced == null) rethrow;
+          existingRow = raced;
+          await _client
+              .from('professional_media')
+              .update(payload)
+              .eq('id', raced['id'] as String);
+        }
+      } else {
+        await _client
+            .from('professional_media')
+            .update(payload)
+            .eq('id', existingRow['id'] as String);
+      }
+    } catch (_) {
+      try {
+        await MediaStorageService.deleteObject(
+          bucket: MediaBucket.professional,
+          path: upload.path,
+          provider: upload.provider,
+          context: {'professional_profile_id': professionalProfileId},
+        );
+      } catch (_) {}
+      rethrow;
+    }
+
+    if (existingRow != null) {
+      final oldPath = existingRow['storage_path'] as String?;
+      if (oldPath != null &&
+          oldPath.isNotEmpty &&
+          oldPath != upload.path) {
+        try {
+          await MediaStorageService.deleteObject(
+            bucket: MediaBucket.professional,
+            path: oldPath,
+            provider: MediaStorageProvider.parse(
+              existingRow['storage_provider'] as String?,
+            ),
+            context: {'professional_profile_id': professionalProfileId},
+          );
+        } catch (_) {}
+      }
+    }
   }
 
   static Future<void> _uploadSingle({
@@ -283,12 +360,61 @@ class ProfessionalMediaService {
   }
 
   static Future<void> deleteMedia(ProfessionalMediaItem media) async {
-    await MediaStorageService.deleteObject(
-      bucket: MediaBucket.professional,
-      path: media.storagePath,
-      provider: media.storageProvider,
-    );
+    try {
+      await MediaStorageService.deleteObject(
+        bucket: MediaBucket.professional,
+        path: media.storagePath,
+        provider: media.storageProvider,
+      );
+    } catch (_) {}
     await _client.from('professional_media').delete().eq('id', media.id);
+  }
+
+  static Future<void> removeAvatar(String professionalProfileId) =>
+      _removeRoleMedia(
+        professionalProfileId: professionalProfileId,
+        role: 'avatar',
+      );
+
+  static Future<void> removeCover(String professionalProfileId) =>
+      _removeRoleMedia(
+        professionalProfileId: professionalProfileId,
+        role: 'cover',
+      );
+
+  static Future<void> _removeRoleMedia({
+    required String professionalProfileId,
+    required String role,
+  }) async {
+    List<dynamic> rows = const [];
+    try {
+      rows = await _client
+          .from('professional_media')
+          .select('id, storage_path, storage_provider')
+          .eq('professional_profile_id', professionalProfileId)
+          .eq('media_role', role);
+    } catch (_) {
+      return;
+    }
+
+    for (final row in rows) {
+      final path = row['storage_path'] as String?;
+      final id = row['id'] as String?;
+      if (path == null || id == null) continue;
+      try {
+        await MediaStorageService.deleteObject(
+          bucket: MediaBucket.professional,
+          path: path,
+          provider: MediaStorageProvider.parse(
+            row['storage_provider'] as String?,
+          ),
+          context: {'professional_profile_id': professionalProfileId},
+        );
+      } catch (_) {}
+      try {
+        await _client.from('professional_media').delete().eq('id', id);
+      } catch (_) {}
+    }
   }
 
   static Future<void> setFeaturedForTrending({

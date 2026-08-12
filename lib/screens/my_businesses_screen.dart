@@ -309,7 +309,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
   }
 
   Future<void> _changeAvatar() async {
-    final files = await showImagePickerSheet(context);
+    final files = await showMediaPickerSheet(context);
     if (files == null || files.isEmpty || !mounted) return;
     setState(() => _profileMediaUpdating = true);
     try {
@@ -577,6 +577,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
         EntityProfileMediaEditor(
           avatarUrl: _profileImages.avatar?.signedUrl,
           coverUrl: _profileImages.cover?.signedUrl,
+          avatarIsVideo: _profileImages.avatar?.isVideo == true,
           updating: _profileMediaUpdating,
           placeholderIcon: Icons.storefront_outlined,
           onChangeCover: _changeCover,

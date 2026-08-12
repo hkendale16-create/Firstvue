@@ -144,7 +144,7 @@ class _ProfessionalProfileEditorScreenState
       _showMessage('Save your profile before adding photos.');
       return;
     }
-    final files = await showImagePickerSheet(context);
+    final files = await showMediaPickerSheet(context);
     if (files == null || files.isEmpty || !mounted) return;
     setState(() => _profileMediaUpdating = true);
     try {
@@ -258,6 +258,7 @@ class _ProfessionalProfileEditorScreenState
                     EntityProfileMediaEditor(
                       avatarUrl: _profileImages.avatar?.signedUrl,
                       coverUrl: _profileImages.cover?.signedUrl,
+                      avatarIsVideo: _profileImages.avatar?.isVideo == true,
                       updating: _profileMediaUpdating,
                       placeholderIcon: Icons.badge_outlined,
                       onChangeCover: _changeCover,

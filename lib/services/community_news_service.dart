@@ -179,29 +179,46 @@ class CommunityNewsService {
     return trimmed;
   }
 
+  static void logFeedError(Object error, {String context = 'NewsFeed'}) {
+    if (error is PostgrestException) {
+      // ignore: avoid_print
+      print(
+        '[$context] PostgrestException '
+        'code=${error.code} message=${error.message} '
+        'details=${error.details} hint=${error.hint}',
+      );
+      return;
+    }
+    // ignore: avoid_print
+    print('[$context] $error');
+  }
+
   static Future<List<CommunityNewsPost>> fetchPosts({int limit = 20}) async {
     final me = _client.auth.currentUser?.id;
     try {
-      // RLS returns approved posts plus the signed-in author's own posts.
+      // Broad Home News Feed — no community_id required.
+      // RLS returns approved public posts plus author/followers visibility.
       final rows = await _selectPosts(
         (query) => query.order('created_at', ascending: false).limit(limit),
       );
       return await _mapPostRows(rows, currentUserId: me);
-    } catch (_) {
+    } catch (error) {
+      logFeedError(error, context: 'HomeNewsFeed.fetchPosts');
       // Keep the Home News Feed usable even if enrichment fails.
       try {
         final rows = await _selectPosts(
           (query) => query.order('created_at', ascending: false).limit(limit),
         );
         return await _mapPostRowsMinimal(rows, currentUserId: me);
-      } catch (_) {
+      } catch (fallbackError) {
+        logFeedError(fallbackError, context: 'HomeNewsFeed.fetchPosts.fallback');
         return const [];
       }
     }
   }
 
   /// Posts authored by the signed-in user (any status), for profile display.
-  static Future<List<CommunityNewsPost>> fetchMyPosts({int limit = 10}) async {
+  static Future<List<CommunityNewsPost>> fetchMyPosts({int limit = 50}) async {
     final me = _client.auth.currentUser;
     if (me == null) return const [];
 
@@ -213,9 +230,24 @@ class CommunityNewsService {
             .limit(limit),
       );
 
-      return _mapPostRows(rows, currentUserId: me.id);
-    } catch (_) {
-      return const [];
+      return await _mapPostRows(rows, currentUserId: me.id);
+    } catch (error) {
+      logFeedError(error, context: 'ProfileFeed.fetchMyPosts');
+      try {
+        final rows = await _selectPosts(
+          (query) => query
+              .eq('author_id', me.id)
+              .order('created_at', ascending: false)
+              .limit(limit),
+        );
+        return await _mapPostRowsMinimal(rows, currentUserId: me.id);
+      } catch (fallbackError) {
+        logFeedError(
+          fallbackError,
+          context: 'ProfileFeed.fetchMyPosts.fallback',
+        );
+        return const [];
+      }
     }
   }
 

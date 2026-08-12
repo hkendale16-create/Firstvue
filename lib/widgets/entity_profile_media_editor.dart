@@ -6,6 +6,7 @@ import '../theme/firstvue_theme.dart';
 class EntityProfileMediaEditor extends StatelessWidget {
   final String? avatarUrl;
   final String? coverUrl;
+  final bool avatarIsVideo;
   final bool updating;
   final IconData placeholderIcon;
   final VoidCallback? onChangeCover;
@@ -15,6 +16,7 @@ class EntityProfileMediaEditor extends StatelessWidget {
     super.key,
     this.avatarUrl,
     this.coverUrl,
+    this.avatarIsVideo = false,
     this.updating = false,
     this.placeholderIcon = Icons.storefront_outlined,
     this.onChangeCover,
@@ -36,7 +38,7 @@ class EntityProfileMediaEditor extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Tap cover or profile photo to upload — just like your main profile.',
+          'Tap cover or profile photo to upload a photo or video.',
           style: TextStyle(
             color: Colors.white.withValues(alpha: .45),
             fontSize: 12,
@@ -78,14 +80,47 @@ class EntityProfileMediaEditor extends StatelessWidget {
           children: [
             GestureDetector(
               onTap: updating ? null : onChangeAvatar,
-              child: CircleAvatar(
-                radius: 40,
-                backgroundColor: const Color(0xFF241D22),
-                backgroundImage:
-                    avatarUrl != null ? NetworkImage(avatarUrl!) : null,
-                child: avatarUrl == null
-                    ? Icon(placeholderIcon, color: FirstVueColors.teal, size: 34)
-                    : null,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundColor: const Color(0xFF241D22),
+                    backgroundImage: avatarUrl != null && !avatarIsVideo
+                        ? NetworkImage(avatarUrl!)
+                        : null,
+                    child: avatarUrl == null
+                        ? Icon(
+                            placeholderIcon,
+                            color: FirstVueColors.teal,
+                            size: 34,
+                          )
+                        : avatarIsVideo
+                            ? const Icon(
+                                Icons.videocam_rounded,
+                                color: FirstVueColors.gold,
+                                size: 30,
+                              )
+                            : null,
+                  ),
+                  if (avatarIsVideo && avatarUrl != null)
+                    Positioned(
+                      right: 2,
+                      bottom: 2,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF080B0F),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 14,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             const SizedBox(width: 12),
@@ -93,7 +128,9 @@ class EntityProfileMediaEditor extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: updating ? null : onChangeAvatar,
                 icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-                label: Text(updating ? 'Uploading…' : 'Profile photo'),
+                label: Text(
+                  updating ? 'Uploading…' : 'Profile photo / video',
+                ),
               ),
             ),
           ],

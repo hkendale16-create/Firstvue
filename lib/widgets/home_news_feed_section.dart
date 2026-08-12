@@ -122,8 +122,11 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
       try {
         reposted = await RepostService.fetchMyRepostedIds(postIds);
         repostCounts = await RepostService.fetchRepostCounts(postIds);
-      } catch (_) {
-        // Repost metadata is optional; never block the News Feed.
+      } catch (error) {
+        CommunityNewsService.logFeedError(
+          error,
+          context: 'HomeNewsFeed.repostMeta',
+        );
       }
       if (!mounted) return;
       setState(() {
@@ -134,17 +137,18 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
             .toList();
         _repostedPostIds = reposted;
         _loadingPosts = false;
-        // Empty feed is not an error — only surface errors when fetch fails
-        // and we have nothing to show.
         _loadError = null;
       });
     } catch (error) {
+      CommunityNewsService.logFeedError(error, context: 'HomeNewsFeed._loadPosts');
       if (mounted) {
+        final detail = error is PostgrestException
+            ? 'Unable to load posts (${error.code ?? 'error'}): ${error.message}'
+            : 'Unable to load posts. Pull to refresh or tap below.';
         setState(() {
           _loadingPosts = false;
-          // Keep previously loaded posts visible if a refresh fails.
           if (_posts.isEmpty) {
-            _loadError = error.toString();
+            _loadError = detail;
           }
         });
       }
@@ -664,7 +668,8 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Unable to load posts. Pull to refresh or tap below.',
+                  _loadError ??
+                      'Unable to load posts. Pull to refresh or tap below.',
                   style: TextStyle(color: Colors.white.withValues(alpha: .54)),
                 ),
                 TextButton(onPressed: _refresh, child: const Text('Try again')),
