@@ -187,40 +187,79 @@ end $$;
 -- 6) Optional helper view — Community News Feed (posts with a community_id)
 --    App can keep querying community_news_posts directly; this is for SQL /
 --    dashboards / debugging.
+--    Avatars come from profile_media (not profiles.avatar_url).
 -- ---------------------------------------------------------------------------
-create or replace view public.community_news_feed_view
-with (security_invoker = true)
-as
-select
-  p.id,
-  p.body,
-  p.created_at,
-  p.author_id,
-  p.business_id,
-  p.community_id,
-  p.professional_profile_id,
-  p.event_id,
-  p.visibility,
-  p.status,
-  coalesce(pr.display_name, 'Member') as author_name,
-  pr.username as author_username,
-  -- Avatars live in profile_media (media_role = 'avatar'), not profiles.avatar_url
-  pm.storage_path as author_avatar_path,
-  c.name as community_name,
-  (
-    select count(*)::int
-    from public.community_news_post_sparks s
-    where s.post_id = p.id
-  ) as spark_count
-from public.community_news_posts p
-left join public.profiles pr on pr.id = p.author_id
-left join public.communities c on c.id = p.community_id
-left join public.profile_media pm
-  on pm.profile_id = p.author_id
- and pm.media_role = 'avatar'
-where p.status = 'approved'
-  and p.community_id is not null
-order by p.created_at desc;
+do $$
+begin
+  if to_regclass('public.profile_media') is not null then
+    execute $view$
+      create or replace view public.community_news_feed_view
+      with (security_invoker = true)
+      as
+      select
+        p.id,
+        p.body,
+        p.created_at,
+        p.author_id,
+        p.business_id,
+        p.community_id,
+        p.professional_profile_id,
+        p.event_id,
+        p.visibility,
+        p.status,
+        coalesce(pr.display_name, 'Member') as author_name,
+        pr.username as author_username,
+        pm.storage_path as author_avatar_path,
+        c.name as community_name,
+        (
+          select count(*)::int
+          from public.community_news_post_sparks s
+          where s.post_id = p.id
+        ) as spark_count
+      from public.community_news_posts p
+      left join public.profiles pr on pr.id = p.author_id
+      left join public.communities c on c.id = p.community_id
+      left join public.profile_media pm
+        on pm.profile_id = p.author_id
+       and pm.media_role = 'avatar'
+      where p.status = 'approved'
+        and p.community_id is not null
+      order by p.created_at desc
+    $view$;
+  else
+    execute $view$
+      create or replace view public.community_news_feed_view
+      with (security_invoker = true)
+      as
+      select
+        p.id,
+        p.body,
+        p.created_at,
+        p.author_id,
+        p.business_id,
+        p.community_id,
+        p.professional_profile_id,
+        p.event_id,
+        p.visibility,
+        p.status,
+        coalesce(pr.display_name, 'Member') as author_name,
+        pr.username as author_username,
+        null::text as author_avatar_path,
+        c.name as community_name,
+        (
+          select count(*)::int
+          from public.community_news_post_sparks s
+          where s.post_id = p.id
+        ) as spark_count
+      from public.community_news_posts p
+      left join public.profiles pr on pr.id = p.author_id
+      left join public.communities c on c.id = p.community_id
+      where p.status = 'approved'
+        and p.community_id is not null
+      order by p.created_at desc
+    $view$;
+  end if;
+end $$;
 
 grant select on public.community_news_feed_view to anon, authenticated;
 

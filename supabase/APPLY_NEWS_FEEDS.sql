@@ -1,5 +1,7 @@
 -- Paste this entire file into Supabase SQL Editor and Run.
+
 -- Dashboard: https://supabase.com/dashboard/project/sdssshegqdwobjelxzkp/sql/new
+
 -- Source: migrations/20260831_news_feeds.sql
 
 -- =============================================================================

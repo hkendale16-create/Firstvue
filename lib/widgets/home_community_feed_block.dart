@@ -7,6 +7,7 @@ import '../screens/auth_screen.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../services/community_news_service.dart';
 import '../services/interaction_preferences_service.dart';
+import '../services/profile_media_service.dart';
 import '../services/repost_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'community_news_post_card.dart';
@@ -71,16 +72,19 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
     try {
-      final row = await Supabase.instance.client
+      final rowFuture = Supabase.instance.client
           .from('profiles')
-          .select('display_name, avatar_url')
+          .select('display_name')
           .eq('id', user.id)
           .maybeSingle();
-      if (!mounted || row == null) return;
-      final name = (row['display_name'] as String?)?.trim();
+      final imagesFuture = ProfileMediaService.fetchProfileImagesForUser(user.id);
+      final row = await rowFuture;
+      final images = await imagesFuture;
+      if (!mounted) return;
+      final name = (row?['display_name'] as String?)?.trim();
+      final avatar = images.avatar?.signedUrl;
       setState(() {
         if (name != null && name.isNotEmpty) _displayName = name;
-        final avatar = row['avatar_url'] as String?;
         if (avatar != null && avatar.isNotEmpty) _avatarUrl = avatar;
       });
     } catch (_) {
