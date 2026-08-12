@@ -3,6 +3,7 @@ import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/activity_notifications_service.dart';
+import '../services/follow_service.dart';
 import '../services/messaging_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
@@ -145,6 +146,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       }
                       return Column(
                         children: items.map((item) {
+                          if (item.type == 'follow_request') {
+                            return _FollowRequestNotificationTile(
+                              item: item,
+                              onChanged: _refresh,
+                            );
+                          }
                           return _NotificationTile(
                             title: item.title,
                             body: item.body,
@@ -279,6 +286,179 @@ class _EmptyCard extends StatelessWidget {
         border: Border.all(color: Colors.white12),
       ),
       child: Text(text, style: const TextStyle(color: Colors.white54)),
+    );
+  }
+}
+
+class _FollowRequestNotificationTile extends StatefulWidget {
+  final ActivityNotification item;
+  final Future<void> Function() onChanged;
+
+  const _FollowRequestNotificationTile({
+    required this.item,
+    required this.onChanged,
+  });
+
+  @override
+  State<_FollowRequestNotificationTile> createState() =>
+      _FollowRequestNotificationTileState();
+}
+
+class _FollowRequestNotificationTileState
+    extends State<_FollowRequestNotificationTile> {
+  bool _busy = false;
+
+  Future<void> _markReadIfNeeded() async {
+    if (!widget.item.isRead) {
+      await ActivityNotificationsService.markRead(widget.item.id);
+    }
+  }
+
+  Future<void> _accept() async {
+    setState(() => _busy = true);
+    try {
+      final requesterId = widget.item.payload['profile_id'] as String?;
+      if (requesterId == null) return;
+      final requestId = await FollowService.resolveRequestId(
+        requesterId: requesterId,
+        requestId: widget.item.payload['request_id'] as String?,
+      );
+      if (requestId == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This follow request is no longer pending.')),
+        );
+        return;
+      }
+      await _markReadIfNeeded();
+      await FollowService.acceptRequest(requestId);
+      if (!mounted) return;
+      await widget.onChanged();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to accept follow request.')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _decline() async {
+    setState(() => _busy = true);
+    try {
+      final requesterId = widget.item.payload['profile_id'] as String?;
+      if (requesterId == null) return;
+      final requestId = await FollowService.resolveRequestId(
+        requesterId: requesterId,
+        requestId: widget.item.payload['request_id'] as String?,
+      );
+      if (requestId == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This follow request is no longer pending.')),
+        );
+        return;
+      }
+      await _markReadIfNeeded();
+      await FollowService.declineRequest(requestId);
+      if (!mounted) return;
+      await widget.onChanged();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to decline follow request.')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _openProfile() async {
+    final requesterId = widget.item.payload['profile_id'] as String?;
+    if (requesterId == null) return;
+    await _markReadIfNeeded();
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      FirstVuePageRoute(
+        builder: (_) => MemberPublicProfileScreen(profileId: requesterId),
+      ),
+    );
+    if (!mounted) return;
+    await widget.onChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final unread = !widget.item.isRead;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _busy ? null : _openProfile,
+          borderRadius: BorderRadius.circular(16),
+          child: Ink(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: unread
+                  ? FirstVueColors.teal.withValues(alpha: .12)
+                  : FirstVueColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: unread
+                    ? FirstVueColors.teal.withValues(alpha: .35)
+                    : Colors.white12,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.item.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (widget.item.body?.trim().isNotEmpty == true) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.item.body!,
+                    style: const TextStyle(color: Colors.white54, fontSize: 13),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                _busy
+                    ? const LinearProgressIndicator(color: FirstVueColors.teal)
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _decline,
+                              child: const Text('Decline'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: _accept,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: FirstVueColors.gold,
+                                foregroundColor: Colors.black,
+                              ),
+                              child: const Text('Accept'),
+                            ),
+                          ),
+                        ],
+                      ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

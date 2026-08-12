@@ -24,4 +24,26 @@ class PostIdentityOption {
         );
 
   bool get isPersonal => kind == PostIdentityKind.personal;
+
+  String get storageKey {
+    switch (kind) {
+      case PostIdentityKind.personal:
+        return 'personal';
+      case PostIdentityKind.business:
+        return 'business:${businessId ?? ''}';
+      case PostIdentityKind.community:
+        return 'community:${communityId ?? ''}';
+    }
+  }
+
+  static PostIdentityOption? matchStoredKey(
+    List<PostIdentityOption> options,
+    String? key,
+  ) {
+    if (key == null || key.isEmpty) return null;
+    for (final option in options) {
+      if (option.storageKey == key) return option;
+    }
+    return null;
+  }
 }

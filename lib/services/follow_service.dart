@@ -134,21 +134,31 @@ class FollowService {
     final isPrivate = await _isPrivateProfile(profileId);
 
     if (isPrivate) {
+      String? requestId;
       try {
-        await _client.from('follow_requests').insert({
-          'follower_id': me.id,
-          'target_id': profileId,
-          'status': 'pending',
-        });
+        final inserted = await _client
+            .from('follow_requests')
+            .insert({
+              'follower_id': me.id,
+              'target_id': profileId,
+              'status': 'pending',
+            })
+            .select('id')
+            .maybeSingle();
+        requestId = inserted?['id'] as String?;
       } on PostgrestException catch (error) {
         if (error.code != '23505') rethrow;
+        requestId = await findPendingRequestId(me.id, profileId);
       }
       final actor = await _actorLabel(me.id);
       await ActivityNotificationsService.notifyUser(
         userId: profileId,
         type: 'follow_request',
         title: '$actor requested to follow you',
-        payload: {'profile_id': me.id},
+        payload: {
+          'profile_id': me.id,
+          'request_id': ?requestId,
+        },
       );
       return;
     }
@@ -410,6 +420,34 @@ class FollowService {
       title: '$accepter accepted your follow request',
       payload: {'profile_id': me.id},
     );
+  }
+
+  static Future<String?> findPendingRequestId(
+    String requesterId,
+    String targetId,
+  ) async {
+    try {
+      final row = await _client
+          .from('follow_requests')
+          .select('id')
+          .eq('follower_id', requesterId)
+          .eq('target_id', targetId)
+          .eq('status', 'pending')
+          .maybeSingle();
+      return row?['id'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<String?> resolveRequestId({
+    required String requesterId,
+    String? requestId,
+  }) async {
+    if (requestId != null && requestId.isNotEmpty) return requestId;
+    final me = _client.auth.currentUser;
+    if (me == null) return null;
+    return findPendingRequestId(requesterId, me.id);
   }
 
   static Future<void> declineRequest(String requestId) async {

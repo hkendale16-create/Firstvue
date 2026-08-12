@@ -8,6 +8,7 @@ import '../screens/member_public_profile_screen.dart';
 import '../models/post_identity.dart';
 import '../services/community_news_service.dart';
 import '../services/post_identity_service.dart';
+import '../services/post_identity_store.dart';
 import '../services/repost_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../utils/app_environment.dart';
@@ -50,9 +51,12 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
   Future<void> _loadIdentityOptions() async {
     final options = await PostIdentityService.fetchOptions();
     if (!mounted) return;
+    final storedKey = await PostIdentityStore.loadSelectedKey();
+    final restored = PostIdentityOption.matchStoredKey(options, storedKey);
     setState(() {
       _identityOptions = options;
-      _selectedIdentity = options.isEmpty ? null : options.first;
+      _selectedIdentity =
+          restored ?? (options.isEmpty ? null : options.first);
     });
   }
 
@@ -447,8 +451,10 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
                 PostIdentitySelector(
                   options: _identityOptions,
                   selected: _selectedIdentity!,
-                  onChanged: (value) =>
-                      setState(() => _selectedIdentity = value),
+                  onChanged: (value) {
+                    setState(() => _selectedIdentity = value);
+                    PostIdentityStore.saveSelected(value);
+                  },
                 ),
               TextField(
                 controller: _composer,

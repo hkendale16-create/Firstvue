@@ -21,6 +21,7 @@ import '../widgets/firstvue_refresh_scaffold.dart';
 import '../config/app_config.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/follow_requests_section.dart';
+import '../widgets/live_stream_eligibility_card.dart';
 import '../widgets/firstvue_settings_drawer.dart';
 import '../models/share_payload.dart';
 
@@ -440,6 +441,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 setState(() => _pullRefreshToken++);
               },
             ),
+          if (user != null) const LiveStreamEligibilityCard(),
           Stack(
             children: [
               FacebookStyleProfileHeader(

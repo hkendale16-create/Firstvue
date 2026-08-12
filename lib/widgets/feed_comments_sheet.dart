@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/feed_comments_service.dart';
 import '../screens/auth_screen.dart';
 import '../utils/app_environment.dart';
+import 'social_rich_text.dart';
 
 class FeedCommentsSheet extends StatefulWidget {
   final String mediaId;
@@ -466,7 +467,10 @@ class _CommentTile extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(comment.body, style: const TextStyle(color: Colors.white)),
+          SocialRichText(
+            text: comment.body,
+            style: const TextStyle(color: Colors.white),
+          ),
           const SizedBox(height: 6),
           Row(
             children: [
