@@ -14,6 +14,8 @@ import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/firstvue_inline_search_bar.dart';
 import '../widgets/facebook_style_profile_header.dart';
+import '../widgets/portfolio_albums_section.dart';
+import '../services/portfolio_album_service.dart';
 import 'auth_screen.dart';
 import 'conversation_screen.dart';
 import 'meet_the_owner_screen.dart';
@@ -325,6 +327,14 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
                 const _ProfileSectionTitle('PHOTOS'),
                 const SizedBox(height: 10),
                 _BusinessMediaGallery(businessId: details.id),
+                const SizedBox(height: 22),
+                const _ProfileSectionTitle('PORTFOLIO'),
+                const SizedBox(height: 10),
+                PortfolioAlbumsSection(
+                  ownerType: PortfolioOwnerType.business,
+                  ownerId: details.id,
+                  canManage: isOwnerPreview,
+                ),
                 const SizedBox(height: 22),
                 const _ProfileSectionTitle('REVIEWS'),
                 const SizedBox(height: 10),

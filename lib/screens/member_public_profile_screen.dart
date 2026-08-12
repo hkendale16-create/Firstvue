@@ -15,6 +15,7 @@ import '../widgets/community_news_post_detail_sheet.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/feed_comments_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/profile_affiliations_section.dart';
 import '../widgets/signed_media_viewer.dart';
 import 'auth_screen.dart';
 
@@ -51,7 +52,7 @@ class MemberPublicProfileScreen extends StatefulWidget {
 }
 
 class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
-  static const _tabLabels = ['POSTS', 'PHOTOS'];
+  static const _tabLabels = ['POSTS', 'PHOTOS', 'GROUPS', 'COMMUNITIES'];
 
   ProfileImageSet _profileImages = const ProfileImageSet();
   ProfileEngagementStats _stats = const ProfileEngagementStats(
@@ -488,17 +489,14 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
             ],
             const SizedBox(height: 20),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10151B),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withValues(alpha: .08)),
-                ),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
                     for (var i = 0; i < _tabLabels.length; i++)
-                      Expanded(
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: _MemberProfileTabButton(
                           label: _tabLabels[i],
                           selected: _selectedTab == i,
@@ -522,7 +520,20 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
                 duration: const Duration(milliseconds: 200),
                 child: KeyedSubtree(
                   key: ValueKey(_selectedTab),
-                  child: _selectedTab == 0 ? _buildPostsTab() : _buildPhotosTab(),
+                  child: switch (_selectedTab) {
+                    0 => _buildPostsTab(),
+                    1 => _buildPhotosTab(),
+                    2 => ProfileAffiliationsSection(
+                        profileId: widget.profileId,
+                        showGroups: true,
+                        showCommunities: false,
+                      ),
+                    _ => ProfileAffiliationsSection(
+                        profileId: widget.profileId,
+                        showGroups: false,
+                        showCommunities: true,
+                      ),
+                  },
                 ),
               ),
             const SizedBox(height: 28),

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/business_submission_service.dart';
 import '../services/community_creation_service.dart';
+import '../services/community_hub_service.dart';
 import '../services/community_leader_service.dart';
 import '../services/organizer_application_service.dart';
 import '../services/professional_profiles_service.dart';
@@ -13,7 +15,7 @@ class AdminApprovalsHubScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 5,
+      length: 6,
       child: Scaffold(
         backgroundColor: const Color(0xFF080B0F),
         appBar: AppBar(
@@ -31,6 +33,7 @@ class AdminApprovalsHubScreen extends StatelessWidget {
               Tab(text: 'ORGANIZER'),
               Tab(text: 'COMMUNITY LEADER'),
               Tab(text: 'COMMUNITY'),
+              Tab(text: 'GROUP LINK'),
             ],
           ),
         ),
@@ -42,12 +45,21 @@ class AdminApprovalsHubScreen extends StatelessWidget {
               _OrganizerApprovalsTab(),
               _CommunityLeaderApprovalsTab(),
               _CommunityCreationApprovalsTab(),
+              _GroupLinkApprovalsTab(),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+String _approvalErrorMessage(Object error) {
+  if (error is PostgrestException) {
+    final message = error.message.trim();
+    if (message.isNotEmpty) return message;
+  }
+  return error.toString();
 }
 
 class _BusinessApprovalsTab extends StatefulWidget {
@@ -401,11 +413,103 @@ class _CommunityCreationApprovalsTabState
   }
 }
 
-class _ApprovalCard extends StatelessWidget {
+class _GroupLinkApprovalsTab extends StatefulWidget {
+  @override
+  State<_GroupLinkApprovalsTab> createState() => _GroupLinkApprovalsTabState();
+}
+
+class _GroupLinkApprovalsTabState extends State<_GroupLinkApprovalsTab> {
+  late Future<List<Map<String, dynamic>>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = CommunityHubService.fetchAllPendingLinkRequestsForAdmin();
+  }
+
+  Future<void> _refresh() async {
+    setState(
+      () => _future = CommunityHubService.fetchAllPendingLinkRequestsForAdmin(),
+    );
+    await _future;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                _approvalErrorMessage(snapshot.error!),
+                style: const TextStyle(color: Colors.white54),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        }
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final items = snapshot.data!;
+        if (items.isEmpty) {
+          return const Center(
+            child: Text(
+              'No pending group link requests.',
+              style: TextStyle(color: Colors.white54),
+            ),
+          );
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.all(20),
+          itemCount: items.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final item = items[index];
+            final id = (item['id'] as String?) ?? '';
+            final community = item['communities'];
+            final hub = item['community_hubs'];
+            final communityName = community is Map
+                ? (community['name'] as String?) ?? 'Community'
+                : 'Community';
+            final hubName = hub is Map
+                ? (hub['name'] as String?) ?? 'Hub'
+                : 'Hub';
+            final requester =
+                (item['requested_by_profile_id'] as String?) ?? 'unknown';
+            return _ApprovalCard(
+              title: communityName,
+              subtitle: 'Link to hub: $hubName\nRequester: $requester',
+              onApprove: () async {
+                await CommunityHubService.reviewLinkRequest(
+                  requestId: id,
+                  approve: true,
+                );
+                await _refresh();
+              },
+              onReject: () async {
+                await CommunityHubService.reviewLinkRequest(
+                  requestId: id,
+                  approve: false,
+                );
+                await _refresh();
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _ApprovalCard extends StatefulWidget {
   final String title;
   final String subtitle;
-  final VoidCallback onApprove;
-  final VoidCallback onReject;
+  final Future<void> Function() onApprove;
+  final Future<void> Function() onReject;
 
   const _ApprovalCard({
     required this.title,
@@ -413,6 +517,34 @@ class _ApprovalCard extends StatelessWidget {
     required this.onApprove,
     required this.onReject,
   });
+
+  @override
+  State<_ApprovalCard> createState() => _ApprovalCardState();
+}
+
+class _ApprovalCardState extends State<_ApprovalCard> {
+  bool _busy = false;
+
+  Future<void> _run(Future<void> Function() action, {required bool approved}) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await action();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(approved ? 'Approved.' : 'Rejected.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_approvalErrorMessage(error))),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -427,7 +559,7 @@ class _ApprovalCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            title,
+            widget.title,
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
@@ -435,21 +567,37 @@ class _ApprovalCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Text(subtitle, style: const TextStyle(color: Colors.white54)),
+          Text(widget.subtitle, style: const TextStyle(color: Colors.white54)),
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: onReject,
-                  child: const Text('REJECT'),
+                  onPressed: _busy
+                      ? null
+                      : () => _run(widget.onReject, approved: false),
+                  child: _busy
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('REJECT'),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: FilledButton(
-                  onPressed: onApprove,
-                  child: const Text('APPROVE'),
+                  onPressed: _busy
+                      ? null
+                      : () => _run(widget.onApprove, approved: true),
+                  child: _busy
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('APPROVE'),
                 ),
               ),
             ],

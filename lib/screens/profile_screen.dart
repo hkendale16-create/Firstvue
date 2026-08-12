@@ -5,9 +5,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_screen.dart';
 import 'edit_profile_screen.dart';
 import 'followers_following_screen.dart';
+import 'my_business_profile_view_screen.dart';
+import 'my_businesses_screen.dart';
+import 'my_professional_profile_view_screen.dart';
+import '../services/business_submission_service.dart';
 import '../services/community_news_service.dart';
 import '../services/profile_media_service.dart';
 import '../services/follow_service.dart';
+import '../services/professional_profiles_service.dart';
 import '../services/user_profile_service.dart';
 import '../services/profile_privacy_service.dart';
 import '../services/username_service.dart';
@@ -15,9 +20,9 @@ import '../theme/firstvue_theme.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/media_picker_sheet.dart';
 import '../widgets/signed_media_viewer.dart' show openSignedMedia;
+import '../widgets/profile_affiliations_section.dart';
 import '../widgets/profile_media_section.dart';
 import '../widgets/profile_my_posts_section.dart';
-import '../widgets/profile_recent_activity_section.dart';
 import '../widgets/profile_saved_section.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../config/app_config.dart';
@@ -55,8 +60,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _selectedTab = 0;
   int _pullRefreshToken = 0;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
+  List<OwnedBusiness> _approvedBusinesses = const [];
+  bool _hasApprovedProfessional = false;
 
-  static const _tabLabels = ['POSTS', 'PHOTOS', 'ACTIVITY'];
+  static const _tabLabels = [
+    'POSTS',
+    'PHOTOS',
+    'GROUPS',
+    'COMMUNITIES',
+    'ABOUT',
+  ];
 
   @override
   void initState() {
@@ -65,6 +78,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadStats();
     _loadDisplayName();
     _loadPrivacy();
+    _loadManagedProfiles();
+  }
+
+  Future<void> _loadManagedProfiles() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      if (mounted) {
+        setState(() {
+          _approvedBusinesses = const [];
+          _hasApprovedProfessional = false;
+        });
+      }
+      return;
+    }
+    try {
+      final results = await Future.wait([
+        BusinessSubmissionService.fetchMyBusinesses(),
+        ProfessionalProfilesService.fetchMine(),
+      ]);
+      if (!mounted) return;
+      final businesses = (results[0] as List<OwnedBusiness>)
+          .where((b) => b.status == 'approved')
+          .toList();
+      final professional = results[1] as ProfessionalProfile?;
+      setState(() {
+        _approvedBusinesses = businesses;
+        _hasApprovedProfessional = professional?.status == 'approved';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _approvedBusinesses = const [];
+        _hasApprovedProfessional = false;
+      });
+    }
   }
 
   Future<void> _loadPrivacy() async {
@@ -104,6 +152,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _loadStats();
       _loadDisplayName();
       _loadPrivacy();
+      _loadManagedProfiles();
     }
   }
 
@@ -348,6 +397,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() {});
         await _loadStats();
         await _loadDisplayName();
+        await _loadManagedProfiles();
         if (needsHandle == true) {
           await _openEditProfile();
         }
@@ -370,6 +420,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _loadStats(),
       _loadDisplayName(),
       _loadPrivacy(),
+      _loadManagedProfiles(),
     ]);
     if (mounted) setState(() => _pullRefreshToken++);
   }
@@ -423,7 +474,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Widget _buildTabContent() {
+  Future<void> _openMyBusiness() async {
+    if (_approvedBusinesses.isEmpty) return;
+    if (_approvedBusinesses.length == 1) {
+      await Navigator.push(
+        context,
+        FirstVuePageRoute(
+          builder: (_) => MyBusinessProfileViewScreen(
+            business: _approvedBusinesses.first,
+          ),
+        ),
+      );
+      return;
+    }
+    await Navigator.push(
+      context,
+      FirstVuePageRoute(builder: (_) => const MyBusinessesScreen()),
+    );
+  }
+
+  Future<void> _openMyProfessional() async {
+    await Navigator.push(
+      context,
+      FirstVuePageRoute(builder: (_) => const MyProfessionalProfileViewScreen()),
+    );
+  }
+
+  Widget _buildTabContent(String userId) {
     return switch (_selectedTab) {
       0 => ProfileMyPostsSection(
           refreshToken: _effectiveRefreshToken,
@@ -433,9 +510,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
           refreshToken: _effectiveRefreshToken,
           embedded: true,
         ),
-      _ => ProfileRecentActivitySection(
+      2 => ProfileAffiliationsSection(
+          profileId: userId,
+          showGroups: true,
+          showCommunities: false,
           refreshToken: _effectiveRefreshToken,
-          embedded: true,
+        ),
+      3 => ProfileAffiliationsSection(
+          profileId: userId,
+          showGroups: false,
+          showCommunities: true,
+          refreshToken: _effectiveRefreshToken,
+        ),
+      _ => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ProfileSavedSection(refreshToken: widget.refreshToken),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Text(
+                'Your about & saved items stay private to you unless you choose to share them.',
+                style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.4),
+              ),
+            ),
+          ],
         ),
     };
   }
@@ -477,6 +575,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.zero,
           children: [
+          if (user != null)
+            const FirstVueInlineSearchBar(
+              padding: EdgeInsets.fromLTRB(12, 4, 12, 0),
+            ),
           if (user != null)
             FollowRequestsSection(
               onChanged: () {
@@ -593,6 +695,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             side: BorderSide(color: Colors.white.withValues(alpha: .25)),
                           ),
                         ),
+                        if (_approvedBusinesses.isNotEmpty)
+                          OutlinedButton.icon(
+                            onPressed: _openMyBusiness,
+                            icon: const Icon(Icons.storefront_outlined, size: 18),
+                            label: Text(
+                              _approvedBusinesses.length == 1
+                                  ? 'My Business'
+                                  : 'My Businesses',
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: BorderSide(
+                                color: Colors.white.withValues(alpha: .25),
+                              ),
+                            ),
+                          ),
+                        if (_hasApprovedProfessional)
+                          OutlinedButton.icon(
+                            onPressed: _openMyProfessional,
+                            icon: const Icon(Icons.work_outline, size: 18),
+                            label: const Text('My Professional'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: BorderSide(
+                                color: Colors.white.withValues(alpha: .25),
+                              ),
+                            ),
+                          ),
                       ],
               ),
               Positioned(
@@ -610,21 +740,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
           if (user != null) ...[
-            const FirstVueInlineSearchBar(),
             const SizedBox(height: 12),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  for (var i = 0; i < _tabLabels.length; i++)
-                    Expanded(
-                      child: _ProfileTabButton(
-                        label: _tabLabels[i],
-                        selected: _selectedTab == i,
-                        onTap: () => setState(() => _selectedTab = i),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (var i = 0; i < _tabLabels.length; i++)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: _ProfileTabButton(
+                          label: _tabLabels[i],
+                          selected: _selectedTab == i,
+                          onTap: () => setState(() => _selectedTab = i),
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -632,13 +765,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               duration: const Duration(milliseconds: 200),
               child: KeyedSubtree(
                 key: ValueKey(_selectedTab),
-                child: _buildTabContent(),
+                child: _buildTabContent(user.id),
               ),
             ),
-            if (_selectedTab == 0) ...[
-              const SizedBox(height: 8),
-              ProfileSavedSection(refreshToken: widget.refreshToken),
-            ],
           ],
           if (user == null) ...[
             const SizedBox(height: 16),
