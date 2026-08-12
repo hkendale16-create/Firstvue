@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 
 import '../screens/community_detail_screen.dart';
+import '../screens/community_hub_detail_screen.dart';
 import '../screens/firstvue_business_profile_screen.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../services/search_autocomplete_service.dart';
@@ -80,6 +81,13 @@ class _SearchScreenState extends State<SearchScreen> {
           context,
           FirstVuePageRoute(
             builder: (_) => CommunityDetailScreen(communityId: result.id),
+          ),
+        );
+      case SearchResultType.communityHub:
+        Navigator.push(
+          context,
+          FirstVuePageRoute(
+            builder: (_) => CommunityHubDetailScreen(hubId: result.id),
           ),
         );
       case SearchResultType.hashtag:

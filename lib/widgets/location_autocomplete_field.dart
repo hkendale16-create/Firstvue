@@ -27,6 +27,7 @@ class LocationAutocompleteField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Autocomplete<String>(
       optionsBuilder: (textEditingValue) {
         return _options(textEditingValue.text);
@@ -43,24 +44,39 @@ class LocationAutocompleteField extends StatelessWidget {
           focusNode: focusNode,
           maxLines: lines,
           onChanged: (value) => controller.text = value,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: fv.primaryText),
           decoration: InputDecoration(
             labelText: label,
-            helperText: 'Type ${UsLocations.minQueryLength}+ letters for suggestions',
-            helperStyle: const TextStyle(color: Colors.white38, fontSize: 11),
-            labelStyle: const TextStyle(color: Colors.white54),
+            helperText:
+                'Type ${UsLocations.minQueryLength}+ letters for suggestions',
+            helperStyle: TextStyle(color: fv.tertiaryText, fontSize: 11),
+            labelStyle: TextStyle(color: fv.secondaryText),
             filled: true,
-            fillColor: const Color(0xFF151B22),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+            fillColor: fv.inputFill,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: fv.borderSubtle),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: fv.borderSubtle),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: FirstVueColors.teal.withValues(alpha: .55),
+              ),
+            ),
           ),
         );
       },
       optionsViewBuilder: (context, onSelected, options) {
         if (options.isEmpty) return const SizedBox.shrink();
+        final optionsFv = context.fv;
         return Align(
           alignment: Alignment.topLeft,
           child: Material(
-            color: Theme.of(context).extension<FirstVuePalette>()?.elevatedSurface ?? FirstVueColors.elevatedSurface,
+            color: optionsFv.elevatedSurface,
             elevation: 6,
             borderRadius: BorderRadius.circular(12),
             child: ConstrainedBox(
@@ -75,7 +91,10 @@ class LocationAutocompleteField extends StatelessWidget {
                     dense: true,
                     title: Text(
                       option,
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      style: TextStyle(
+                        color: optionsFv.primaryText,
+                        fontSize: 14,
+                      ),
                     ),
                     onTap: () => onSelected(option),
                   );

@@ -2,7 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'username_service.dart';
 
-enum SearchResultType { profile, business, community, hashtag }
+enum SearchResultType { profile, business, community, communityHub, hashtag }
 
 class SearchAutocompleteResult {
   final String id;
@@ -49,6 +49,7 @@ class SearchAutocompleteService {
     results.addAll(await _searchProfiles(lower));
     results.addAll(await _searchBusinesses(lower));
     results.addAll(await _searchCommunities(lower));
+    results.addAll(await _searchCommunityHubs(lower));
     results.addAll(await _searchHashtags(lower));
 
     return results;
@@ -167,8 +168,39 @@ class SearchAutocompleteService {
         return SearchAutocompleteResult(
           id: row['id'] as String,
           label: row['name'] as String,
-          subtitle: location.isNotEmpty ? location : 'Community group',
+          subtitle: location.isNotEmpty ? location : 'Group',
           type: SearchResultType.community,
+        );
+      }).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<List<SearchAutocompleteResult>> _searchCommunityHubs(
+    String prefix,
+  ) async {
+    try {
+      final rows = await _client
+          .from('community_hubs')
+          .select('id, name, city, state, status')
+          .eq('status', 'active')
+          .ilike('name', '$prefix%')
+          .limit(8);
+
+      return rows.map((row) {
+        final city = row['city'] as String?;
+        final state = row['state'] as String?;
+        final location = [city, state]
+            .whereType<String>()
+            .where((part) => part.trim().isNotEmpty)
+            .join(', ');
+
+        return SearchAutocompleteResult(
+          id: row['id'] as String,
+          label: row['name'] as String,
+          subtitle: location.isNotEmpty ? location : 'Community',
+          type: SearchResultType.communityHub,
         );
       }).toList();
     } catch (_) {

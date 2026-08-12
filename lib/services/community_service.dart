@@ -2,6 +2,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/media_config.dart';
+import 'entity_image_url.dart';
 import 'media_storage_service.dart';
 import 'media_type_helpers.dart';
 import 'user_preferences_service.dart';
@@ -81,6 +82,8 @@ class Community {
     String? myRole,
   }) {
     final createdRaw = row['created_at'];
+    final storagePath = row['image_storage_path'] as String?;
+    final legacy = row['image_url'] as String?;
     return Community(
       id: row['id'] as String,
       name: (row['name'] as String?) ?? 'Group',
@@ -89,7 +92,8 @@ class Community {
       city: row['city'] as String?,
       state: row['state'] as String?,
       postalCode: row['postal_code'] as String?,
-      imageUrl: row['image_url'] as String?,
+      // Temporary raw value; call [withResolvedImage] before display.
+      imageUrl: storagePath?.trim().isNotEmpty == true ? storagePath : legacy,
       rules: row['rules'] as String?,
       creatorId: (row['creator_id'] as String?) ?? '',
       hubId: row['hub_id'] as String?,
@@ -107,6 +111,16 @@ class Community {
               ? createdRaw
               : DateTime.now(),
     );
+  }
+
+  Future<Community> withResolvedImage() async {
+    final resolved = await EntityImageUrl.resolve(
+      storagePath: EntityImageUrl.looksLikeStoragePath(imageUrl) ? imageUrl : null,
+      legacyUrl: imageUrl,
+      provider: MediaStorageProvider.supabase,
+    );
+    if (resolved == imageUrl) return this;
+    return copyWith(imageUrl: resolved);
   }
 
   Community copyWith({
@@ -188,8 +202,46 @@ class CommunityService {
 
   static const _communityColumns =
       'id, name, description, category, city, state, postal_code, image_url, '
+      'image_storage_path, image_storage_provider, '
       'rules, creator_id, hub_id, privacy_type, posting_permission, '
       'member_count, follower_count, created_at';
+
+  static const _communityColumnsLegacy =
+      'id, name, description, category, city, state, postal_code, image_url, '
+      'rules, creator_id, hub_id, privacy_type, posting_permission, '
+      'member_count, follower_count, created_at';
+
+  static Future<List<Map<String, dynamic>>> _selectCommunityRows({
+    required dynamic Function(dynamic query) configure,
+  }) async {
+    Future<List<Map<String, dynamic>>> run(String columns) async {
+      dynamic query = _client.from('communities').select(columns);
+      query = configure(query);
+      final rows = await query;
+      return List<Map<String, dynamic>>.from(rows as List);
+    }
+
+    try {
+      return await run(_communityColumns);
+    } catch (_) {
+      return await run(_communityColumnsLegacy);
+    }
+  }
+
+  static Future<List<Community>> _resolveCommunityImages(
+    List<Community> communities,
+  ) async {
+    return Future.wait(communities.map((c) => c.withResolvedImage()));
+  }
+
+  static Map<String, dynamic> _imagePersistPayload(MediaUploadResult upload) {
+    return {
+      // Durable storage path (also written to image_url for pre-migration DBs).
+      'image_url': upload.path,
+      'image_storage_path': upload.path,
+      'image_storage_provider': upload.provider.value,
+    };
+  }
 
   static Future<void> _ensureProfile(User user) async {
     final displayName = user.email?.split('@').first;
@@ -289,11 +341,10 @@ class CommunityService {
 
   static Future<List<Community>> fetchCommunities({int limit = 50}) async {
     try {
-      final rows = await _client
-          .from('communities')
-          .select(_communityColumns)
-          .order('created_at', ascending: false)
-          .limit(limit);
+      final rows = await _selectCommunityRows(
+        configure: (query) =>
+            query.order('created_at', ascending: false).limit(limit),
+      );
 
       final membershipMeta = await _myMembershipMeta();
       final memberIds = membershipMeta.entries
@@ -306,7 +357,7 @@ class CommunityService {
           .toSet();
       final followIds = await _myFollowIds();
 
-      return rows
+      final mapped = rows
           .map(
             (row) => _mapRow(
               row,
@@ -317,6 +368,7 @@ class CommunityService {
             ),
           )
           .toList();
+      return await _resolveCommunityImages(mapped);
     } catch (_) {
       return const [];
     }
@@ -326,12 +378,11 @@ class CommunityService {
     if (id.trim().isEmpty) return null;
 
     try {
-      final row = await _client
-          .from('communities')
-          .select(_communityColumns)
-          .eq('id', id)
-          .maybeSingle();
-      if (row == null) return null;
+      final rows = await _selectCommunityRows(
+        configure: (query) => query.eq('id', id).limit(1),
+      );
+      if (rows.isEmpty) return null;
+      final row = rows.first;
 
       final membershipMeta = await _myMembershipMeta();
       final memberIds = membershipMeta.entries
@@ -344,13 +395,13 @@ class CommunityService {
           .toSet();
       final followIds = await _myFollowIds();
 
-      return _mapRow(
+      return await _mapRow(
         row,
         memberIds: memberIds,
         followIds: followIds,
         pendingIds: pendingIds,
         membershipMeta: membershipMeta,
-      );
+      ).withResolvedImage();
     } catch (_) {
       return null;
     }
@@ -362,12 +413,12 @@ class CommunityService {
   }) async {
     if (hubId.trim().isEmpty) return const [];
     try {
-      final rows = await _client
-          .from('communities')
-          .select(_communityColumns)
-          .eq('hub_id', hubId)
-          .order('created_at', ascending: false)
-          .limit(limit);
+      final rows = await _selectCommunityRows(
+        configure: (query) => query
+            .eq('hub_id', hubId)
+            .order('created_at', ascending: false)
+            .limit(limit),
+      );
 
       final membershipMeta = await _myMembershipMeta();
       final memberIds = membershipMeta.entries
@@ -380,7 +431,7 @@ class CommunityService {
           .toSet();
       final followIds = await _myFollowIds();
 
-      return rows
+      final mapped = rows
           .map(
             (row) => _mapRow(
               row,
@@ -391,6 +442,7 @@ class CommunityService {
             ),
           )
           .toList();
+      return await _resolveCommunityImages(mapped);
     } catch (_) {
       return const [];
     }
@@ -420,9 +472,9 @@ class CommunityService {
 
     await _ensureProfile(me);
 
-    String? imageUrl;
+    MediaUploadResult? upload;
     if (imageFile != null) {
-      imageUrl = await CommunityMediaService.uploadGroupImage(
+      upload = await CommunityMediaService.uploadGroupImage(
         communityIdHint: me.id,
         file: imageFile,
       );
@@ -435,22 +487,35 @@ class CommunityService {
       'city': city?.trim(),
       'state': state?.trim(),
       'postal_code': postalCode?.trim(),
-      'image_url': imageUrl,
       'rules': rules?.trim(),
       'privacy_type': privacy,
       'creator_id': me.id,
       'member_count': 1,
       'follower_count': 0,
     };
+    if (upload != null) {
+      insert.addAll(_imagePersistPayload(upload));
+    }
     if (hubId != null && hubId.trim().isNotEmpty) {
       insert['hub_id'] = hubId.trim();
     }
 
-    final row = await _client
-        .from('communities')
-        .insert(insert)
-        .select(_communityColumns)
-        .single();
+    Map<String, dynamic> row;
+    try {
+      row = await _client
+          .from('communities')
+          .insert(insert)
+          .select(_communityColumns)
+          .single();
+    } catch (_) {
+      insert.remove('image_storage_path');
+      insert.remove('image_storage_provider');
+      row = await _client
+          .from('communities')
+          .insert(insert)
+          .select(_communityColumnsLegacy)
+          .single();
+    }
 
     // Creator becomes the Group Leader (owner).
     try {
@@ -464,7 +529,8 @@ class CommunityService {
       if (error.code != '23505') rethrow;
     }
 
-    return Community.fromRow(row, isMember: true, myRole: 'owner');
+    return Community.fromRow(row, isMember: true, myRole: 'owner')
+        .withResolvedImage();
   }
 
   static Future<Community> updateCommunity({
@@ -503,17 +569,31 @@ class CommunityService {
     } else if (hubId != null) {
       patch['hub_id'] = hubId.trim().isEmpty ? null : hubId.trim();
     }
-    if (clearImage) patch['image_url'] = null;
+    if (clearImage) {
+      patch['image_url'] = null;
+      patch['image_storage_path'] = null;
+    }
 
-    final row = await _client
-        .from('communities')
-        .update(patch)
-        .eq('id', communityId)
-        .select(_communityColumns)
-        .single();
-
-    return (await fetchCommunityById(communityId)) ??
-        Community.fromRow(row, isMember: true);
+    try {
+      final row = await _client
+          .from('communities')
+          .update(patch)
+          .eq('id', communityId)
+          .select(_communityColumns)
+          .single();
+      return (await fetchCommunityById(communityId)) ??
+          await Community.fromRow(row, isMember: true).withResolvedImage();
+    } catch (_) {
+      patch.remove('image_storage_path');
+      final row = await _client
+          .from('communities')
+          .update(patch)
+          .eq('id', communityId)
+          .select(_communityColumnsLegacy)
+          .single();
+      return (await fetchCommunityById(communityId)) ??
+          await Community.fromRow(row, isMember: true).withResolvedImage();
+    }
   }
 
   static Future<Community> updateCommunityImage({
@@ -523,23 +603,31 @@ class CommunityService {
     final me = _client.auth.currentUser;
     if (me == null) throw const AuthException('Sign in to update group image.');
 
-    final imageUrl = await CommunityMediaService.uploadGroupImage(
+    final upload = await CommunityMediaService.uploadGroupImage(
       communityIdHint: communityId,
       file: file,
     );
+    final patch = {
+      ..._imagePersistPayload(upload),
+      'updated_at': DateTime.now().toIso8601String(),
+    };
 
-    final row = await _client
-        .from('communities')
-        .update({
-          'image_url': imageUrl,
-          'updated_at': DateTime.now().toIso8601String(),
-        })
-        .eq('id', communityId)
-        .select(_communityColumns)
-        .single();
+    try {
+      await _client.from('communities').update(patch).eq('id', communityId);
+    } catch (_) {
+      patch.remove('image_storage_path');
+      patch.remove('image_storage_provider');
+      await _client.from('communities').update(patch).eq('id', communityId);
+    }
 
     return (await fetchCommunityById(communityId)) ??
-        Community.fromRow(row, isMember: true);
+        await Community.fromRow({
+          'id': communityId,
+          'name': 'Group',
+          'creator_id': me.id,
+          'created_at': DateTime.now().toIso8601String(),
+          ...patch,
+        }, isMember: true).withResolvedImage();
   }
 
   static Future<Community> removeCommunityImage(String communityId) async {
@@ -794,16 +882,16 @@ class CommunityService {
 
       if (ids.isEmpty) return const [];
 
-      final rows = await _client
-          .from('communities')
-          .select(_communityColumns)
-          .inFilter('id', ids)
-          .order('created_at', ascending: false)
-          .limit(limit);
+      final rows = await _selectCommunityRows(
+        configure: (query) => query
+            .inFilter('id', ids)
+            .order('created_at', ascending: false)
+            .limit(limit),
+      );
 
       final membershipMeta = await _myMembershipMeta();
       final followIds = await _myFollowIds();
-      return rows
+      final mapped = rows
           .map(
             (row) => _mapRow(
               row,
@@ -814,6 +902,7 @@ class CommunityService {
             ),
           )
           .toList();
+      return await _resolveCommunityImages(mapped);
     } catch (_) {
       return const [];
     }
@@ -828,18 +917,22 @@ class CommunityService {
       final city = prefs.locationCity?.trim();
       final state = prefs.locationState?.trim();
 
-      var query = _client.from('communities').select(_communityColumns);
-
-      if (city != null && city.isNotEmpty && state != null && state.isNotEmpty) {
-        query = query.or('city.ilike.%$city%,state.ilike.%$state%');
-      } else if (city != null && city.isNotEmpty) {
-        query = query.ilike('city', '%$city%');
-      } else if (state != null && state.isNotEmpty) {
-        query = query.ilike('state', '%$state%');
-      }
-
-      final rows =
-          await query.order('created_at', ascending: false).limit(limit);
+      final rows = await _selectCommunityRows(
+        configure: (query) {
+          var q = query;
+          if (city != null &&
+              city.isNotEmpty &&
+              state != null &&
+              state.isNotEmpty) {
+            q = q.or('city.ilike.%$city%,state.ilike.%$state%');
+          } else if (city != null && city.isNotEmpty) {
+            q = q.ilike('city', '%$city%');
+          } else if (state != null && state.isNotEmpty) {
+            q = q.ilike('state', '%$state%');
+          }
+          return q.order('created_at', ascending: false).limit(limit);
+        },
+      );
 
       final membershipMeta = await _myMembershipMeta();
       final memberIds = membershipMeta.entries
@@ -852,7 +945,7 @@ class CommunityService {
           .toSet();
       final followIds = await _myFollowIds();
 
-      return rows
+      final mapped = rows
           .where((row) => !memberIds.contains(row['id'] as String))
           .map(
             (row) => _mapRow(
@@ -864,6 +957,7 @@ class CommunityService {
             ),
           )
           .toList();
+      return await _resolveCommunityImages(mapped);
     } catch (_) {
       return fetchCommunities(limit: limit);
     }
@@ -882,9 +976,8 @@ class CommunityMediaService {
   static const _maxBytes = 10 * 1024 * 1024;
   static final _client = Supabase.instance.client;
 
-  /// Uploads a group profile image under the signed-in user's storage folder
-  /// and returns a signed read URL for `communities.image_url`.
-  static Future<String> uploadGroupImage({
+  /// Uploads a group profile image and returns the durable storage path.
+  static Future<MediaUploadResult> uploadGroupImage({
     required String communityIdHint,
     required XFile file,
   }) async {
@@ -904,7 +997,7 @@ class CommunityMediaService {
       throw const StorageException('Group profile image must be a photo.');
     }
 
-    final upload = await MediaStorageService.uploadBytes(
+    return MediaStorageService.uploadBytes(
       bucket: MediaBucket.profile,
       bytes: bytes,
       contentType: mimeTypeForFile(file, mediaType),
@@ -913,16 +1006,9 @@ class CommunityMediaService {
       subfolder: 'community-avatars/$communityIdHint',
       context: {'profile_id': user.id},
     );
-
-    return MediaStorageService.createReadUrl(
-      bucket: MediaBucket.profile,
-      path: upload.path,
-      provider: upload.provider,
-      context: {'profile_id': user.id},
-    );
   }
 
-  static Future<String> uploadHubImage({
+  static Future<MediaUploadResult> uploadHubImage({
     required String hubIdHint,
     required XFile file,
   }) async {
@@ -942,20 +1028,13 @@ class CommunityMediaService {
       throw const StorageException('Community profile image must be a photo.');
     }
 
-    final upload = await MediaStorageService.uploadBytes(
+    return MediaStorageService.uploadBytes(
       bucket: MediaBucket.profile,
       bytes: bytes,
       contentType: mimeTypeForFile(file, mediaType),
       fileName: file.name,
       index: 0,
       subfolder: 'community-hub-avatars/$hubIdHint',
-      context: {'profile_id': user.id},
-    );
-
-    return MediaStorageService.createReadUrl(
-      bucket: MediaBucket.profile,
-      path: upload.path,
-      provider: upload.provider,
       context: {'profile_id': user.id},
     );
   }

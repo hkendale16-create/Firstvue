@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../widgets/editable_media_grid.dart';
+import '../widgets/entity_details_form.dart';
 import '../widgets/entity_profile_media_editor.dart';
 import '../widgets/media_picker_sheet.dart';
 
+import '../services/entity_details_service.dart';
 import '../services/professional_media_service.dart';
 import '../services/professional_profiles_service.dart';
 import 'professional_showcase_editor_screen.dart';
@@ -37,6 +39,7 @@ class _ProfessionalProfileEditorScreenState
   bool _acceptsNewClients = true;
   ProfessionalImageSet _profileImages = const ProfessionalImageSet();
   Future<List<ProfessionalMediaItem>> _media = Future.value(const []);
+  Map<String, dynamic> _entityDetails = {};
 
   @override
   void initState() {
@@ -48,6 +51,7 @@ class _ProfessionalProfileEditorScreenState
     try {
       final profile = await ProfessionalProfilesService.fetchMine();
       if (!mounted) return;
+      Map<String, dynamic> details = {};
       if (profile != null) {
         _nameController.text = profile.displayName;
         _bioController.text = profile.bio;
@@ -62,9 +66,12 @@ class _ProfessionalProfileEditorScreenState
         _media = ProfessionalMediaService.fetchMedia(profile.id);
         _profileImages =
             await ProfessionalMediaService.fetchProfileImages(profile.id);
+        details =
+            await EntityDetailsService.fetchProfessionalDetails(profile.id);
       }
       setState(() {
         _existing = profile;
+        _entityDetails = details;
         _loading = false;
       });
     } catch (_) {
@@ -97,6 +104,15 @@ class _ProfessionalProfileEditorScreenState
         availabilityNote: _availabilityController.text.trim(),
         bookingUrl: _bookingUrlController.text.trim(),
       );
+      final saved = await ProfessionalProfilesService.fetchMine();
+      if (saved != null) {
+        try {
+          await EntityDetailsService.saveProfessionalDetails(
+            saved.id,
+            _entityDetails,
+          );
+        } catch (_) {}
+      }
       if (!mounted) return;
       _showMessage('Profile submitted for FIRSTVUE approval.');
       await _load();
@@ -262,7 +278,63 @@ class _ProfessionalProfileEditorScreenState
                       placeholderIcon: Icons.badge_outlined,
                       onChangeCover: _changeCover,
                       onChangeAvatar: _changeAvatar,
+                      onRemoveCover: _profileImages.cover == null
+                          ? null
+                          : () async {
+                              final profile = _existing;
+                              if (profile == null) return;
+                              setState(() => _profileMediaUpdating = true);
+                              try {
+                                await ProfessionalMediaService.removeCover(
+                                  profile.id,
+                                );
+                                _profileImages = await ProfessionalMediaService
+                                    .fetchProfileImages(profile.id);
+                              } catch (_) {
+                                if (mounted) {
+                                  _showMessage('Unable to remove cover photo.');
+                                }
+                              } finally {
+                                if (mounted) {
+                                  setState(() => _profileMediaUpdating = false);
+                                }
+                              }
+                            },
+                      onRemoveAvatar: _profileImages.avatar == null
+                          ? null
+                          : () async {
+                              final profile = _existing;
+                              if (profile == null) return;
+                              setState(() => _profileMediaUpdating = true);
+                              try {
+                                await ProfessionalMediaService.removeAvatar(
+                                  profile.id,
+                                );
+                                _profileImages = await ProfessionalMediaService
+                                    .fetchProfileImages(profile.id);
+                              } catch (_) {
+                                if (mounted) {
+                                  _showMessage(
+                                    'Unable to remove profile photo.',
+                                  );
+                                }
+                              } finally {
+                                if (mounted) {
+                                  setState(() => _profileMediaUpdating = false);
+                                }
+                              }
+                            },
                     ),
+                  if (_existing != null) ...[
+                    const SizedBox(height: 20),
+                    EntityDetailsForm(
+                      fields: EntityDetailSchemas.forProfessionalType(
+                        _type.value,
+                      ),
+                      initialValues: _entityDetails,
+                      onChanged: (values) => _entityDetails = values,
+                    ),
+                  ],
                   if (_existing == null) ...[
                     const SizedBox(height: 8),
                     Text(

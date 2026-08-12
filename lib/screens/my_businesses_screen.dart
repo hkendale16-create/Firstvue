@@ -6,7 +6,9 @@ import '../services/business_media_service.dart';
 import '../services/business_menu_service.dart';
 import '../services/business_social_links_service.dart';
 import '../services/business_submission_service.dart';
+import '../services/entity_details_service.dart';
 import '../widgets/editable_media_grid.dart';
+import '../widgets/entity_details_form.dart';
 import '../widgets/entity_profile_media_editor.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/location_autocomplete_field.dart';
@@ -201,6 +203,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
   final _specialLines = TextEditingController();
   late Future<List<BusinessMediaItem>> _media;
   BusinessImageSet _profileImages = const BusinessImageSet();
+  Map<String, dynamic> _entityDetails = {};
   late TabController _tabController;
   int _previewToken = 0;
 
@@ -217,6 +220,14 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
     _loadProfileImages();
     _loadLocation();
     _loadExtras();
+    _loadEntityDetails();
+  }
+
+  Future<void> _loadEntityDetails() async {
+    final details =
+        await EntityDetailsService.fetchBusinessDetails(widget.business.id);
+    if (!mounted) return;
+    setState(() => _entityDetails = details);
   }
 
   PublicBusinessDetails _draftPreviewDetails() {
@@ -334,6 +345,38 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
     }
   }
 
+  Future<void> _removeAvatar() async {
+    setState(() => _profileMediaUpdating = true);
+    try {
+      await BusinessMediaService.removeAvatar(widget.business.id);
+      await _loadProfileImages();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to remove profile photo: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _profileMediaUpdating = false);
+    }
+  }
+
+  Future<void> _removeCover() async {
+    setState(() => _profileMediaUpdating = true);
+    try {
+      await BusinessMediaService.removeCover(widget.business.id);
+      await _loadProfileImages();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to remove cover photo: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _profileMediaUpdating = false);
+    }
+  }
+
   Future<void> _loadLocation() async {
     final value = await BusinessSubmissionService.fetchLocation(
       widget.business.id,
@@ -434,6 +477,12 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
           specials: _parseSpecialLines(),
         );
       }
+      try {
+        await EntityDetailsService.saveBusinessDetails(
+          widget.business.id,
+          _entityDetails,
+        );
+      } catch (_) {}
       if (!mounted) return;
       Navigator.pop(context);
     } catch (_) {
@@ -581,6 +630,18 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
           placeholderIcon: Icons.storefront_outlined,
           onChangeCover: _changeCover,
           onChangeAvatar: _changeAvatar,
+          onRemoveCover:
+              _profileImages.cover == null ? null : _removeCover,
+          onRemoveAvatar:
+              _profileImages.avatar == null ? null : _removeAvatar,
+        ),
+        const SizedBox(height: 24),
+        EntityDetailsForm(
+          fields: EntityDetailSchemas.forBusinessType(
+            widget.business.businessType,
+          ),
+          initialValues: _entityDetails,
+          onChanged: (values) => _entityDetails = values,
         ),
         const SizedBox(height: 24),
         _Field(controller: _about, label: 'About your business', lines: 4),

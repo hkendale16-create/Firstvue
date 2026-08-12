@@ -8,6 +8,12 @@ class UserProfile {
   final String? city;
   final String? state;
   final String? website;
+  final String? phone;
+  final DateTime? birthday;
+  final bool? isPrivate;
+  final String? profileVisibility;
+  final bool? showEmailOnProfile;
+  final Map<String, String>? fieldVisibility;
 
   const UserProfile({
     required this.id,
@@ -17,10 +23,17 @@ class UserProfile {
     this.city,
     this.state,
     this.website,
+    this.phone,
+    this.birthday,
+    this.isPrivate,
+    this.profileVisibility,
+    this.showEmailOnProfile,
+    this.fieldVisibility,
   });
 
   String? get locationLabel {
-    final parts = [city, state].whereType<String>().where((p) => p.trim().isNotEmpty);
+    final parts =
+        [city, state].whereType<String>().where((p) => p.trim().isNotEmpty);
     if (parts.isEmpty) return null;
     return parts.join(', ');
   }
@@ -61,26 +74,28 @@ class UserProfileService {
   static Future<UserProfile?> fetchProfileForUser(String profileId) async {
     if (profileId.trim().isEmpty) return null;
 
-    const fullColumns =
-        'id, display_name, username, bio, city, state, website';
-    const baseColumns = 'id, display_name, username, bio, city, state';
+    const columnSets = <String>[
+      'id, display_name, username, bio, city, state, website, phone, birthday, '
+          'is_private, profile_visibility, show_email_on_profile, field_visibility',
+      'id, display_name, username, bio, city, state, website, phone, birthday, '
+          'is_private, profile_visibility, field_visibility',
+      'id, display_name, username, bio, city, state, website, '
+          'is_private, profile_visibility',
+      'id, display_name, username, bio, city, state, website',
+      'id, display_name, username, bio, city, state',
+    ];
 
     Map<String, dynamic>? row;
-    try {
-      row = await _client
-          .from('profiles')
-          .select(fullColumns)
-          .eq('id', profileId)
-          .maybeSingle();
-    } catch (_) {
+    for (final columns in columnSets) {
       try {
         row = await _client
             .from('profiles')
-            .select(baseColumns)
+            .select(columns)
             .eq('id', profileId)
             .maybeSingle();
+        break;
       } catch (_) {
-        return null;
+        row = null;
       }
     }
 
@@ -94,6 +109,12 @@ class UserProfileService {
       city: row['city'] as String?,
       state: row['state'] as String?,
       website: row['website'] as String?,
+      phone: row['phone'] as String?,
+      birthday: _parseDate(row['birthday']),
+      isPrivate: row['is_private'] as bool?,
+      profileVisibility: row['profile_visibility'] as String?,
+      showEmailOnProfile: row['show_email_on_profile'] as bool?,
+      fieldVisibility: _parseFieldVisibility(row['field_visibility']),
     );
   }
 
@@ -103,7 +124,8 @@ class UserProfileService {
     if (trimmed.isEmpty) {
       return 'Display name cannot be empty.';
     }
-    final normalized = trimmed.toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]'), '');
+    final normalized =
+        trimmed.toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]'), '');
     if (normalized.length < 3 || normalized.length > 30) {
       return 'Display names must be 3–30 characters using letters, numbers, and underscores.';
     }
@@ -131,6 +153,9 @@ class UserProfileService {
     String? city,
     String? state,
     String? website,
+    String? phone,
+    DateTime? birthday,
+    bool clearBirthday = false,
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) {
@@ -166,7 +191,22 @@ class UserProfileService {
       updates['website'] = website.trim().isEmpty ? null : website.trim();
     }
 
-    await _upsertProfile(user.id, updates);
+    final withPhone = Map<String, dynamic>.from(updates);
+    if (phone != null) {
+      withPhone['phone'] = phone.trim().isEmpty ? null : phone.trim();
+    }
+    if (clearBirthday) {
+      withPhone['birthday'] = null;
+    } else if (birthday != null) {
+      withPhone['birthday'] = birthday.toIso8601String().split('T').first;
+    }
+
+    try {
+      await _upsertProfile(user.id, withPhone);
+    } catch (_) {
+      // phone / birthday columns may be missing pre-migration.
+      await _upsertProfile(user.id, updates);
+    }
   }
 
   static Future<void> _upsertProfile(
@@ -177,5 +217,24 @@ class UserProfileService {
       'id': userId,
       ...fields,
     });
+  }
+
+  static DateTime? _parseDate(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is DateTime) return raw;
+    final text = raw.toString().trim();
+    if (text.isEmpty) return null;
+    return DateTime.tryParse(text);
+  }
+
+  static Map<String, String>? _parseFieldVisibility(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is! Map) return const {};
+    final out = <String, String>{};
+    raw.forEach((key, value) {
+      if (key == null) return;
+      out[key.toString()] = (value?.toString() ?? '').trim();
+    });
+    return out;
   }
 }

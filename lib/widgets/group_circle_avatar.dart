@@ -21,8 +21,9 @@ class GroupCircleAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     final hasImage = imageUrl != null && imageUrl!.trim().isNotEmpty;
-    final ring = ringColor ?? Colors.white24;
+    final ring = ringColor ?? fv.borderSubtle;
 
     Widget avatar = Container(
       width: size,
@@ -40,6 +41,7 @@ class GroupCircleAvatar extends StatelessWidget {
       child: Container(
         decoration: const BoxDecoration(
           shape: BoxShape.circle,
+          // Keep media plate dark for contrast on both themes.
           color: Color(0xFF080B0F),
         ),
         padding: const EdgeInsets.all(2),
@@ -55,7 +57,7 @@ class GroupCircleAvatar extends StatelessWidget {
                     height: size - 9,
                     filterQuality: FilterQuality.low,
                     errorBuilder: (_, _, _) => ColoredBox(
-                      color: FirstVueColors.elevatedSurface,
+                      color: fv.elevatedSurface,
                       child: Icon(
                         fallbackIcon,
                         color: FirstVueColors.teal,
@@ -64,7 +66,7 @@ class GroupCircleAvatar extends StatelessWidget {
                     ),
                   )
                 : ColoredBox(
-                    color: FirstVueColors.elevatedSurface,
+                    color: fv.elevatedSurface,
                     child: Icon(
                       fallbackIcon,
                       color: FirstVueColors.teal,
@@ -106,6 +108,7 @@ class GroupCircleTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return SizedBox(
       width: width,
       child: InkWell(
@@ -120,7 +123,7 @@ class GroupCircleTile extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(color: FirstVueColors.coral, width: 2),
-                  color: FirstVueColors.elevatedSurface,
+                  color: fv.elevatedSurface,
                 ),
                 child: const Icon(Icons.add, color: FirstVueColors.coral),
               )
@@ -135,8 +138,8 @@ class GroupCircleTile extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: fv.primaryText,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 height: 1.15,

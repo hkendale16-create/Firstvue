@@ -20,12 +20,15 @@ import '../theme/firstvue_theme.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/media_picker_sheet.dart';
 import '../widgets/signed_media_viewer.dart' show openSignedMedia;
+import '../widgets/portfolio_albums_section.dart';
 import '../widgets/profile_affiliations_section.dart';
+import '../widgets/profile_completion_banner.dart';
 import '../widgets/profile_media_section.dart';
 import '../widgets/profile_my_posts_section.dart';
 import '../widgets/profile_saved_section.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../config/app_config.dart';
+import '../services/portfolio_album_service.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/follow_requests_section.dart';
 import '../widgets/live_stream_eligibility_card.dart';
@@ -66,6 +69,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const _tabLabels = [
     'POSTS',
     'PHOTOS',
+    'PORTFOLIO',
     'GROUPS',
     'COMMUNITIES',
     'ABOUT',
@@ -510,13 +514,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           refreshToken: _effectiveRefreshToken,
           embedded: true,
         ),
-      2 => ProfileAffiliationsSection(
+      2 => PortfolioAlbumsSection(
+          ownerType: PortfolioOwnerType.user,
+          ownerId: userId,
+          canManage: true,
+        ),
+      3 => ProfileAffiliationsSection(
           profileId: userId,
           showGroups: true,
           showCommunities: false,
           refreshToken: _effectiveRefreshToken,
         ),
-      3 => ProfileAffiliationsSection(
+      4 => ProfileAffiliationsSection(
           profileId: userId,
           showGroups: false,
           showCommunities: true,
@@ -526,11 +535,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ProfileSavedSection(refreshToken: widget.refreshToken),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: Text(
                 'Your about & saved items stay private to you unless you choose to share them.',
-                style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.4),
+                style: TextStyle(
+                  color: context.fv.secondaryText,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
               ),
             ),
           ],
@@ -741,6 +754,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           if (user != null) ...[
             const SizedBox(height: 12),
+            UserProfileCompletionBanner(userId: user.id),
+            const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: SingleChildScrollView(
