@@ -479,7 +479,9 @@ class _TrendingPortraitCard extends StatelessWidget {
 }
 
 class YouMightLikeSection extends StatefulWidget {
-  const YouMightLikeSection({super.key});
+  final bool showTitle;
+
+  const YouMightLikeSection({super.key, this.showTitle = true});
 
   @override
   State<YouMightLikeSection> createState() => _YouMightLikeSectionState();
@@ -500,21 +502,31 @@ class _YouMightLikeSectionState extends State<YouMightLikeSection> {
       future: _future,
       builder: (context, snapshot) {
         final businesses = snapshot.data ?? const [];
-        if (businesses.isEmpty) return const SizedBox.shrink();
+        if (businesses.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Personalized picks will appear here as you explore.',
+              style: TextStyle(color: Colors.white54),
+            ),
+          );
+        }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 24),
-            const Text(
-              'YOU MIGHT LIKE',
-              style: TextStyle(
-                color: FirstVueColors.ivory,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.4,
+            if (widget.showTitle) ...[
+              const SizedBox(height: 24),
+              const Text(
+                'YOU MIGHT LIKE',
+                style: TextStyle(
+                  color: FirstVueColors.ivory,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.4,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
             SizedBox(
               height: 140,
               child: ListView.separated(

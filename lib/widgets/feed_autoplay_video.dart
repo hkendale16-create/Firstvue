@@ -6,13 +6,17 @@ import 'package:visibility_detector/visibility_detector.dart';
 
 import '../theme/firstvue_theme.dart';
 
-/// Feed video that autoplays muted when mostly on screen (~4s preview), then pauses.
+/// Feed video that autoplays muted when mostly on screen.
+///
+/// By default ([previewOnly] = false) plays and loops continuously while
+/// visible. When [previewOnly] is true, pauses after [previewDuration].
 class FeedAutoplayVideo extends StatefulWidget {
   final String url;
   final double? width;
   final double? height;
   final BoxFit fit;
   final BorderRadius? borderRadius;
+  final bool previewOnly;
   final Duration previewDuration;
   final VoidCallback? onTap;
 
@@ -23,6 +27,7 @@ class FeedAutoplayVideo extends StatefulWidget {
     this.height,
     this.fit = BoxFit.cover,
     this.borderRadius,
+    this.previewOnly = false,
     this.previewDuration = const Duration(seconds: 4),
     this.onTap,
   });
@@ -62,6 +67,15 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
       _previewFinished = false;
       _playing = false;
       _initController();
+    } else if (oldWidget.previewOnly != widget.previewOnly &&
+        _isMostlyVisible) {
+      if (widget.previewOnly) {
+        _startPlayback();
+      } else {
+        _previewTimer?.cancel();
+        _previewFinished = false;
+        _resumeLoop();
+      }
     }
   }
 
@@ -78,7 +92,7 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
       }
       setState(() => _ready = true);
       if (_isMostlyVisible) {
-        _startPreview();
+        _startPlayback();
       }
     } catch (_) {
       if (!mounted || _controller != controller) return;
@@ -93,18 +107,18 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
 
     if (mostlyVisible) {
       _previewFinished = false;
-      _startPreview();
+      _startPlayback();
     } else {
-      _stopPreview(reset: true);
+      _pausePlayback(reset: true);
     }
   }
 
-  void _startPreview() {
+  void _startPlayback() {
     final controller = _controller;
     if (!_ready || controller == null || _failed) return;
 
     _previewTimer?.cancel();
-    if (controller.value.position > Duration.zero) {
+    if (widget.previewOnly && controller.value.position > Duration.zero) {
       controller.seekTo(Duration.zero);
     }
     controller.play();
@@ -112,6 +126,8 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
       _playing = true;
       _previewFinished = false;
     });
+
+    if (!widget.previewOnly) return;
 
     _previewTimer = Timer(widget.previewDuration, () {
       if (!mounted || !_isMostlyVisible) return;
@@ -123,7 +139,19 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
     });
   }
 
-  void _stopPreview({required bool reset}) {
+  void _resumeLoop() {
+    final controller = _controller;
+    if (!_ready || controller == null || _failed) return;
+    controller.play();
+    if (mounted) {
+      setState(() {
+        _playing = true;
+        _previewFinished = false;
+      });
+    }
+  }
+
+  void _pausePlayback({required bool reset}) {
     _previewTimer?.cancel();
     final controller = _controller;
     if (controller != null && _ready) {
@@ -201,6 +229,8 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
       );
     }
 
+    final showPausedOverlay = !_playing || _previewFinished;
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -213,7 +243,7 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
             child: VideoPlayer(_controller!),
           ),
         ),
-        if (!_playing || _previewFinished)
+        if (showPausedOverlay)
           Container(
             color: Colors.black.withValues(alpha: _previewFinished ? 0.25 : 0.15),
             child: Center(
@@ -255,7 +285,7 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
               ),
             ),
           ),
-        if (_playing && !_previewFinished)
+        if (widget.previewOnly && _playing && !_previewFinished)
           Positioned(
             left: 8,
             bottom: 8,
