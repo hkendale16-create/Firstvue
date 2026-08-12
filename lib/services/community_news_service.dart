@@ -98,26 +98,44 @@ class CommunityNewsService {
   static const _postColumnsBase =
       'id, body, created_at, author_id, business_id, community_id';
 
+  /// Filters must run *after* `.select()` — discarding the ordered builder
+  /// before select breaks Home / Community feed loading (PostgREST 400).
   static Future<List<dynamic>> _selectPosts(
-    void Function(dynamic query) configure,
+    dynamic Function(dynamic query) configure,
   ) async {
-    dynamic query = _client.from('community_news_posts');
-    configure(query);
+    Future<List<dynamic>> run(String columns) async {
+      dynamic query = _client.from('community_news_posts').select(columns);
+      query = configure(query);
+      final rows = await query;
+      if (rows is List) return rows;
+      return const [];
+    }
+
     try {
-      return await query.select(_postColumns);
+      return await run(_postColumns);
     } catch (_) {
       try {
-        query = _client.from('community_news_posts');
-        configure(query);
-        return await query.select(
+        return await run(
           'id, body, created_at, author_id, business_id, community_id, visibility',
         );
       } catch (_) {
-        query = _client.from('community_news_posts');
-        configure(query);
-        return await query.select(_postColumnsBase);
+        return await run(_postColumnsBase);
       }
     }
+  }
+
+  static void logFeedError(Object error, {String context = 'NewsFeed'}) {
+    if (error is PostgrestException) {
+      // ignore: avoid_print
+      print(
+        '[$context] PostgrestException '
+        'code=${error.code} message=${error.message} '
+        'details=${error.details} hint=${error.hint}',
+      );
+      return;
+    }
+    // ignore: avoid_print
+    print('[$context] $error');
   }
 
   static Future<Map<String, dynamic>> _insertPostReturning(
@@ -175,12 +193,41 @@ class CommunityNewsService {
 
   static Future<List<CommunityNewsPost>> fetchPosts({int limit = 20}) async {
     final me = _client.auth.currentUser?.id;
-    // RLS returns approved posts plus the signed-in author's own posts.
-    final rows = await _selectPosts(
-      (query) => query.order('created_at', ascending: false).limit(limit),
-    );
+    try {
+      final rows = await _selectPosts(
+        (query) => query.order('created_at', ascending: false).limit(limit),
+      );
+      return await _mapPostRows(rows, currentUserId: me);
+    } catch (error) {
+      logFeedError(error, context: 'HomeNewsFeed.fetchPosts');
+      return const [];
+    }
+  }
 
-    return _mapPostRows(rows, currentUserId: me);
+  /// Community Feed — posts attached to a community/group (`community_id`).
+  static Future<List<CommunityNewsPost>> fetchCommunityFeedPosts({
+    int limit = 20,
+  }) async {
+    final me = _client.auth.currentUser?.id;
+    try {
+      final rows = await _selectPosts(
+        (query) => query
+            .not('community_id', 'is', null)
+            .order('created_at', ascending: false)
+            .limit(limit),
+      );
+      final mapped = await _mapPostRows(rows, currentUserId: me);
+      if (mapped.isNotEmpty) return mapped;
+      // Soft fallback so the Community block is not empty on older data.
+      return fetchPosts(limit: limit);
+    } catch (error) {
+      logFeedError(error, context: 'CommunityFeed.fetchPosts');
+      try {
+        return await fetchPosts(limit: limit);
+      } catch (_) {
+        return const [];
+      }
+    }
   }
 
   /// Posts authored by the signed-in user (any status), for profile display.
@@ -701,7 +748,7 @@ class CommunityNewsService {
             .limit(limit),
       );
 
-      return _mapPostRows(rows, currentUserId: me);
+      return await _mapPostRows(rows, currentUserId: me);
     } catch (_) {
       return const [];
     }
@@ -720,7 +767,7 @@ class CommunityNewsService {
             .order('created_at', ascending: false)
             .limit(limit),
       );
-      return _mapPostRows(rows, currentUserId: me);
+      return await _mapPostRows(rows, currentUserId: me);
     } catch (_) {
       return const [];
     }
@@ -739,7 +786,7 @@ class CommunityNewsService {
             .order('created_at', ascending: false)
             .limit(limit),
       );
-      return _mapPostRows(rows, currentUserId: me);
+      return await _mapPostRows(rows, currentUserId: me);
     } catch (_) {
       return const [];
     }
@@ -758,7 +805,7 @@ class CommunityNewsService {
             .order('created_at', ascending: false)
             .limit(limit),
       );
-      return _mapPostRows(rows, currentUserId: me);
+      return await _mapPostRows(rows, currentUserId: me);
     } catch (_) {
       return const [];
     }
@@ -909,12 +956,30 @@ class CommunityNewsService {
 
       final profiles = await _client
           .from('profiles')
-          .select('id, display_name, username, avatar_url')
+          .select('id, display_name, username')
           .inFilter('id', ids);
 
       final byId = {
         for (final row in profiles) row['id'] as String: row,
       };
+
+      // Avatars are in profile_media, not profiles.avatar_url.
+      final avatarById = <String, String>{};
+      try {
+        final mediaRows = await _client
+            .from('profile_media')
+            .select('profile_id, storage_path')
+            .inFilter('profile_id', ids)
+            .eq('media_role', 'avatar');
+        for (final row in mediaRows) {
+          final profileId = row['profile_id'] as String?;
+          final path = row['storage_path'] as String?;
+          if (profileId == null || path == null || path.isEmpty) continue;
+          avatarById[profileId] = path;
+        }
+      } catch (_) {
+        // profile_media / media_role may be missing on older DBs.
+      }
 
       return ids.map((id) {
         final row = byId[id];
@@ -925,7 +990,7 @@ class CommunityNewsService {
           id: id,
           displayName: (row['display_name'] as String?) ?? 'FirstVue member',
           username: row['username'] as String?,
-          avatarUrl: row['avatar_url'] as String?,
+          avatarUrl: avatarById[id],
         );
       }).toList();
     } catch (_) {

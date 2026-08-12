@@ -3,9 +3,14 @@ import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../screens/communities_screen.dart';
 import '../screens/community_detail_screen.dart';
+import '../screens/create_community_screen.dart';
 import '../services/community_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'group_circle_avatar.dart';
+import 'home_community_feed_block.dart';
 
+/// Home discovery: Groups first, then a single Community container with
+/// nearby communities + Facebook-style composer and news feed.
 class HomeCommunitiesSection extends StatefulWidget {
   final int refreshToken;
 
@@ -16,7 +21,8 @@ class HomeCommunitiesSection extends StatefulWidget {
 }
 
 class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
-  List<Community> _communities = const [];
+  List<Community> _yourGroups = const [];
+  List<Community> _communitiesNearby = const [];
   bool _loading = true;
 
   @override
@@ -35,11 +41,46 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final items = await CommunityService.fetchHomePreview(limit: 8);
+    final results = await Future.wait([
+      CommunityService.fetchYourCommunities(limit: 16),
+      CommunityService.fetchNearbyCommunities(limit: 16),
+    ]);
     if (!mounted) return;
     setState(() {
-      _communities = items;
+      _yourGroups = results[0];
+      _communitiesNearby = results[1];
       _loading = false;
+    });
+  }
+
+  Future<void> _openCreateGroup() async {
+    final created = await Navigator.push<bool>(
+      context,
+      FirstVuePageRoute(builder: (_) => const CreateCommunityScreen()),
+    );
+    if (created == true && mounted) await _load();
+  }
+
+  void _openAll() {
+    Navigator.push(
+      context,
+      FirstVuePageRoute(builder: (_) => const CommunitiesScreen()),
+    ).then((_) {
+      if (mounted) _load();
+    });
+  }
+
+  void _openGroup(Community community) {
+    Navigator.push(
+      context,
+      FirstVuePageRoute(
+        builder: (_) => CommunityDetailScreen(
+          communityId: community.id,
+          initialCommunity: community,
+        ),
+      ),
+    ).then((_) {
+      if (mounted) _load();
     });
   }
 
@@ -62,142 +103,195 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
               ),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  FirstVuePageRoute(builder: (_) => const CommunitiesScreen()),
-                );
-              },
+              onPressed: _openAll,
               child: const Text('See all'),
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         if (_loading)
           const SizedBox(
-            height: 100,
+            height: 110,
             child: Center(
               child: CircularProgressIndicator(color: FirstVueColors.teal),
             ),
           )
-        else if (_communities.isEmpty)
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  FirstVuePageRoute(builder: (_) => const CommunitiesScreen()),
-                );
-              },
-              borderRadius: BorderRadius.circular(16),
-              child: Ink(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: FirstVueColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withValues(alpha: .08)),
-                ),
-                child: const Text(
-                  'Join or create a community group',
-                  style: TextStyle(color: Colors.white54),
+        else
+          _CircleRow(
+            items: _yourGroups,
+            includeCreate: true,
+            emptyLabel: 'Create or join a group',
+            onCreate: _openCreateGroup,
+            onOpen: _openGroup,
+            onEmptyTap: _openAll,
+          ),
+        const SizedBox(height: 28),
+        // Single Facebook-style Community container: discovery + post + feed
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
+          decoration: BoxDecoration(
+            color: FirstVueColors.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: FirstVueColors.ivory.withValues(alpha: 0.08),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.28),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 3,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: FirstVueColors.gold,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'COMMUNITY',
+                      style: TextStyle(
+                        color: FirstVueColors.ivory,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.4,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _openAll,
+                    style: TextButton.styleFrom(
+                      foregroundColor: FirstVueColors.teal,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Explore',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Communities near you',
+                style: TextStyle(
+                  color: FirstVueColors.ivory.withValues(alpha: 0.55),
+                  fontSize: 12,
                 ),
               ),
-            ),
-          )
-        else
-          SizedBox(
-            height: 110,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _communities.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 12),
-              itemBuilder: (context, index) {
-                final community = _communities[index];
-                return _CommunityPreviewCard(
-                  community: community,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      FirstVuePageRoute(
-                        builder: (_) => CommunityDetailScreen(
-                          communityId: community.id,
-                          initialCommunity: community,
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+              const SizedBox(height: 12),
+              if (_loading)
+                const SizedBox(
+                  height: 110,
+                  child: Center(
+                    child: CircularProgressIndicator(color: FirstVueColors.teal),
+                  ),
+                )
+              else
+                _CircleRow(
+                  items: _communitiesNearby,
+                  includeCreate: false,
+                  emptyLabel: 'Local communities will appear here',
+                  onCreate: _openCreateGroup,
+                  onOpen: _openGroup,
+                  onEmptyTap: _openAll,
+                  defaultRingColor: FirstVueColors.gold,
+                ),
+              const SizedBox(height: 16),
+              Divider(
+                height: 1,
+                color: FirstVueColors.ivory.withValues(alpha: 0.1),
+              ),
+              const SizedBox(height: 14),
+              HomeCommunityFeedBlock(refreshToken: widget.refreshToken),
+            ],
           ),
+        ),
       ],
     );
   }
 }
 
-class _CommunityPreviewCard extends StatelessWidget {
-  final Community community;
-  final VoidCallback onTap;
+class _CircleRow extends StatelessWidget {
+  final List<Community> items;
+  final bool includeCreate;
+  final String emptyLabel;
+  final VoidCallback onCreate;
+  final ValueChanged<Community> onOpen;
+  final VoidCallback onEmptyTap;
+  final Color defaultRingColor;
 
-  const _CommunityPreviewCard({
-    required this.community,
-    required this.onTap,
+  const _CircleRow({
+    required this.items,
+    required this.includeCreate,
+    required this.emptyLabel,
+    required this.onCreate,
+    required this.onOpen,
+    required this.onEmptyTap,
+    this.defaultRingColor = Colors.white24,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Ink(
-          width: 140,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: FirstVueColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: community.isMember
-                  ? FirstVueColors.teal.withValues(alpha: .45)
-                  : Colors.white.withValues(alpha: .08),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                Icons.groups_rounded,
-                color: FirstVueColors.teal.withValues(alpha: .9),
-                size: 24,
-              ),
-              const Spacer(),
-              Text(
-                community.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                community.locationLabel ??
-                    '${community.memberCount} member${community.memberCount == 1 ? '' : 's'}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: .45),
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
+    if (items.isEmpty && !includeCreate) {
+      return GestureDetector(
+        onTap: onEmptyTap,
+        child: Text(
+          emptyLabel,
+          style: const TextStyle(color: Colors.white54),
         ),
+      );
+    }
+
+    final count = items.length + (includeCreate ? 1 : 0);
+
+    return SizedBox(
+      height: 118,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: count == 0 ? 1 : count,
+        separatorBuilder: (_, _) => const SizedBox(width: 14),
+        itemBuilder: (context, index) {
+          if (includeCreate && index == 0) {
+            return GroupCircleTile(
+              label: 'Create',
+              imageUrl: null,
+              isCreate: true,
+              onTap: onCreate,
+            );
+          }
+          if (items.isEmpty) {
+            return GroupCircleTile(
+              label: emptyLabel,
+              imageUrl: null,
+              onTap: onEmptyTap,
+            );
+          }
+          final item = items[includeCreate ? index - 1 : index];
+          return GroupCircleTile(
+            label: item.name,
+            imageUrl: item.imageUrl,
+            ringColor: item.isMember
+                ? FirstVueColors.teal
+                : item.isFollowing
+                    ? FirstVueColors.gold
+                    : defaultRingColor,
+            onTap: () => onOpen(item),
+          );
+        },
       ),
     );
   }
