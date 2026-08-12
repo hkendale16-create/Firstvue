@@ -20,6 +20,7 @@ class HomeNewsFeedSection extends StatefulWidget {
 class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
   List<CommunityNewsPost> _posts = const [];
   bool _loadingPosts = true;
+  String? _loadError;
   final _composer = TextEditingController();
   bool _posting = false;
   List<XFile> _attachedMedia = const [];
@@ -37,16 +38,25 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
   }
 
   Future<void> _loadPosts() async {
-    setState(() => _loadingPosts = true);
+    setState(() {
+      _loadingPosts = true;
+      _loadError = null;
+    });
     try {
       final posts = await CommunityNewsService.fetchPosts();
       if (!mounted) return;
       setState(() {
         _posts = posts;
         _loadingPosts = false;
+        _loadError = null;
       });
-    } catch (_) {
-      if (mounted) setState(() => _loadingPosts = false);
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _loadingPosts = false;
+          _loadError = error.toString();
+        });
+      }
     }
   }
 
@@ -64,6 +74,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     if ((text.isEmpty && _attachedMedia.isEmpty) || _posting) return;
     setState(() => _posting = true);
     try {
+      final hadMedia = _attachedMedia.isNotEmpty;
       final newPost = await CommunityNewsService.createPost(
         text,
         files: _attachedMedia,
@@ -79,7 +90,15 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
         ];
         _loadingPosts = false;
       });
-      await _refresh();
+      if (hadMedia && newPost.media.isEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Post saved. Photo/video needs Supabase migration 20260817_community_news_post_media.sql.',
+            ),
+          ),
+        );
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -350,6 +369,20 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
             child: Padding(
               padding: EdgeInsets.all(24),
               child: CircularProgressIndicator(color: FirstVueColors.teal),
+            ),
+          )
+        else if (_loadError != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Unable to load posts. Pull to refresh or tap below.',
+                  style: TextStyle(color: Colors.white.withValues(alpha: .54)),
+                ),
+                TextButton(onPressed: _refresh, child: const Text('Try again')),
+              ],
             ),
           )
         else if (_posts.isEmpty)

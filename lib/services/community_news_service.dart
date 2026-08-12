@@ -79,7 +79,11 @@ class CommunityNewsService {
     final rows = await query
         .order('created_at', ascending: false)
         .limit(limit);
-    return _mapPostRows(rows, currentUserId: me);
+    try {
+      return await _mapPostRows(rows, currentUserId: me);
+    } catch (_) {
+      return const [];
+    }
   }
 
   /// Posts authored by the signed-in user (any status), for profile display.
@@ -87,14 +91,18 @@ class CommunityNewsService {
     final me = _client.auth.currentUser;
     if (me == null) return const [];
 
-    final rows = await _client
-        .from('community_news_posts')
-        .select('id, body, created_at, author_id, business_id')
-        .eq('author_id', me.id)
-        .order('created_at', ascending: false)
-        .limit(limit);
+    try {
+      final rows = await _client
+          .from('community_news_posts')
+          .select('id, body, created_at, author_id, business_id')
+          .eq('author_id', me.id)
+          .order('created_at', ascending: false)
+          .limit(limit);
 
-    return _mapPostRows(rows, currentUserId: me.id);
+      return _mapPostRows(rows, currentUserId: me.id);
+    } catch (_) {
+      return const [];
+    }
   }
 
   static Future<List<CommunityNewsPost>> _mapPostRows(
@@ -268,12 +276,17 @@ class CommunityNewsService {
         .single();
 
     final postId = row['id'] as String;
-    final media = files.isEmpty
-        ? const <CommunityNewsMediaItem>[]
-        : await CommunityNewsMediaService.uploadMedia(
-            postId: postId,
-            files: files,
-          );
+    var media = const <CommunityNewsMediaItem>[];
+    if (files.isNotEmpty) {
+      try {
+        media = await CommunityNewsMediaService.uploadMedia(
+          postId: postId,
+          files: files,
+        );
+      } catch (_) {
+        // Keep the text post even if media upload fails (e.g. migration pending).
+      }
+    }
 
     final authorNames = await _fetchProfileNames([me.id]);
     final insertedBusinessId = row['business_id'] as String?;

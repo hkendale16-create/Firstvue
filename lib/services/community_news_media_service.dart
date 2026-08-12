@@ -34,43 +34,56 @@ class CommunityNewsMediaService {
   ) async {
     if (postIds.isEmpty) return {};
 
-    final rows = await _client
-        .from('community_news_post_media')
-        .select('id, post_id, storage_path, storage_provider, media_type, sort_order')
-        .inFilter('post_id', postIds)
-        .order('sort_order')
-        .order('created_at');
+    try {
+      final rows = await _client
+          .from('community_news_post_media')
+          .select('id, post_id, storage_path, storage_provider, media_type, sort_order')
+          .inFilter('post_id', postIds)
+          .order('sort_order')
+          .order('created_at');
 
-    final grouped = <String, List<Map<String, dynamic>>>{};
-    for (final row in rows) {
-      final postId = row['post_id'] as String;
-      grouped.putIfAbsent(postId, () => []).add(row);
-    }
+      final grouped = <String, List<Map<String, dynamic>>>{};
+      for (final row in rows) {
+        final postId = row['post_id'] as String;
+        grouped.putIfAbsent(postId, () => []).add(row);
+      }
 
-    final result = <String, List<CommunityNewsMediaItem>>{};
-    for (final entry in grouped.entries) {
-      result[entry.key] = await Future.wait(
-        entry.value.map((row) async {
-          final path = row['storage_path'] as String;
-          final provider = MediaStorageProvider.parse(
-            row['storage_provider'] as String?,
-          );
-          return CommunityNewsMediaItem(
-            id: row['id'] as String,
-            storagePath: path,
-            storageProvider: provider,
-            mediaType: (row['media_type'] as String?) ?? 'image',
-            signedUrl: await MediaStorageService.createReadUrl(
-              bucket: MediaBucket.communityNews,
-              path: path,
-              provider: provider,
-              context: {'post_id': entry.key},
-            ),
-          );
-        }),
-      );
+      final result = <String, List<CommunityNewsMediaItem>>{};
+      for (final entry in grouped.entries) {
+        final items = <CommunityNewsMediaItem>[];
+        for (final row in entry.value) {
+          try {
+            final path = row['storage_path'] as String;
+            final provider = MediaStorageProvider.parse(
+              row['storage_provider'] as String?,
+            );
+            items.add(
+              CommunityNewsMediaItem(
+                id: row['id'] as String,
+                storagePath: path,
+                storageProvider: provider,
+                mediaType: (row['media_type'] as String?) ?? 'image',
+                signedUrl: await MediaStorageService.createReadUrl(
+                  bucket: MediaBucket.communityNews,
+                  path: path,
+                  provider: provider,
+                  context: {'post_id': entry.key},
+                ),
+              ),
+            );
+          } catch (_) {
+            // Skip broken media rows so text posts still load.
+          }
+        }
+        if (items.isNotEmpty) {
+          result[entry.key] = items;
+        }
+      }
+      return result;
+    } catch (_) {
+      // Table or policy may not exist yet — posts still load without attachments.
+      return {};
     }
-    return result;
   }
 
   static Future<List<CommunityNewsMediaItem>> uploadMedia({
