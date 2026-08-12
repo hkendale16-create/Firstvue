@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'activity_notifications_service.dart';
 import 'community_news_media_service.dart';
+import 'community_service.dart';
 import 'follow_service.dart';
 import 'post_metadata_service.dart';
 import 'saved_items_service.dart';
@@ -839,6 +840,31 @@ class CommunityNewsService {
       final rows = await _selectPosts(
         (query) => query
             .eq('community_id', communityId)
+            .order('created_at', ascending: false)
+            .limit(limit),
+      );
+      return _mapPostRows(rows, currentUserId: me);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Posts from communities the signed-in user joined or follows.
+  /// Separate from the broad Home News Feed (`fetchPosts`).
+  static Future<List<CommunityNewsPost>> fetchCommunityFeed({
+    int limit = 20,
+  }) async {
+    final me = _client.auth.currentUser?.id;
+    if (me == null) return const [];
+
+    try {
+      final communityIds =
+          await CommunityService.fetchMyCommunityFeedIds();
+      if (communityIds.isEmpty) return const [];
+
+      final rows = await _selectPosts(
+        (query) => query
+            .inFilter('community_id', communityIds.toList())
             .order('created_at', ascending: false)
             .limit(limit),
       );

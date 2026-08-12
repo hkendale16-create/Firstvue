@@ -3,13 +3,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
 import '../models/share_payload.dart';
+import '../navigation/firstvue_page_route.dart';
 import '../services/community_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/firstvue_share_sheet.dart';
+import '../widgets/group_circle_avatar.dart';
 import 'auth_screen.dart';
-import '../navigation/firstvue_page_route.dart';
+import 'edit_community_screen.dart';
+import 'member_public_profile_screen.dart';
 
 class CommunityDetailScreen extends StatefulWidget {
   final String communityId;
@@ -27,7 +30,9 @@ class CommunityDetailScreen extends StatefulWidget {
 
 class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
   Community? _community;
+  CommunityMember? _leader;
   List<CommunityMember> _members = const [];
+  List<CommunityMember> _pending = const [];
   bool _loading = true;
   bool _actionLoading = false;
   int _feedRefreshToken = 0;
@@ -46,13 +51,27 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     setState(() => _loading = true);
     final community =
         await CommunityService.fetchCommunityById(widget.communityId);
+    final leader = await CommunityService.fetchGroupLeader(widget.communityId);
     final members = community == null
         ? const <CommunityMember>[]
-        : await CommunityService.fetchMembers(widget.communityId, limit: 12);
+        : await CommunityService.fetchMembers(widget.communityId, limit: 20);
+    final me = Supabase.instance.client.auth.currentUser?.id;
+    final canManage = community != null &&
+        me != null &&
+        community.canManageAs(me);
+    final pending = canManage
+        ? await CommunityService.fetchMembers(
+            widget.communityId,
+            limit: 20,
+            status: 'pending',
+          )
+        : const <CommunityMember>[];
     if (!mounted) return;
     setState(() {
       _community = community ?? _community;
+      _leader = leader;
       _members = members;
+      _pending = pending;
       _loading = false;
       _feedRefreshToken++;
     });
@@ -77,6 +96,8 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     try {
       if (community.isMember) {
         await CommunityService.leave(community.id);
+      } else if (community.isPendingMember) {
+        await CommunityService.cancelJoinRequest(community.id);
       } else {
         await CommunityService.join(community.id);
       }
@@ -119,6 +140,21 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     }
   }
 
+  Future<void> _edit() async {
+    final community = _community;
+    if (community == null) return;
+    final updated = await Navigator.push<Community>(
+      context,
+      FirstVuePageRoute(
+        builder: (_) => EditCommunityScreen(community: community),
+      ),
+    );
+    if (updated != null && mounted) {
+      setState(() => _community = updated);
+      await _load();
+    }
+  }
+
   void _share() {
     final community = _community;
     if (community == null) return;
@@ -132,18 +168,44 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     );
   }
 
+  void _openProfile(CommunityMember member) {
+    openMemberProfile(
+      context,
+      profileId: member.userId,
+      displayName: member.displayName,
+    );
+  }
+
+  String get _joinLabel {
+    final community = _community;
+    if (community == null) return 'Join';
+    if (community.isMember) return 'Leave group';
+    if (community.isPendingMember) return 'Cancel request';
+    if (community.isPrivate) return 'Request to Join';
+    return 'Join group';
+  }
+
   @override
   Widget build(BuildContext context) {
     final community = _community;
     final me = Supabase.instance.client.auth.currentUser?.id;
+    final canManage = community != null && me != null && community.canManageAs(me);
+    final canPost = community != null &&
+        (community.isMember || community.creatorId == me);
 
     return Scaffold(
       backgroundColor: const Color(0xFF080B0F),
       appBar: AppBar(
         backgroundColor: const Color(0xFF080B0F),
         foregroundColor: Colors.white,
-        title: Text(community?.name ?? 'Community'),
+        title: Text(community?.name ?? 'Group'),
         actions: [
+          if (canManage)
+            IconButton(
+              onPressed: _edit,
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Edit group',
+            ),
           IconButton(
             onPressed: community == null ? null : _share,
             icon: const Icon(Icons.share_outlined),
@@ -171,22 +233,10 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: Row(
                           children: [
-                            CircleAvatar(
-                              radius: 36,
-                              backgroundColor: FirstVueColors.elevatedSurface,
-                              backgroundImage:
-                                  community.imageUrl != null &&
-                                          community.imageUrl!.isNotEmpty
-                                      ? NetworkImage(community.imageUrl!)
-                                      : null,
-                              child: community.imageUrl == null ||
-                                      community.imageUrl!.isEmpty
-                                  ? const Icon(
-                                      Icons.groups_rounded,
-                                      color: FirstVueColors.teal,
-                                      size: 32,
-                                    )
-                                  : null,
+                            GroupCircleAvatar(
+                              imageUrl: community.imageUrl,
+                              size: 84,
+                              ringColor: FirstVueColors.teal,
                             ),
                             const SizedBox(width: 14),
                             Expanded(
@@ -209,12 +259,27 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                       ),
                                     ),
                                   const SizedBox(height: 6),
-                                  Text(
-                                    '${community.memberCount} member${community.memberCount == 1 ? '' : 's'}',
-                                    style: const TextStyle(
-                                      color: FirstVueColors.gold,
-                                      fontSize: 13,
-                                    ),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 4,
+                                    children: [
+                                      _chip(
+                                        community.isPublic
+                                            ? 'Public'
+                                            : 'Private',
+                                      ),
+                                      if (community.category?.isNotEmpty ==
+                                          true)
+                                        _chip(community.category!),
+                                      Text(
+                                        '${community.memberCount} members · '
+                                        '${community.followerCount} followers',
+                                        style: const TextStyle(
+                                          color: FirstVueColors.gold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -235,6 +300,72 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                           ),
                         ),
                       ],
+                      if (_leader != null) ...[
+                        const SizedBox(height: 16),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: InkWell(
+                            onTap: () => _openProfile(_leader!),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor:
+                                      FirstVueColors.elevatedSurface,
+                                  backgroundImage: _leader!.avatarUrl != null &&
+                                          _leader!.avatarUrl!.isNotEmpty
+                                      ? NetworkImage(_leader!.avatarUrl!)
+                                      : null,
+                                  child: _leader!.avatarUrl == null ||
+                                          _leader!.avatarUrl!.isEmpty
+                                      ? Text(
+                                          _leader!.displayName.isNotEmpty
+                                              ? _leader!.displayName[0]
+                                                  .toUpperCase()
+                                              : '?',
+                                          style: const TextStyle(
+                                            color: FirstVueColors.gold,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _leader!.displayName,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      Text(
+                                        [
+                                          if (_leader!.username != null)
+                                            '@${_leader!.username}',
+                                          'Group Leader',
+                                        ].join(' · '),
+                                        style: const TextStyle(
+                                          color: FirstVueColors.teal,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.chevron_right,
+                                  color: Colors.white38,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -250,11 +381,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                   foregroundColor: Colors.white,
                                 ),
                                 child: Text(
-                                  _actionLoading
-                                      ? '…'
-                                      : community.isMember
-                                          ? 'Leave group'
-                                          : 'Join group',
+                                  _actionLoading ? '…' : _joinLabel,
                                 ),
                               ),
                             ),
@@ -281,11 +408,98 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                           ],
                         ),
                       ),
+                      if (community.rules?.trim().isNotEmpty == true) ...[
+                        const SizedBox(height: 20),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 20),
+                          child: Text(
+                            'RULES',
+                            style: TextStyle(
+                              color: FirstVueColors.gold,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Text(
+                            community.rules!.trim(),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (_pending.isNotEmpty && canManage) ...[
+                        const SizedBox(height: 24),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 20),
+                          child: Text(
+                            'JOIN REQUESTS',
+                            style: TextStyle(
+                              color: FirstVueColors.gold,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ),
+                        ..._pending.map(
+                          (member) => ListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 20),
+                            leading: CircleAvatar(
+                              backgroundColor: FirstVueColors.elevatedSurface,
+                              child: Text(
+                                member.displayName.isNotEmpty
+                                    ? member.displayName[0].toUpperCase()
+                                    : '?',
+                              ),
+                            ),
+                            title: Text(
+                              member.displayName,
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                TextButton(
+                                  onPressed: () async {
+                                    await CommunityService.reviewMembership(
+                                      communityId: community.id,
+                                      profileId: member.userId,
+                                      approve: true,
+                                    );
+                                    await _load();
+                                  },
+                                  child: const Text('Approve'),
+                                ),
+                                TextButton(
+                                  onPressed: () async {
+                                    await CommunityService.reviewMembership(
+                                      communityId: community.id,
+                                      profileId: member.userId,
+                                      approve: false,
+                                    );
+                                    await _load();
+                                  },
+                                  child: const Text(
+                                    'Decline',
+                                    style: TextStyle(color: FirstVueColors.coral),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 28),
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 20),
                         child: Text(
-                          'GROUP FEED',
+                          'GROUP NEWS FEED',
                           style: TextStyle(
                             color: FirstVueColors.gold,
                             fontWeight: FontWeight.bold,
@@ -297,8 +511,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                       EntityProfileFeedSection(
                         scope: EntityFeedScope.community,
                         entityId: community.id,
-                        canPost: community.isMember ||
-                            community.creatorId == me,
+                        canPost: canPost,
                         refreshToken: _feedRefreshToken,
                         showHeader: false,
                       ),
@@ -327,18 +540,27 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                   ..._members.map(
                                     (member) => ListTile(
                                       contentPadding: EdgeInsets.zero,
+                                      onTap: () => _openProfile(member),
                                       leading: CircleAvatar(
                                         backgroundColor:
                                             FirstVueColors.elevatedSurface,
-                                        child: Text(
-                                          member.displayName.isNotEmpty
-                                              ? member.displayName[0]
-                                                  .toUpperCase()
-                                              : '?',
-                                          style: const TextStyle(
-                                            color: FirstVueColors.gold,
-                                          ),
-                                        ),
+                                        backgroundImage: member.avatarUrl !=
+                                                    null &&
+                                                member.avatarUrl!.isNotEmpty
+                                            ? NetworkImage(member.avatarUrl!)
+                                            : null,
+                                        child: member.avatarUrl == null ||
+                                                member.avatarUrl!.isEmpty
+                                            ? Text(
+                                                member.displayName.isNotEmpty
+                                                    ? member.displayName[0]
+                                                        .toUpperCase()
+                                                    : '?',
+                                                style: const TextStyle(
+                                                  color: FirstVueColors.gold,
+                                                ),
+                                              )
+                                            : null,
                                       ),
                                       title: Text(
                                         member.displayName,
@@ -354,15 +576,15 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                               ),
                                             )
                                           : null,
-                                      trailing: member.role == 'admin'
-                                          ? const Text(
-                                              'Admin',
-                                              style: TextStyle(
-                                                color: FirstVueColors.teal,
-                                                fontSize: 12,
-                                              ),
-                                            )
-                                          : null,
+                                      trailing: Text(
+                                        member.roleLabel,
+                                        style: TextStyle(
+                                          color: member.isGroupLeader
+                                              ? FirstVueColors.teal
+                                              : Colors.white54,
+                                          fontSize: 12,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -371,6 +593,20 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                     ],
                   ),
                 ),
+    );
+  }
+
+  Widget _chip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: FirstVueColors.elevatedSurface,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(color: Colors.white70, fontSize: 11),
+      ),
     );
   }
 }

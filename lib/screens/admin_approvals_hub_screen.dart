@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/business_submission_service.dart';
+import '../services/community_leader_service.dart';
 import '../services/organizer_application_service.dart';
 import '../services/professional_profiles_service.dart';
 import '../widgets/admin_gate.dart';
@@ -11,7 +12,7 @@ class AdminApprovalsHubScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         backgroundColor: const Color(0xFF080B0F),
         appBar: AppBar(
@@ -19,6 +20,7 @@ class AdminApprovalsHubScreen extends StatelessWidget {
           surfaceTintColor: Colors.transparent,
           title: const Text('APPROVAL CENTER'),
           bottom: const TabBar(
+            isScrollable: true,
             labelColor: Color(0xFFD8B56A),
             unselectedLabelColor: Colors.white54,
             indicatorColor: Color(0xFF78B9BE),
@@ -26,6 +28,7 @@ class AdminApprovalsHubScreen extends StatelessWidget {
               Tab(text: 'BUSINESS'),
               Tab(text: 'PROFESSIONAL'),
               Tab(text: 'ORGANIZER'),
+              Tab(text: 'COMMUNITY LEADER'),
             ],
           ),
         ),
@@ -35,6 +38,7 @@ class AdminApprovalsHubScreen extends StatelessWidget {
               _BusinessApprovalsTab(),
               _ProfessionalApprovalsTab(),
               _OrganizerApprovalsTab(),
+              _CommunityLeaderApprovalsTab(),
             ],
           ),
         ),
@@ -227,6 +231,82 @@ class _OrganizerApprovalsTabState extends State<_OrganizerApprovalsTab> {
                   applicationId: item.id,
                   profileId: item.profileId,
                   approved: false,
+                );
+                await _refresh();
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _CommunityLeaderApprovalsTab extends StatefulWidget {
+  @override
+  State<_CommunityLeaderApprovalsTab> createState() =>
+      _CommunityLeaderApprovalsTabState();
+}
+
+class _CommunityLeaderApprovalsTabState
+    extends State<_CommunityLeaderApprovalsTab> {
+  late Future<List<CommunityLeaderRequest>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = CommunityLeaderService.fetchPendingForAdmin();
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _future = CommunityLeaderService.fetchPendingForAdmin());
+    await _future;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<CommunityLeaderRequest>>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final items = snapshot.data!;
+        if (items.isEmpty) {
+          return const Center(
+            child: Text(
+              'No pending Community Leader requests.',
+              style: TextStyle(color: Colors.white54),
+            ),
+          );
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.all(20),
+          itemCount: items.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final item = items[index];
+            final location = [
+              item.requestedCity,
+              item.requestedState,
+              item.requestedLocation,
+            ].whereType<String>().where((s) => s.trim().isNotEmpty).join(', ');
+            return _ApprovalCard(
+              title: 'Leader request',
+              subtitle:
+                  '${location.isEmpty ? 'Location not specified' : location}\n'
+                  '${item.reason ?? ''}\n${item.experience ?? ''}',
+              onApprove: () async {
+                await CommunityLeaderService.review(
+                  requestId: item.id,
+                  approve: true,
+                );
+                await _refresh();
+              },
+              onReject: () async {
+                await CommunityLeaderService.review(
+                  requestId: item.id,
+                  approve: false,
                 );
                 await _refresh();
               },

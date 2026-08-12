@@ -1,8 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../navigation/firstvue_page_route.dart';
+import '../services/community_hub_service.dart';
 import '../services/community_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/location_autocomplete_field.dart';
@@ -10,7 +13,9 @@ import '../widgets/media_picker_sheet.dart';
 import 'auth_screen.dart';
 
 class CreateCommunityScreen extends StatefulWidget {
-  const CreateCommunityScreen({super.key});
+  final String? initialHubId;
+
+  const CreateCommunityScreen({super.key, this.initialHubId});
 
   @override
   State<CreateCommunityScreen> createState() => _CreateCommunityScreenState();
@@ -19,19 +24,42 @@ class CreateCommunityScreen extends StatefulWidget {
 class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _categoryController = TextEditingController();
   final _cityController = TextEditingController();
   final _stateController = TextEditingController();
+  final _postalController = TextEditingController();
+  final _rulesController = TextEditingController();
   XFile? _imageFile;
+  Uint8List? _imageBytes;
+  String _privacy = 'public';
+  String? _hubId;
+  List<CommunityHub> _hubs = const [];
   bool _saving = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _hubId = widget.initialHubId;
+    _loadHubs();
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
+    _categoryController.dispose();
     _cityController.dispose();
     _stateController.dispose();
+    _postalController.dispose();
+    _rulesController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadHubs() async {
+    final hubs = await CommunityHubService.fetchHubs(limit: 40);
+    if (!mounted) return;
+    setState(() => _hubs = hubs);
   }
 
   Future<void> _pickImage() async {
@@ -40,7 +68,20 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
       mode: MediaPickerMode.photosOnly,
     );
     if (files == null || files.isEmpty || !mounted) return;
-    setState(() => _imageFile = files.first);
+    final file = files.first;
+    final bytes = await file.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      _imageFile = file;
+      _imageBytes = bytes;
+    });
+  }
+
+  void _removeImage() {
+    setState(() {
+      _imageFile = null;
+      _imageBytes = null;
+    });
   }
 
   Future<void> _create() async {
@@ -61,8 +102,13 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
       final community = await CommunityService.createCommunity(
         name: _nameController.text,
         description: _descriptionController.text,
+        category: _categoryController.text,
         city: _cityController.text,
         state: _stateController.text,
+        postalCode: _postalController.text,
+        privacyType: _privacy,
+        rules: _rulesController.text,
+        hubId: _hubId,
         imageFile: _imageFile,
       );
       if (!mounted) return;
@@ -95,67 +141,72 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
             const SizedBox(height: 12),
           ],
           Center(
-            child: GestureDetector(
-              onTap: _saving ? null : _pickImage,
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 42,
+            child: Column(
+              children: [
+                GestureDetector(
+                  onTap: _saving ? null : _pickImage,
+                  child: CircleAvatar(
+                    radius: 46,
                     backgroundColor: FirstVueColors.elevatedSurface,
-                    child: _imageFile == null
+                    backgroundImage: _imageBytes != null
+                        ? MemoryImage(_imageBytes!)
+                        : null,
+                    child: _imageBytes == null
                         ? const Icon(
                             Icons.add_a_photo_outlined,
                             color: FirstVueColors.teal,
                             size: 28,
                           )
-                        : const Icon(
-                            Icons.check_circle,
-                            color: FirstVueColors.teal,
-                            size: 28,
-                          ),
+                        : null,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _imageFile == null
-                        ? 'Add group profile image'
-                        : 'Image selected',
-                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _imageFile == null
+                      ? 'Add group profile photo'
+                      : 'Tap to replace photo',
+                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+                if (_imageFile != null)
+                  TextButton(
+                    onPressed: _saving ? null : _removeImage,
+                    child: const Text('Remove photo'),
                   ),
-                ],
-              ),
+              ],
             ),
           ),
           const SizedBox(height: 20),
-          TextField(
-            controller: _nameController,
-            style: const TextStyle(color: Colors.white),
-            textCapitalization: TextCapitalization.words,
-            decoration: InputDecoration(
-              labelText: 'Group name',
-              labelStyle: const TextStyle(color: Colors.white54),
-              filled: true,
-              fillColor: FirstVueColors.surface,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-            ),
+          _field(_nameController, 'Group name'),
+          const SizedBox(height: 16),
+          _field(
+            _descriptionController,
+            'Group bio / about',
+            lines: 4,
           ),
           const SizedBox(height: 16),
-          TextField(
-            controller: _descriptionController,
-            style: const TextStyle(color: Colors.white),
-            maxLines: 4,
-            decoration: InputDecoration(
-              labelText: 'Description (optional)',
-              labelStyle: const TextStyle(color: Colors.white54),
-              filled: true,
-              fillColor: FirstVueColors.surface,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-            ),
+          _field(_categoryController, 'Category (optional)'),
+          const SizedBox(height: 16),
+          const Text(
+            'Privacy',
+            style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'public', label: Text('Public')),
+              ButtonSegment(value: 'private', label: Text('Private')),
+            ],
+            selected: {_privacy},
+            onSelectionChanged: _saving
+                ? null
+                : (value) => setState(() => _privacy = value.first),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _privacy == 'public'
+                ? 'Anyone can discover and join this group.'
+                : 'Membership requires Group Leader approval.',
+            style: const TextStyle(color: Colors.white54, fontSize: 12),
           ),
           const SizedBox(height: 16),
           LocationAutocompleteField(
@@ -169,17 +220,82 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
             label: 'State',
             type: LocationFieldType.state,
           ),
-          const SizedBox(height: 28),
-          FilledButton(
-            onPressed: _saving ? null : _create,
-            style: FilledButton.styleFrom(
-              backgroundColor: FirstVueColors.coral,
-              foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(48),
+          const SizedBox(height: 16),
+          _field(_postalController, 'ZIP / postal code (optional)'),
+          const SizedBox(height: 16),
+          _field(_rulesController, 'Group rules (optional)', lines: 3),
+          if (_hubs.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String?>(
+              initialValue: _hubId,
+              dropdownColor: FirstVueColors.surface,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                labelText: 'Associate with Community (optional)',
+                labelStyle: const TextStyle(color: Colors.white54),
+                filled: true,
+                fillColor: FirstVueColors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('No community yet'),
+                ),
+                ..._hubs.map(
+                  (hub) => DropdownMenuItem<String?>(
+                    value: hub.id,
+                    child: Text(hub.name),
+                  ),
+                ),
+              ],
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _hubId = value),
             ),
-            child: Text(_saving ? 'Creating…' : 'Create group'),
+          ],
+          const SizedBox(height: 28),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: FilledButton(
+              onPressed: _saving ? null : _create,
+              style: FilledButton.styleFrom(
+                backgroundColor: FirstVueColors.coral,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(_saving ? 'Creating…' : 'Create Group'),
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _field(
+    TextEditingController controller,
+    String label, {
+    int lines = 1,
+  }) {
+    return TextField(
+      controller: controller,
+      style: const TextStyle(color: Colors.white),
+      maxLines: lines,
+      textCapitalization: lines > 1
+          ? TextCapitalization.sentences
+          : TextCapitalization.words,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white54),
+        filled: true,
+        fillColor: FirstVueColors.surface,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
       ),
     );
   }

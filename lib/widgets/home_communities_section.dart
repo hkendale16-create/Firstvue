@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../screens/communities_screen.dart';
 import '../screens/community_detail_screen.dart';
+import '../screens/community_hub_detail_screen.dart';
+import '../screens/create_community_hub_screen.dart';
 import '../screens/create_community_screen.dart';
+import '../services/community_hub_service.dart';
 import '../services/community_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'group_circle_avatar.dart';
 
 class HomeCommunitiesSection extends StatefulWidget {
   final int refreshToken;
@@ -18,7 +22,8 @@ class HomeCommunitiesSection extends StatefulWidget {
 
 class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
   List<Community> _yours = const [];
-  List<Community> _nearby = const [];
+  List<Community> _nearbyGroups = const [];
+  List<CommunityHub> _nearbyHubs = const [];
   bool _loading = true;
 
   @override
@@ -40,16 +45,18 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
     final results = await Future.wait([
       CommunityService.fetchYourCommunities(limit: 16),
       CommunityService.fetchNearbyCommunities(limit: 16),
+      CommunityHubService.fetchNearbyHubs(limit: 12),
     ]);
     if (!mounted) return;
     setState(() {
-      _yours = results[0];
-      _nearby = results[1];
+      _yours = results[0] as List<Community>;
+      _nearbyGroups = results[1] as List<Community>;
+      _nearbyHubs = results[2] as List<CommunityHub>;
       _loading = false;
     });
   }
 
-  Future<void> _openCreate() async {
+  Future<void> _openCreateGroup() async {
     final created = await Navigator.push<Community>(
       context,
       FirstVuePageRoute(builder: (_) => const CreateCommunityScreen()),
@@ -70,6 +77,27 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
     }
   }
 
+  Future<void> _openCreateHub() async {
+    final created = await Navigator.push<CommunityHub>(
+      context,
+      FirstVuePageRoute(builder: (_) => const CreateCommunityHubScreen()),
+    );
+    if (created != null && mounted) {
+      await _load();
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        FirstVuePageRoute(
+          builder: (_) => CommunityHubDetailScreen(
+            hubId: created.id,
+            initialHub: created,
+          ),
+        ),
+      );
+      if (mounted) await _load();
+    }
+  }
+
   void _openAll() {
     Navigator.push(
       context,
@@ -79,13 +107,27 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
     });
   }
 
-  void _openCommunity(Community community) {
+  void _openGroup(Community community) {
     Navigator.push(
       context,
       FirstVuePageRoute(
         builder: (_) => CommunityDetailScreen(
           communityId: community.id,
           initialCommunity: community,
+        ),
+      ),
+    ).then((_) {
+      if (mounted) _load();
+    });
+  }
+
+  void _openHub(CommunityHub hub) {
+    Navigator.push(
+      context,
+      FirstVuePageRoute(
+        builder: (_) => CommunityHubDetailScreen(
+          hubId: hub.id,
+          initialHub: hub,
         ),
       ),
     ).then((_) {
@@ -126,17 +168,17 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
             ),
           )
         else
-          _CommunityCircleRow(
-            communities: _yours,
+          _GroupCircleRow(
+            groups: _yours,
             includeCreate: true,
             emptyLabel: 'Create or join a group',
-            onCreate: _openCreate,
-            onOpen: _openCommunity,
+            onCreate: _openCreateGroup,
+            onOpen: _openGroup,
             onEmptyTap: _openAll,
           ),
         const SizedBox(height: 26),
         const Text(
-          'COMMUNITIES IN YOUR AREA',
+          'GROUPS IN YOUR AREA',
           style: TextStyle(
             color: FirstVueColors.ivory,
             fontSize: 14,
@@ -153,29 +195,83 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
             ),
           )
         else
-          _CommunityCircleRow(
-            communities: _nearby,
+          _GroupCircleRow(
+            groups: _nearbyGroups,
             includeCreate: false,
             emptyLabel: 'Nearby groups will appear here',
-            onCreate: _openCreate,
-            onOpen: _openCommunity,
+            onCreate: _openCreateGroup,
+            onOpen: _openGroup,
             onEmptyTap: _openAll,
+          ),
+        const SizedBox(height: 26),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'COMMUNITIES IN YOUR AREA',
+                style: TextStyle(
+                  color: FirstVueColors.ivory,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.4,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: _openCreateHub,
+              child: const Text('Create'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (_loading)
+          const SizedBox(
+            height: 110,
+            child: Center(
+              child: CircularProgressIndicator(color: FirstVueColors.teal),
+            ),
+          )
+        else if (_nearbyHubs.isEmpty)
+          GestureDetector(
+            onTap: _openCreateHub,
+            child: const Text(
+              'Local Communities will appear here. Create one if you are an approved Community Leader.',
+              style: TextStyle(color: Colors.white54),
+            ),
+          )
+        else
+          SizedBox(
+            height: 118,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _nearbyHubs.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 14),
+              itemBuilder: (context, index) {
+                final hub = _nearbyHubs[index];
+                return GroupCircleTile(
+                  label: hub.name,
+                  imageUrl: hub.imageUrl,
+                  ringColor: FirstVueColors.gold,
+                  onTap: () => _openHub(hub),
+                );
+              },
+            ),
           ),
       ],
     );
   }
 }
 
-class _CommunityCircleRow extends StatelessWidget {
-  final List<Community> communities;
+class _GroupCircleRow extends StatelessWidget {
+  final List<Community> groups;
   final bool includeCreate;
   final String emptyLabel;
   final VoidCallback onCreate;
   final ValueChanged<Community> onOpen;
   final VoidCallback onEmptyTap;
 
-  const _CommunityCircleRow({
-    required this.communities,
+  const _GroupCircleRow({
+    required this.groups,
     required this.includeCreate,
     required this.emptyLabel,
     required this.onCreate,
@@ -185,7 +281,7 @@ class _CommunityCircleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (communities.isEmpty && !includeCreate) {
+    if (groups.isEmpty && !includeCreate) {
       return GestureDetector(
         onTap: onEmptyTap,
         child: Text(
@@ -195,7 +291,7 @@ class _CommunityCircleRow extends StatelessWidget {
       );
     }
 
-    final count = communities.length + (includeCreate ? 1 : 0);
+    final count = groups.length + (includeCreate ? 1 : 0);
 
     return SizedBox(
       height: 118,
@@ -205,126 +301,32 @@ class _CommunityCircleRow extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(width: 14),
         itemBuilder: (context, index) {
           if (includeCreate && index == 0) {
-            return _CommunityCircle(
+            return GroupCircleTile(
               label: 'Create',
-              onTap: onCreate,
+              imageUrl: null,
               isCreate: true,
-              isFollowing: false,
-              isMember: false,
-              imageUrl: null,
+              onTap: onCreate,
             );
           }
-          if (communities.isEmpty) {
-            return _CommunityCircle(
+          if (groups.isEmpty) {
+            return GroupCircleTile(
               label: emptyLabel,
-              onTap: onEmptyTap,
-              isCreate: false,
-              isFollowing: false,
-              isMember: false,
               imageUrl: null,
+              onTap: onEmptyTap,
             );
           }
-          final community = communities[includeCreate ? index - 1 : index];
-          return _CommunityCircle(
-            label: community.name,
-            imageUrl: community.imageUrl,
-            isCreate: false,
-            isFollowing: community.isFollowing,
-            isMember: community.isMember,
-            onTap: () => onOpen(community),
+          final group = groups[includeCreate ? index - 1 : index];
+          return GroupCircleTile(
+            label: group.name,
+            imageUrl: group.imageUrl,
+            ringColor: group.isMember
+                ? FirstVueColors.teal
+                : group.isFollowing
+                    ? FirstVueColors.gold
+                    : Colors.white24,
+            onTap: () => onOpen(group),
           );
         },
-      ),
-    );
-  }
-}
-
-class _CommunityCircle extends StatelessWidget {
-  final String label;
-  final String? imageUrl;
-  final bool isCreate;
-  final bool isMember;
-  final bool isFollowing;
-  final VoidCallback onTap;
-
-  const _CommunityCircle({
-    required this.label,
-    required this.imageUrl,
-    required this.isCreate,
-    required this.isMember,
-    required this.isFollowing,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final ringColor = isCreate
-        ? FirstVueColors.coral
-        : isMember
-            ? FirstVueColors.teal
-            : isFollowing
-                ? FirstVueColors.gold
-                : Colors.white24;
-
-    return SizedBox(
-      width: 78,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(40),
-        child: Column(
-          children: [
-            Container(
-              width: 68,
-              height: 68,
-              padding: const EdgeInsets.all(2.5),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    ringColor.withValues(alpha: .95),
-                    ringColor.withValues(alpha: .35),
-                  ],
-                ),
-              ),
-              child: Container(
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFF080B0F),
-                ),
-                padding: const EdgeInsets.all(2),
-                child: CircleAvatar(
-                  backgroundColor: FirstVueColors.elevatedSurface,
-                  backgroundImage: !isCreate &&
-                          imageUrl != null &&
-                          imageUrl!.trim().isNotEmpty
-                      ? NetworkImage(imageUrl!)
-                      : null,
-                  child: isCreate
-                      ? const Icon(Icons.add, color: FirstVueColors.coral)
-                      : (imageUrl == null || imageUrl!.trim().isEmpty)
-                          ? const Icon(
-                              Icons.groups_rounded,
-                              color: FirstVueColors.teal,
-                            )
-                          : null,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                height: 1.15,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

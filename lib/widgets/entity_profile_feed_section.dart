@@ -395,10 +395,16 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
             padding: const EdgeInsets.fromLTRB(24, 8, 20, 8),
             child: Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'NEWS FEED',
-                    style: TextStyle(
+                    switch (widget.scope) {
+                      EntityFeedScope.community => 'GROUP NEWS FEED',
+                      EntityFeedScope.business => 'BUSINESS FEED',
+                      EntityFeedScope.professional => 'PROFESSIONAL FEED',
+                      EntityFeedScope.event => 'EVENT FEED',
+                      EntityFeedScope.user => 'PROFILE FEED',
+                    },
+                    style: const TextStyle(
                       color: Colors.white54,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1.2,
