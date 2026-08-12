@@ -10,6 +10,8 @@ class EntityProfileMediaEditor extends StatelessWidget {
   final IconData placeholderIcon;
   final VoidCallback? onChangeCover;
   final VoidCallback? onChangeAvatar;
+  final VoidCallback? onRemoveAvatar;
+  final VoidCallback? onRemoveCover;
 
   const EntityProfileMediaEditor({
     super.key,
@@ -19,17 +21,25 @@ class EntityProfileMediaEditor extends StatelessWidget {
     this.placeholderIcon = Icons.storefront_outlined,
     this.onChangeCover,
     this.onChangeAvatar,
+    this.onRemoveAvatar,
+    this.onRemoveCover,
   });
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
+    final showRemoveCover =
+        onRemoveCover != null && coverUrl != null && coverUrl!.isNotEmpty;
+    final showRemoveAvatar =
+        onRemoveAvatar != null && avatarUrl != null && avatarUrl!.isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'PROFILE PHOTOS',
           style: TextStyle(
-            color: Colors.white,
+            color: fv.primaryText,
             fontWeight: FontWeight.bold,
             letterSpacing: 1.4,
           ),
@@ -38,7 +48,7 @@ class EntityProfileMediaEditor extends StatelessWidget {
         Text(
           'Tap cover or profile photo to upload — just like your main profile.',
           style: TextStyle(
-            color: Colors.white.withValues(alpha: .45),
+            color: fv.tertiaryText,
             fontSize: 12,
             height: 1.4,
           ),
@@ -50,10 +60,13 @@ class EntityProfileMediaEditor extends StatelessWidget {
             height: 130,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withValues(alpha: .08)),
+              border: Border.all(color: fv.borderSubtle),
               gradient: coverUrl == null
-                  ? const LinearGradient(
-                      colors: [Color(0xFF1A2530), Color(0xFF78B9BE)],
+                  ? LinearGradient(
+                      colors: [
+                        fv.elevatedSurface,
+                        FirstVueColors.teal.withValues(alpha: .55),
+                      ],
                     )
                   : null,
               image: coverUrl != null
@@ -67,12 +80,31 @@ class EntityProfileMediaEditor extends StatelessWidget {
               alignment: Alignment.bottomRight,
               child: TextButton.icon(
                 onPressed: updating ? null : onChangeCover,
-                icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                label: const Text('Cover photo'),
+                icon: Icon(
+                  Icons.photo_camera_outlined,
+                  size: 18,
+                  color: fv.primaryText,
+                ),
+                label: Text(
+                  'Cover photo',
+                  style: TextStyle(color: fv.primaryText),
+                ),
               ),
             ),
           ),
         ),
+        if (showRemoveCover) ...[
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: updating ? null : onRemoveCover,
+              child: Text(
+                'Remove cover',
+                style: TextStyle(color: fv.secondaryText),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 14),
         Row(
           children: [
@@ -80,7 +112,7 @@ class EntityProfileMediaEditor extends StatelessWidget {
               onTap: updating ? null : onChangeAvatar,
               child: CircleAvatar(
                 radius: 40,
-                backgroundColor: const Color(0xFF241D22),
+                backgroundColor: fv.elevatedSurface,
                 backgroundImage:
                     avatarUrl != null ? NetworkImage(avatarUrl!) : null,
                 child: avatarUrl == null
@@ -98,6 +130,18 @@ class EntityProfileMediaEditor extends StatelessWidget {
             ),
           ],
         ),
+        if (showRemoveAvatar) ...[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: updating ? null : onRemoveAvatar,
+              child: Text(
+                'Remove profile photo',
+                style: TextStyle(color: fv.secondaryText),
+              ),
+            ),
+          ),
+        ],
         if (updating) ...[
           const SizedBox(height: 10),
           const LinearProgressIndicator(color: FirstVueColors.gold),

@@ -1,8 +1,12 @@
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/media_config.dart';
 import 'community_editor_service.dart';
 import 'community_service.dart';
+import 'entity_image_url.dart';
+import 'media_storage_service.dart';
+import 'profile_media_service.dart';
 import 'user_preferences_service.dart';
 
 /// Parent umbrella Community (backed by `public.community_hubs`).
@@ -24,6 +28,8 @@ class CommunityHub {
   final String status;
   final int followerCount;
   final DateTime createdAt;
+  final MediaStorageProvider imageStorageProvider;
+  final MediaStorageProvider coverStorageProvider;
 
   const CommunityHub({
     required this.id,
@@ -42,6 +48,8 @@ class CommunityHub {
     this.status = 'active',
     this.followerCount = 0,
     required this.createdAt,
+    this.imageStorageProvider = MediaStorageProvider.supabase,
+    this.coverStorageProvider = MediaStorageProvider.supabase,
   });
 
   String? get locationLabel {
@@ -53,13 +61,22 @@ class CommunityHub {
 
   factory CommunityHub.fromRow(Map<String, dynamic> row) {
     final createdRaw = row['created_at'];
+    final storagePath = row['image_storage_path'] as String?;
+    final legacyImage = row['image_url'] as String?;
+    final coverStoragePath = row['cover_storage_path'] as String?;
+    final legacyCover = row['cover_url'] as String?;
     return CommunityHub(
       id: row['id'] as String,
       name: (row['name'] as String?) ?? 'Community',
       description: row['description'] as String?,
       category: row['category'] as String?,
-      imageUrl: row['image_url'] as String?,
-      coverUrl: row['cover_url'] as String?,
+      // Temporary raw value; call [withResolvedImages] before display.
+      imageUrl: storagePath?.trim().isNotEmpty == true
+          ? storagePath
+          : legacyImage,
+      coverUrl: coverStoragePath?.trim().isNotEmpty == true
+          ? coverStoragePath
+          : legacyCover,
       city: row['city'] as String?,
       state: row['state'] as String?,
       postalCode: row['postal_code'] as String?,
@@ -75,6 +92,77 @@ class CommunityHub {
           : createdRaw is DateTime
               ? createdRaw
               : DateTime.now(),
+      imageStorageProvider: MediaStorageProvider.parse(
+        row['image_storage_provider'] as String?,
+      ),
+      coverStorageProvider: MediaStorageProvider.parse(
+        row['cover_storage_provider'] as String?,
+      ),
+    );
+  }
+
+  Future<CommunityHub> withResolvedImages() async {
+    final resolvedImage = await EntityImageUrl.resolve(
+      storagePath:
+          EntityImageUrl.looksLikeStoragePath(imageUrl) ? imageUrl : null,
+      legacyUrl: imageUrl,
+      provider: imageStorageProvider,
+    );
+    final resolvedCover = await EntityImageUrl.resolve(
+      storagePath:
+          EntityImageUrl.looksLikeStoragePath(coverUrl) ? coverUrl : null,
+      legacyUrl: coverUrl,
+      provider: coverStorageProvider,
+    );
+    if (resolvedImage == imageUrl && resolvedCover == coverUrl) return this;
+    return CommunityHub(
+      id: id,
+      name: name,
+      description: description,
+      category: category,
+      imageUrl: resolvedImage,
+      coverUrl: resolvedCover,
+      city: city,
+      state: state,
+      postalCode: postalCode,
+      rules: rules,
+      visibility: visibility,
+      createdByProfileId: createdByProfileId,
+      leaderUserId: leaderUserId,
+      status: status,
+      followerCount: followerCount,
+      createdAt: createdAt,
+      imageStorageProvider: imageStorageProvider,
+      coverStorageProvider: coverStorageProvider,
+    );
+  }
+
+  CommunityHub copyWith({
+    String? imageUrl,
+    String? coverUrl,
+    String? description,
+    String? status,
+    int? followerCount,
+  }) {
+    return CommunityHub(
+      id: id,
+      name: name,
+      description: description ?? this.description,
+      category: category,
+      imageUrl: imageUrl ?? this.imageUrl,
+      coverUrl: coverUrl ?? this.coverUrl,
+      city: city,
+      state: state,
+      postalCode: postalCode,
+      rules: rules,
+      visibility: visibility,
+      createdByProfileId: createdByProfileId,
+      leaderUserId: leaderUserId,
+      status: status ?? this.status,
+      followerCount: followerCount ?? this.followerCount,
+      createdAt: createdAt,
+      imageStorageProvider: imageStorageProvider,
+      coverStorageProvider: coverStorageProvider,
     );
   }
 }
@@ -207,9 +295,11 @@ class CommunityHubService {
   static final _client = Supabase.instance.client;
 
   static const _columns =
-      'id, name, description, category, image_url, cover_url, city, state, '
-      'postal_code, rules, visibility, created_by_profile_id, leader_user_id, '
-      'status, follower_count, created_at';
+      'id, name, description, category, image_url, cover_url, '
+      'image_storage_path, image_storage_provider, '
+      'cover_storage_path, cover_storage_provider, '
+      'city, state, postal_code, rules, visibility, created_by_profile_id, '
+      'leader_user_id, status, follower_count, created_at';
 
   static const _columnsLegacy =
       'id, name, description, category, image_url, city, state, postal_code, '
@@ -230,6 +320,20 @@ class CommunityHubService {
       'id, community_id, group_id, source_post_id, shared_by, created_at, '
       'removed_from_community_at';
 
+  static Map<String, dynamic> _imagePersistPayload(MediaUploadResult upload) {
+    return {
+      'image_url': upload.path,
+      'image_storage_path': upload.path,
+      'image_storage_provider': upload.provider.value,
+    };
+  }
+
+  static Future<List<CommunityHub>> _resolveHubImages(
+    List<CommunityHub> hubs,
+  ) async {
+    return Future.wait(hubs.map((h) => h.withResolvedImages()));
+  }
+
   static Future<List<Map<String, dynamic>>> _selectHubRows({
     required dynamic Function(dynamic query) configure,
   }) async {
@@ -249,11 +353,21 @@ class CommunityHubService {
 
   static Future<List<CommunityHub>> fetchHubs({int limit = 40}) async {
     try {
-      final rows = await _selectHubRows(
-        configure: (query) =>
-            query.order('created_at', ascending: false).limit(limit),
-      );
-      return rows.map(CommunityHub.fromRow).toList();
+      List<Map<String, dynamic>> rows;
+      try {
+        rows = await _selectHubRows(
+          configure: (query) => query
+              .eq('status', 'active')
+              .order('created_at', ascending: false)
+              .limit(limit),
+        );
+      } catch (_) {
+        rows = await _selectHubRows(
+          configure: (query) =>
+              query.order('created_at', ascending: false).limit(limit),
+        );
+      }
+      return _resolveHubImages(rows.map(CommunityHub.fromRow).toList());
     } catch (_) {
       return const [];
     }
@@ -266,7 +380,7 @@ class CommunityHubService {
         configure: (query) => query.eq('id', id).limit(1),
       );
       if (rows.isEmpty) return null;
-      return CommunityHub.fromRow(rows.first);
+      return CommunityHub.fromRow(rows.first).withResolvedImages();
     } catch (_) {
       return null;
     }
@@ -277,24 +391,45 @@ class CommunityHubService {
       final prefs = await UserPreferencesService.fetch();
       final city = prefs.locationCity?.trim();
       final state = prefs.locationState?.trim();
+      final hasCity = city != null && city.isNotEmpty;
+      final hasState = state != null && state.isNotEmpty;
 
-      final rows = await _selectHubRows(
-        configure: (query) {
-          var q = query;
-          if (city != null &&
-              city.isNotEmpty &&
-              state != null &&
-              state.isNotEmpty) {
-            q = q.or('city.ilike.%$city%,state.ilike.%$state%');
-          } else if (city != null && city.isNotEmpty) {
-            q = q.ilike('city', '%$city%');
-          } else if (state != null && state.isNotEmpty) {
-            q = q.ilike('state', '%$state%');
-          }
-          return q.order('created_at', ascending: false).limit(limit);
-        },
-      );
-      return rows.map(CommunityHub.fromRow).toList();
+      if (!hasCity && !hasState) {
+        return fetchHubs(limit: limit);
+      }
+
+      Future<List<Map<String, dynamic>>> runNearby({
+        required bool filterActive,
+      }) {
+        return _selectHubRows(
+          configure: (query) {
+            var q = query;
+            if (filterActive) {
+              q = q.eq('status', 'active');
+            }
+            if (hasCity && hasState) {
+              q = q.or('city.ilike.%$city%,state.ilike.%$state%');
+            } else if (hasCity) {
+              q = q.ilike('city', '%$city%');
+            } else {
+              q = q.ilike('state', '%$state%');
+            }
+            return q.order('created_at', ascending: false).limit(limit);
+          },
+        );
+      }
+
+      List<Map<String, dynamic>> rows;
+      try {
+        rows = await runNearby(filterActive: true);
+      } catch (_) {
+        rows = await runNearby(filterActive: false);
+      }
+
+      if (rows.isEmpty) {
+        return fetchHubs(limit: limit);
+      }
+      return _resolveHubImages(rows.map(CommunityHub.fromRow).toList());
     } catch (_) {
       return fetchHubs(limit: limit);
     }
@@ -321,49 +456,46 @@ class CommunityHubService {
       throw ArgumentError('Community name is required.');
     }
 
-    String? imageUrl;
+    MediaUploadResult? upload;
     if (imageFile != null) {
-      imageUrl = await CommunityMediaService.uploadHubImage(
+      upload = await CommunityMediaService.uploadHubImage(
         hubIdHint: me.id,
         file: imageFile,
       );
+    }
+
+    final insert = <String, dynamic>{
+      'name': trimmed,
+      'description': description?.trim(),
+      'category': category?.trim(),
+      'city': city?.trim(),
+      'state': state?.trim(),
+      'postal_code': postalCode?.trim(),
+      'rules': rules?.trim(),
+      'visibility': visibility == 'private' ? 'private' : 'public',
+      'created_by_profile_id': me.id,
+      'leader_user_id': me.id,
+      'status': 'active',
+    };
+    if (upload != null) {
+      insert.addAll(_imagePersistPayload(upload));
     }
 
     Map<String, dynamic> row;
     try {
       row = await _client
           .from('community_hubs')
-          .insert({
-            'name': trimmed,
-            'description': description?.trim(),
-            'category': category?.trim(),
-            'city': city?.trim(),
-            'state': state?.trim(),
-            'postal_code': postalCode?.trim(),
-            'rules': rules?.trim(),
-            'visibility': visibility == 'private' ? 'private' : 'public',
-            'image_url': imageUrl,
-            'created_by_profile_id': me.id,
-            'leader_user_id': me.id,
-            'status': 'active',
-          })
+          .insert(insert)
           .select(_columns)
           .single();
     } catch (_) {
+      insert.remove('image_storage_path');
+      insert.remove('image_storage_provider');
+      insert.remove('leader_user_id');
+      insert.remove('status');
       row = await _client
           .from('community_hubs')
-          .insert({
-            'name': trimmed,
-            'description': description?.trim(),
-            'category': category?.trim(),
-            'city': city?.trim(),
-            'state': state?.trim(),
-            'postal_code': postalCode?.trim(),
-            'rules': rules?.trim(),
-            'visibility': visibility == 'private' ? 'private' : 'public',
-            'image_url': imageUrl,
-            'created_by_profile_id': me.id,
-          })
+          .insert(insert)
           .select(_columnsLegacy)
           .single();
     }
@@ -379,7 +511,7 @@ class CommunityHubService {
       if (error.code != '23505') rethrow;
     }
 
-    return CommunityHub.fromRow(row);
+    return CommunityHub.fromRow(row).withResolvedImages();
   }
 
   static Future<CommunityHub> updateHub({
@@ -411,7 +543,10 @@ class CommunityHubService {
     }
     if (coverUrl != null) patch['cover_url'] = coverUrl.trim();
     if (status != null) patch['status'] = status.trim();
-    if (clearImage) patch['image_url'] = null;
+    if (clearImage) {
+      patch['image_url'] = null;
+      patch['image_storage_path'] = null;
+    }
 
     try {
       final row = await _client
@@ -420,17 +555,18 @@ class CommunityHubService {
           .eq('id', hubId)
           .select(_columns)
           .single();
-      return CommunityHub.fromRow(row);
+      return CommunityHub.fromRow(row).withResolvedImages();
     } catch (_) {
       patch.remove('cover_url');
       patch.remove('status');
+      patch.remove('image_storage_path');
       final row = await _client
           .from('community_hubs')
           .update(patch)
           .eq('id', hubId)
           .select(_columnsLegacy)
           .single();
-      return CommunityHub.fromRow(row);
+      return CommunityHub.fromRow(row).withResolvedImages();
     }
   }
 
@@ -438,32 +574,32 @@ class CommunityHubService {
     required String hubId,
     required XFile file,
   }) async {
-    final imageUrl = await CommunityMediaService.uploadHubImage(
+    final upload = await CommunityMediaService.uploadHubImage(
       hubIdHint: hubId,
       file: file,
     );
+    final patch = {
+      ..._imagePersistPayload(upload),
+      'updated_at': DateTime.now().toIso8601String(),
+    };
     try {
       final row = await _client
           .from('community_hubs')
-          .update({
-            'image_url': imageUrl,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
+          .update(patch)
           .eq('id', hubId)
           .select(_columns)
           .single();
-      return CommunityHub.fromRow(row);
+      return CommunityHub.fromRow(row).withResolvedImages();
     } catch (_) {
+      patch.remove('image_storage_path');
+      patch.remove('image_storage_provider');
       final row = await _client
           .from('community_hubs')
-          .update({
-            'image_url': imageUrl,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
+          .update(patch)
           .eq('id', hubId)
           .select(_columnsLegacy)
           .single();
-      return CommunityHub.fromRow(row);
+      return CommunityHub.fromRow(row).withResolvedImages();
     }
   }
 
@@ -471,17 +607,20 @@ class CommunityHubService {
     try {
       final hub = await fetchHubById(hubId);
       if (hub?.leaderUserId != null && hub!.leaderUserId!.isNotEmpty) {
+        final profileId = hub.leaderUserId!;
         final profile = await _client
             .from('profiles')
-            .select('display_name, username, avatar_url')
-            .eq('id', hub.leaderUserId!)
+            .select('display_name, username')
+            .eq('id', profileId)
             .maybeSingle();
+        final avatars =
+            await ProfileMediaService.fetchAvatarUrlsForProfiles([profileId]);
         return CommunityHubLeader(
-          profileId: hub.leaderUserId!,
+          profileId: profileId,
           displayName:
               (profile?['display_name'] as String?) ?? 'FirstVue member',
           username: profile?['username'] as String?,
-          avatarUrl: profile?['avatar_url'] as String?,
+          avatarUrl: avatars[profileId],
           role: 'creator',
         );
       }
@@ -516,16 +655,18 @@ class CommunityHubService {
       final profileId = chosen['profile_id'] as String;
       final profile = await _client
           .from('profiles')
-          .select('display_name, username, avatar_url')
+          .select('display_name, username')
           .eq('id', profileId)
           .maybeSingle();
+      final avatars =
+          await ProfileMediaService.fetchAvatarUrlsForProfiles([profileId]);
 
       return CommunityHubLeader(
         profileId: profileId,
         displayName:
             (profile?['display_name'] as String?) ?? 'FirstVue member',
         username: profile?['username'] as String?,
-        avatarUrl: profile?['avatar_url'] as String?,
+        avatarUrl: avatars[profileId],
         role: (chosen['role'] as String?) ?? 'leader',
       );
     } catch (_) {
