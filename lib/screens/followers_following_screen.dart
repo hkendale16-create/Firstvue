@@ -176,6 +176,20 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen> {
       );
     }
 
+    final me = Supabase.instance.client.auth.currentUser;
+    if (me == null) {
+      return ListView(
+        children: [
+          const SizedBox(height: 80),
+          Text(
+            'Sign in to view ${title.toLowerCase()}.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white.withValues(alpha: .55)),
+          ),
+        ],
+      );
+    }
+
     if (_profiles.isEmpty) {
       return ListView(
         children: [
@@ -188,8 +202,6 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen> {
         ],
       );
     }
-
-    final me = Supabase.instance.client.auth.currentUser;
 
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
@@ -224,7 +236,7 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen> {
 
           final profile = _profiles[index];
           final status = _statusById[profile.id] ?? FollowStatus.notFollowing;
-          final isSelf = me?.id == profile.id;
+          final isSelf = me.id == profile.id;
 
           return ListTile(
             contentPadding: const EdgeInsets.symmetric(vertical: 4),

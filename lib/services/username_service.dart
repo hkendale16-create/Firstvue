@@ -143,13 +143,22 @@ class UsernameService {
       );
       return (result as String?) ?? normalized;
     } on PostgrestException catch (error) {
-      final message = error.message.trim();
-      if (message.toLowerCase().contains('already taken') ||
-          error.code == '23505') {
+      final message = error.message.trim().toLowerCase();
+      if (error.code == 'PGRST202' ||
+          message.contains('set_profile_username') ||
+          message.contains('could not find the function')) {
+        await _client.from('profiles').upsert({
+          'id': user.id,
+          'username': normalized,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        });
+        return normalized;
+      }
+      if (message.contains('already taken') || error.code == '23505') {
         throw ArgumentError('That @handle is already taken. Choose another one.');
       }
       if (message.isNotEmpty) {
-        throw ArgumentError(message);
+        throw ArgumentError(error.message.trim());
       }
       rethrow;
     }

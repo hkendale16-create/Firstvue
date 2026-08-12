@@ -115,18 +115,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         return;
       }
 
-      if (_usernameAvailability == UsernameAvailability.taken ||
-          _usernameAvailability == UsernameAvailability.invalid) {
-        setState(() {
-          _saving = false;
-          _usernameError = _usernameAvailability == UsernameAvailability.taken
-              ? 'That @handle is already taken. Choose another one.'
-              : 'Use 3–30 lowercase letters, numbers, or underscores.';
-        });
-        return;
-      }
-
-      if (_usernameAvailability == UsernameAvailability.checking) {
+      if (_usernameAvailability == UsernameAvailability.empty ||
+          _usernameAvailability == UsernameAvailability.checking) {
         final availability =
             await UsernameService.checkAvailability(usernameRaw);
         if (availability != UsernameAvailability.available) {
@@ -135,13 +125,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             _usernameAvailability = availability;
             _usernameError = availability == UsernameAvailability.taken
                 ? 'That @handle is already taken. Choose another one.'
-                : 'Could not verify @handle availability.';
+                : availability == UsernameAvailability.invalid
+                    ? 'Use 3–30 lowercase letters, numbers, or underscores.'
+                    : 'Could not verify @handle availability.';
           });
           return;
         }
+        _usernameAvailability = UsernameAvailability.available;
       }
 
-      await UsernameService.updateUsername(usernameRaw);
+      final savedHandle = await UsernameService.updateUsername(usernameRaw);
 
       await UserProfileService.updateExtendedProfile(
         displayName: _nameController.text,
@@ -156,7 +149,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile updated.')),
       );
-      Navigator.pop(context, true);
+      Navigator.pop(context, savedHandle);
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -165,6 +158,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ? error.message?.toString() ?? 'Unable to save profile.'
             : 'Unable to save your profile right now.';
       });
+    } finally {
+      if (mounted && _saving) setState(() => _saving = false);
     }
   }
 

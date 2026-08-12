@@ -10,6 +10,7 @@ import '../services/profile_media_service.dart';
 import '../services/follow_service.dart';
 import '../services/user_profile_service.dart';
 import '../services/profile_privacy_service.dart';
+import '../services/username_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/media_picker_sheet.dart';
@@ -74,17 +75,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadDisplayName() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
-      if (mounted) setState(() => _displayName = null);
+      if (mounted) {
+        setState(() {
+          _displayName = null;
+          _username = null;
+        });
+      }
       return;
     }
     setState(() => _nameLoading = true);
     final profile = await UserProfileService.fetchProfile();
+    final username = await UsernameService.fetchUsername();
     if (!mounted) return;
     setState(() {
       _displayName = profile?.displayName?.trim().isNotEmpty == true
           ? profile!.displayName!.trim()
           : user.email?.split('@').first;
-      _username = profile?.username;
+      _username = username ?? profile?.username;
       _nameLoading = false;
     });
   }
@@ -394,11 +401,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await _handleAccountTap(null);
       return;
     }
-    final updated = await Navigator.push<bool>(
+    final updated = await Navigator.push<String>(
       context,
       FirstVuePageRoute(builder: (_) => const EditProfileScreen()),
     );
-    if (updated == true && mounted) {
+    if (!mounted) return;
+    if (updated != null) {
+      if (updated.isNotEmpty) {
+        setState(() => _username = updated);
+      }
       await Future.wait([
         _loadDisplayName(),
         _loadProfileImages(),

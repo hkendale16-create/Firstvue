@@ -61,26 +61,40 @@ class UserProfileService {
   static Future<UserProfile?> fetchProfileForUser(String profileId) async {
     if (profileId.trim().isEmpty) return null;
 
+    const fullColumns =
+        'id, display_name, username, bio, city, state, website';
+    const baseColumns = 'id, display_name, username, bio, city, state';
+
+    Map<String, dynamic>? row;
     try {
-      final row = await _client
+      row = await _client
           .from('profiles')
-          .select('id, display_name, username, bio, city, state, website')
+          .select(fullColumns)
           .eq('id', profileId)
           .maybeSingle();
-      if (row == null) return null;
-
-      return UserProfile(
-        id: row['id'] as String,
-        displayName: row['display_name'] as String?,
-        username: row['username'] as String?,
-        bio: row['bio'] as String?,
-        city: row['city'] as String?,
-        state: row['state'] as String?,
-        website: row['website'] as String?,
-      );
     } catch (_) {
-      return null;
+      try {
+        row = await _client
+            .from('profiles')
+            .select(baseColumns)
+            .eq('id', profileId)
+            .maybeSingle();
+      } catch (_) {
+        return null;
+      }
     }
+
+    if (row == null) return null;
+
+    return UserProfile(
+      id: row['id'] as String,
+      displayName: row['display_name'] as String?,
+      username: row['username'] as String?,
+      bio: row['bio'] as String?,
+      city: row['city'] as String?,
+      state: row['state'] as String?,
+      website: row['website'] as String?,
+    );
   }
 
   static Future<void> updateDisplayName(String displayName) async {

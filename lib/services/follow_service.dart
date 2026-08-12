@@ -249,15 +249,15 @@ class FollowService {
     int offset = 0,
   }) async {
     if (profileId.trim().isEmpty) return const [];
-    final joined = await _fetchFollowProfilesViaJoin(
+
+    final rpc = await _fetchFollowListRpc(
+      functionName: 'list_profile_followers',
       profileId: profileId,
-      idColumn: 'follower_id',
-      filterColumn: 'following_id',
-      profileEmbedFk: 'profile_follows_follower_id_fkey',
       limit: limit,
       offset: offset,
     );
-    if (joined.isNotEmpty) return joined;
+    if (rpc != null) return rpc;
+
     return _fetchFollowProfiles(
       profileId: profileId,
       column: 'follower_id',
@@ -273,15 +273,15 @@ class FollowService {
     int offset = 0,
   }) async {
     if (profileId.trim().isEmpty) return const [];
-    final joined = await _fetchFollowProfilesViaJoin(
+
+    final rpc = await _fetchFollowListRpc(
+      functionName: 'list_profile_following',
       profileId: profileId,
-      idColumn: 'following_id',
-      filterColumn: 'follower_id',
-      profileEmbedFk: 'profile_follows_following_id_fkey',
       limit: limit,
       offset: offset,
     );
-    if (joined.isNotEmpty) return joined;
+    if (rpc != null) return rpc;
+
     return _fetchFollowProfiles(
       profileId: profileId,
       column: 'following_id',
@@ -291,34 +291,27 @@ class FollowService {
     );
   }
 
-  static Future<List<FollowProfile>> _fetchFollowProfilesViaJoin({
+  static Future<List<FollowProfile>?> _fetchFollowListRpc({
+    required String functionName,
     required String profileId,
-    required String idColumn,
-    required String filterColumn,
-    required String profileEmbedFk,
     required int limit,
     required int offset,
   }) async {
     try {
-      final rows = await _client
-          .from('profile_follows')
-          .select(
-            '$idColumn, profiles!$profileEmbedFk(id, display_name, username, avatar_url)',
-          )
-          .eq(filterColumn, profileId)
-          .order('created_at', ascending: false)
-          .range(offset, offset + limit - 1);
-
-      return rows.map((row) {
-        final profile = row['profiles'] as Map<String, dynamic>?;
-        if (profile != null) return FollowProfile.fromRow(profile);
-        return FollowProfile(
-          id: row[idColumn] as String,
-          displayName: 'FirstVue member',
-        );
-      }).toList();
+      final rows = await _client.rpc(
+        functionName,
+        params: {
+          'p_profile_id': profileId,
+          'p_limit': limit,
+          'p_offset': offset,
+        },
+      );
+      if (rows is! List) return const [];
+      return rows
+          .map((row) => FollowProfile.fromRow(row as Map<String, dynamic>))
+          .toList();
     } catch (_) {
-      return const [];
+      return null;
     }
   }
 
@@ -373,26 +366,35 @@ class FollowService {
     List<String> ids,
   ) async {
     if (ids.isEmpty) return const [];
+
+    List<dynamic> rows;
     try {
-      final rows = await _client
+      rows = await _client
           .from('profiles')
-          .select('id, display_name, username, avatar_url')
+          .select('id, display_name, username')
           .inFilter('id', ids);
-      final byId = {
-        for (final row in rows)
-          row['id'] as String: FollowProfile.fromRow(row),
-      };
-      return ids
-          .map(
-            (id) =>
-                byId[id] ?? FollowProfile(id: id, displayName: 'FirstVue member'),
-          )
-          .toList();
     } catch (_) {
-      return ids
-          .map((id) => FollowProfile(id: id, displayName: 'FirstVue member'))
-          .toList();
+      try {
+        rows = await _client
+            .from('profiles')
+            .select('id, display_name')
+            .inFilter('id', ids);
+      } catch (_) {
+        return ids
+            .map((id) => FollowProfile(id: id, displayName: 'FirstVue member'))
+            .toList();
+      }
     }
+
+    final byId = {
+      for (final row in rows)
+        row['id'] as String: FollowProfile.fromRow(row as Map<String, dynamic>),
+    };
+    return ids
+        .map(
+          (id) => byId[id] ?? FollowProfile(id: id, displayName: 'FirstVue member'),
+        )
+        .toList();
   }
 
   static Future<List<FollowRequestItem>> fetchPendingIncoming() async {
