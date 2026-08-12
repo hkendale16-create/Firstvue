@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../constants/business_types.dart';
 import '../services/business_submission_service.dart';
 import 'auth_screen.dart';
 import 'rentals_screen.dart';
@@ -253,7 +254,14 @@ class _NewBusinessScreen extends StatefulWidget {
 
 class _NewBusinessScreenState extends State<_NewBusinessScreen> {
   final _businessController = TextEditingController();
-  String _category = 'Barbershop';
+  String _categoryGroup = defaultBusinessCategoryGroup;
+  late String _category;
+
+  @override
+  void initState() {
+    super.initState();
+    _category = businessCategoryGroups[_categoryGroup]!.first;
+  }
 
   @override
   void dispose() {
@@ -300,27 +308,44 @@ class _NewBusinessScreenState extends State<_NewBusinessScreen> {
               decoration: _fieldDecoration('Business name'),
             ),
             const SizedBox(height: 14),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'What type of business is this?',
+                style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              initialValue: _categoryGroup,
+              dropdownColor: const Color(0xFF151B22),
+              style: const TextStyle(color: Colors.white),
+              decoration: _fieldDecoration('Business category'),
+              items: businessCategoryGroups.keys
+                  .map(
+                    (group) => DropdownMenuItem(value: group, child: Text(group)),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  _categoryGroup = value;
+                  _category = businessCategoryGroups[value]!.first;
+                });
+              },
+            ),
+            const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _category,
               dropdownColor: const Color(0xFF151B22),
               style: const TextStyle(color: Colors.white),
-              decoration: _fieldDecoration('Business type'),
-              items:
-                  const [
-                        'Barbershop',
-                        'Barber Suite',
-                        'Salon',
-                        'Salon Suite',
-                        'Beauty Studio',
-                        'Beauty Suite',
-                        'Spa',
-                        'Nail Salon',
-                      ]
-                      .map(
-                        (type) =>
-                            DropdownMenuItem(value: type, child: Text(type)),
-                      )
-                      .toList(),
+              decoration: _fieldDecoration('Specific business type'),
+              items: businessCategoryGroups[_categoryGroup]!
+                  .map(
+                    (type) =>
+                        DropdownMenuItem(value: type, child: Text(type)),
+                  )
+                  .toList(),
               onChanged: (value) =>
                   setState(() => _category = value ?? _category),
             ),

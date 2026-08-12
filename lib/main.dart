@@ -22,6 +22,7 @@ import 'theme/firstvue_theme.dart';
 import 'widgets/firstvue_bottom_nav.dart';
 import 'widgets/firstvue_onboarding.dart';
 import 'widgets/home_discovery_section.dart';
+import 'widgets/home_news_feed_section.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -159,8 +160,8 @@ class _FirstVueHomeState extends State<FirstVueHome> {
       ),
       _ExploreCategory(
         title: 'FINE AND DINE',
-        subtitle: 'Restaurants & dining',
-        imagePath: 'assets/images/explore_rentals.jpg',
+        subtitle: 'Bars, restaurants & dining',
+        imagePath: 'assets/images/explore_restaurants.jpg',
         accent: FirstVueColors.gold,
         icon: Icons.restaurant_rounded,
         onTap: () {
@@ -413,6 +414,10 @@ class _FirstVueHomeState extends State<FirstVueHome> {
                   );
                 },
               ),
+
+              const SizedBox(height: 30),
+
+              const HomeNewsFeedSection(),
 
               const SizedBox(height: 30),
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../screens/firstvue_business_profile_screen.dart';
 import '../services/recommendations_service.dart';
+import '../services/things_to_do_service.dart';
 import '../services/trending_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
 
@@ -20,7 +21,7 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
   bool _showComingSoon = false;
   bool _tabsReady = false;
 
-  final _tabLabels = <String>['Trending', 'New', 'Recommended'];
+  final _tabLabels = <String>['Trending', 'New', 'Recommended', 'Events'];
 
   @override
   void initState() {
@@ -31,13 +32,17 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
   Future<void> _initTabs() async {
     final hasComingSoon = await TrendingBusinessesService.hasComingSoonBusinesses();
     if (!mounted) return;
-    final labels = [..._tabLabels];
-    if (hasComingSoon) labels.add('Coming Soon');
     setState(() {
       _showComingSoon = hasComingSoon;
-      _tabController = TabController(length: labels.length, vsync: this);
+      _tabController = TabController(length: _labels.length, vsync: this);
       _tabsReady = true;
     });
+  }
+
+  List<String> get _labels {
+    final labels = [..._tabLabels];
+    if (_showComingSoon) labels.add('Coming Soon');
+    return labels;
   }
 
   @override
@@ -46,21 +51,14 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
     super.dispose();
   }
 
-  Future<List<TrendingBusiness>> _loadForTab(int index) {
-    if (_showComingSoon && index == 3) {
-      return TrendingBusinessesService.fetchComingSoonNearYou();
-    }
-    return switch (index) {
-      0 => TrendingBusinessesService.fetchTrendingNearYou(),
-      1 => TrendingBusinessesService.fetchNewNearYou(),
-      _ => TrendingBusinessesService.fetchRecommendedNearYou(),
+  Future<List<TrendingBusiness>> _loadBusinessesForLabel(String label) {
+    return switch (label) {
+      'Trending' => TrendingBusinessesService.fetchTrendingNearYou(limit: 16),
+      'New' => TrendingBusinessesService.fetchNewNearYou(limit: 16),
+      'Recommended' => TrendingBusinessesService.fetchRecommendedNearYou(limit: 16),
+      'Coming Soon' => TrendingBusinessesService.fetchComingSoonNearYou(limit: 16),
+      _ => TrendingBusinessesService.fetchTrendingNearYou(limit: 16),
     };
-  }
-
-  List<String> get _labels {
-    final labels = [..._tabLabels];
-    if (_showComingSoon) labels.add('Coming Soon');
-    return labels;
   }
 
   @override
@@ -123,50 +121,17 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
         const SizedBox(height: 12),
         SizedBox(
           height: 248,
-          child: FutureBuilder<List<TrendingBusiness>>(
-            key: ValueKey(_tabController.index),
-            future: _loadForTab(_tabController.index),
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return _TrendingEmptyCard(
-                  message: 'Discovery is unavailable right now.',
-                );
+          child: TabBarView(
+            controller: _tabController,
+            children: _labels.map((label) {
+              if (label == 'Events') {
+                return _EventsSwipeList();
               }
-              if (!snapshot.hasData) {
-                return const Center(
-                  child: CircularProgressIndicator(color: FirstVueColors.teal),
-                );
-              }
-              final businesses = snapshot.data!;
-              if (businesses.isEmpty) {
-                return _TrendingEmptyCard(
-                  message: 'No listings in this section yet.',
-                );
-              }
-              return ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: businesses.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 12),
-                itemBuilder: (context, index) {
-                  final business = businesses[index];
-                  final accent = index.isEven
-                      ? FirstVueColors.teal
-                      : FirstVueColors.coral;
-                  return _TrendingPortraitCard(
-                    business: business,
-                    accent: accent,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => FirstVueBusinessProfileScreen(
-                          businessId: business.id,
-                        ),
-                      ),
-                    ),
-                  );
-                },
+              return _BusinessSwipeList(
+                label: label,
+                loadBusinesses: () => _loadBusinessesForLabel(label),
               );
-            },
+            }).toList(),
           ),
         ),
         const SizedBox(height: 16),
@@ -192,6 +157,129 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
           accent: FirstVueColors.coral,
         ),
       ],
+    );
+  }
+}
+
+class _BusinessSwipeList extends StatelessWidget {
+  final String label;
+  final Future<List<TrendingBusiness>> Function() loadBusinesses;
+
+  const _BusinessSwipeList({
+    required this.label,
+    required this.loadBusinesses,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<TrendingBusiness>>(
+      future: loadBusinesses(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _TrendingEmptyCard(
+            message: 'Discovery is unavailable right now.',
+          );
+        }
+        if (!snapshot.hasData) {
+          return const Center(
+            child: CircularProgressIndicator(color: FirstVueColors.teal),
+          );
+        }
+        final businesses = snapshot.data!;
+        if (businesses.isEmpty) {
+          return _TrendingEmptyCard(
+            message: 'No $label listings yet.',
+          );
+        }
+        return ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: businesses.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 12),
+          itemBuilder: (context, index) {
+            final business = businesses[index];
+            final accent =
+                index.isEven ? FirstVueColors.teal : FirstVueColors.coral;
+            return _TrendingPortraitCard(
+              business: business,
+              accent: accent,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => FirstVueBusinessProfileScreen(
+                    businessId: business.id,
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _EventsSwipeList extends StatelessWidget {
+  const _EventsSwipeList();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder(
+      future: ThingsToDoService.fetchApprovedEvents(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(
+            child: CircularProgressIndicator(color: FirstVueColors.teal),
+          );
+        }
+        final events = snapshot.data!;
+        if (events.isEmpty) {
+          return const _TrendingEmptyCard(
+            message: 'Local events will appear here.',
+          );
+        }
+        return ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: events.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 12),
+          itemBuilder: (context, index) {
+            final event = events[index];
+            return Container(
+              width: 220,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: FirstVueColors.surface,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: FirstVueColors.coral.withValues(alpha: .35),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.local_activity, color: FirstVueColors.coral),
+                  const SizedBox(height: 8),
+                  Text(
+                    event.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (event.locationLabel != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      event.locationLabel!,
+                      style: const TextStyle(color: Colors.white54, fontSize: 12),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

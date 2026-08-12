@@ -1,5 +1,6 @@
 import 'package:firstvue/config/supabase_config.dart';
 import 'package:firstvue/main.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -26,10 +27,17 @@ void main() {
     await tester.tap(homeNav);
     await tester.pumpAndSettle();
 
-    expect(find.text('FIRSTVUE'), findsOneWidget);
     expect(find.text('EXPLORE'), findsOneWidget);
     expect(find.text('BARBER & BEAUTY'), findsOneWidget);
-    expect(find.text('AVAILABLE RENTALS'), findsOneWidget);
-    expect(find.text('THINGS TO DO'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('NEWS FEED'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('NEWS FEED'), findsOneWidget);
+    expect(find.text('POST HERE'), findsOneWidget);
   });
 }

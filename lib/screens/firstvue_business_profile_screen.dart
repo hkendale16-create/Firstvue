@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/approved_businesses_service.dart';
 import '../services/business_media_service.dart';
+import '../services/business_menu_service.dart';
 import '../services/business_reviews_service.dart';
 import '../services/business_social_links_service.dart';
 import '../services/messaging_service.dart';
@@ -168,6 +169,18 @@ class _BusinessProfileContent extends StatelessWidget {
                             .map((service) => _ServiceChip(text: service))
                             .toList(),
                       ),
+                if (BusinessMenuService.isDiningBusinessType(
+                  details.businessType,
+                )) ...[
+                  const SizedBox(height: 22),
+                  const _ProfileSectionTitle('MENU'),
+                  const SizedBox(height: 10),
+                  _DiningMenuSection(businessId: details.id),
+                  const SizedBox(height: 22),
+                  const _ProfileSectionTitle('SPECIALS'),
+                  const SizedBox(height: 10),
+                  _DiningSpecialsSection(businessId: details.id),
+                ],
                 const SizedBox(height: 22),
                 const _ProfileSectionTitle('PHOTOS'),
                 const SizedBox(height: 10),
@@ -810,6 +823,80 @@ class _BusinessSocialLinksSection extends StatelessWidget {
               },
             );
           }).toList(),
+        );
+      },
+    );
+  }
+}
+
+class _DiningMenuSection extends StatelessWidget {
+  final String businessId;
+
+  const _DiningMenuSection({required this.businessId});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<BusinessMenuItem>>(
+      future: BusinessMenuService.fetchMenuItems(businessId),
+      builder: (context, snapshot) {
+        final items = snapshot.data ?? const [];
+        if (items.isEmpty) {
+          return const _ProfileInfoCard(
+            icon: Icons.restaurant_menu_outlined,
+            text: 'The owner has not added menu items yet.',
+          );
+        }
+        return Column(
+          children: items
+              .map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _ProfileInfoCard(
+                    icon: Icons.restaurant_outlined,
+                    text:
+                        '${item.name}${item.priceLabel != null ? ' • ${item.priceLabel}' : ''}'
+                        '${item.description?.trim().isNotEmpty == true ? '\n${item.description}' : ''}',
+                  ),
+                ),
+              )
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+class _DiningSpecialsSection extends StatelessWidget {
+  final String businessId;
+
+  const _DiningSpecialsSection({required this.businessId});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<BusinessSpecial>>(
+      future: BusinessMenuService.fetchSpecials(businessId),
+      builder: (context, snapshot) {
+        final specials = snapshot.data ?? const [];
+        if (specials.isEmpty) {
+          return const _ProfileInfoCard(
+            icon: Icons.local_offer_outlined,
+            text: 'No specials posted right now.',
+          );
+        }
+        return Column(
+          children: specials
+              .map(
+                (special) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _ProfileInfoCard(
+                    icon: Icons.star_outline,
+                    text:
+                        '${special.title}${special.priceLabel != null ? ' • ${special.priceLabel}' : ''}'
+                        '${special.description?.trim().isNotEmpty == true ? '\n${special.description}' : ''}',
+                  ),
+                ),
+              )
+              .toList(),
         );
       },
     );

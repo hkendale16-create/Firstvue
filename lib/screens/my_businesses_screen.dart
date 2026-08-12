@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/business_media_service.dart';
+import '../services/business_menu_service.dart';
 import '../services/business_social_links_service.dart';
 import '../services/business_submission_service.dart';
 
@@ -127,6 +128,8 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
   final _instagram = TextEditingController();
   final _facebook = TextEditingController();
   final _youtube = TextEditingController();
+  final _menuLines = TextEditingController();
+  final _specialLines = TextEditingController();
   late Future<List<BusinessMediaItem>> _media;
   @override
   void initState() {
@@ -143,6 +146,22 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
     final links = await BusinessSocialLinksService.fetchForBusiness(
       widget.business.id,
     );
+    if (BusinessMenuService.isDiningBusinessType(widget.business.businessType)) {
+      final menu = await BusinessMenuService.fetchMenuItems(widget.business.id);
+      final specials = await BusinessMenuService.fetchSpecials(widget.business.id);
+      _menuLines.text = menu
+          .map(
+            (item) =>
+                '${item.name} | ${item.priceLabel ?? ''} | ${item.description ?? ''}',
+          )
+          .join('\n');
+      _specialLines.text = specials
+          .map(
+            (item) =>
+                '${item.title} | ${item.priceLabel ?? ''} | ${item.description ?? ''}',
+          )
+          .join('\n');
+    }
     if (!mounted) return;
     _comingSoon = comingSoon;
     for (final link in links) {
@@ -177,7 +196,43 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
     _instagram.dispose();
     _facebook.dispose();
     _youtube.dispose();
+    _menuLines.dispose();
+    _specialLines.dispose();
     super.dispose();
+  }
+
+  List<({String name, String description, String price, String category})>
+  _parseMenuLines() {
+    return _menuLines.text
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .map((line) {
+          final parts = line.split('|').map((part) => part.trim()).toList();
+          return (
+            name: parts.isNotEmpty ? parts[0] : line,
+            price: parts.length > 1 ? parts[1] : '',
+            description: parts.length > 2 ? parts[2] : '',
+            category: 'Menu',
+          );
+        })
+        .toList();
+  }
+
+  List<({String title, String description, String price})> _parseSpecialLines() {
+    return _specialLines.text
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .map((line) {
+          final parts = line.split('|').map((part) => part.trim()).toList();
+          return (
+            title: parts.isNotEmpty ? parts[0] : line,
+            price: parts.length > 1 ? parts[1] : '',
+            description: parts.length > 2 ? parts[2] : '',
+          );
+        })
+        .toList();
   }
 
   Future<void> _save() async {
@@ -207,6 +262,16 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
         businessId: widget.business.id,
         links: links,
       );
+      if (BusinessMenuService.isDiningBusinessType(widget.business.businessType)) {
+        await BusinessMenuService.replaceMenuItems(
+          businessId: widget.business.id,
+          items: _parseMenuLines(),
+        );
+        await BusinessMenuService.replaceSpecials(
+          businessId: widget.business.id,
+          specials: _parseSpecialLines(),
+        );
+      }
       if (!mounted) return;
       Navigator.pop(context);
     } catch (_) {
@@ -316,6 +381,36 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
         _Field(controller: _facebook, label: 'Facebook URL'),
         const SizedBox(height: 12),
         _Field(controller: _youtube, label: 'YouTube URL'),
+        if (BusinessMenuService.isDiningBusinessType(
+          widget.business.businessType,
+        )) ...[
+          const SizedBox(height: 18),
+          const Text(
+            'MENU & SPECIALS',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.4,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'One item per line: Name | Price | Description',
+            style: TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          _Field(
+            controller: _menuLines,
+            label: 'Menu items',
+            lines: 5,
+          ),
+          const SizedBox(height: 12),
+          _Field(
+            controller: _specialLines,
+            label: 'Specials',
+            lines: 4,
+          ),
+        ],
         const SizedBox(height: 12),
         _Field(controller: _address, label: 'Street address'),
         const SizedBox(height: 12),
