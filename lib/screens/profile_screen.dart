@@ -14,7 +14,7 @@ import 'rental_inquiries_screen.dart';
 import 'rentals_screen.dart';
 import 'my_businesses_screen.dart';
 import 'messages_inbox_screen.dart';
-import 'professional_profile_editor_screen.dart';
+import 'my_professional_profile_view_screen.dart';
 import '../services/admin_auth_service.dart';
 import '../widgets/profile_recent_activity_section.dart';
 import '../widgets/profile_saved_section.dart';
@@ -200,7 +200,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 subtitle: 'Individual barber or stylist profile',
                 onTap: user == null
                     ? () => _handleAccountTap(user)
-                    : () => _open(const ProfessionalProfileEditorScreen()),
+                    : () => _open(const MyProfessionalProfileViewScreen()),
               ),
             ],
           ),

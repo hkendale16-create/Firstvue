@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../services/approved_businesses_service.dart';
 import '../services/business_media_service.dart';
 import '../services/business_menu_service.dart';
 import '../services/business_social_links_service.dart';
 import '../services/business_submission_service.dart';
 import '../widgets/location_autocomplete_field.dart';
+import 'firstvue_business_profile_screen.dart';
+import 'my_business_profile_view_screen.dart';
 import 'join_firstvue_screen.dart';
 
 class MyBusinessesScreen extends StatefulWidget {
@@ -149,7 +152,7 @@ class _MyBusinessesScreenState extends State<MyBusinessesScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (_) =>
-                          EditBusinessProfileScreen(business: business),
+                          MyBusinessProfileViewScreen(business: business),
                     ),
                   );
                   if (mounted) _refresh();
@@ -171,7 +174,8 @@ class EditBusinessProfileScreen extends StatefulWidget {
       _EditBusinessProfileScreenState();
 }
 
-class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
+class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
+    with SingleTickerProviderStateMixin {
   late final TextEditingController _about = TextEditingController(
     text: widget.business.description,
   );
@@ -192,12 +196,43 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
   final _specialLines = TextEditingController();
   final _imagePicker = ImagePicker();
   late Future<List<BusinessMediaItem>> _media;
+  late TabController _tabController;
+  int _previewToken = 0;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging && _tabController.index == 1) {
+        setState(() => _previewToken++);
+      }
+    });
     _media = BusinessMediaService.fetchMedia(widget.business.id);
     _loadLocation();
     _loadExtras();
+  }
+
+  PublicBusinessDetails _draftPreviewDetails() {
+    final locationParts = [
+      _address.text.trim(),
+      _city.text.trim(),
+      _state.text.trim().toUpperCase(),
+      _zip.text.trim(),
+    ].where((part) => part.isNotEmpty).toList();
+
+    return PublicBusinessDetails(
+      id: widget.business.id,
+      name: widget.business.name,
+      businessType: widget.business.businessType,
+      description: _about.text.trim(),
+      address: locationParts.isEmpty ? null : locationParts.join(', '),
+      services: _services.text
+          .split(',')
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toList(),
+    );
   }
 
   Future<void> _loadExtras() async {
@@ -248,6 +283,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
 
   @override
   void dispose() {
+    _tabController.dispose();
     _about.dispose();
     _services.dispose();
     _address.dispose();
@@ -467,8 +503,34 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
       backgroundColor: const Color(0xFF080B0F),
       surfaceTintColor: Colors.transparent,
       title: Text(widget.business.name),
+      bottom: TabBar(
+        controller: _tabController,
+        labelColor: const Color(0xFFD8B56A),
+        unselectedLabelColor: Colors.white54,
+        indicatorColor: const Color(0xFF78B9BE),
+        tabs: const [
+          Tab(text: 'EDIT'),
+          Tab(text: 'PREVIEW AS USER'),
+        ],
+      ),
     ),
-    body: ListView(
+    body: TabBarView(
+      controller: _tabController,
+      children: [
+        _buildEditForm(),
+        FirstVueBusinessProfileScreen(
+          key: ValueKey(_previewToken),
+          businessId: widget.business.id,
+          previewDetails: _draftPreviewDetails(),
+          isOwnerPreview: true,
+          hideAppBarBack: true,
+          businessStatus: widget.business.status,
+        ),
+      ],
+    ),
+  );
+
+  Widget _buildEditForm() => ListView(
       padding: const EdgeInsets.all(20),
       children: [
         const Text(
@@ -478,6 +540,11 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
             fontWeight: FontWeight.bold,
             letterSpacing: 1.4,
           ),
+        ),
+        const SizedBox(height: 14),
+        const Text(
+          'Switch to Preview as user to see how customers will view your profile. Photos use saved uploads; text fields update live.',
+          style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.4),
         ),
         const SizedBox(height: 14),
         _Field(controller: _about, label: 'About your business', lines: 4),
@@ -671,8 +738,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
           child: Text(_saving ? 'SAVING...' : 'SAVE PROFILE DETAILS'),
         ),
       ],
-    ),
-  );
+    );
 }
 
 class _Field extends StatelessWidget {

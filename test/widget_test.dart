@@ -27,17 +27,39 @@ void main() {
     await tester.tap(homeNav);
     await tester.pumpAndSettle();
 
-    expect(find.text('EXPLORE'), findsOneWidget);
-    expect(find.text('BARBER & BEAUTY'), findsOneWidget);
+    final homeScrollable = find.byType(Scrollable).first;
+
+    // Trending section loads async; wait for tabs to appear at top of home.
+    expect(find.text('TRENDING NEAR YOU'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('NEWS FEED'),
       300,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: homeScrollable,
     );
     await tester.pumpAndSettle();
 
     expect(find.text('NEWS FEED'), findsOneWidget);
     expect(find.text('POST HERE'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('EXPLORE'),
+      300,
+      scrollable: homeScrollable,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('EXPLORE'), findsOneWidget);
+    expect(find.text('BARBER & BEAUTY'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text("WHAT'S NOW"),
+      300,
+      scrollable: homeScrollable,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text("WHAT'S NOW"), findsOneWidget);
+    expect(find.text('TRENDING & EVENTS'), findsOneWidget);
   });
 }

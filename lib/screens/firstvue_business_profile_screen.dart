@@ -16,11 +16,34 @@ import 'meet_the_owner_screen.dart';
 
 class FirstVueBusinessProfileScreen extends StatelessWidget {
   final String businessId;
+  final PublicBusinessDetails? previewDetails;
+  final bool isOwnerPreview;
+  final bool hideAppBarBack;
+  final String? businessStatus;
 
-  const FirstVueBusinessProfileScreen({super.key, required this.businessId});
+  const FirstVueBusinessProfileScreen({
+    super.key,
+    required this.businessId,
+    this.previewDetails,
+    this.isOwnerPreview = false,
+    this.hideAppBarBack = false,
+    this.businessStatus,
+  });
 
   @override
   Widget build(BuildContext context) {
+    if (previewDetails != null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF080B0F),
+        body: _BusinessProfileContent(
+          details: previewDetails!,
+          isOwnerPreview: isOwnerPreview,
+          hideAppBarBack: hideAppBarBack,
+          businessStatus: businessStatus,
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF080B0F),
       body: FutureBuilder<PublicBusinessDetails>(
@@ -39,7 +62,12 @@ class FirstVueBusinessProfileScreen extends StatelessWidget {
               child: CircularProgressIndicator(color: Color(0xFFD8B56A)),
             );
           }
-          return _BusinessProfileContent(details: snapshot.data!);
+          return _BusinessProfileContent(
+            details: snapshot.data!,
+            isOwnerPreview: isOwnerPreview,
+            hideAppBarBack: hideAppBarBack,
+            businessStatus: businessStatus,
+          );
         },
       ),
     );
@@ -48,21 +76,34 @@ class FirstVueBusinessProfileScreen extends StatelessWidget {
 
 class _BusinessProfileContent extends StatelessWidget {
   final PublicBusinessDetails details;
+  final bool isOwnerPreview;
+  final bool hideAppBarBack;
+  final String? businessStatus;
 
-  const _BusinessProfileContent({required this.details});
+  const _BusinessProfileContent({
+    required this.details,
+    this.isOwnerPreview = false,
+    this.hideAppBarBack = false,
+    this.businessStatus,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final isApproved = (businessStatus ?? 'approved') == 'approved';
+
     return CustomScrollView(
       slivers: [
         SliverAppBar(
           expandedHeight: 250,
           pinned: true,
           backgroundColor: const Color(0xFF080B0F),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
+          automaticallyImplyLeading: !hideAppBarBack,
+          leading: hideAppBarBack
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
           flexibleSpace: FlexibleSpaceBar(
             background: Container(
               decoration: const BoxDecoration(
@@ -92,6 +133,42 @@ class _BusinessProfileContent extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (isOwnerPreview) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A2530),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: const Color(0xFF78B9BE).withValues(alpha: .4),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.visibility_outlined,
+                          color: Color(0xFF78B9BE),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            isApproved
+                                ? 'Customer preview — this is how users see your profile.'
+                                : 'Customer preview — goes fully public after business approval.',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 Row(
                   children: [
                     Expanded(
@@ -104,7 +181,8 @@ class _BusinessProfileContent extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const Icon(Icons.verified, color: Color(0xFFD8B56A)),
+                    if (isApproved && !isOwnerPreview)
+                      const Icon(Icons.verified, color: Color(0xFFD8B56A)),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -118,21 +196,26 @@ class _BusinessProfileContent extends StatelessWidget {
                 const SizedBox(height: 22),
                 const _ProfileSectionTitle('FIRSTVUE VERIFICATION'),
                 const SizedBox(height: 10),
-                const _ProfileInfoCard(
-                  icon: Icons.verified_user_outlined,
-                  text:
-                      'This business has been approved and verified by FirstVue.',
+                _ProfileInfoCard(
+                  icon: isApproved
+                      ? Icons.verified_user_outlined
+                      : Icons.hourglass_top_outlined,
+                  text: isApproved
+                      ? 'This business has been approved and verified by FirstVue.'
+                      : 'This business is pending FirstVue approval. Customers will see this profile once approved.',
                 ),
-                const SizedBox(height: 14),
-                _MessageOwnerButton(
-                  businessId: details.id,
-                  businessName: details.name,
-                ),
-                const SizedBox(height: 12),
-                _MeetOwnerButton(
-                  businessId: details.id,
-                  businessName: details.name,
-                ),
+                if (!isOwnerPreview) ...[
+                  const SizedBox(height: 14),
+                  _MessageOwnerButton(
+                    businessId: details.id,
+                    businessName: details.name,
+                  ),
+                  const SizedBox(height: 12),
+                  _MeetOwnerButton(
+                    businessId: details.id,
+                    businessName: details.name,
+                  ),
+                ],
                 const SizedBox(height: 22),
                 const _ProfileSectionTitle('SOCIAL LINKS'),
                 const SizedBox(height: 10),
