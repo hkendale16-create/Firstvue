@@ -24,6 +24,7 @@ import 'services/recommendations_service.dart';
 import 'theme/firstvue_theme.dart';
 import 'widgets/firstvue_bottom_nav.dart';
 import 'widgets/firstvue_onboarding.dart';
+import 'widgets/firstvue_refresh_scaffold.dart';
 import 'widgets/home_discovery_section.dart';
 import 'widgets/home_news_feed_section.dart';
 
@@ -82,6 +83,7 @@ class _ExploreCategory {
 class _FirstVueHomeState extends State<FirstVueHome> {
   int selectedIndex = 2;
   int _profileRefreshToken = 0;
+  int _homeRefreshToken = 0;
   int _notificationBadge = 0;
 
   @override
@@ -241,6 +243,10 @@ class _FirstVueHomeState extends State<FirstVueHome> {
     setState(() => selectedIndex = 4);
   }
 
+  Future<void> _refreshHomeTab() async {
+    setState(() => _homeRefreshToken++);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -252,9 +258,12 @@ class _FirstVueHomeState extends State<FirstVueHome> {
         3 => const SavedScreen(),
         4 => ProfileScreen(refreshToken: _profileRefreshToken),
         _ => SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-            children: [
+          child: FirstVueRefreshScaffold(
+            onRefresh: _refreshHomeTab,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -384,12 +393,13 @@ class _FirstVueHomeState extends State<FirstVueHome> {
               const SizedBox(height: 24),
 
               HomeDiscoverySection(
+                refreshToken: _homeRefreshToken,
                 onViewAllVue: () => setState(() => selectedIndex = 2),
               ),
 
               const SizedBox(height: 30),
 
-              const HomeNewsFeedSection(),
+              HomeNewsFeedSection(refreshToken: _homeRefreshToken),
 
               const SizedBox(height: 30),
 
@@ -467,6 +477,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
               const SizedBox(height: 12),
             ],
           ),
+        ),
         ),
       },
 

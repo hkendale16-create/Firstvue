@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/things_to_do_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../widgets/firstvue_refresh_scaffold.dart';
 import 'auth_screen.dart';
 
 class ThingsToDoScreen extends StatefulWidget {
@@ -151,8 +152,7 @@ class _ThingsToDoScreenState extends State<ThingsToDoScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        color: FirstVueColors.gold,
+      body: FirstVueRefreshScaffold(
         onRefresh: _refresh,
         child: FutureBuilder<List<CommunityEvent>>(
           future: _eventsFuture,

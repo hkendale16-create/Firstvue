@@ -9,12 +9,14 @@ class ProfileRecentActivitySection extends StatefulWidget {
   final ProfileActivityScope scope;
   final String? businessId;
   final int refreshToken;
+  final bool embedded;
 
   const ProfileRecentActivitySection({
     super.key,
     this.scope = ProfileActivityScope.user,
     this.businessId,
     this.refreshToken = 0,
+    this.embedded = false,
   });
 
   @override
@@ -58,37 +60,39 @@ class _ProfileRecentActivitySectionState
 
   @override
   Widget build(BuildContext context) {
+    final embedded = widget.embedded;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+      padding: EdgeInsets.fromLTRB(embedded ? 16 : 20, 0, embedded ? 16 : 20, embedded ? 0 : 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'RECENT ACTIVITY',
-                    style: TextStyle(
-                      color: Colors.white54,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                      fontSize: 12,
+          if (!embedded)
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 8),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'RECENT ACTIVITY',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
-                ),
-                IconButton(
-                  onPressed: _refresh,
-                  icon: const Icon(Icons.refresh, size: 18, color: Colors.white38),
-                  tooltip: 'Refresh activity',
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                ),
-              ],
+                  IconButton(
+                    onPressed: _refresh,
+                    icon: const Icon(Icons.refresh, size: 18, color: Colors.white38),
+                    tooltip: 'Refresh activity',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                ],
+              ),
             ),
-          ),
           FutureBuilder<List<ProfileActivityItem>>(
             future: _activityFuture,
             builder: (context, snapshot) {
@@ -112,35 +116,77 @@ class _ProfileRecentActivitySectionState
 
               final items = snapshot.data ?? const [];
               if (items.isEmpty) {
-                return _ActivityContainer(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 22,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.history,
-                          color: Colors.white.withValues(alpha: .35),
-                          size: 28,
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            widget.scope == ProfileActivityScope.business
-                                ? 'No recent updates yet. Posts, photos, and reviews will show here.'
-                                : 'No recent activity yet. Post to the news feed, update a business profile, or spark posts to see activity here.',
-                            style: const TextStyle(
-                              color: Colors.white54,
-                              height: 1.4,
-                              fontSize: 13,
+                final message = widget.scope == ProfileActivityScope.business
+                    ? 'No recent updates yet. Posts, photos, and reviews will show here.'
+                    : 'No activity yet. Post to the feed, spark posts, or update a business profile.';
+                return embedded
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 36),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.history,
+                              color: Colors.white.withValues(alpha: .25),
+                              size: 40,
                             ),
+                            const SizedBox(height: 12),
+                            Text(
+                              message,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                height: 1.45,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : _ActivityContainer(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 22,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.history,
+                                color: Colors.white.withValues(alpha: .35),
+                                size: 28,
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Text(
+                                  message,
+                                  style: const TextStyle(
+                                    color: Colors.white54,
+                                    height: 1.4,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
+                      );
+              }
+
+              if (embedded) {
+                return Column(
+                  children: [
+                    for (var i = 0; i < items.length; i++) ...[
+                      _ActivityTile(
+                        item: items[i],
+                        onTap: () => _handleActivityTap(context, items[i]),
+                      ),
+                      if (i < items.length - 1)
+                        Divider(
+                          height: 1,
+                          color: Colors.white.withValues(alpha: .08),
+                        ),
+                    ],
+                  ],
                 );
               }
 

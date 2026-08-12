@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/feed_comments_service.dart';
 import '../screens/auth_screen.dart';
+import '../utils/app_environment.dart';
 
 class FeedCommentsSheet extends StatefulWidget {
   final String mediaId;
@@ -63,6 +64,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
   }
 
   void _subscribeToComments() {
+    if (isWidgetTestBinding) return;
     _commentsChannel?.unsubscribe();
     _commentsChannel = Supabase.instance.client
         .channel('feed-comments-${widget.mediaId}')

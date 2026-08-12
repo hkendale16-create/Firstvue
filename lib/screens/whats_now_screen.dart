@@ -7,6 +7,7 @@ import '../services/community_news_service.dart';
 import '../services/things_to_do_service.dart';
 import '../services/trending_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../utils/app_environment.dart';
 import '../widgets/feed_comments_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 
@@ -629,6 +630,7 @@ class _CommunityPulseSectionState extends State<_CommunityPulseSection> {
   }
 
   void _subscribeToNewsFeed() {
+    if (isWidgetTestBinding) return;
     _newsChannel?.unsubscribe();
     _newsChannel = Supabase.instance.client
         .channel('whats-now-news-feed')

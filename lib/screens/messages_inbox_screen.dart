@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 
 import '../services/messaging_service.dart';
+import '../widgets/firstvue_refresh_scaffold.dart';
 import 'conversation_screen.dart';
 import 'new_message_screen.dart';
 
@@ -66,10 +67,10 @@ class _MessagesInboxScreenState extends State<MessagesInboxScreen> {
           }
           final threads = snapshot.data!;
           if (threads.isEmpty) {
-            return RefreshIndicator(
-              color: const Color(0xFFD8B56A),
+            return FirstVueRefreshScaffold(
               onRefresh: _refresh,
               child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 children: const [
                   SizedBox(height: 240),
                   Center(
@@ -86,10 +87,10 @@ class _MessagesInboxScreenState extends State<MessagesInboxScreen> {
               ),
             );
           }
-          return RefreshIndicator(
-            color: const Color(0xFFD8B56A),
+          return FirstVueRefreshScaffold(
             onRefresh: _refresh,
             child: ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(20),
               itemCount: threads.length,
               separatorBuilder: (_, _) => const SizedBox(height: 12),

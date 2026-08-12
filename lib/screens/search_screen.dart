@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 
 import 'barber_results_screen.dart';
+import '../widgets/firstvue_refresh_scaffold.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -33,14 +34,20 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  Future<void> _refresh() async {
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: FirstVueRefreshScaffold(
+        onRefresh: _refresh,
+        child: FirstVueRefreshScaffold.alwaysScrollable(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             const Text(
               'SEARCH',
               style: TextStyle(
@@ -142,7 +149,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ],
             ),
-            const Spacer(),
+            const SizedBox(height: 40),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -165,6 +172,7 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

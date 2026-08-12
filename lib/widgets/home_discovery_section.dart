@@ -9,8 +9,13 @@ import '../theme/firstvue_theme.dart';
 
 class HomeDiscoverySection extends StatefulWidget {
   final VoidCallback onViewAllVue;
+  final int refreshToken;
 
-  const HomeDiscoverySection({super.key, required this.onViewAllVue});
+  const HomeDiscoverySection({
+    super.key,
+    required this.onViewAllVue,
+    this.refreshToken = 0,
+  });
 
   @override
   State<HomeDiscoverySection> createState() => _HomeDiscoverySectionState();
@@ -126,9 +131,12 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
             controller: _tabController,
             children: _labels.map((label) {
               if (label == 'Events') {
-                return _EventsSwipeList();
+                return _EventsSwipeList(
+                  key: ValueKey('events-${widget.refreshToken}'),
+                );
               }
               return _BusinessSwipeList(
+                key: ValueKey('$label-${widget.refreshToken}'),
                 label: label,
                 loadBusinesses: () => _loadBusinessesForLabel(label),
               );
@@ -167,6 +175,7 @@ class _BusinessSwipeList extends StatelessWidget {
   final Future<List<TrendingBusiness>> Function() loadBusinesses;
 
   const _BusinessSwipeList({
+    super.key,
     required this.label,
     required this.loadBusinesses,
   });
@@ -220,7 +229,7 @@ class _BusinessSwipeList extends StatelessWidget {
 }
 
 class _EventsSwipeList extends StatelessWidget {
-  const _EventsSwipeList();
+  const _EventsSwipeList({super.key});
 
   @override
   Widget build(BuildContext context) {

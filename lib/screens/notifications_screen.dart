@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/activity_notifications_service.dart';
 import '../services/messaging_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../widgets/firstvue_refresh_scaffold.dart';
 import 'auth_screen.dart';
 import 'messages_inbox_screen.dart';
 
@@ -84,10 +85,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ],
               ),
             )
-          : RefreshIndicator(
-              color: FirstVueColors.gold,
+          : FirstVueRefreshScaffold(
               onRefresh: _refresh,
               child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
                 children: [
                   _SectionHeader(

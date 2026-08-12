@@ -10,8 +10,13 @@ import 'media_picker_sheet.dart';
 
 class ProfileMediaSection extends StatefulWidget {
   final int refreshToken;
+  final bool embedded;
 
-  const ProfileMediaSection({super.key, this.refreshToken = 0});
+  const ProfileMediaSection({
+    super.key,
+    this.refreshToken = 0,
+    this.embedded = false,
+  });
 
   @override
   State<ProfileMediaSection> createState() => _ProfileMediaSectionState();
@@ -115,39 +120,72 @@ class _ProfileMediaSectionState extends State<ProfileMediaSection> {
 
   @override
   Widget build(BuildContext context) {
+    final embedded = widget.embedded;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+      padding: EdgeInsets.fromLTRB(embedded ? 16 : 20, 0, embedded ? 16 : 20, embedded ? 0 : 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'PROFILE PHOTOS & VIDEOS',
-                    style: TextStyle(
-                      color: Colors.white54,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                      fontSize: 12,
+          if (!embedded)
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 8),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'PROFILE PHOTOS & VIDEOS',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
-                ),
-                TextButton.icon(
-                  onPressed: _uploading ? null : _addMedia,
-                  icon: _uploading
-                      ? const SizedBox.square(
-                          dimension: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.add_photo_alternate_outlined, size: 18),
-                  label: Text(_uploading ? 'UPLOADING' : 'ADD MEDIA'),
-                ),
-              ],
+                  TextButton.icon(
+                    onPressed: _uploading ? null : _addMedia,
+                    icon: _uploading
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.add_photo_alternate_outlined, size: 18),
+                    label: Text(_uploading ? 'UPLOADING' : 'ADD MEDIA'),
+                  ),
+                ],
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Tap + to add photos or videos to your grid.',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: .45),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  IconButton.filledTonal(
+                    onPressed: _uploading ? null : _addMedia,
+                    icon: _uploading
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.add_photo_alternate_outlined, size: 20),
+                    tooltip: 'Add media',
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0xFF10151B),
+                      foregroundColor: const Color(0xFFD8B56A),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
           FutureBuilder<List<ProfileMediaItem>>(
             future: _mediaFuture,
             builder: (context, snapshot) {
@@ -163,19 +201,42 @@ class _ProfileMediaSectionState extends State<ProfileMediaSection> {
 
               final media = snapshot.data ?? _media;
               if (media.isEmpty) {
-                return Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF10151B),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: .07)),
-                  ),
-                  child: const Text(
-                    'Add photos or videos to your profile. Star one to use as your trending cover when your business is featured.',
-                    style: TextStyle(color: Colors.white54, height: 1.4, fontSize: 13),
-                  ),
-                );
+                return embedded
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 36),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.photo_library_outlined,
+                              color: Colors.white.withValues(alpha: .25),
+                              size: 40,
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Your photo grid is empty. Add shots from cuts, events, or behind the scenes.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white54,
+                                height: 1.45,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10151B),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white.withValues(alpha: .07)),
+                        ),
+                        child: const Text(
+                          'Add photos or videos to your profile. Star one to use as your trending cover when your business is featured.',
+                          style: TextStyle(color: Colors.white54, height: 1.4, fontSize: 13),
+                        ),
+                      );
               }
 
               return EditableMediaGrid(
@@ -190,6 +251,9 @@ class _ProfileMediaSectionState extends State<ProfileMediaSection> {
                 ],
                 onDelete: _deleteMedia,
                 onSetTrendingFeatured: _setTrending,
+                trendingHint: embedded
+                    ? 'Star a photo for your Trending cover.'
+                    : 'Tap the star to choose what shows in Trending Near You.',
               );
             },
           ),

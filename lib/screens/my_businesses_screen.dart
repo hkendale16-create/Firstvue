@@ -7,6 +7,7 @@ import '../services/business_menu_service.dart';
 import '../services/business_social_links_service.dart';
 import '../services/business_submission_service.dart';
 import '../widgets/editable_media_grid.dart';
+import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/location_autocomplete_field.dart';
 import '../widgets/media_picker_sheet.dart';
 import 'firstvue_business_profile_screen.dart';
@@ -115,10 +116,10 @@ class _MyBusinessesScreenState extends State<MyBusinessesScreen> {
             ),
           );
         }
-        return RefreshIndicator(
-          color: const Color(0xFFD8B56A),
+        return FirstVueRefreshScaffold(
           onRefresh: _refresh,
           child: ListView.separated(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(20),
             itemCount: businesses.length,
             separatorBuilder: (_, _) => const SizedBox(height: 12),

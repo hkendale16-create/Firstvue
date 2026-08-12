@@ -10,8 +10,13 @@ import 'feed_comments_sheet.dart';
 
 class ProfileMyPostsSection extends StatefulWidget {
   final int refreshToken;
+  final bool embedded;
 
-  const ProfileMyPostsSection({super.key, this.refreshToken = 0});
+  const ProfileMyPostsSection({
+    super.key,
+    this.refreshToken = 0,
+    this.embedded = false,
+  });
 
   @override
   State<ProfileMyPostsSection> createState() => _ProfileMyPostsSectionState();
@@ -145,39 +150,57 @@ class _ProfileMyPostsSectionState extends State<ProfileMyPostsSection> {
     }
   }
 
+  Future<void> _deletePost(int index) async {
+    if (index < 0 || index >= _posts.length) return;
+    final deleted = await confirmDeleteNewsPost(context, _posts[index]);
+    if (!deleted || !mounted) return;
+    setState(() {
+      _posts = [
+        for (var i = 0; i < _posts.length; i++)
+          if (i != index) _posts[i],
+      ];
+    });
+  }
+
+  Future<void> _showPostMenu(int index) async {
+    await _deletePost(index);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final embedded = widget.embedded;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+      padding: EdgeInsets.fromLTRB(embedded ? 16 : 20, 0, embedded ? 16 : 20, embedded ? 0 : 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'MY POSTS',
-                    style: TextStyle(
-                      color: Colors.white54,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                      fontSize: 12,
+          if (!embedded)
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 8),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'MY POSTS',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
-                ),
-                IconButton(
-                  onPressed: _refresh,
-                  icon: const Icon(Icons.refresh, size: 18, color: Colors.white38),
-                  tooltip: 'Refresh posts',
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                ),
-              ],
+                  IconButton(
+                    onPressed: _refresh,
+                    icon: const Icon(Icons.refresh, size: 18, color: Colors.white38),
+                    tooltip: 'Refresh posts',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                ],
+              ),
             ),
-          ),
           FutureBuilder<List<CommunityNewsPost>>(
             future: _postsFuture,
             builder: (context, snapshot) {
@@ -241,44 +264,53 @@ class _ProfileMyPostsSectionState extends State<ProfileMyPostsSection> {
 
               final posts = snapshot.data ?? _posts;
               if (posts.isEmpty) {
-                return _PostsContainer(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 22,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.campaign_outlined,
-                          color: Colors.white.withValues(alpha: .35),
-                          size: 28,
-                        ),
-                        const SizedBox(width: 14),
-                        const Expanded(
-                          child: Text(
-                            'No posts yet. Share updates from the home news feed and they will appear here.',
-                            style: TextStyle(
-                              color: Colors.white54,
-                              height: 1.4,
-                              fontSize: 13,
-                            ),
+                return embedded
+                    ? _emptyState(
+                        icon: Icons.campaign_outlined,
+                        message:
+                            'No posts yet. Share updates from the home feed and they will show up here.',
+                      )
+                    : _PostsContainer(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 22,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.campaign_outlined,
+                                color: Colors.white.withValues(alpha: .35),
+                                size: 28,
+                              ),
+                              const SizedBox(width: 14),
+                              const Expanded(
+                                child: Text(
+                                  'No posts yet. Share updates from the home news feed and they will appear here.',
+                                  style: TextStyle(
+                                    color: Colors.white54,
+                                    height: 1.4,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                );
+                      );
               }
 
               return Column(
                 children: [
                   for (var index = 0; index < posts.length; index++)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
+                      padding: EdgeInsets.only(bottom: embedded ? 0 : 10),
                       child: CommunityNewsPostCard(
                         post: posts[index],
-                        compact: true,
+                        compact: !embedded,
+                        style: embedded
+                            ? CommunityNewsPostCardStyle.timeline
+                            : CommunityNewsPostCardStyle.compact,
                         onTap: () => CommunityNewsPostDetailSheet.show(
                           context,
                           postId: posts[index].id,
@@ -291,6 +323,9 @@ class _ProfileMyPostsSectionState extends State<ProfileMyPostsSection> {
                           mediaId: posts[index].commentsMediaId,
                           businessName: posts[index].authorName,
                         ),
+                        onDelete: posts[index].isMine
+                            ? () => _showPostMenu(index)
+                            : null,
                       ),
                     ),
                 ],
@@ -319,4 +354,21 @@ class _PostsContainer extends StatelessWidget {
       child: child,
     );
   }
+}
+
+Widget _emptyState({required IconData icon, required String message}) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 8),
+    child: Column(
+      children: [
+        Icon(icon, color: Colors.white.withValues(alpha: .25), size: 40),
+        const SizedBox(height: 12),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white54, height: 1.45, fontSize: 13),
+        ),
+      ],
+    ),
+  );
 }

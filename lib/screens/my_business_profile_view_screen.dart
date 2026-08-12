@@ -4,6 +4,7 @@ import '../navigation/firstvue_page_route.dart';
 import '../services/business_media_service.dart';
 import '../services/business_submission_service.dart';
 import '../widgets/facebook_style_profile_header.dart';
+import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/profile_recent_activity_section.dart';
 import 'firstvue_business_profile_screen.dart';
 import 'my_businesses_screen.dart';
@@ -86,8 +87,7 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
 
     return Scaffold(
       backgroundColor: const Color(0xFF080B0F),
-      body: RefreshIndicator(
-        color: const Color(0xFFD8B56A),
+      body: FirstVueRefreshScaffold(
         onRefresh: _refresh,
         child: FutureBuilder<_BusinessViewData>(
           future: _dataFuture,

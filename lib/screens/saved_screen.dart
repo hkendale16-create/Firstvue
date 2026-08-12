@@ -2,44 +2,57 @@ import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 
 import '../services/saved_businesses_store.dart';
+import '../widgets/firstvue_refresh_scaffold.dart';
 import 'business_profile_screen.dart';
 
 class SavedScreen extends StatelessWidget {
   const SavedScreen({super.key});
 
+  Future<void> _refresh() async {
+    SavedBusinessesStore.businesses.value = [
+      ...SavedBusinessesStore.businesses.value,
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: ValueListenableBuilder<List<SavedBusiness>>(
-        valueListenable: SavedBusinessesStore.businesses,
-        builder: (context, businesses, _) {
-          if (businesses.isEmpty) {
-            return const _EmptySavedState();
-          }
+      child: FirstVueRefreshScaffold(
+        onRefresh: _refresh,
+        child: ValueListenableBuilder<List<SavedBusiness>>(
+          valueListenable: SavedBusinessesStore.businesses,
+          builder: (context, businesses, _) {
+            if (businesses.isEmpty) {
+              return FirstVueRefreshScaffold.alwaysScrollable(
+                child: const _EmptySavedState(),
+              );
+            }
 
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
-            itemCount: businesses.length + 1,
-            separatorBuilder: (_, _) => const SizedBox(height: 14),
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return const Text(
-                  'SAVED',
-                  style: TextStyle(
-                    fontFamily: 'CormorantGaramond',
-                    color: Colors.white,
-                    fontSize: 25,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 2,
-                  ),
-                );
-              }
+            return ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+              itemCount: businesses.length + 1,
+              separatorBuilder: (_, _) => const SizedBox(height: 14),
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return const Text(
+                    'SAVED',
+                    style: TextStyle(
+                      fontFamily: 'CormorantGaramond',
+                      color: Colors.white,
+                      fontSize: 25,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 2,
+                    ),
+                  );
+                }
 
-              final business = businesses[index - 1];
-              return _SavedBusinessCard(business: business);
-            },
-          );
-        },
+                final business = businesses[index - 1];
+                return _SavedBusinessCard(business: business);
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -149,10 +162,14 @@ class _SavedBusinessCard extends StatelessWidget {
                       '${business.rating} ★  •  ${business.distance}',
                       style: const TextStyle(color: Colors.white60),
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      business.specialty,
+                      style: const TextStyle(color: Colors.white54, fontSize: 13),
+                    ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Colors.white38),
             ],
           ),
         ),

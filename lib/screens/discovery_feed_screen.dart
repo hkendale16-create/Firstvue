@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../config/app_config.dart';
 import '../services/discovery_feed_service.dart';
 import '../widgets/feed_comments_sheet.dart';
+import '../widgets/firstvue_refresh_scaffold.dart';
 import 'ai_search_screen.dart';
 import 'business_profile_screen.dart';
 import 'firstvue_business_profile_screen.dart';
@@ -219,7 +220,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                       ? _connectedItems(snapshot.data!)
                       : <_FeedItem>[];
                   final items = connected.isEmpty ? _items : connected;
-                  return RefreshIndicator(
+                  return FirstVueRefreshScaffold(
                     onRefresh: () async {
                       final next = DiscoveryFeedService.fetchFeed();
                       setState(() => _feedFuture = next);

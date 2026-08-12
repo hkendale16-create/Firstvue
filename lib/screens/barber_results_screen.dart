@@ -8,6 +8,7 @@ import 'professional_public_profile_screen.dart';
 import '../services/approved_businesses_service.dart';
 import '../services/location_service.dart';
 import '../services/professional_profiles_service.dart';
+import '../widgets/firstvue_refresh_scaffold.dart';
 
 enum _BarberFilter { nearMe, topRated, verified }
 
@@ -691,6 +692,10 @@ class _BarberResultsScreenState extends State<BarberResultsScreen> {
     });
   }
 
+  Future<void> _refreshResults() async {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -795,9 +800,12 @@ class _BarberResultsScreenState extends State<BarberResultsScreen> {
                           onReset: _resetSearchAndFilters,
                         );
                       }
-                      return ListView(
-                        padding: const EdgeInsets.fromLTRB(20, 25, 20, 28),
-                        children: [
+                      return FirstVueRefreshScaffold(
+                        onRefresh: _refreshResults,
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(20, 25, 20, 28),
+                          children: [
                           Row(
                             children: [
                               const Text(
@@ -938,6 +946,7 @@ class _BarberResultsScreenState extends State<BarberResultsScreen> {
                             ),
                           ],
                         ],
+                        ),
                       );
                     },
                   );

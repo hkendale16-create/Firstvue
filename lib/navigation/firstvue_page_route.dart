@@ -1,13 +1,19 @@
 import 'package:flutter/cupertino.dart';
 
-/// App-wide page route with interactive swipe-from-left-edge back navigation.
+import '../widgets/swipe_back_wrapper.dart';
+
+/// App-wide page route with interactive swipe-back navigation.
 ///
-/// Drop-in replacement for [MaterialPageRoute] on pushed detail screens.
+/// Uses [CupertinoPageRoute] for native iOS edge swipe, plus [SwipeBackWrapper]
+/// for swipe-left back on web/desktop and the right-edge strip on mobile.
 class FirstVuePageRoute<T> extends CupertinoPageRoute<T> {
   FirstVuePageRoute({
-    required super.builder,
+    required WidgetBuilder builder,
     super.settings,
     super.maintainState = true,
     super.fullscreenDialog = false,
-  });
+  }) : super(
+          builder: (context) =>
+              SwipeBackWrapper(child: builder(context)),
+        );
 }

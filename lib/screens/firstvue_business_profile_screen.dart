@@ -11,11 +11,12 @@ import '../services/business_social_links_service.dart';
 import '../services/messaging_service.dart';
 import '../widgets/profile_recent_activity_section.dart';
 import '../widgets/social_platform_icon.dart';
+import '../widgets/firstvue_refresh_scaffold.dart';
 import 'auth_screen.dart';
 import 'conversation_screen.dart';
 import 'meet_the_owner_screen.dart';
 
-class FirstVueBusinessProfileScreen extends StatelessWidget {
+class FirstVueBusinessProfileScreen extends StatefulWidget {
   final String businessId;
   final PublicBusinessDetails? previewDetails;
   final bool isOwnerPreview;
@@ -32,15 +33,43 @@ class FirstVueBusinessProfileScreen extends StatelessWidget {
   });
 
   @override
+  State<FirstVueBusinessProfileScreen> createState() =>
+      _FirstVueBusinessProfileScreenState();
+}
+
+class _FirstVueBusinessProfileScreenState
+    extends State<FirstVueBusinessProfileScreen> {
+  Future<PublicBusinessDetails>? _detailsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.previewDetails == null) {
+      _detailsFuture =
+          ApprovedBusinessesService.fetchPublicBusiness(widget.businessId);
+    }
+  }
+
+  Future<void> _refresh() async {
+    if (widget.previewDetails != null) return;
+    final next = ApprovedBusinessesService.fetchPublicBusiness(widget.businessId);
+    setState(() => _detailsFuture = next);
+    await next;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (previewDetails != null) {
+    if (widget.previewDetails != null) {
       return Scaffold(
         backgroundColor: const Color(0xFF080B0F),
-        body: _BusinessProfileContent(
-          details: previewDetails!,
-          isOwnerPreview: isOwnerPreview,
-          hideAppBarBack: hideAppBarBack,
-          businessStatus: businessStatus,
+        body: FirstVueRefreshScaffold(
+          onRefresh: _refresh,
+          child: _BusinessProfileContent(
+            details: widget.previewDetails!,
+            isOwnerPreview: widget.isOwnerPreview,
+            hideAppBarBack: widget.hideAppBarBack,
+            businessStatus: widget.businessStatus,
+          ),
         ),
       );
     }
@@ -48,13 +77,18 @@ class FirstVueBusinessProfileScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFF080B0F),
       body: FutureBuilder<PublicBusinessDetails>(
-        future: ApprovedBusinessesService.fetchPublicBusiness(businessId),
+        future: _detailsFuture,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return const Center(
-              child: Text(
-                'Unable to load this business profile.',
-                style: TextStyle(color: Colors.white54),
+            return FirstVueRefreshScaffold(
+              onRefresh: _refresh,
+              child: FirstVueRefreshScaffold.alwaysScrollable(
+                child: const Center(
+                  child: Text(
+                    'Unable to load this business profile.',
+                    style: TextStyle(color: Colors.white54),
+                  ),
+                ),
               ),
             );
           }
@@ -63,11 +97,14 @@ class FirstVueBusinessProfileScreen extends StatelessWidget {
               child: CircularProgressIndicator(color: Color(0xFFD8B56A)),
             );
           }
-          return _BusinessProfileContent(
-            details: snapshot.data!,
-            isOwnerPreview: isOwnerPreview,
-            hideAppBarBack: hideAppBarBack,
-            businessStatus: businessStatus,
+          return FirstVueRefreshScaffold(
+            onRefresh: _refresh,
+            child: _BusinessProfileContent(
+              details: snapshot.data!,
+              isOwnerPreview: widget.isOwnerPreview,
+              hideAppBarBack: widget.hideAppBarBack,
+              businessStatus: widget.businessStatus,
+            ),
           );
         },
       ),
@@ -93,6 +130,7 @@ class _BusinessProfileContent extends StatelessWidget {
     final isApproved = (businessStatus ?? 'approved') == 'approved';
 
     return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         SliverAppBar(
           expandedHeight: 250,
