@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import '../screens/full_screen_media_viewer.dart';
 import '../theme/firstvue_theme.dart';
 
 /// Thumbnail for a signed network URL — images load directly; videos show the
@@ -428,17 +429,25 @@ class _SignedMediaViewerDialogState extends State<_SignedMediaViewerDialog> {
   }
 }
 
-/// Opens the fullscreen viewer for a signed network URL.
+/// Opens a dedicated full-screen page for images/videos (not a floating modal).
 void openSignedMedia(
   BuildContext context, {
   required String url,
   required bool isVideo,
   String? title,
 }) {
-  SignedMediaViewer.show(
-    context,
-    url: url,
-    isVideo: isVideo,
-    title: title,
-  );
+  if (isVideo) {
+    openFullScreenVideoPlayer(
+      context,
+      url: url,
+      title: title ?? 'VIDEO',
+      loop: true,
+    );
+  } else {
+    openFullScreenImageViewer(
+      context,
+      items: [FullScreenMediaItem(url: url, isVideo: false)],
+      title: title ?? 'PHOTO',
+    );
+  }
 }

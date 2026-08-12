@@ -19,6 +19,7 @@ class PostIdentitySelector extends StatelessWidget {
     return switch (kind) {
       PostIdentityKind.personal => 'Personal',
       PostIdentityKind.business => 'Business',
+      PostIdentityKind.professional => 'Professional',
       PostIdentityKind.community => 'Community',
     };
   }

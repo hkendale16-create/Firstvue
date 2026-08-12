@@ -44,6 +44,27 @@ class PostIdentityService {
     } catch (_) {}
 
     try {
+      final professionals = await _client
+          .from('professional_profiles')
+          .select('id, display_name')
+          .eq('profile_id', user.id)
+          .eq('status', 'approved')
+          .order('display_name')
+          .limit(10);
+
+      for (final row in professionals) {
+        options.add(
+          PostIdentityOption(
+            kind: PostIdentityKind.professional,
+            professionalProfileId: row['id'] as String,
+            label: row['display_name'] as String,
+            subtitle: 'Professional',
+          ),
+        );
+      }
+    } catch (_) {}
+
+    try {
       final memberships = await _client
           .from('community_members')
           .select('community_id, communities(id, name, city, state)')
@@ -66,7 +87,7 @@ class PostIdentityService {
             kind: PostIdentityKind.community,
             communityId: community['id'] as String,
             label: community['name'] as String,
-            subtitle: location.isEmpty ? 'Community' : location,
+            subtitle: location.isEmpty ? 'Group' : location,
           ),
         );
       }

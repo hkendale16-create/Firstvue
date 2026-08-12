@@ -192,6 +192,27 @@ class ProfessionalMediaService {
     );
   }
 
+  static Future<void> removeAvatar(String professionalProfileId) =>
+      _removeRoleImage(professionalProfileId, 'avatar');
+
+  static Future<void> removeCover(String professionalProfileId) =>
+      _removeRoleImage(professionalProfileId, 'cover');
+
+  static Future<void> _removeRoleImage(
+    String professionalProfileId,
+    String role,
+  ) async {
+    final row = await _client
+        .from('professional_media')
+        .select(_selectColumns)
+        .eq('professional_profile_id', professionalProfileId)
+        .eq('media_role', role)
+        .maybeSingle();
+    if (row == null) return;
+    final item = await _rowToItem(row, professionalProfileId);
+    await deleteMedia(item);
+  }
+
   static Future<void> _setRoleImage({
     required String professionalProfileId,
     required XFile file,
@@ -216,18 +237,95 @@ class ProfessionalMediaService {
       }
     } catch (_) {}
 
-    if (existing != null) {
-      await deleteMedia(existing);
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) {
+      throw const StorageException('Selected file is empty.');
+    }
+    if (bytes.length > _maxMediaBytes) {
+      throw const StorageException(
+        'Each photo or video must be 50 MB or smaller.',
+      );
     }
 
-    await _uploadSingle(
-      professionalProfileId: professionalProfileId,
-      file: file,
+    final mediaType = mediaTypeForFile(file);
+    final contentType = mimeTypeForFile(file, mediaType);
+    final upload = await MediaStorageService.uploadBytes(
+      bucket: MediaBucket.professional,
+      bytes: bytes,
+      contentType: contentType,
+      fileName: file.name,
       index: 0,
-      sortOrder: 0,
-      mediaRole: role,
       subfolder: subfolder,
+      context: {'professional_profile_id': professionalProfileId},
     );
+
+    try {
+      final rpcName = role == 'avatar'
+          ? 'replace_professional_avatar'
+          : 'replace_professional_cover';
+      await _client.rpc(
+        rpcName,
+        params: {
+          'p_professional_profile_id': professionalProfileId,
+          'p_storage_path': upload.path,
+          'p_storage_provider': upload.provider.value,
+          'p_media_type': mediaType,
+        },
+      );
+    } catch (_) {
+      await _client
+          .from('professional_media')
+          .delete()
+          .eq('professional_profile_id', professionalProfileId)
+          .eq('media_role', role);
+      try {
+        await _client.from('professional_media').insert({
+          'professional_profile_id': professionalProfileId,
+          'storage_path': upload.path,
+          'storage_provider': upload.provider.value,
+          'media_type': mediaType,
+          'sort_order': 0,
+          'media_role': role,
+        });
+      } catch (error) {
+        final isDuplicate =
+            error is PostgrestException && error.code == '23505';
+        if (isDuplicate) {
+          await _client
+              .from('professional_media')
+              .delete()
+              .eq('professional_profile_id', professionalProfileId)
+              .eq('media_role', role);
+          await _client.from('professional_media').insert({
+            'professional_profile_id': professionalProfileId,
+            'storage_path': upload.path,
+            'storage_provider': upload.provider.value,
+            'media_type': mediaType,
+            'sort_order': 0,
+            'media_role': role,
+          });
+        } else {
+          await MediaStorageService.deleteObject(
+            bucket: MediaBucket.professional,
+            path: upload.path,
+            provider: upload.provider,
+            context: {'professional_profile_id': professionalProfileId},
+          );
+          rethrow;
+        }
+      }
+    }
+
+    if (existing != null) {
+      try {
+        await MediaStorageService.deleteObject(
+          bucket: MediaBucket.professional,
+          path: existing.storagePath,
+          provider: existing.storageProvider,
+          context: {'professional_profile_id': professionalProfileId},
+        );
+      } catch (_) {}
+    }
   }
 
   static Future<void> _uploadSingle({

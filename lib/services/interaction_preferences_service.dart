@@ -1,5 +1,6 @@
-import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'firstvue_feedback_sounds.dart';
 
 class InteractionPreferencesService {
   InteractionPreferencesService._();
@@ -17,9 +18,6 @@ class InteractionPreferencesService {
   }
 
   static Future<void> playSparkFeedback({required bool fromUserTap}) async {
-    if (!fromUserTap) return;
-    HapticFeedback.lightImpact();
-    if (!await interactionSoundsEnabled()) return;
-    SystemSound.play(SystemSoundType.click);
+    await FirstVueFeedbackSounds.playSpark(fromUserTap: fromUserTap);
   }
 }

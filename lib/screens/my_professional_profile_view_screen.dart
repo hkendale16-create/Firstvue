@@ -3,9 +3,11 @@ import '../navigation/firstvue_page_route.dart';
 
 import '../services/professional_media_service.dart';
 import '../services/professional_profiles_service.dart';
+import '../services/portfolio_album_service.dart';
 import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/portfolio_albums_section.dart';
 import 'professional_profile_editor_screen.dart';
 import 'professional_public_profile_screen.dart';
 import 'professional_showcase_editor_screen.dart';
@@ -331,6 +333,12 @@ class _MyProfessionalProfileViewScreenState
               scope: EntityFeedScope.professional,
               entityId: profile.id,
               canPost: true,
+              refreshToken: _refreshToken,
+            ),
+            PortfolioAlbumsSection(
+              ownerType: PortfolioOwnerType.professional,
+              ownerId: profile.id,
+              canManage: true,
               refreshToken: _refreshToken,
             ),
             const SizedBox(height: 24),

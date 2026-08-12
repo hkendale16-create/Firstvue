@@ -235,18 +235,100 @@ class ProfileMediaService {
       }
     } catch (_) {}
 
-    if (existing != null) {
-      await deleteMedia(existing);
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) {
+      throw const StorageException('Selected file is empty.');
+    }
+    if (bytes.length > _maxMediaBytes) {
+      throw const StorageException(
+        'Each photo or video must be 50 MB or smaller.',
+      );
     }
 
-    await _uploadSingle(
-      file: file,
-      userId: userId,
+    final mediaType = mediaTypeForFile(file);
+    final contentType = mimeTypeForFile(file, mediaType);
+    final upload = await MediaStorageService.uploadBytes(
+      bucket: MediaBucket.profile,
+      bytes: bytes,
+      contentType: contentType,
+      fileName: file.name,
       index: 0,
-      sortOrder: 0,
-      mediaRole: role,
       subfolder: subfolder,
+      context: {'profile_id': userId},
     );
+
+    try {
+      final rpcName =
+          role == 'avatar' ? 'replace_profile_avatar' : 'replace_profile_cover';
+      await _client.rpc(
+        rpcName,
+        params: {
+          'p_profile_id': userId,
+          'p_storage_path': upload.path,
+          'p_storage_provider': upload.provider.value,
+          'p_media_type': mediaType,
+        },
+      );
+    } catch (error) {
+      // Fallback for environments where the RPC is not yet applied:
+      // delete-then-insert with one retry on unique violations.
+      try {
+        await _client
+            .from('profile_media')
+            .delete()
+            .eq('profile_id', userId)
+            .eq('media_role', role);
+        await _client.from('profile_media').insert({
+          'profile_id': userId,
+          'storage_path': upload.path,
+          'storage_provider': upload.provider.value,
+          'media_type': mediaType,
+          'sort_order': 0,
+          'media_role': role,
+        });
+      } catch (fallbackError) {
+        final isDuplicate = fallbackError is PostgrestException &&
+            fallbackError.code == '23505';
+        if (isDuplicate) {
+          await _client
+              .from('profile_media')
+              .delete()
+              .eq('profile_id', userId)
+              .eq('media_role', role);
+          await _client.from('profile_media').insert({
+            'profile_id': userId,
+            'storage_path': upload.path,
+            'storage_provider': upload.provider.value,
+            'media_type': mediaType,
+            'sort_order': 0,
+            'media_role': role,
+          });
+        } else {
+          await MediaStorageService.deleteObject(
+            bucket: MediaBucket.profile,
+            path: upload.path,
+            provider: upload.provider,
+            context: {'profile_id': userId},
+          );
+          rethrow;
+        }
+      }
+      // Prefer original error context when both fail.
+      if (error is PostgrestException && error.code != 'PGRST202') {
+        // RPC existed but failed for another reason — still keep inserted row.
+      }
+    }
+
+    if (existing != null) {
+      try {
+        await MediaStorageService.deleteObject(
+          bucket: MediaBucket.profile,
+          path: existing.storagePath,
+          provider: existing.storageProvider,
+          context: {'profile_id': userId},
+        );
+      } catch (_) {}
+    }
   }
 
   static Future<void> _removeRoleImage(String role) async {

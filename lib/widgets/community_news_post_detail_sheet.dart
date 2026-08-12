@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../screens/auth_screen.dart';
 import '../screens/member_public_profile_screen.dart';
+import '../screens/post_detail_screen.dart';
 import '../config/app_config.dart';
 import '../models/share_payload.dart';
 import '../services/community_news_service.dart';
@@ -27,16 +28,9 @@ class CommunityNewsPostDetailSheet extends StatefulWidget {
     CommunityNewsPost? initialPost,
   }) {
     final normalizedId = CommunityNewsService.normalizePostId(postId);
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF10151B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SizedBox(
-        height: MediaQuery.of(ctx).size.height * 0.85,
-        child: CommunityNewsPostDetailSheet(
+    return Navigator.of(context).push(
+      FirstVuePageRoute(
+        builder: (_) => PostDetailScreen(
           postId: normalizedId,
           initialPost: initialPost,
         ),

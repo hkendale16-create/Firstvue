@@ -18,7 +18,7 @@ import 'community_news_post_detail_sheet.dart';
 import 'feed_comments_sheet.dart';
 import 'local_media_thumbnail.dart';
 import 'post_identity_selector.dart';
-import 'media_picker_sheet.dart';
+import 'profile_composer_media_actions.dart';
 
 class HomeNewsFeedSection extends StatefulWidget {
   final int refreshToken;
@@ -163,6 +163,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
         newPost = await CommunityNewsService.createPost(
           text,
           businessId: identity?.businessId,
+          professionalProfileId: identity?.professionalProfileId,
           communityId: identity?.communityId,
           files: _attachedMedia,
         );
@@ -213,20 +214,6 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     } finally {
       if (mounted) setState(() => _posting = false);
     }
-  }
-
-  Future<void> _showMediaPicker() async {
-    if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
-      return;
-    }
-
-    final files = await showMediaPickerSheet(context);
-    if (files == null || files.isEmpty || !mounted) return;
-    setState(() => _attachedMedia = [..._attachedMedia, ...files]);
   }
 
   Future<void> _savePost(int index) async {
@@ -611,20 +598,19 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
               ],
               Row(
                 children: [
-                  OutlinedButton.icon(
-                    onPressed: _posting ? null : _showMediaPicker,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: FirstVueColors.teal,
-                      side: BorderSide(color: FirstVueColors.teal.withValues(alpha: .45)),
-                    ),
-                    icon: const Icon(Icons.perm_media_outlined, size: 18),
-                    label: Text(
-                      _attachedMedia.isEmpty
-                          ? 'PHOTO / VIDEO'
-                          : '${_attachedMedia.length} ATTACHED',
+                  Expanded(
+                    child: ProfileComposerMediaActions(
+                      enabled: !_posting,
+                      onMediaPicked: (files) {
+                        setState(
+                          () => _attachedMedia = [
+                            ..._attachedMedia,
+                            ...files,
+                          ],
+                        );
+                      },
                     ),
                   ),
-                  const Spacer(),
                   FilledButton(
                     onPressed: _posting ? null : _submitPost,
                     style: FilledButton.styleFrom(

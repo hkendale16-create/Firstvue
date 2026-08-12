@@ -738,6 +738,20 @@ class CommunityHubService {
     }
   }
 
+  /// Admin: all pending community↔hub group link requests.
+  static Future<List<Map<String, dynamic>>>
+      fetchAllPendingLinkRequestsForAdmin() async {
+    final rows = await _client
+        .from('community_group_link_requests')
+        .select(
+          'id, community_id, hub_id, requested_by_profile_id, status, created_at, '
+          'communities(name, image_url), community_hubs(name)',
+        )
+        .eq('status', 'pending')
+        .order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
   static Future<void> reviewLinkRequest({
     required String requestId,
     required bool approve,

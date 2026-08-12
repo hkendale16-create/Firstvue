@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import '../theme/firstvue_theme.dart';
 import 'package:flutter/services.dart';
 
+import '../services/portfolio_album_service.dart';
 import '../services/professional_media_service.dart';
 import '../services/professional_profiles_service.dart';
 import '../services/professional_showcase_service.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/firstvue_inline_search_bar.dart';
+import '../widgets/portfolio_albums_section.dart';
+import '../widgets/signed_media_viewer.dart';
 
 class ProfessionalPublicProfileScreen extends StatefulWidget {
   final ProfessionalProfile profile;
@@ -229,6 +232,14 @@ class _ProfessionalPublicProfileScreenState
                   const SizedBox(height: 28),
                   const _ProfileHeading('PORTFOLIO'),
                   const SizedBox(height: 12),
+                  PortfolioAlbumsSection(
+                    ownerType: PortfolioOwnerType.professional,
+                    ownerId: profile.id,
+                    canManage: false,
+                  ),
+                  const SizedBox(height: 22),
+                  const _ProfileHeading('GALLERY'),
+                  const SizedBox(height: 12),
                   FutureBuilder<List<ProfessionalMediaItem>>(
                     future: ProfessionalMediaService.fetchMedia(profile.id),
                     builder: (context, snapshot) {
@@ -256,30 +267,11 @@ class _ProfessionalPublicProfileScreenState
                           itemBuilder: (context, index) {
                             final media = snapshot.data![index];
                             return GestureDetector(
-                              onTap: () => showDialog<void>(
-                                context: context,
-                                builder: (_) => Dialog.fullscreen(
-                                  backgroundColor: Colors.black,
-                                  child: Stack(
-                                    children: [
-                                      InteractiveViewer(
-                                        child: Center(
-                                          child: Image.network(
-                                            media.signedUrl,
-                                            fit: BoxFit.contain,
-                                          ),
-                                        ),
-                                      ),
-                                      SafeArea(
-                                        child: IconButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context),
-                                          icon: const Icon(Icons.close),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                              onTap: () => openSignedMedia(
+                                context,
+                                url: media.signedUrl,
+                                isVideo: media.isVideo,
+                                title: 'PORTFOLIO',
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(16),

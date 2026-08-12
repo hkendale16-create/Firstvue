@@ -106,7 +106,7 @@ class CommunityNewsService {
   static final _client = Supabase.instance.client;
 
   static const _postColumns =
-      'id, body, created_at, author_id, business_id, community_id, visibility, professional_profile_id, event_id';
+      'id, body, created_at, author_id, business_id, community_id, visibility, professional_profile_id, event_id, author_profile_type, author_profile_id';
 
   static const _postColumnsBase =
       'id, body, created_at, author_id, business_id, community_id';
@@ -163,11 +163,25 @@ class CommunityNewsService {
           .select(_postColumns)
           .single();
     } catch (_) {
-      return await _client
-          .from('community_news_posts')
-          .insert(insertPayload)
-          .select(_postColumnsBase)
-          .single();
+      final fallback = Map<String, dynamic>.from(insertPayload)
+        ..remove('author_profile_type')
+        ..remove('author_profile_id');
+      try {
+        return await _client
+            .from('community_news_posts')
+            .insert(fallback)
+            .select(
+              'id, body, created_at, author_id, business_id, community_id, '
+              'visibility, professional_profile_id, event_id',
+            )
+            .single();
+      } catch (_) {
+        return await _client
+            .from('community_news_posts')
+            .insert(fallback)
+            .select(_postColumnsBase)
+            .single();
+      }
     }
   }
 
@@ -302,7 +316,7 @@ class CommunityNewsService {
     }
   }
 
-  /// Posts authored by the signed-in user (any status), for profile display.
+  /// Personal posts only (excludes Business / Professional entity posts).
   static Future<List<CommunityNewsPost>> fetchMyPosts({int limit = 10}) async {
     final me = _client.auth.currentUser;
     if (me == null) return const [];
@@ -311,13 +325,32 @@ class CommunityNewsService {
       final rows = await _selectPosts(
         (query) => query
             .eq('author_id', me.id)
+            .filter('business_id', 'is', null)
+            .filter('professional_profile_id', 'is', null)
             .order('created_at', ascending: false)
             .limit(limit),
       );
 
       return await _mapPostRows(rows, currentUserId: me.id);
     } catch (_) {
-      return const [];
+      try {
+        final rows = await _selectPosts(
+          (query) => query
+              .eq('author_id', me.id)
+              .order('created_at', ascending: false)
+              .limit(limit),
+        );
+        final mapped = await _mapPostRows(rows, currentUserId: me.id);
+        return mapped
+            .where(
+              (p) =>
+                  p.businessName == null ||
+                  (p.communityId != null && p.businessName == p.communityName),
+            )
+            .toList();
+      } catch (_) {
+        return const [];
+      }
     }
   }
 
@@ -763,13 +796,32 @@ class CommunityNewsService {
       'author_id': me.id,
       'body': trimmed,
       'status': 'approved',
+      'author_profile_type': 'user',
     };
-    if (businessId != null) insertPayload['business_id'] = businessId;
-    if (communityId != null) insertPayload['community_id'] = communityId;
+    if (businessId != null) {
+      insertPayload['business_id'] = businessId;
+      insertPayload['author_profile_type'] = 'business';
+      insertPayload['author_profile_id'] = businessId;
+    }
     if (professionalProfileId != null) {
       insertPayload['professional_profile_id'] = professionalProfileId;
+      insertPayload['author_profile_type'] = 'professional';
+      insertPayload['author_profile_id'] = professionalProfileId;
     }
-    if (eventId != null) insertPayload['event_id'] = eventId;
+    if (eventId != null) {
+      insertPayload['event_id'] = eventId;
+      insertPayload['author_profile_type'] = 'event';
+      insertPayload['author_profile_id'] = eventId;
+    }
+    if (communityId != null) {
+      insertPayload['community_id'] = communityId;
+      if (businessId == null &&
+          professionalProfileId == null &&
+          eventId == null) {
+        insertPayload['author_profile_type'] = 'community';
+        insertPayload['author_profile_id'] = communityId;
+      }
+    }
 
     final row = await _insertPostReturning(insertPayload);
 
@@ -854,7 +906,7 @@ class CommunityNewsService {
     return post.copyWith(savedByMe: saved);
   }
 
-  /// Approved posts by a member (RLS also allows viewing own pending posts).
+  /// Approved personal posts by a member (excludes Business/Professional posts).
   static Future<List<CommunityNewsPost>> fetchPostsByAuthor(
     String authorId, {
     int limit = 20,
@@ -867,13 +919,26 @@ class CommunityNewsService {
       final rows = await _selectPosts(
         (query) => query
             .eq('author_id', authorId)
+            .filter('business_id', 'is', null)
+            .filter('professional_profile_id', 'is', null)
             .order('created_at', ascending: false)
             .limit(limit),
       );
 
       return await _mapPostRows(rows, currentUserId: me);
     } catch (_) {
-      return const [];
+      try {
+        final rows = await _selectPosts(
+          (query) => query
+              .eq('author_id', authorId)
+              .order('created_at', ascending: false)
+              .limit(limit),
+        );
+        final mapped = await _mapPostRows(rows, currentUserId: me);
+        return mapped.where((p) => p.businessName == null).toList();
+      } catch (_) {
+        return const [];
+      }
     }
   }
 
