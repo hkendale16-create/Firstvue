@@ -121,8 +121,8 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
                     if (index == 0) {
                       return _CreateGroupCard(
                         onTap: () async {
-                          final created = await Navigator.push<Community>(
-                            context,
+                          final navigator = Navigator.of(this.context);
+                          final created = await navigator.push<Community>(
                             FirstVuePageRoute(
                               builder: (_) => const CreateCommunityScreen(),
                             ),
@@ -130,8 +130,7 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
                           if (created == null || !mounted) return;
                           await _load();
                           if (!mounted) return;
-                          await Navigator.push(
-                            context,
+                          await navigator.push(
                             FirstVuePageRoute(
                               builder: (_) => CommunityDetailScreen(
                                 communityId: created.id,
