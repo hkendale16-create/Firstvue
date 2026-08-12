@@ -6,6 +6,7 @@ import '../services/business_submission_service.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/profile_photo_actions.dart';
 import 'firstvue_business_profile_screen.dart';
 import 'my_businesses_screen.dart';
 
@@ -22,6 +23,7 @@ class MyBusinessProfileViewScreen extends StatefulWidget {
 class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScreen> {
   late Future<_BusinessViewData> _dataFuture;
   int _refreshToken = 0;
+  bool _imageUpdating = false;
 
   @override
   void initState() {
@@ -87,6 +89,103 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
     if (mounted) _refresh();
   }
 
+  Future<void> _handleAvatarTap(BusinessImageSet images) async {
+    await _handlePhotoTap(images: images, isAvatar: true);
+  }
+
+  Future<void> _handleCoverTap(BusinessImageSet images) async {
+    await _handlePhotoTap(images: images, isAvatar: false);
+  }
+
+  Future<void> _handlePhotoTap({
+    required BusinessImageSet images,
+    required bool isAvatar,
+  }) async {
+    if (_imageUpdating) return;
+    final existing = isAvatar ? images.avatar : images.cover;
+    final action = await showProfilePhotoActionSheet(
+      context,
+      changeLabel: isAvatar ? 'Change profile photo' : 'Change cover photo',
+      viewLabel: isAvatar ? 'View profile photo' : 'View cover photo',
+      removeLabel: isAvatar ? 'Remove profile photo' : 'Remove cover photo',
+      hasExisting: existing != null,
+    );
+    if (!mounted || action == null) return;
+
+    if (action == ProfilePhotoAction.view) {
+      if (existing == null) return;
+      await viewProfilePhoto(
+        context,
+        url: existing.signedUrl,
+        isVideo: existing.isVideo,
+        title: isAvatar ? 'PROFILE PHOTO' : 'COVER PHOTO',
+      );
+      return;
+    }
+
+    if (action == ProfilePhotoAction.remove) {
+      setState(() => _imageUpdating = true);
+      try {
+        if (isAvatar) {
+          await BusinessMediaService.removeAvatar(widget.business.id);
+        } else {
+          await BusinessMediaService.removeCover(widget.business.id);
+        }
+        await _refresh();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isAvatar ? 'Profile photo removed.' : 'Cover photo removed.',
+            ),
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not remove photo: $e')),
+        );
+      } finally {
+        if (mounted) setState(() => _imageUpdating = false);
+      }
+      return;
+    }
+
+    final picked = await pickProfilePhoto(context, allowVideo: isAvatar);
+    if (picked == null || !mounted) return;
+
+    setState(() => _imageUpdating = true);
+    try {
+      if (isAvatar) {
+        await BusinessMediaService.setAvatar(
+          businessId: widget.business.id,
+          file: picked,
+        );
+      } else {
+        await BusinessMediaService.setCover(
+          businessId: widget.business.id,
+          file: picked,
+        );
+      }
+      await _refresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isAvatar ? 'Profile photo updated.' : 'Cover photo updated.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update photo: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _imageUpdating = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final business = widget.business;
@@ -128,10 +227,15 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
                   avatarIcon: Icons.storefront_outlined,
                   avatarImageUrl: avatarUrl,
                   coverImageUrl: coverUrl,
-                  onAvatarTap: avatarUrl != null
-                      ? () => _openEdit()
-                      : null,
-                  onCoverTap: coverUrl != null ? () => _openEdit() : null,
+                  avatarIsVideo: profileImages.avatar?.isVideo ?? false,
+                  coverIsVideo: profileImages.cover?.isVideo ?? false,
+                  onAvatarTap: _imageUpdating
+                      ? null
+                      : () => _handleAvatarTap(profileImages),
+                  onCoverTap: _imageUpdating
+                      ? null
+                      : () => _handleCoverTap(profileImages),
+                  showImageLoading: _imageUpdating,
                   coverGradient: const [
                     Color(0xFF2A241B),
                     Color(0xFF1A2530),

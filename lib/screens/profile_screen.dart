@@ -13,8 +13,8 @@ import '../services/profile_privacy_service.dart';
 import '../services/username_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/facebook_style_profile_header.dart';
+import '../widgets/profile_photo_actions.dart';
 import '../widgets/media_picker_sheet.dart';
-import '../widgets/signed_media_viewer.dart' show openSignedMedia;
 import '../widgets/profile_media_section.dart';
 import '../widgets/profile_my_posts_section.dart';
 import '../widgets/profile_recent_activity_section.dart';
@@ -168,51 +168,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
     final hasAvatar = _profileImages.avatar != null;
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: const Color(0xFF10151B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined, color: Color(0xFFD8B56A)),
-              title: const Text('Change profile photo', style: TextStyle(color: Colors.white)),
-              onTap: () => Navigator.pop(ctx, 'change'),
-            ),
-            if (hasAvatar) ...[
-              ListTile(
-                leading: const Icon(Icons.visibility_outlined, color: Color(0xFF78B9BE)),
-                title: const Text('View profile photo', style: TextStyle(color: Colors.white)),
-                onTap: () => Navigator.pop(ctx, 'view'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.white54),
-                title: const Text('Remove profile photo', style: TextStyle(color: Colors.white70)),
-                onTap: () => Navigator.pop(ctx, 'remove'),
-              ),
-            ],
-          ],
-        ),
-      ),
+    final action = await showProfilePhotoActionSheet(
+      context,
+      changeLabel: 'Change profile photo',
+      viewLabel: 'View profile photo',
+      removeLabel: 'Remove profile photo',
+      hasExisting: hasAvatar,
     );
     if (!mounted || action == null) return;
-    if (action == 'remove') {
+    if (action == ProfilePhotoAction.remove) {
       await _removeProfileImage(isAvatar: true);
-    } else if (action == 'view') {
+    } else if (action == ProfilePhotoAction.view) {
       final avatar = _profileImages.avatar;
       if (avatar != null && mounted) {
-        openSignedMedia(
+        await viewProfilePhoto(
           context,
           url: avatar.signedUrl,
           isVideo: avatar.isVideo,
           title: 'PROFILE PHOTO',
         );
       }
-    } else if (action == 'change') {
+    } else if (action == ProfilePhotoAction.change) {
       await _changeProfileImage(isAvatar: true);
     }
   }
@@ -223,51 +199,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
     final hasCover = _profileImages.cover != null;
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: const Color(0xFF10151B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined, color: Color(0xFFD8B56A)),
-              title: const Text('Change cover photo', style: TextStyle(color: Colors.white)),
-              onTap: () => Navigator.pop(ctx, 'change'),
-            ),
-            if (hasCover) ...[
-              ListTile(
-                leading: const Icon(Icons.visibility_outlined, color: Color(0xFF78B9BE)),
-                title: const Text('View cover photo', style: TextStyle(color: Colors.white)),
-                onTap: () => Navigator.pop(ctx, 'view'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.white54),
-                title: const Text('Remove cover photo', style: TextStyle(color: Colors.white70)),
-                onTap: () => Navigator.pop(ctx, 'remove'),
-              ),
-            ],
-          ],
-        ),
-      ),
+    final action = await showProfilePhotoActionSheet(
+      context,
+      changeLabel: 'Change cover photo',
+      viewLabel: 'View cover photo',
+      removeLabel: 'Remove cover photo',
+      hasExisting: hasCover,
     );
     if (!mounted || action == null) return;
-    if (action == 'remove') {
+    if (action == ProfilePhotoAction.remove) {
       await _removeProfileImage(isAvatar: false);
-    } else if (action == 'view') {
+    } else if (action == ProfilePhotoAction.view) {
       final cover = _profileImages.cover;
       if (cover != null && mounted) {
-        openSignedMedia(
+        await viewProfilePhoto(
           context,
           url: cover.signedUrl,
           isVideo: cover.isVideo,
           title: 'COVER PHOTO',
         );
       }
-    } else if (action == 'change') {
+    } else if (action == ProfilePhotoAction.change) {
       await _changeProfileImage(isAvatar: false);
     }
   }

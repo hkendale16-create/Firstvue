@@ -283,6 +283,47 @@ class BusinessMediaService {
     await _client.from('business_media').delete().eq('id', media.id);
   }
 
+  static Future<void> removeAvatar(String businessId) =>
+      _removeRoleMedia(businessId: businessId, role: 'avatar');
+
+  static Future<void> removeCover(String businessId) =>
+      _removeRoleMedia(businessId: businessId, role: 'cover');
+
+  static Future<void> _removeRoleMedia({
+    required String businessId,
+    required String role,
+  }) async {
+    List<dynamic> rows = const [];
+    try {
+      rows = await _client
+          .from('business_media')
+          .select('id, storage_path, storage_provider')
+          .eq('business_id', businessId)
+          .eq('media_role', role);
+    } catch (_) {
+      return;
+    }
+
+    for (final row in rows) {
+      final path = row['storage_path'] as String?;
+      final id = row['id'] as String?;
+      if (path == null || id == null) continue;
+      try {
+        await MediaStorageService.deleteObject(
+          bucket: MediaBucket.business,
+          path: path,
+          provider: MediaStorageProvider.parse(
+            row['storage_provider'] as String?,
+          ),
+          context: {'business_id': businessId},
+        );
+      } catch (_) {}
+      try {
+        await _client.from('business_media').delete().eq('id', id);
+      } catch (_) {}
+    }
+  }
+
   static Future<void> setFeaturedForTrending({
     required String businessId,
     required String mediaId,
