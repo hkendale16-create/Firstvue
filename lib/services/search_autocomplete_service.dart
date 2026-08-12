@@ -2,7 +2,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'username_service.dart';
 
-enum SearchResultType { profile, business, community, hashtag }
+enum SearchResultType {
+  profile,
+  business,
+  professional,
+  event,
+  community,
+  hashtag,
+}
 
 class SearchAutocompleteResult {
   final String id;
@@ -48,6 +55,8 @@ class SearchAutocompleteService {
 
     results.addAll(await _searchProfiles(lower));
     results.addAll(await _searchBusinesses(lower));
+    results.addAll(await _searchProfessionals(lower));
+    results.addAll(await _searchEvents(lower));
     results.addAll(await _searchCommunities(lower));
     results.addAll(await _searchHashtags(lower));
 
@@ -128,7 +137,7 @@ class SearchAutocompleteService {
           .from('businesses')
           .select('id, name, business_type')
           .eq('status', 'approved')
-          .ilike('name', '$prefix%')
+          .ilike('name', '%$prefix%')
           .limit(8);
 
       return rows
@@ -146,6 +155,63 @@ class SearchAutocompleteService {
     }
   }
 
+  static Future<List<SearchAutocompleteResult>> _searchProfessionals(
+    String prefix,
+  ) async {
+    try {
+      final rows = await _client
+          .from('professional_profiles')
+          .select('id, display_name, professional_type, city, state')
+          .eq('status', 'approved')
+          .ilike('display_name', '%$prefix%')
+          .limit(8);
+
+      return rows.map((row) {
+        final city = row['city'] as String?;
+        final state = row['state'] as String?;
+        final location = [city, state]
+            .whereType<String>()
+            .where((part) => part.trim().isNotEmpty)
+            .join(', ');
+        final type = (row['professional_type'] as String?) ?? 'Professional';
+        return SearchAutocompleteResult(
+          id: row['id'] as String,
+          label: row['display_name'] as String,
+          subtitle: location.isNotEmpty ? '$type · $location' : type,
+          type: SearchResultType.professional,
+        );
+      }).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<List<SearchAutocompleteResult>> _searchEvents(
+    String prefix,
+  ) async {
+    try {
+      final rows = await _client
+          .from('community_events')
+          .select('id, title, location_label')
+          .eq('status', 'approved')
+          .ilike('title', '%$prefix%')
+          .limit(8);
+
+      return rows
+          .map(
+            (row) => SearchAutocompleteResult(
+              id: row['id'] as String,
+              label: row['title'] as String,
+              subtitle: (row['location_label'] as String?) ?? 'Event',
+              type: SearchResultType.event,
+            ),
+          )
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
   static Future<List<SearchAutocompleteResult>> _searchCommunities(
     String prefix,
   ) async {
@@ -153,7 +219,7 @@ class SearchAutocompleteService {
       final rows = await _client
           .from('communities')
           .select('id, name, city, state')
-          .ilike('name', '$prefix%')
+          .ilike('name', '%$prefix%')
           .limit(8);
 
       return rows.map((row) {

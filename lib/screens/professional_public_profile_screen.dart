@@ -6,6 +6,8 @@ import '../services/professional_profiles_service.dart';
 import '../services/professional_showcase_service.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/entity_profile_feed_section.dart';
+import '../widgets/shoutout_card.dart';
+import '../services/shoutout_service.dart';
 import '../widgets/firstvue_inline_search_bar.dart';
 
 class ProfessionalPublicProfileScreen extends StatefulWidget {
@@ -333,6 +335,11 @@ class _ProfessionalPublicProfileScreenState
                   EntityProfileFeedSection(
                     scope: EntityFeedScope.professional,
                     entityId: profile.id,
+                  ),
+                  ShoutoutsReceivedSection(
+                    targetType: ShoutoutTargetType.professional,
+                    targetId: profile.id,
+                    title: 'SHOUTOUTS RECEIVED',
                   ),
                   const SizedBox(height: 28),
                   Container(

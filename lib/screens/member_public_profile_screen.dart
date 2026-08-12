@@ -16,6 +16,8 @@ import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/feed_comments_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/signed_media_viewer.dart';
+import '../widgets/shoutout_card.dart';
+import '../services/shoutout_service.dart';
 import 'auth_screen.dart';
 
 void openMemberProfile(
@@ -525,6 +527,11 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
                   child: _selectedTab == 0 ? _buildPostsTab() : _buildPhotosTab(),
                 ),
               ),
+            ShoutoutsReceivedSection(
+              targetType: ShoutoutTargetType.profile,
+              targetId: widget.profileId,
+              title: 'SHOUTOUTS RECEIVED',
+            ),
             const SizedBox(height: 28),
           ],
         ),

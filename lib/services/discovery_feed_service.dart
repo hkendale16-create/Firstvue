@@ -3,15 +3,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/media_config.dart';
 import 'media_storage_service.dart';
 
-enum VueFeedSource { business, member }
+enum VueFeedSource { business, member, professional, event, community }
 
 enum VueFeedMode { forYou, nearby, trending }
 
 class DiscoveryFeedItem {
   final String mediaId;
-  final String businessId;
-  final String businessName;
-  final String businessType;
+  /// Stable target entity id used for routing (business / pro / event / community / member).
+  final String entityId;
+  final String entityName;
+  final String entitySubtitle;
   final String ownerId;
   final String ownerName;
   final String caption;
@@ -25,9 +26,9 @@ class DiscoveryFeedItem {
 
   const DiscoveryFeedItem({
     required this.mediaId,
-    required this.businessId,
-    required this.businessName,
-    required this.businessType,
+    required this.entityId,
+    required this.entityName,
+    required this.entitySubtitle,
     required this.ownerId,
     required this.ownerName,
     required this.caption,
@@ -40,9 +41,23 @@ class DiscoveryFeedItem {
     this.source = VueFeedSource.business,
   });
 
+  /// Back-compat aliases used by older UI call sites.
+  String get businessId =>
+      source == VueFeedSource.business ? entityId : '';
+  String get businessName => entityName;
+  String get businessType => entitySubtitle;
+
   bool get isVideo => mediaType == 'video';
 
   bool get isMember => source == VueFeedSource.member;
+
+  String get viewActionLabel => switch (source) {
+        VueFeedSource.business => 'View Business',
+        VueFeedSource.member => 'View Profile',
+        VueFeedSource.professional => 'View Professional',
+        VueFeedSource.event => 'View Event',
+        VueFeedSource.community => 'View Community',
+      };
 }
 
 class DiscoveryFeedService {
@@ -55,8 +70,14 @@ class DiscoveryFeedService {
     VueFeedMode mode = VueFeedMode.forYou,
   }) async {
     final me = _client.auth.currentUser?.id;
-    final businessItems = await _fetchBusinessMedia(limit: limit);
-    final memberItems = await _fetchMemberProfileMedia(limit: limit);
+    final results = await Future.wait([
+      _fetchBusinessMedia(limit: limit),
+      _fetchMemberProfileMedia(limit: limit),
+      _fetchProfessionalMedia(limit: limit),
+    ]);
+    final businessItems = results[0];
+    final memberItems = results[1];
+    final professionalItems = results[2];
 
     final mine = me == null
         ? const <DiscoveryFeedItem>[]
@@ -64,6 +85,7 @@ class DiscoveryFeedService {
     var others = [
       ...memberItems.where((item) => item.ownerId != me),
       ...businessItems,
+      ...professionalItems,
     ];
 
     others = switch (mode) {
@@ -148,9 +170,9 @@ class DiscoveryFeedService {
           final ownerId = (business['created_by'] as String?) ?? '';
           return DiscoveryFeedItem(
             mediaId: row['id'] as String,
-            businessId: businessId,
-            businessName: business['name'] as String,
-            businessType:
+            entityId: businessId,
+            entityName: business['name'] as String,
+            entitySubtitle:
                 (business['business_type'] as String?) ?? 'Local business',
             ownerId: ownerId,
             ownerName: ownerNames[ownerId] ?? business['name'] as String,
@@ -163,6 +185,7 @@ class DiscoveryFeedService {
             services: List<String>.from(
               (business['services'] as List?) ?? const [],
             ),
+            source: VueFeedSource.business,
           );
         }),
       );
@@ -240,9 +263,9 @@ class DiscoveryFeedService {
 
         return DiscoveryFeedItem(
           mediaId: row['id'] as String,
-          businessId: '',
-          businessName: displayName,
-          businessType: 'FirstVue member',
+          entityId: profileId,
+          entityName: displayName,
+          entitySubtitle: 'FirstVue member',
           ownerId: profileId,
           ownerName: displayName,
           caption: caption,
@@ -260,6 +283,64 @@ class DiscoveryFeedService {
     }
   }
 
+  static Future<List<DiscoveryFeedItem>> _fetchProfessionalMedia({
+    required int limit,
+  }) async {
+    try {
+      final rows = await _client
+          .from('professional_media')
+          .select(
+            'id, storage_path, storage_provider, media_type, featured_for_trending, professional_profile_id, professional_profiles!inner(id, display_name, professional_type, profile_id, status, city, state)',
+          )
+          .eq('professional_profiles.status', 'approved')
+          .order('featured_for_trending', ascending: false)
+          .order('created_at', ascending: false)
+          .limit(limit);
+
+      if (rows.isEmpty) return const [];
+
+      return Future.wait(rows.map((row) async {
+        final pro = row['professional_profiles'] as Map<String, dynamic>;
+        final proId = pro['id'] as String;
+        final mediaType = (row['media_type'] as String?) ?? 'image';
+        final storagePath = row['storage_path'] as String;
+        final provider = MediaStorageProvider.parse(
+          row['storage_provider'] as String?,
+        );
+        final mediaUrl = await MediaStorageService.createReadUrl(
+          bucket: MediaBucket.professional,
+          path: storagePath,
+          provider: provider,
+          context: {'professional_profile_id': proId},
+        );
+        final ownerId = (pro['profile_id'] as String?) ?? '';
+        final displayName =
+            (pro['display_name'] as String?) ?? 'FirstVue professional';
+        final typeLabel =
+            (pro['professional_type'] as String?) ?? 'Professional';
+
+        return DiscoveryFeedItem(
+          mediaId: row['id'] as String,
+          entityId: proId,
+          entityName: displayName,
+          entitySubtitle: typeLabel,
+          ownerId: ownerId,
+          ownerName: displayName,
+          caption: 'Professional spotlight on Vue',
+          mediaType: mediaType,
+          mediaUrl: mediaUrl,
+          verified: true,
+          sponsored: false,
+          rating: 0,
+          services: const [],
+          source: VueFeedSource.professional,
+        );
+      }));
+    } catch (_) {
+      return const [];
+    }
+  }
+
   static Future<void> recordProfileTap(DiscoveryFeedItem item) async {
     await recordEngagement(item, 'profile_tap');
   }
@@ -270,10 +351,12 @@ class DiscoveryFeedService {
   ) async {
     final user = _client.auth.currentUser;
     if (user == null) return;
-    await _client.from('feed_engagements').insert({
-      'profile_id': user.id,
-      'media_id': item.mediaId,
-      'event_type': eventType,
-    });
+    try {
+      await _client.from('feed_engagements').insert({
+        'profile_id': user.id,
+        'media_id': item.mediaId,
+        'event_type': eventType,
+      });
+    } catch (_) {}
   }
 }
