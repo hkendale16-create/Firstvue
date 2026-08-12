@@ -534,8 +534,15 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
           ],
         ),
         const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: FirstVueColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: FirstVueColors.gold.withValues(alpha: .35),
+            ),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -653,7 +660,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
             ],
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 14),
         if (_loadingPosts)
           const Center(
             child: Padding(
@@ -685,33 +692,36 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
           Column(
             children: [
               for (var index = 0; index < _posts.length; index++)
-                CommunityNewsPostCard(
-                  post: _posts[index],
-                  style: CommunityNewsPostCardStyle.timeline,
-                  onTap: () => CommunityNewsPostDetailSheet.show(
-                    context,
-                    postId: _posts[index].id,
-                    initialPost: _posts[index],
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: CommunityNewsPostCard(
+                    post: _posts[index],
+                    style: CommunityNewsPostCardStyle.compact,
+                    onTap: () => CommunityNewsPostDetailSheet.show(
+                      context,
+                      postId: _posts[index].id,
+                      initialPost: _posts[index],
+                    ),
+                    onAuthorTap: _posts[index].authorId.isNotEmpty
+                        ? () => openMemberProfile(
+                              context,
+                              profileId: _posts[index].authorId,
+                              displayName: _posts[index].authorName,
+                            )
+                        : null,
+                    onSpark: () => _sparkPost(index),
+                    onSave: () => _savePost(index),
+                    onDelete: _posts[index].isMine
+                        ? () => _showPostMenu(index)
+                        : null,
+                    onComment: () => FeedCommentsSheet.show(
+                      context,
+                      mediaId: _posts[index].commentsMediaId,
+                      businessName: _posts[index].authorName,
+                    ),
+                    onRepost: () => _repostPost(index),
+                    repostedByMe: _repostedPostIds.contains(_posts[index].id),
                   ),
-                  onAuthorTap: _posts[index].authorId.isNotEmpty
-                      ? () => openMemberProfile(
-                            context,
-                            profileId: _posts[index].authorId,
-                            displayName: _posts[index].authorName,
-                          )
-                      : null,
-                  onSpark: () => _sparkPost(index),
-                  onSave: () => _savePost(index),
-                  onDelete: _posts[index].isMine
-                      ? () => _showPostMenu(index)
-                      : null,
-                  onComment: () => FeedCommentsSheet.show(
-                    context,
-                    mediaId: _posts[index].commentsMediaId,
-                    businessName: _posts[index].authorName,
-                  ),
-                  onRepost: () => _repostPost(index),
-                  repostedByMe: _repostedPostIds.contains(_posts[index].id),
                 ),
             ],
           ),
