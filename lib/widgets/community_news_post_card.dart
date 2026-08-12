@@ -4,6 +4,7 @@ import '../services/community_news_media_service.dart';
 import '../services/community_news_service.dart';
 import '../services/profile_activity_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'feed_autoplay_video.dart';
 import 'signed_media_viewer.dart';
 
 enum CommunityNewsPostCardStyle { compact, timeline }
@@ -408,12 +409,14 @@ class _MediaTile extends StatelessWidget {
     final tileWidth = fullWidth ? double.infinity : (width ?? height);
 
     return GestureDetector(
-      onTap: () => openSignedMedia(
-        context,
-        url: item.signedUrl,
-        isVideo: item.isVideo,
-        title: item.isVideo ? 'VIDEO' : 'PHOTO',
-      ),
+      onTap: item.isVideo
+          ? null
+          : () => openSignedMedia(
+                context,
+                url: item.signedUrl,
+                isVideo: false,
+                title: 'PHOTO',
+              ),
       onDoubleTap: onDoubleTapSpark,
       child: AnimatedBuilder(
         animation: sparkFlash,
@@ -439,13 +442,26 @@ class _MediaTile extends StatelessWidget {
             ],
           );
         },
-        child: SignedMediaThumbnail(
-          url: item.signedUrl,
-          isVideo: item.isVideo,
-          width: tileWidth,
-          height: height,
-          borderRadius: BorderRadius.circular(fullWidth ? 0 : 12),
-        ),
+        child: item.isVideo
+            ? FeedAutoplayVideo(
+                url: item.signedUrl,
+                width: tileWidth,
+                height: height,
+                borderRadius: BorderRadius.circular(fullWidth ? 0 : 12),
+                onTap: () => openSignedMedia(
+                  context,
+                  url: item.signedUrl,
+                  isVideo: true,
+                  title: 'VIDEO',
+                ),
+              )
+            : SignedMediaThumbnail(
+                url: item.signedUrl,
+                isVideo: false,
+                width: tileWidth,
+                height: height,
+                borderRadius: BorderRadius.circular(fullWidth ? 0 : 12),
+              ),
       ),
     );
   }

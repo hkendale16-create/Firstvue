@@ -8,6 +8,7 @@ import 'admin_business_submissions_screen.dart';
 import 'admin_business_reviews_screen.dart';
 import 'admin_professional_profiles_screen.dart';
 import 'auth_screen.dart';
+import 'edit_profile_screen.dart';
 import 'join_firstvue_screen.dart';
 import 'business_growth_screen.dart';
 import 'legal_policy_screen.dart';
@@ -19,6 +20,7 @@ import 'my_professional_profile_view_screen.dart';
 import '../services/admin_auth_service.dart';
 import '../services/community_news_service.dart';
 import '../services/profile_media_service.dart';
+import '../services/user_profile_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/media_picker_sheet.dart';
@@ -49,6 +51,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     sparksReceived: 0,
   );
   bool _statsLoading = false;
+  String? _displayName;
+  bool _nameLoading = false;
   int _selectedTab = 0;
   int _pullRefreshToken = 0;
   bool _showSettings = false;
@@ -61,6 +65,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadAdminAccess();
     _loadProfileImages();
     _loadStats();
+    _loadDisplayName();
+  }
+
+  Future<void> _loadDisplayName() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _displayName = null);
+      return;
+    }
+    setState(() => _nameLoading = true);
+    final name = await UserProfileService.fetchDisplayName();
+    if (!mounted) return;
+    setState(() {
+      _displayName = name?.trim().isNotEmpty == true
+          ? name!.trim()
+          : user.email?.split('@').first;
+      _nameLoading = false;
+    });
   }
 
   @override
@@ -70,6 +92,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _loadAdminAccess();
       _loadProfileImages();
       _loadStats();
+      _loadDisplayName();
     }
   }
 
@@ -320,6 +343,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _loadAdminAccess(),
       _loadProfileImages(),
       _loadStats(),
+      _loadDisplayName(),
     ]);
     if (mounted) setState(() => _pullRefreshToken++);
   }
@@ -330,10 +354,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _editProfilePlaceholder() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Use cover and avatar taps to update your look.')),
+  Future<void> _openEditProfile() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      await _handleAccountTap(null);
+      return;
+    }
+    final updated = await Navigator.push<bool>(
+      context,
+      FirstVuePageRoute(builder: (_) => const EditProfileScreen()),
     );
+    if (updated == true && mounted) {
+      await Future.wait([
+        _loadDisplayName(),
+        _loadProfileImages(),
+      ]);
+      setState(() => _pullRefreshToken++);
+    }
   }
 
   Widget _buildTabContent() {
@@ -357,7 +394,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
     final email = user?.email ?? '';
-    final displayName = email.isEmpty ? 'Guest' : email.split('@').first;
+    final displayName = user == null
+        ? 'Guest'
+        : (_nameLoading
+            ? (email.isEmpty ? '…' : email.split('@').first)
+            : (_displayName ?? (email.isEmpty ? 'Guest' : email.split('@').first)));
 
     return SafeArea(
       child: FirstVueRefreshScaffold(
@@ -405,7 +446,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ]
                     : [
                         OutlinedButton.icon(
-                          onPressed: _editProfilePlaceholder,
+                          onPressed: _openEditProfile,
                           icon: const Icon(Icons.edit_outlined, size: 18),
                           label: const Text('Edit profile'),
                           style: OutlinedButton.styleFrom(
