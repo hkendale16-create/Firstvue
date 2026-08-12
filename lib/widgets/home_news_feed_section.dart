@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import '../navigation/firstvue_page_route.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../navigation/firstvue_page_route.dart';
+import '../screens/auth_screen.dart';
 import '../services/community_news_service.dart';
 import '../theme/firstvue_theme.dart';
-import '../widgets/community_news_post_card.dart';
-import '../widgets/feed_comments_sheet.dart';
-import '../screens/auth_screen.dart';
+import 'community_news_post_card.dart';
+import 'feed_comments_sheet.dart';
+import 'media_picker_sheet.dart';
 
 class HomeNewsFeedSection extends StatefulWidget {
   const HomeNewsFeedSection({super.key});
@@ -20,6 +22,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
   bool _loadingPosts = true;
   final _composer = TextEditingController();
   bool _posting = false;
+  List<XFile> _attachedMedia = const [];
 
   @override
   void initState() {
@@ -58,13 +61,17 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
       return;
     }
     final text = _composer.text.trim();
-    if (text.isEmpty || _posting) return;
+    if ((text.isEmpty && _attachedMedia.isEmpty) || _posting) return;
     setState(() => _posting = true);
     try {
-      final newPost = await CommunityNewsService.createPost(text);
+      final newPost = await CommunityNewsService.createPost(
+        text,
+        files: _attachedMedia,
+      );
       _composer.clear();
       if (!mounted) return;
       setState(() {
+        _attachedMedia = const [];
         _posts = [
           newPost,
           for (final post in _posts)
@@ -82,6 +89,20 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     } finally {
       if (mounted) setState(() => _posting = false);
     }
+  }
+
+  Future<void> _showMediaPicker() async {
+    if (Supabase.instance.client.auth.currentUser == null) {
+      await Navigator.push(
+        context,
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
+      );
+      return;
+    }
+
+    final files = await showMediaPickerSheet(context);
+    if (files == null || files.isEmpty || !mounted) return;
+    setState(() => _attachedMedia = [..._attachedMedia, ...files]);
   }
 
   Future<void> _savePost(int index) async {
@@ -239,16 +260,84 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: FilledButton(
-                      onPressed: _posting ? null : _submitPost,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: FirstVueColors.coral,
-                        foregroundColor: Colors.white,
+                  if (_attachedMedia.isNotEmpty) ...[
+                    SizedBox(
+                      height: 72,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _attachedMedia.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final file = _attachedMedia[index];
+                          final isVideo = _isVideoFile(file);
+                          return Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  width: 72,
+                                  height: 72,
+                                  color: FirstVueColors.elevatedSurface,
+                                  child: isVideo
+                                      ? const Icon(Icons.videocam_outlined, color: FirstVueColors.teal)
+                                      : const Icon(Icons.image_outlined, color: FirstVueColors.gold),
+                                ),
+                              ),
+                              Positioned(
+                                top: -6,
+                                right: -6,
+                                child: IconButton.filledTonal(
+                                  visualDensity: VisualDensity.compact,
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: FirstVueColors.surface,
+                                    foregroundColor: Colors.white70,
+                                    minimumSize: const Size(24, 24),
+                                    padding: EdgeInsets.zero,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _attachedMedia = [
+                                        for (var i = 0; i < _attachedMedia.length; i++)
+                                          if (i != index) _attachedMedia[i],
+                                      ];
+                                    });
+                                  },
+                                  icon: const Icon(Icons.close, size: 14),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
-                      child: Text(_posting ? 'POSTING...' : 'POST'),
                     ),
+                    const SizedBox(height: 10),
+                  ],
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _posting ? null : _showMediaPicker,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: FirstVueColors.teal,
+                          side: BorderSide(color: FirstVueColors.teal.withValues(alpha: .45)),
+                        ),
+                        icon: const Icon(Icons.perm_media_outlined, size: 18),
+                        label: Text(
+                          _attachedMedia.isEmpty
+                              ? 'PHOTO / VIDEO'
+                              : '${_attachedMedia.length} ATTACHED',
+                        ),
+                      ),
+                      const Spacer(),
+                      FilledButton(
+                        onPressed: _posting ? null : _submitPost,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: FirstVueColors.coral,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: Text(_posting ? 'POSTING...' : 'POST'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -289,5 +378,13 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
           ),
       ],
     );
+  }
+
+  bool _isVideoFile(XFile file) {
+    final mime = file.mimeType?.toLowerCase() ?? '';
+    if (mime.startsWith('video/')) return true;
+    const videoExtensions = {'mp4', 'mov', 'webm', 'avi', 'mkv', '3gp', 'm4v'};
+    final extension = file.name.split('.').last.toLowerCase();
+    return videoExtensions.contains(extension);
   }
 }

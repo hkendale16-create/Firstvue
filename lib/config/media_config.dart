@@ -16,7 +16,9 @@ class MediaConfig {
 enum MediaBucket {
   business('business-media'),
   rental('rental-media'),
-  professional('professional-media');
+  professional('professional-media'),
+  communityNews('community-news-media'),
+  profile('profile-media');
 
   final String id;
   const MediaBucket(this.id);

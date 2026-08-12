@@ -93,10 +93,17 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
           future: _dataFuture,
           builder: (context, snapshot) {
             final data = snapshot.data;
-            final coverUrl = data?.media.isNotEmpty == true &&
-                    !data!.media.first.isVideo
-                ? data.media.first.signedUrl
-                : null;
+            final media = data?.media ?? const <BusinessMediaItem>[];
+            BusinessMediaItem? coverMedia;
+            for (final item in media) {
+              if (item.featuredForTrending) {
+                coverMedia = item;
+                break;
+              }
+            }
+            coverMedia ??= media.isNotEmpty ? media.first : null;
+            final coverUrl =
+                coverMedia != null && !coverMedia.isVideo ? coverMedia.signedUrl : null;
 
             return ListView(
               padding: EdgeInsets.zero,

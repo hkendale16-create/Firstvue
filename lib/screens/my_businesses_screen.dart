@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../services/approved_businesses_service.dart';
 import '../services/business_media_service.dart';
 import '../services/business_menu_service.dart';
 import '../services/business_social_links_service.dart';
 import '../services/business_submission_service.dart';
+import '../widgets/editable_media_grid.dart';
 import '../widgets/location_autocomplete_field.dart';
+import '../widgets/media_picker_sheet.dart';
 import 'firstvue_business_profile_screen.dart';
 import 'my_business_profile_view_screen.dart';
 import 'join_firstvue_screen.dart';
@@ -195,7 +196,6 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
   final _youtube = TextEditingController();
   final _menuLines = TextEditingController();
   final _specialLines = TextEditingController();
-  final _imagePicker = ImagePicker();
   late Future<List<BusinessMediaItem>> _media;
   late TabController _tabController;
   int _previewToken = 0;
@@ -384,73 +384,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
   }
 
   Future<void> _showMediaPicker() async {
-    final files = await showModalBottomSheet<List<XFile>>(
-      context: context,
-      backgroundColor: const Color(0xFF10151B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'ADD PHOTOS OR VIDEOS',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.1,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Uploads go live on your profile immediately — no separate approval needed.',
-                style: TextStyle(color: Colors.white54, fontSize: 12),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 14),
-              ListTile(
-                leading: const Icon(Icons.photo_library_outlined, color: Color(0xFFD8B56A)),
-                title: const Text('Photos from gallery', style: TextStyle(color: Colors.white)),
-                onTap: () async {
-                  final photos = await _imagePicker.pickMultiImage(imageQuality: 90);
-                  if (sheetContext.mounted) {
-                    Navigator.pop(sheetContext, photos);
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.videocam_outlined, color: Color(0xFF78B9BE)),
-                title: const Text('Video from gallery', style: TextStyle(color: Colors.white)),
-                onTap: () async {
-                  final video = await _imagePicker.pickVideo(source: ImageSource.gallery);
-                  if (sheetContext.mounted) {
-                    Navigator.pop(sheetContext, video == null ? <XFile>[] : [video]);
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.perm_media_outlined, color: Color(0xFFE5C16F)),
-                title: const Text(
-                  'Photos & videos (all types)',
-                  style: TextStyle(color: Colors.white),
-                ),
-                onTap: () async {
-                  final media = await _imagePicker.pickMultipleMedia(
-                    imageQuality: 90,
-                  );
-                  if (sheetContext.mounted) {
-                    Navigator.pop(sheetContext, media);
-                  }
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    final files = await showMediaPickerSheet(context);
     if (files == null || files.isEmpty || !mounted) return;
     setState(() => _uploading = true);
     try {
@@ -495,6 +429,34 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
         );
       }
     }
+  }
+
+  Future<void> _setTrendingFeatured(EditableMediaGridItem item) async {
+    try {
+      await BusinessMediaService.setFeaturedForTrending(
+        businessId: widget.business.id,
+        mediaId: item.id,
+      );
+      if (mounted) {
+        setState(
+          () => _media = BusinessMediaService.fetchMedia(widget.business.id),
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Trending cover updated.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to update trending cover.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deletePhotoFromGrid(EditableMediaGridItem item) async {
+    final media = (await _media).firstWhere((entry) => entry.id == item.id);
+    await _deletePhoto(media);
   }
 
   @override
@@ -672,60 +634,18 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
                 style: TextStyle(color: Colors.white54, fontSize: 12),
               );
             }
-            return GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-              ),
-              itemCount: snapshot.data!.length,
-              itemBuilder: (context, index) {
-                final media = snapshot.data![index];
-                return ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      if (media.isVideo)
-                        ColoredBox(
-                          color: const Color(0xFF151B22),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.videocam_outlined, color: Color(0xFF78B9BE), size: 32),
-                              SizedBox(height: 4),
-                              Text('VIDEO', style: TextStyle(color: Colors.white54, fontSize: 10)),
-                            ],
-                          ),
-                        )
-                      else
-                        Image.network(
-                          media.signedUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const ColoredBox(
-                            color: Color(0xFF151B22),
-                            child: Icon(
-                              Icons.broken_image_outlined,
-                              color: Colors.white38,
-                            ),
-                          ),
-                        ),
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: IconButton.filledTonal(
-                          visualDensity: VisualDensity.compact,
-                          tooltip: 'Delete',
-                          onPressed: () => _deletePhoto(media),
-                          icon: const Icon(Icons.delete_outline, size: 18),
-                        ),
-                      ),
-                    ],
+            return EditableMediaGrid(
+              items: [
+                for (final media in snapshot.data!)
+                  EditableMediaGridItem(
+                    id: media.id,
+                    signedUrl: media.signedUrl,
+                    isVideo: media.isVideo,
+                    featuredForTrending: media.featuredForTrending,
                   ),
-                );
-              },
+              ],
+              onDelete: _deletePhotoFromGrid,
+              onSetTrendingFeatured: _setTrendingFeatured,
             );
           },
         ),

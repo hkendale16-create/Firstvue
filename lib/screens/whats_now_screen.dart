@@ -292,13 +292,25 @@ class _TrendingFeedCard extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      business.imageUrl != null
+                      business.imageUrl != null && !business.featuredIsVideo
                           ? Image.network(
                               business.imageUrl!,
                               fit: BoxFit.cover,
                               errorBuilder: (_, _, _) => Image.asset(
                                 'assets/images/explore_barbershops.jpg',
                                 fit: BoxFit.cover,
+                              ),
+                            )
+                          : business.featuredIsVideo
+                          ? ColoredBox(
+                              color: FirstVueColors.elevatedSurface,
+                              child: const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.play_circle_outline, color: FirstVueColors.teal, size: 44),
+                                  SizedBox(height: 6),
+                                  Text('VIDEO', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                                ],
                               ),
                             )
                           : Image.asset(

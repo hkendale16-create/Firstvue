@@ -2,6 +2,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/media_config.dart';
+import 'media_type_helpers.dart';
 import 'media_storage_service.dart';
 
 class BusinessMediaItem {
@@ -10,6 +11,7 @@ class BusinessMediaItem {
   final String signedUrl;
   final MediaStorageProvider storageProvider;
   final String mediaType;
+  final bool featuredForTrending;
 
   const BusinessMediaItem({
     required this.id,
@@ -17,6 +19,7 @@ class BusinessMediaItem {
     required this.signedUrl,
     required this.storageProvider,
     required this.mediaType,
+    this.featuredForTrending = false,
   });
 
   bool get isVideo => mediaType == 'video';
@@ -31,7 +34,7 @@ class BusinessMediaService {
   static Future<List<BusinessMediaItem>> fetchMedia(String businessId) async {
     final rows = await _client
         .from('business_media')
-        .select('id, storage_path, storage_provider, media_type')
+        .select('id, storage_path, storage_provider, media_type, featured_for_trending')
         .eq('business_id', businessId)
         .order('sort_order')
         .order('created_at');
@@ -48,6 +51,7 @@ class BusinessMediaService {
           storagePath: path,
           storageProvider: provider,
           mediaType: mediaType,
+          featuredForTrending: (row['featured_for_trending'] as bool?) ?? false,
           signedUrl: await MediaStorageService.createReadUrl(
             bucket: MediaBucket.business,
             path: path,
@@ -90,8 +94,8 @@ class BusinessMediaService {
         );
       }
 
-      final mediaType = _mediaTypeFor(file);
-      final contentType = _mimeTypeFor(file, mediaType);
+      final mediaType = mediaTypeForFile(file);
+      final contentType = mimeTypeForFile(file, mediaType);
       final upload = await MediaStorageService.uploadBytes(
         bucket: MediaBucket.business,
         bytes: bytes,
@@ -129,37 +133,18 @@ class BusinessMediaService {
     await _client.from('business_media').delete().eq('id', media.id);
   }
 
-  static String _mediaTypeFor(XFile file) {
-    final mimeType = file.mimeType?.toLowerCase() ?? '';
-    if (mimeType.startsWith('video/')) return 'video';
-    if (mimeType.startsWith('image/')) return 'image';
-    final extension = file.name.split('.').last.toLowerCase();
-    const videoExtensions = {'mp4', 'mov', 'webm', 'avi', 'mkv', '3gp', 'm4v'};
-    return videoExtensions.contains(extension) ? 'video' : 'image';
-  }
-
-  static String _mimeTypeFor(XFile file, String mediaType) {
-    final supplied = file.mimeType?.toLowerCase();
-    if (supplied != null && supplied.isNotEmpty) {
-      return supplied;
-    }
-    final extension = file.name.split('.').last.toLowerCase();
-    return switch (extension) {
-      'jpg' || 'jpeg' => 'image/jpeg',
-      'png' => 'image/png',
-      'webp' => 'image/webp',
-      'gif' => 'image/gif',
-      'heic' => 'image/heic',
-      'heif' => 'image/heif',
-      'bmp' => 'image/bmp',
-      'mp4' => 'video/mp4',
-      'mov' => 'video/quicktime',
-      'webm' => 'video/webm',
-      'avi' => 'video/x-msvideo',
-      '3gp' => 'video/3gpp',
-      'mkv' => 'video/x-matroska',
-      'm4v' => 'video/x-m4v',
-      _ => mediaType == 'video' ? 'video/mp4' : 'image/jpeg',
-    };
+  static Future<void> setFeaturedForTrending({
+    required String businessId,
+    required String mediaId,
+  }) async {
+    await _client
+        .from('business_media')
+        .update({'featured_for_trending': false})
+        .eq('business_id', businessId);
+    await _client
+        .from('business_media')
+        .update({'featured_for_trending': true})
+        .eq('id', mediaId)
+        .eq('business_id', businessId);
   }
 }

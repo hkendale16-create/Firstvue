@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
-import 'package:image_picker/image_picker.dart';
+import '../widgets/editable_media_grid.dart';
+import '../widgets/media_picker_sheet.dart';
 
 import '../services/professional_media_service.dart';
 import '../services/professional_profiles_service.dart';
@@ -108,34 +109,48 @@ class _ProfessionalProfileEditorScreenState
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _addPhotos() async {
+  Future<void> _addMedia() async {
     final profile = _existing;
     if (profile == null || _uploading) {
-      _showMessage('Save your profile before adding portfolio photos.');
+      _showMessage('Save your profile before adding portfolio media.');
       return;
     }
-    final images = await ImagePicker().pickMultiImage(
-      imageQuality: 92,
-      requestFullMetadata: false,
-    );
-    if (images.isEmpty || !mounted) return;
+    final files = await showMediaPickerSheet(context);
+    if (files == null || files.isEmpty || !mounted) return;
 
     setState(() => _uploading = true);
     try {
-      await ProfessionalMediaService.uploadImages(
+      await ProfessionalMediaService.uploadMedia(
         professionalProfileId: profile.id,
-        images: images,
+        files: files,
       );
       if (!mounted) return;
       setState(() {
         _media = ProfessionalMediaService.fetchMedia(profile.id);
       });
-      _showMessage('Portfolio photos uploaded.');
+      _showMessage('Portfolio media uploaded.');
     } catch (_) {
       if (!mounted) return;
-      _showMessage('Unable to upload those photos. Please try again.');
+      _showMessage('Unable to upload media. Please try again.');
     } finally {
       if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<void> _setTrendingFeatured(EditableMediaGridItem item) async {
+    final profile = _existing;
+    if (profile == null) return;
+    try {
+      await ProfessionalMediaService.setFeaturedForTrending(
+        professionalProfileId: profile.id,
+        mediaId: item.id,
+      );
+      if (!mounted) return;
+      setState(() => _media = ProfessionalMediaService.fetchMedia(profile.id));
+      _showMessage('Trending cover updated.');
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Unable to update trending cover.');
     }
   }
 
@@ -149,8 +164,14 @@ class _ProfessionalProfileEditorScreenState
       });
     } catch (_) {
       if (!mounted) return;
-      _showMessage('Unable to delete that photo.');
+      _showMessage('Unable to delete that file.');
     }
+  }
+
+  Future<void> _deleteMediaFromGrid(EditableMediaGridItem item) async {
+    final items = await _media;
+    final media = items.firstWhere((entry) => entry.id == item.id);
+    await _deletePhoto(media);
   }
 
   @override
@@ -353,7 +374,7 @@ class _ProfessionalProfileEditorScreenState
                     children: [
                       const Expanded(
                         child: Text(
-                          'PORTFOLIO PHOTOS',
+                          'PORTFOLIO PHOTOS & VIDEOS',
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
@@ -362,7 +383,7 @@ class _ProfessionalProfileEditorScreenState
                         ),
                       ),
                       TextButton.icon(
-                        onPressed: _uploading ? null : _addPhotos,
+                        onPressed: _uploading ? null : _addMedia,
                         icon: _uploading
                             ? const SizedBox.square(
                                 dimension: 16,
@@ -371,7 +392,7 @@ class _ProfessionalProfileEditorScreenState
                                 ),
                               )
                             : const Icon(Icons.add_photo_alternate_outlined),
-                        label: Text(_uploading ? 'UPLOADING' : 'ADD PHOTOS'),
+                        label: Text(_uploading ? 'UPLOADING' : 'ADD MEDIA'),
                       ),
                     ],
                   ),
@@ -398,55 +419,25 @@ class _ProfessionalProfileEditorScreenState
                         }
                         if (snapshot.data!.isEmpty) {
                           return const Text(
-                            'Add JPEG, PNG, or WebP examples of your work.',
+                            'Add photos or videos of your work. Star one for Trending.',
                             style: TextStyle(
                               color: Colors.white54,
                               fontSize: 12,
                             ),
                           );
                         }
-                        return GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
-                                crossAxisSpacing: 8,
-                                mainAxisSpacing: 8,
+                        return EditableMediaGrid(
+                          items: [
+                            for (final media in snapshot.data!)
+                              EditableMediaGridItem(
+                                id: media.id,
+                                signedUrl: media.signedUrl,
+                                isVideo: media.isVideo,
+                                featuredForTrending: media.featuredForTrending,
                               ),
-                          itemCount: snapshot.data!.length,
-                          itemBuilder: (context, index) {
-                            final media = snapshot.data![index];
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  Image.network(
-                                    media.signedUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, _, _) => const ColoredBox(
-                                      color: Color(0xFF151B22),
-                                      child: Icon(Icons.broken_image_outlined),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 4,
-                                    right: 4,
-                                    child: IconButton.filledTonal(
-                                      visualDensity: VisualDensity.compact,
-                                      tooltip: 'Delete photo',
-                                      onPressed: () => _deletePhoto(media),
-                                      icon: const Icon(
-                                        Icons.delete_outline,
-                                        size: 18,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
+                          ],
+                          onDelete: _deleteMediaFromGrid,
+                          onSetTrendingFeatured: _setTrendingFeatured,
                         );
                       },
                     ),

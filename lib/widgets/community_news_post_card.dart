@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../services/community_news_media_service.dart';
 import '../services/community_news_service.dart';
 import '../services/profile_activity_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -64,14 +66,19 @@ class CommunityNewsPostCard extends StatelessWidget {
             ),
           ),
           SizedBox(height: compact ? 6 : 8),
-          Text(
-            post.body,
-            style: TextStyle(
-              color: Colors.white,
-              height: 1.4,
-              fontSize: compact ? 13 : 14,
+          if (post.body.isNotEmpty)
+            Text(
+              post.body,
+              style: TextStyle(
+                color: Colors.white,
+                height: 1.4,
+                fontSize: compact ? 13 : 14,
+              ),
             ),
-          ),
+          if (post.media.isNotEmpty) ...[
+            SizedBox(height: compact ? 8 : 10),
+            _NewsPostMediaStrip(media: post.media, compact: compact),
+          ],
           if (onSpark != null || onComment != null || onSave != null) ...[
             SizedBox(height: compact ? 6 : 10),
             Row(
@@ -130,6 +137,86 @@ class CommunityNewsPostCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _NewsPostMediaStrip extends StatelessWidget {
+  final List<CommunityNewsMediaItem> media;
+  final bool compact;
+
+  const _NewsPostMediaStrip({
+    required this.media,
+    required this.compact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final height = compact ? 120.0 : 160.0;
+    return SizedBox(
+      height: height,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: media.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final item = media[index];
+          return GestureDetector(
+            onTap: () => _openMedia(context, item),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: item.isVideo
+                  ? Container(
+                      width: height * 1.2,
+                      height: height,
+                      color: FirstVueColors.elevatedSurface,
+                      child: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.play_circle_outline, color: FirstVueColors.teal, size: 40),
+                          SizedBox(height: 6),
+                          Text('Video', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                        ],
+                      ),
+                    )
+                  : Image.network(
+                      item.signedUrl,
+                      width: height * 1.2,
+                      height: height,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Container(
+                        width: height * 1.2,
+                        height: height,
+                        color: FirstVueColors.elevatedSurface,
+                        child: const Icon(Icons.broken_image_outlined, color: Colors.white38),
+                      ),
+                    ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _openMedia(BuildContext context, CommunityNewsMediaItem item) async {
+    if (item.isVideo) {
+      final uri = Uri.parse(item.signedUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return;
+    }
+
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: InteractiveViewer(
+          child: Image.network(item.signedUrl, fit: BoxFit.contain),
+        ),
       ),
     );
   }

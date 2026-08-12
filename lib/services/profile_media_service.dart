@@ -5,7 +5,7 @@ import '../config/media_config.dart';
 import 'media_storage_service.dart';
 import 'media_type_helpers.dart';
 
-class ProfessionalMediaItem {
+class ProfileMediaItem {
   final String id;
   final String storagePath;
   final String signedUrl;
@@ -13,33 +13,34 @@ class ProfessionalMediaItem {
   final String mediaType;
   final bool featuredForTrending;
 
-  const ProfessionalMediaItem({
+  const ProfileMediaItem({
     required this.id,
     required this.storagePath,
     required this.signedUrl,
     required this.storageProvider,
     required this.mediaType,
-    this.featuredForTrending = false,
+    required this.featuredForTrending,
   });
 
   bool get isVideo => mediaType == 'video';
 }
 
-class ProfessionalMediaService {
-  ProfessionalMediaService._();
+class ProfileMediaService {
+  ProfileMediaService._();
 
   static const _maxMediaBytes = 50 * 1024 * 1024;
   static final _client = Supabase.instance.client;
 
-  static Future<List<ProfessionalMediaItem>> fetchMedia(
-    String professionalProfileId,
-  ) async {
+  static Future<List<ProfileMediaItem>> fetchMyMedia() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return const [];
+
     final rows = await _client
-        .from('professional_media')
+        .from('profile_media')
         .select(
           'id, storage_path, storage_provider, media_type, featured_for_trending',
         )
-        .eq('professional_profile_id', professionalProfileId)
+        .eq('profile_id', user.id)
         .order('sort_order')
         .order('created_at');
 
@@ -49,37 +50,33 @@ class ProfessionalMediaService {
         final provider = MediaStorageProvider.parse(
           row['storage_provider'] as String?,
         );
-        final mediaType = (row['media_type'] as String?) ?? 'image';
-        return ProfessionalMediaItem(
+        return ProfileMediaItem(
           id: row['id'] as String,
           storagePath: path,
           storageProvider: provider,
-          mediaType: mediaType,
+          mediaType: (row['media_type'] as String?) ?? 'image',
           featuredForTrending: (row['featured_for_trending'] as bool?) ?? false,
           signedUrl: await MediaStorageService.createReadUrl(
-            bucket: MediaBucket.professional,
+            bucket: MediaBucket.profile,
             path: path,
             provider: provider,
-            context: {'professional_profile_id': professionalProfileId},
+            context: {'profile_id': user.id},
           ),
         );
       }),
     );
   }
 
-  static Future<void> uploadMedia({
-    required String professionalProfileId,
-    required List<XFile> files,
-  }) async {
+  static Future<void> uploadMedia(List<XFile> files) async {
     final user = _client.auth.currentUser;
     if (user == null) {
-      throw const AuthException('Sign in before adding portfolio media.');
+      throw const AuthException('Sign in before adding profile photos.');
     }
 
     final existing = await _client
-        .from('professional_media')
+        .from('profile_media')
         .select('sort_order')
-        .eq('professional_profile_id', professionalProfileId)
+        .eq('profile_id', user.id)
         .order('sort_order', ascending: false)
         .limit(1);
     final firstSortOrder = existing.isEmpty
@@ -101,16 +98,16 @@ class ProfessionalMediaService {
       final mediaType = mediaTypeForFile(file);
       final contentType = mimeTypeForFile(file, mediaType);
       final upload = await MediaStorageService.uploadBytes(
-        bucket: MediaBucket.professional,
+        bucket: MediaBucket.profile,
         bytes: bytes,
         contentType: contentType,
         fileName: file.name,
         index: index,
-        context: {'professional_profile_id': professionalProfileId},
+        context: {'profile_id': user.id},
       );
       try {
-        await _client.from('professional_media').insert({
-          'professional_profile_id': professionalProfileId,
+        await _client.from('profile_media').insert({
+          'profile_id': user.id,
           'storage_path': upload.path,
           'storage_provider': upload.provider.value,
           'media_type': mediaType,
@@ -118,37 +115,39 @@ class ProfessionalMediaService {
         });
       } catch (_) {
         await MediaStorageService.deleteObject(
-          bucket: MediaBucket.professional,
+          bucket: MediaBucket.profile,
           path: upload.path,
           provider: upload.provider,
-          context: {'professional_profile_id': professionalProfileId},
+          context: {'profile_id': user.id},
         );
         rethrow;
       }
     }
   }
 
-  static Future<void> deleteMedia(ProfessionalMediaItem media) async {
+  static Future<void> deleteMedia(ProfileMediaItem media) async {
     await MediaStorageService.deleteObject(
-      bucket: MediaBucket.professional,
+      bucket: MediaBucket.profile,
       path: media.storagePath,
       provider: media.storageProvider,
     );
-    await _client.from('professional_media').delete().eq('id', media.id);
+    await _client.from('profile_media').delete().eq('id', media.id);
   }
 
-  static Future<void> setFeaturedForTrending({
-    required String professionalProfileId,
-    required String mediaId,
-  }) async {
+  static Future<void> setFeaturedForTrending(String mediaId) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw const AuthException('Sign in to update trending cover.');
+    }
+
     await _client
-        .from('professional_media')
+        .from('profile_media')
         .update({'featured_for_trending': false})
-        .eq('professional_profile_id', professionalProfileId);
+        .eq('profile_id', user.id);
     await _client
-        .from('professional_media')
+        .from('profile_media')
         .update({'featured_for_trending': true})
         .eq('id', mediaId)
-        .eq('professional_profile_id', professionalProfileId);
+        .eq('profile_id', user.id);
   }
 }

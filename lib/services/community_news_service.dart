@@ -1,6 +1,8 @@
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'activity_notifications_service.dart';
+import 'community_news_media_service.dart';
 import 'saved_items_service.dart';
 
 class CommunityNewsPost {
@@ -13,6 +15,7 @@ class CommunityNewsPost {
   final int sparkCount;
   final bool sparkedByMe;
   final bool savedByMe;
+  final List<CommunityNewsMediaItem> media;
 
   const CommunityNewsPost({
     required this.id,
@@ -24,6 +27,7 @@ class CommunityNewsPost {
     required this.sparkCount,
     required this.sparkedByMe,
     required this.savedByMe,
+    this.media = const [],
   });
 
   String get commentsMediaId => 'news-post:$id';
@@ -38,6 +42,7 @@ class CommunityNewsPost {
     int? sparkCount,
     bool? sparkedByMe,
     bool? savedByMe,
+    List<CommunityNewsMediaItem>? media,
   }) {
     return CommunityNewsPost(
       id: id ?? this.id,
@@ -49,6 +54,7 @@ class CommunityNewsPost {
       sparkCount: sparkCount ?? this.sparkCount,
       sparkedByMe: sparkedByMe ?? this.sparkedByMe,
       savedByMe: savedByMe ?? this.savedByMe,
+      media: media ?? this.media,
     );
   }
 }
@@ -118,6 +124,9 @@ class CommunityNewsService {
             contentType: SavedContentType.newsPost,
             contentIds: postIds,
           );
+    final mediaByPost = await CommunityNewsMediaService.fetchMediaByPostIds(
+      postIds,
+    );
 
     return rows.map((row) {
       final id = row['id'] as String;
@@ -134,6 +143,7 @@ class CommunityNewsService {
         sparkCount: sparkCounts[id] ?? 0,
         sparkedByMe: mySparks.contains(id),
         savedByMe: mySaves.contains(id),
+        media: mediaByPost[id] ?? const [],
       );
     }).toList();
   }
@@ -235,12 +245,13 @@ class CommunityNewsService {
   static Future<CommunityNewsPost> createPost(
     String body, {
     String? businessId,
+    List<XFile> files = const [],
   }) async {
     final me = _client.auth.currentUser;
     if (me == null) throw const AuthException('Sign in to post.');
     final trimmed = body.trim();
-    if (trimmed.isEmpty) {
-      throw ArgumentError('Post body cannot be empty.');
+    if (trimmed.isEmpty && files.isEmpty) {
+      throw ArgumentError('Add text or attach a photo/video.');
     }
 
     await _ensureProfile(me);
@@ -256,6 +267,14 @@ class CommunityNewsService {
         .select('id, body, created_at, author_id, business_id')
         .single();
 
+    final postId = row['id'] as String;
+    final media = files.isEmpty
+        ? const <CommunityNewsMediaItem>[]
+        : await CommunityNewsMediaService.uploadMedia(
+            postId: postId,
+            files: files,
+          );
+
     final authorNames = await _fetchProfileNames([me.id]);
     final insertedBusinessId = row['business_id'] as String?;
     final businessNames = insertedBusinessId == null
@@ -263,7 +282,7 @@ class CommunityNewsService {
         : await _fetchBusinessNames([insertedBusinessId]);
 
     return CommunityNewsPost(
-      id: row['id'] as String,
+      id: postId,
       body: row['body'] as String,
       authorName: authorNames[me.id] ?? 'FirstVue member',
       businessName: insertedBusinessId == null
@@ -274,6 +293,7 @@ class CommunityNewsService {
       sparkCount: 0,
       sparkedByMe: false,
       savedByMe: false,
+      media: media,
     );
   }
 

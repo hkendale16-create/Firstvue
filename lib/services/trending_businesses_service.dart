@@ -16,6 +16,7 @@ class TrendingBusiness {
   final bool verified;
   final bool availableToday;
   final String? imageUrl;
+  final bool featuredIsVideo;
 
   const TrendingBusiness({
     required this.id,
@@ -27,6 +28,7 @@ class TrendingBusiness {
     required this.verified,
     required this.availableToday,
     required this.imageUrl,
+    this.featuredIsVideo = false,
   });
 }
 
@@ -186,26 +188,39 @@ class TrendingBusinessesService {
 
     final mediaRow = await _client
         .from('business_media')
-        .select('storage_path, thumbnail_path, storage_provider')
+        .select('storage_path, thumbnail_path, storage_provider, media_type')
         .eq('business_id', businessId)
-        .order('created_at', ascending: false)
-        .limit(1)
+        .eq('featured_for_trending', true)
         .maybeSingle();
 
+    final fallbackMediaRow = mediaRow ??
+        await _client
+            .from('business_media')
+            .select('storage_path, thumbnail_path, storage_provider, media_type')
+            .eq('business_id', businessId)
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+
     String? imageUrl;
-    if (mediaRow != null) {
-      final displayPath =
-          (mediaRow['thumbnail_path'] as String?) ??
-          mediaRow['storage_path'] as String;
-      final provider = MediaStorageProvider.parse(
-        mediaRow['storage_provider'] as String?,
-      );
-      imageUrl = await MediaStorageService.createReadUrl(
-        bucket: MediaBucket.business,
-        path: displayPath,
-        provider: provider,
-        context: {'business_id': businessId},
-      );
+    var featuredIsVideo = false;
+    if (fallbackMediaRow != null) {
+      final mediaType = (fallbackMediaRow['media_type'] as String?) ?? 'image';
+      featuredIsVideo = mediaType == 'video';
+      if (!featuredIsVideo) {
+        final displayPath =
+            (fallbackMediaRow['thumbnail_path'] as String?) ??
+            fallbackMediaRow['storage_path'] as String;
+        final provider = MediaStorageProvider.parse(
+          fallbackMediaRow['storage_provider'] as String?,
+        );
+        imageUrl = await MediaStorageService.createReadUrl(
+          bucket: MediaBucket.business,
+          path: displayPath,
+          provider: provider,
+          context: {'business_id': businessId},
+        );
+      }
     }
 
     final locations = (row['business_locations'] as List?) ?? const [];
@@ -235,6 +250,7 @@ class TrendingBusinessesService {
       verified: row['verification_status'] == 'verified',
       availableToday: (row['available_today'] as bool?) ?? false,
       imageUrl: imageUrl,
+      featuredIsVideo: featuredIsVideo,
     );
   }
 }
