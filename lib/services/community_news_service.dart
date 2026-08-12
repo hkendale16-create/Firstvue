@@ -73,6 +73,28 @@ class CommunityNewsService {
     final rows = await query
         .order('created_at', ascending: false)
         .limit(limit);
+    return _mapPostRows(rows, currentUserId: me);
+  }
+
+  /// Posts authored by the signed-in user (any status), for profile display.
+  static Future<List<CommunityNewsPost>> fetchMyPosts({int limit = 10}) async {
+    final me = _client.auth.currentUser;
+    if (me == null) return const [];
+
+    final rows = await _client
+        .from('community_news_posts')
+        .select('id, body, created_at, author_id, business_id')
+        .eq('author_id', me.id)
+        .order('created_at', ascending: false)
+        .limit(limit);
+
+    return _mapPostRows(rows, currentUserId: me.id);
+  }
+
+  static Future<List<CommunityNewsPost>> _mapPostRows(
+    List<dynamic> rows, {
+    required String? currentUserId,
+  }) async {
     if (rows.isEmpty) return const [];
 
     final postIds = rows.map((row) => row['id'] as String).toList();
@@ -87,10 +109,10 @@ class CommunityNewsService {
     final authorNames = await _fetchProfileNames(authorIds);
     final businessNames = await _fetchBusinessNames(businessIds);
     final sparkCounts = await _fetchSparkCounts(postIds);
-    final mySparks = me == null
+    final mySparks = currentUserId == null
         ? const <String>{}
-        : await _fetchMySparks(postIds, me);
-    final mySaves = me == null
+        : await _fetchMySparks(postIds, currentUserId);
+    final mySaves = currentUserId == null
         ? const <String>{}
         : await SavedItemsService.fetchSavedIds(
             contentType: SavedContentType.newsPost,
@@ -108,7 +130,7 @@ class CommunityNewsService {
         businessName:
             businessId == null ? null : businessNames[businessId],
         createdAt: DateTime.parse(row['created_at'] as String),
-        isMine: authorId == me,
+        isMine: authorId == currentUserId,
         sparkCount: sparkCounts[id] ?? 0,
         sparkedByMe: mySparks.contains(id),
         savedByMe: mySaves.contains(id),

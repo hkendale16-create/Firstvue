@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/community_news_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../widgets/community_news_post_card.dart';
 import '../widgets/feed_comments_sheet.dart';
 import '../screens/auth_screen.dart';
 
@@ -51,7 +53,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     if (Supabase.instance.client.auth.currentUser == null) {
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const AuthScreen()),
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
       );
       return;
     }
@@ -114,7 +116,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
       });
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const AuthScreen()),
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
       );
     } catch (_) {
       if (!mounted) return;
@@ -165,7 +167,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
       });
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const AuthScreen()),
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
       );
     } catch (_) {
       if (!mounted) return;
@@ -272,7 +274,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
               for (var index = 0; index < _posts.length; index++)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: _NewsPostCard(
+                  child: CommunityNewsPostCard(
                     post: _posts[index],
                     onSpark: () => _sparkPost(index),
                     onSave: () => _savePost(index),
@@ -286,100 +288,6 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
             ],
           ),
       ],
-    );
-  }
-}
-
-class _NewsPostCard extends StatelessWidget {
-  final CommunityNewsPost post;
-  final VoidCallback onSpark;
-  final VoidCallback onSave;
-  final VoidCallback onComment;
-
-  const _NewsPostCard({
-    required this.post,
-    required this.onSpark,
-    required this.onSave,
-    required this.onComment,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: FirstVueColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  post.authorName,
-                  style: const TextStyle(
-                    color: FirstVueColors.gold,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-              if (post.businessName != null)
-                Text(
-                  post.businessName!,
-                  style: const TextStyle(color: Colors.white54, fontSize: 11),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            post.body,
-            style: const TextStyle(color: Colors.white, height: 1.4),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              TextButton.icon(
-                onPressed: onSpark,
-                style: TextButton.styleFrom(
-                  foregroundColor:
-                      post.sparkedByMe ? FirstVueColors.gold : Colors.white70,
-                ),
-                icon: Icon(
-                  post.sparkedByMe ? Icons.bolt_rounded : Icons.bolt_outlined,
-                  size: 18,
-                  color: post.sparkedByMe ? FirstVueColors.gold : Colors.white70,
-                ),
-                label: Text('${post.sparkCount} sparks'),
-              ),
-              TextButton.icon(
-                onPressed: onComment,
-                icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                label: const Text('Comment'),
-              ),
-              TextButton.icon(
-                onPressed: onSave,
-                style: TextButton.styleFrom(
-                  foregroundColor:
-                      post.savedByMe ? FirstVueColors.gold : Colors.white70,
-                ),
-                icon: Icon(
-                  post.savedByMe
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_border,
-                  size: 18,
-                  color: post.savedByMe ? FirstVueColors.gold : Colors.white70,
-                ),
-                label: Text(post.savedByMe ? 'Saved' : 'Save'),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

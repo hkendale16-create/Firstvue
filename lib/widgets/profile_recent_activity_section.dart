@@ -246,6 +246,7 @@ class _ActivityTile extends StatelessWidget {
   IconData _iconForType(ProfileActivityType type) {
     return switch (type) {
       ProfileActivityType.newsPost => Icons.campaign_outlined,
+      ProfileActivityType.feedComment => Icons.chat_bubble_outline,
       ProfileActivityType.businessMedia => Icons.photo_library_outlined,
       ProfileActivityType.sparkGiven => Icons.bolt_outlined,
       ProfileActivityType.sparkReceived => Icons.bolt_rounded,

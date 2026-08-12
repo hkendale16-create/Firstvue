@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 enum ProfileActivityType {
   newsPost,
+  feedComment,
   businessMedia,
   sparkGiven,
   sparkReceived,
@@ -39,6 +40,7 @@ class ProfileActivityService {
     final perSource = (limit / 2).ceil().clamp(4, limit);
     final batches = await Future.wait([
       _fetchNewsPostsByAuthor(user.id, perSource),
+      _fetchFeedCommentsByAuthor(user.id, perSource),
       _fetchBusinessMediaForOwner(user.id, perSource),
       _fetchSparksGiven(user.id, perSource),
       _fetchSparksReceived(user.id, perSource),
@@ -78,14 +80,22 @@ class ProfileActivityService {
     try {
       final rows = await _client
           .from('community_news_posts')
-          .select('id, body, created_at, businesses(name)')
+          .select('id, body, created_at, business_id')
           .eq('author_id', userId)
           .order('created_at', ascending: false)
           .limit(limit);
 
+      final businessIds = rows
+          .map((row) => row['business_id'] as String?)
+          .whereType<String>()
+          .toSet()
+          .toList();
+      final businessNames = await _fetchBusinessNames(businessIds);
+
       return rows.map((row) {
-        final business = row['businesses'] as Map<String, dynamic>?;
-        final businessName = business?['name'] as String?;
+        final businessId = row['business_id'] as String?;
+        final businessName =
+            businessId == null ? null : businessNames[businessId];
         final body = _truncate(row['body'] as String);
         return ProfileActivityItem(
           type: ProfileActivityType.newsPost,
@@ -95,6 +105,50 @@ class ProfileActivityService {
           subtitle: body,
           createdAt: DateTime.parse(row['created_at'] as String),
           referenceId: row['id'] as String,
+        );
+      }).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<Map<String, String>> _fetchBusinessNames(
+    List<String> businessIds,
+  ) async {
+    if (businessIds.isEmpty) return {};
+    try {
+      final rows = await _client
+          .from('businesses')
+          .select('id, name')
+          .inFilter('id', businessIds);
+      return {
+        for (final row in rows)
+          row['id'] as String: row['name'] as String,
+      };
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<List<ProfileActivityItem>> _fetchFeedCommentsByAuthor(
+    String userId,
+    int limit,
+  ) async {
+    try {
+      final rows = await _client
+          .from('feed_comments')
+          .select('id, body, created_at, media_id')
+          .eq('author_id', userId)
+          .order('created_at', ascending: false)
+          .limit(limit);
+
+      return rows.map((row) {
+        return ProfileActivityItem(
+          type: ProfileActivityType.feedComment,
+          title: 'Commented on a post',
+          subtitle: _truncate(row['body'] as String),
+          createdAt: DateTime.parse(row['created_at'] as String),
+          referenceId: row['media_id'] as String?,
         );
       }).toList();
     } catch (_) {

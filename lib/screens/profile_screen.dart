@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'admin_rentals_screen.dart';
@@ -16,6 +17,7 @@ import 'my_businesses_screen.dart';
 import 'messages_inbox_screen.dart';
 import 'my_professional_profile_view_screen.dart';
 import '../services/admin_auth_service.dart';
+import '../widgets/profile_my_posts_section.dart';
 import '../widgets/profile_recent_activity_section.dart';
 import '../widgets/profile_saved_section.dart';
 
@@ -59,7 +61,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (user == null) {
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const AuthScreen()),
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
       );
     } else {
       await Supabase.instance.client.auth.signOut();
@@ -72,7 +74,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _open(Widget screen) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+    Navigator.push(context, FirstVuePageRoute(builder: (_) => screen));
   }
 
   @override
@@ -172,6 +174,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (user != null) ...[
             const SizedBox(height: 28),
             ProfileSavedSection(refreshToken: widget.refreshToken),
+            ProfileMyPostsSection(refreshToken: widget.refreshToken),
             ProfileRecentActivitySection(refreshToken: widget.refreshToken),
           ],
           const SizedBox(height: 10),
