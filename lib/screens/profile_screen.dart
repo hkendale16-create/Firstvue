@@ -641,13 +641,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 8),
               ProfileSavedSection(refreshToken: widget.refreshToken),
             ],
-            if (user != null)
-              ShoutoutsReceivedSection(
-                targetType: ShoutoutTargetType.profile,
-                targetId: user.id,
-                refreshToken: _effectiveRefreshToken,
-                title: 'SHOUTOUTS RECEIVED',
-              ),
+            ShoutoutsReceivedSection(
+              targetType: ShoutoutTargetType.profile,
+              targetId: user.id,
+              refreshToken: _effectiveRefreshToken,
+              title: 'SHOUTOUTS RECEIVED',
+            ),
           ],
           if (user == null) ...[
             const SizedBox(height: 16),
