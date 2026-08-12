@@ -37,4 +37,26 @@ void main() {
       expect(body, text);
     });
   });
+
+  group('CommunityNewsPost community attribution', () {
+    test('isCommunityPost is true when communityId is set', () {
+      final post = CommunityNewsPost(
+        id: '1',
+        body: 'Hello community',
+        authorId: 'a',
+        authorName: 'John Smith',
+        authorUsername: 'johnsmith',
+        businessName: null,
+        communityId: 'c1',
+        communityName: 'Atlanta Entrepreneurs',
+        createdAt: DateTime.utc(2026, 1, 1),
+        isMine: false,
+        sparkCount: 0,
+        sparkedByMe: false,
+        savedByMe: false,
+      );
+      expect(post.isCommunityPost, isTrue);
+      expect(post.communityName, 'Atlanta Entrepreneurs');
+    });
+  });
 }

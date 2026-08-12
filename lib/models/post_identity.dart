@@ -24,6 +24,8 @@ class PostIdentityOption {
         );
 
   bool get isPersonal => kind == PostIdentityKind.personal;
+  bool get isBusiness => kind == PostIdentityKind.business;
+  bool get isCommunity => kind == PostIdentityKind.community;
 
   String get storageKey {
     switch (kind) {
@@ -38,6 +40,40 @@ class PostIdentityOption {
 
   static PostIdentityOption? matchStoredKey(
     List<PostIdentityOption> options,
+    String? key,
+  ) {
+    if (key == null || key.isEmpty) return null;
+    for (final option in options) {
+      if (option.storageKey == key) return option;
+    }
+    return null;
+  }
+}
+
+/// Where a post is published (main feed vs a community group).
+class PostDestinationOption {
+  final String? communityId;
+  final String label;
+  final String? subtitle;
+
+  const PostDestinationOption({
+    this.communityId,
+    required this.label,
+    this.subtitle,
+  });
+
+  const PostDestinationOption.mainFeed()
+      : communityId = null,
+        label = 'News Feed',
+        subtitle = 'Everyone';
+
+  bool get isMainFeed => communityId == null || communityId!.isEmpty;
+
+  String get storageKey =>
+      isMainFeed ? 'feed' : 'community:${communityId ?? ''}';
+
+  static PostDestinationOption? matchStoredKey(
+    List<PostDestinationOption> options,
     String? key,
   ) {
     if (key == null || key.isEmpty) return null;

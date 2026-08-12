@@ -16,6 +16,7 @@ class CommunityNewsPostCard extends StatefulWidget {
   final CommunityNewsPost post;
   final VoidCallback? onTap;
   final VoidCallback? onAuthorTap;
+  final VoidCallback? onCommunityTap;
   final VoidCallback? onSpark;
   final VoidCallback? onSave;
   final VoidCallback? onComment;
@@ -30,6 +31,7 @@ class CommunityNewsPostCard extends StatefulWidget {
     required this.post,
     this.onTap,
     this.onAuthorTap,
+    this.onCommunityTap,
     this.onSpark,
     this.onSave,
     this.onComment,
@@ -114,16 +116,19 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      post.authorName,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: _isTimeline ? 15 : 14,
+                    child: GestureDetector(
+                      onTap: widget.onAuthorTap,
+                      child: Text(
+                        post.authorName,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: _isTimeline ? 15 : 14,
+                        ),
                       ),
                     ),
                   ),
-                  if (post.businessName != null)
+                  if (post.businessName != null && !post.isCommunityPost)
                     Padding(
                       padding: const EdgeInsets.only(left: 8),
                       child: Text(
@@ -138,11 +143,53 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
               ),
               if (post.authorUsername != null) ...[
                 const SizedBox(height: 2),
-                Text(
-                  '@${post.authorUsername}',
-                  style: TextStyle(
-                    color: FirstVueColors.teal.withValues(alpha: .75),
-                    fontSize: 11,
+                GestureDetector(
+                  onTap: widget.onAuthorTap,
+                  child: Text(
+                    '@${post.authorUsername}',
+                    style: TextStyle(
+                      color: FirstVueColors.teal.withValues(alpha: .75),
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
+              if (post.isCommunityPost && post.communityName != null) ...[
+                const SizedBox(height: 4),
+                GestureDetector(
+                  onTap: widget.onCommunityTap,
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 8,
+                        backgroundColor: FirstVueColors.elevatedSurface,
+                        backgroundImage: post.communityImageUrl != null &&
+                                post.communityImageUrl!.isNotEmpty
+                            ? NetworkImage(post.communityImageUrl!)
+                            : null,
+                        child: post.communityImageUrl == null ||
+                                post.communityImageUrl!.isEmpty
+                            ? const Icon(
+                                Icons.groups_rounded,
+                                size: 10,
+                                color: FirstVueColors.teal,
+                              )
+                            : null,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Posted in ${post.communityName}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: FirstVueColors.gold.withValues(alpha: .9),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

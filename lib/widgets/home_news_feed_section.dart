@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../navigation/firstvue_page_route.dart';
 import '../screens/auth_screen.dart';
+import '../screens/community_detail_screen.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../models/post_identity.dart';
 import '../services/community_news_service.dart';
@@ -40,6 +41,11 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
   RealtimeChannel? _newsChannel;
   List<PostIdentityOption> _identityOptions = const [];
   PostIdentityOption? _selectedIdentity;
+  List<PostDestinationOption> _destinationOptions = const [
+    PostDestinationOption.mainFeed(),
+  ];
+  PostDestinationOption _selectedDestination =
+      const PostDestinationOption.mainFeed();
 
   @override
   void initState() {
@@ -51,13 +57,27 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
 
   Future<void> _loadIdentityOptions() async {
     final options = await PostIdentityService.fetchOptions();
+    final destinations = await PostIdentityService.fetchDestinations();
     if (!mounted) return;
     final storedKey = await PostIdentityStore.loadSelectedKey();
     final restored = PostIdentityOption.matchStoredKey(options, storedKey);
+    // Legacy: if user previously stored a community identity, map it to destination.
+    PostDestinationOption destination = destinations.first;
+    if (storedKey != null && storedKey.startsWith('community:')) {
+      final matched = PostDestinationOption.matchStoredKey(
+        destinations,
+        storedKey,
+      );
+      if (matched != null) destination = matched;
+    }
     setState(() {
       _identityOptions = options;
       _selectedIdentity =
           restored ?? (options.isEmpty ? null : options.first);
+      _destinationOptions = destinations.isEmpty
+          ? const [PostDestinationOption.mainFeed()]
+          : destinations;
+      _selectedDestination = destination;
     });
   }
 
@@ -117,8 +137,12 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     try {
       final posts = await CommunityNewsService.fetchPosts();
       final postIds = posts.map((p) => p.id).toList();
-      final reposted = await RepostService.fetchMyRepostedIds(postIds);
-      final repostCounts = await RepostService.fetchRepostCounts(postIds);
+      Set<String> reposted = const {};
+      Map<String, int> repostCounts = const {};
+      try {
+        reposted = await RepostService.fetchMyRepostedIds(postIds);
+        repostCounts = await RepostService.fetchRepostCounts(postIds);
+      } catch (_) {}
       if (!mounted) return;
       setState(() {
         _posts = posts
@@ -163,7 +187,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
         newPost = await CommunityNewsService.createPost(
           text,
           businessId: identity?.businessId,
-          communityId: identity?.communityId,
+          communityId: _selectedDestination.communityId,
           files: _attachedMedia,
         );
       } on CommunityNewsMediaUploadException catch (error) {
@@ -500,7 +524,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
           children: [
             const Expanded(
               child: Text(
-                'COMMUNITY FEED',
+                'NEWS FEED',
                 style: TextStyle(
                   color: FirstVueColors.ivory,
                   fontSize: 14,
@@ -543,6 +567,13 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
                     PostIdentityStore.saveSelected(value);
                   },
                 ),
+              PostDestinationSelector(
+                options: _destinationOptions,
+                selected: _selectedDestination,
+                onChanged: (value) {
+                  setState(() => _selectedDestination = value);
+                },
+              ),
               TextField(
                 controller: _composer,
                 style: const TextStyle(color: Colors.white),
@@ -661,15 +692,19 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
             ),
           )
         else if (_posts.isEmpty)
-          const Text(
-            'Community posts will appear here.',
-            style: TextStyle(color: Colors.white54),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Text(
+              'No posts yet. Be the first to share something with FirstVue.',
+              style: TextStyle(color: Colors.white.withValues(alpha: .54)),
+            ),
           )
         else
           Column(
             children: [
               for (var index = 0; index < _posts.length; index++)
                 CommunityNewsPostCard(
+                  key: ValueKey('news-post-${_posts[index].id}'),
                   post: _posts[index],
                   style: CommunityNewsPostCardStyle.timeline,
                   onTap: () => CommunityNewsPostDetailSheet.show(
@@ -683,6 +718,18 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
                             profileId: _posts[index].authorId,
                             displayName: _posts[index].authorName,
                           )
+                      : null,
+                  onCommunityTap: _posts[index].communityId != null
+                      ? () {
+                          Navigator.push(
+                            context,
+                            FirstVuePageRoute(
+                              builder: (_) => CommunityDetailScreen(
+                                communityId: _posts[index].communityId!,
+                              ),
+                            ),
+                          );
+                        }
                       : null,
                   onSpark: () => _sparkPost(index),
                   onSave: () => _savePost(index),

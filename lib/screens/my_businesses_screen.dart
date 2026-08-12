@@ -293,6 +293,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
       );
       await _loadProfileImages();
       if (mounted) {
+        setState(() => _previewToken++);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Cover photo updated.')),
         );
@@ -319,6 +320,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
       );
       await _loadProfileImages();
       if (mounted) {
+        setState(() => _previewToken++);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Profile photo updated.')),
         );
@@ -457,9 +459,12 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
         files: files,
       );
       if (!mounted) return;
-      setState(
-        () => _media = BusinessMediaService.fetchMedia(widget.business.id),
-      );
+      setState(() {
+        _media = BusinessMediaService.fetchMedia(widget.business.id);
+        _previewToken++;
+      });
+      await _loadProfileImages();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -482,9 +487,11 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
     try {
       await BusinessMediaService.deleteMedia(media);
       if (mounted) {
-        setState(
-          () => _media = BusinessMediaService.fetchMedia(widget.business.id),
-        );
+        setState(() {
+          _media = BusinessMediaService.fetchMedia(widget.business.id);
+          _previewToken++;
+        });
+        await _loadProfileImages();
       }
     } catch (_) {
       if (mounted) {
@@ -492,6 +499,50 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
           const SnackBar(content: Text('Unable to delete this file.')),
         );
       }
+    }
+  }
+
+  Future<void> _removeAvatar() async {
+    setState(() => _profileMediaUpdating = true);
+    try {
+      await BusinessMediaService.removeAvatar(widget.business.id);
+      await _loadProfileImages();
+      if (mounted) {
+        setState(() => _previewToken++);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile photo removed.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to remove profile photo: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _profileMediaUpdating = false);
+    }
+  }
+
+  Future<void> _removeCover() async {
+    setState(() => _profileMediaUpdating = true);
+    try {
+      await BusinessMediaService.removeCover(widget.business.id);
+      await _loadProfileImages();
+      if (mounted) {
+        setState(() => _previewToken++);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cover photo removed.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to remove cover: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _profileMediaUpdating = false);
     }
   }
 
@@ -581,6 +632,10 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
           placeholderIcon: Icons.storefront_outlined,
           onChangeCover: _changeCover,
           onChangeAvatar: _changeAvatar,
+          onRemoveCover:
+              _profileImages.cover != null ? _removeCover : null,
+          onRemoveAvatar:
+              _profileImages.avatar != null ? _removeAvatar : null,
         ),
         const SizedBox(height: 24),
         _Field(controller: _about, label: 'About your business', lines: 4),
