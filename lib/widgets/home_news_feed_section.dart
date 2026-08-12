@@ -519,13 +519,8 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
           ],
         ),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: FirstVueColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: FirstVueColors.gold.withValues(alpha: .35)),
-          ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -643,7 +638,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
             ],
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
         if (_loadingPosts)
           const Center(
             child: Padding(

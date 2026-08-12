@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'activity_notifications_service.dart';
 import 'community_news_media_service.dart';
+import 'follow_service.dart';
 import 'post_metadata_service.dart';
 import 'saved_items_service.dart';
 
@@ -29,6 +30,7 @@ class CommunityNewsPost {
   final bool sparkedByMe;
   final bool savedByMe;
   final int repostCount;
+  final String visibility;
   final List<CommunityNewsMediaItem> media;
 
   const CommunityNewsPost({
@@ -44,6 +46,7 @@ class CommunityNewsPost {
     required this.sparkedByMe,
     required this.savedByMe,
     this.repostCount = 0,
+    this.visibility = 'public',
     this.media = const [],
   });
 
@@ -62,6 +65,7 @@ class CommunityNewsPost {
     bool? sparkedByMe,
     bool? savedByMe,
     int? repostCount,
+    String? visibility,
     List<CommunityNewsMediaItem>? media,
   }) {
     return CommunityNewsPost(
@@ -77,6 +81,7 @@ class CommunityNewsPost {
       sparkedByMe: sparkedByMe ?? this.sparkedByMe,
       savedByMe: savedByMe ?? this.savedByMe,
       repostCount: repostCount ?? this.repostCount,
+      visibility: visibility ?? this.visibility,
       media: media ?? this.media,
     );
   }
@@ -87,14 +92,89 @@ class CommunityNewsService {
 
   static final _client = Supabase.instance.client;
 
+  static const _postColumns =
+      'id, body, created_at, author_id, business_id, community_id, visibility';
+
+  static const _postColumnsBase =
+      'id, body, created_at, author_id, business_id, community_id';
+
+  static Future<List<dynamic>> _selectPosts(
+    void Function(dynamic query) configure,
+  ) async {
+    dynamic query = _client.from('community_news_posts');
+    configure(query);
+    try {
+      return await query.select(_postColumns);
+    } catch (_) {
+      query = _client.from('community_news_posts');
+      configure(query);
+      return await query.select(_postColumnsBase);
+    }
+  }
+
+  static Future<Map<String, dynamic>> _insertPostReturning(
+    Map<String, dynamic> insertPayload,
+  ) async {
+    try {
+      return await _client
+          .from('community_news_posts')
+          .insert(insertPayload)
+          .select(_postColumns)
+          .single();
+    } catch (_) {
+      return await _client
+          .from('community_news_posts')
+          .insert(insertPayload)
+          .select(_postColumnsBase)
+          .single();
+    }
+  }
+
+  static final _misleadingTeaserPattern = RegExp(
+    r'^follow(\s+(this\s+(account|profile|member|user)))?\s+(for|to(\s+see)?)\s+(more(\s+details)?|the(\s+full(\s+post)?)?)\.?$',
+    caseSensitive: false,
+  );
+
+  static bool isMisleadingFollowTeaser(String body) {
+    return _misleadingTeaserPattern.hasMatch(body.trim());
+  }
+
+  static String resolveDisplayBody({
+    required String rawBody,
+    required String visibility,
+    required bool isMine,
+    required bool followsAuthor,
+    required bool hasMedia,
+  }) {
+    final trimmed = rawBody.trim();
+    if (trimmed.isEmpty) return trimmed;
+
+    final teaser = isMisleadingFollowTeaser(trimmed);
+    final canViewFull = isMine ||
+        visibility == 'public' ||
+        (visibility == 'followers' && followsAuthor);
+
+    if (teaser && canViewFull && hasMedia) {
+      return '';
+    }
+
+    if (teaser && !canViewFull && visibility == 'followers') {
+      return 'Follow this member to see the full post.';
+    }
+
+    if (teaser && canViewFull) {
+      return '';
+    }
+
+    return trimmed;
+  }
+
   static Future<List<CommunityNewsPost>> fetchPosts({int limit = 20}) async {
     final me = _client.auth.currentUser?.id;
     // RLS returns approved posts plus the signed-in author's own posts.
-    final rows = await _client
-        .from('community_news_posts')
-        .select('id, body, created_at, author_id, business_id, community_id')
-        .order('created_at', ascending: false)
-        .limit(limit);
+    final rows = await _selectPosts(
+      (query) => query.order('created_at', ascending: false).limit(limit),
+    );
 
     return _mapPostRows(rows, currentUserId: me);
   }
@@ -105,12 +185,12 @@ class CommunityNewsService {
     if (me == null) return const [];
 
     try {
-      final rows = await _client
-          .from('community_news_posts')
-          .select('id, body, created_at, author_id, business_id, community_id')
-          .eq('author_id', me.id)
-          .order('created_at', ascending: false)
-          .limit(limit);
+      final rows = await _selectPosts(
+        (query) => query
+            .eq('author_id', me.id)
+            .order('created_at', ascending: false)
+            .limit(limit),
+      );
 
       return _mapPostRows(rows, currentUserId: me.id);
     } catch (_) {
@@ -155,12 +235,17 @@ class CommunityNewsService {
     final mediaByPost = await CommunityNewsMediaService.fetchMediaByPostIds(
       postIds,
     );
+    final followingAuthors = await _followingAuthorIds(
+      authorIds,
+      currentUserId: currentUserId,
+    );
 
     return rows.map((row) {
       final id = row['id'] as String;
       final authorId = row['author_id'] as String;
       final businessId = row['business_id'] as String?;
       final communityId = row['community_id'] as String?;
+      final visibility = (row['visibility'] as String?) ?? 'public';
       final createdRaw = row['created_at'];
       final createdAt = createdRaw is String
           ? DateTime.tryParse(createdRaw) ?? DateTime.now()
@@ -168,21 +253,52 @@ class CommunityNewsService {
       final contextName = businessId != null
           ? businessNames[businessId]
           : (communityId != null ? communityNames[communityId] : null);
+      final media = mediaByPost[id] ?? const [];
+      final isMine = authorId == currentUserId;
+      final followsAuthor = followingAuthors.contains(authorId);
+      final rawBody = (row['body'] as String?) ?? '';
+      final body = resolveDisplayBody(
+        rawBody: rawBody,
+        visibility: visibility,
+        isMine: isMine,
+        followsAuthor: followsAuthor,
+        hasMedia: media.isNotEmpty,
+      );
       return CommunityNewsPost(
         id: id,
-        body: (row['body'] as String?) ?? '',
+        body: body,
         authorId: authorId,
         authorName: authorNames[authorId] ?? 'FirstVue member',
         authorUsername: authorUsernames[authorId],
         businessName: contextName,
         createdAt: createdAt,
-        isMine: authorId == currentUserId,
+        isMine: isMine,
         sparkCount: sparkCounts[id] ?? 0,
         sparkedByMe: mySparks.contains(id),
         savedByMe: mySaves.contains(id),
-        media: mediaByPost[id] ?? const [],
+        visibility: visibility,
+        media: media,
       );
     }).toList();
+  }
+
+  static Future<Set<String>> _followingAuthorIds(
+    List<String> authorIds, {
+    required String? currentUserId,
+  }) async {
+    if (currentUserId == null || authorIds.isEmpty) return const {};
+    final others = authorIds.where((id) => id != currentUserId).toSet();
+    if (others.isEmpty) return const {};
+
+    final following = <String>{};
+    await Future.wait(
+      others.map((authorId) async {
+        if (await FollowService.isFollowing(authorId)) {
+          following.add(authorId);
+        }
+      }),
+    );
+    return following;
   }
 
   static String normalizePostId(String raw) {
@@ -337,11 +453,9 @@ class CommunityNewsService {
     final me = _client.auth.currentUser?.id;
 
     try {
-      final rows = await _client
-          .from('community_news_posts')
-          .select('id, body, created_at, author_id, business_id, community_id')
-          .eq('id', postId)
-          .limit(1);
+      final rows = await _selectPosts(
+        (query) => query.eq('id', postId).limit(1),
+      );
 
       if (rows.isNotEmpty) {
         final posts = await _mapPostRows(rows, currentUserId: me);
@@ -386,11 +500,7 @@ class CommunityNewsService {
     if (businessId != null) insertPayload['business_id'] = businessId;
     if (communityId != null) insertPayload['community_id'] = communityId;
 
-    final row = await _client
-        .from('community_news_posts')
-        .insert(insertPayload)
-        .select('id, body, created_at, author_id, business_id, community_id')
-        .single();
+    final row = await _insertPostReturning(insertPayload);
 
     final postId = row['id'] as String;
     await PostMetadataService.syncForPost(postId, trimmed);
@@ -433,6 +543,7 @@ class CommunityNewsService {
       sparkCount: 0,
       sparkedByMe: false,
       savedByMe: false,
+      visibility: (row['visibility'] as String?) ?? 'public',
       media: media,
     );
 
@@ -467,12 +578,12 @@ class CommunityNewsService {
     final me = _client.auth.currentUser?.id;
 
     try {
-      final rows = await _client
-          .from('community_news_posts')
-          .select('id, body, created_at, author_id, business_id, community_id')
-          .eq('author_id', authorId)
-          .order('created_at', ascending: false)
-          .limit(limit);
+      final rows = await _selectPosts(
+        (query) => query
+            .eq('author_id', authorId)
+            .order('created_at', ascending: false)
+            .limit(limit),
+      );
 
       return _mapPostRows(rows, currentUserId: me);
     } catch (_) {
