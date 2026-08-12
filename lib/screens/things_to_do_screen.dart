@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../services/event_social_service.dart';
 import '../services/things_to_do_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
@@ -195,71 +196,210 @@ class _ThingsToDoScreenState extends State<ThingsToDoScreen> {
               separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final event = events[index];
-                return Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: FirstVueColors.surface,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: FirstVueColors.coral.withValues(alpha: .35),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        event.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      if (event.businessName != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          event.businessName!,
-                          style: const TextStyle(
-                            color: FirstVueColors.gold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                      if (event.locationLabel != null) ...[
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.location_on_outlined,
-                              size: 14,
-                              color: Colors.white54,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              event.locationLabel!,
-                              style: const TextStyle(color: Colors.white54),
-                            ),
-                          ],
-                        ),
-                      ],
-                      if (event.description != null &&
-                          event.description!.trim().isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          event.description!,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                );
+                return _EventCard(event: event);
               },
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _EventCard extends StatefulWidget {
+  final CommunityEvent event;
+
+  const _EventCard({required this.event});
+
+  @override
+  State<_EventCard> createState() => _EventCardState();
+}
+
+class _EventCardState extends State<_EventCard> {
+  EventSocialState _state = const EventSocialState();
+  bool _loading = true;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final state = await EventSocialService.fetchState(widget.event.id);
+    if (!mounted) return;
+    setState(() {
+      _state = state;
+      _loading = false;
+    });
+  }
+
+  Future<void> _toggleFollow() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final next = await EventSocialService.toggleFollow(
+        widget.event.id,
+        following: !_state.following,
+      );
+      if (!mounted) return;
+      setState(() => _state = EventSocialState(
+            following: next,
+            attendance: _state.attendance,
+          ));
+    } on AuthException {
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to update event follow.')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _setAttendance(EventAttendanceStatus status) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      EventAttendanceStatus? next;
+      if (_state.attendance == status) {
+        await EventSocialService.clearAttendance(widget.event.id);
+        next = null;
+      } else {
+        next = await EventSocialService.setAttendance(widget.event.id, status);
+      }
+      if (!mounted) return;
+      setState(() => _state = EventSocialState(
+            following: _state.following,
+            attendance: next,
+          ));
+    } on AuthException {
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to update RSVP.')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final event = widget.event;
+    final isPrototype = event.id.startsWith('proto-');
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: FirstVueColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: FirstVueColors.coral.withValues(alpha: .35),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            event.title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+          if (event.businessName != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              event.businessName!,
+              style: const TextStyle(
+                color: FirstVueColors.gold,
+                fontSize: 12,
+              ),
+            ),
+          ],
+          if (event.locationLabel != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 14,
+                  color: Colors.white54,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  event.locationLabel!,
+                  style: const TextStyle(color: Colors.white54),
+                ),
+              ],
+            ),
+          ],
+          if (event.description != null &&
+              event.description!.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              event.description!,
+              style: const TextStyle(
+                color: Colors.white70,
+                height: 1.4,
+              ),
+            ),
+          ],
+          if (!isPrototype) ...[
+            const SizedBox(height: 14),
+            if (_loading)
+              const LinearProgressIndicator(color: FirstVueColors.teal)
+            else ...[
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _toggleFollow,
+                    icon: Icon(
+                      _state.following
+                          ? Icons.notifications_active_outlined
+                          : Icons.notifications_none_outlined,
+                      size: 16,
+                    ),
+                    label: Text(_state.following ? 'Following' : 'Follow'),
+                  ),
+                  FilterChip(
+                    label: const Text('Going'),
+                    selected:
+                        _state.attendance == EventAttendanceStatus.attending,
+                    onSelected: _busy
+                        ? null
+                        : (_) => _setAttendance(EventAttendanceStatus.attending),
+                  ),
+                  FilterChip(
+                    label: const Text('Interested'),
+                    selected:
+                        _state.attendance == EventAttendanceStatus.interested,
+                    onSelected: _busy
+                        ? null
+                        : (_) =>
+                            _setAttendance(EventAttendanceStatus.interested),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ],
       ),
     );
   }

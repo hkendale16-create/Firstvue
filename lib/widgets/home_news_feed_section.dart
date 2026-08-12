@@ -5,7 +5,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../screens/auth_screen.dart';
 import '../screens/member_public_profile_screen.dart';
+import '../models/post_identity.dart';
 import '../services/community_news_service.dart';
+import '../services/post_identity_service.dart';
 import '../services/repost_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../utils/app_environment.dart';
@@ -13,6 +15,7 @@ import 'community_news_post_card.dart';
 import 'community_news_post_detail_sheet.dart';
 import 'feed_comments_sheet.dart';
 import 'local_media_thumbnail.dart';
+import 'post_identity_selector.dart';
 import 'media_picker_sheet.dart';
 
 class HomeNewsFeedSection extends StatefulWidget {
@@ -33,12 +36,24 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
   bool _posting = false;
   List<XFile> _attachedMedia = const [];
   RealtimeChannel? _newsChannel;
+  List<PostIdentityOption> _identityOptions = const [];
+  PostIdentityOption? _selectedIdentity;
 
   @override
   void initState() {
     super.initState();
     _loadPosts();
+    _loadIdentityOptions();
     _subscribeToNewsFeed();
+  }
+
+  Future<void> _loadIdentityOptions() async {
+    final options = await PostIdentityService.fetchOptions();
+    if (!mounted) return;
+    setState(() {
+      _identityOptions = options;
+      _selectedIdentity = options.isEmpty ? null : options.first;
+    });
   }
 
   @override
@@ -135,8 +150,11 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
       final hadMedia = _attachedMedia.isNotEmpty;
       CommunityNewsPost newPost;
       try {
+        final identity = _selectedIdentity;
         newPost = await CommunityNewsService.createPost(
           text,
+          businessId: identity?.businessId,
+          communityId: identity?.communityId,
           files: _attachedMedia,
         );
       } on CommunityNewsMediaUploadException catch (error) {
@@ -425,12 +443,20 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
                 ),
               ),
               const SizedBox(height: 8),
+              if (_identityOptions.isNotEmpty && _selectedIdentity != null)
+                PostIdentitySelector(
+                  options: _identityOptions,
+                  selected: _selectedIdentity!,
+                  onChanged: (value) =>
+                      setState(() => _selectedIdentity = value),
+                ),
               TextField(
                 controller: _composer,
                 style: const TextStyle(color: Colors.white),
                 maxLines: 3,
                 decoration: InputDecoration(
-                  hintText: 'Share news, updates, or shoutouts with the community...',
+                  hintText:
+                      'Share news… Use #hashtags and @usernames in your post.',
                   hintStyle: TextStyle(color: Colors.white.withValues(alpha: .38)),
                   filled: true,
                   fillColor: FirstVueColors.elevatedSurface,

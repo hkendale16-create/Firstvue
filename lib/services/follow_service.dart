@@ -25,6 +25,22 @@ class FollowProfile {
 
 enum FollowStatus { notFollowing, following, pending }
 
+class FollowRequestItem {
+  final String id;
+  final String requesterId;
+  final String displayName;
+  final String? username;
+  final DateTime createdAt;
+
+  const FollowRequestItem({
+    required this.id,
+    required this.requesterId,
+    required this.displayName,
+    this.username,
+    required this.createdAt,
+  });
+}
+
 class FollowService {
   FollowService._();
 
@@ -282,5 +298,90 @@ class FollowService {
     } catch (_) {
       return const [];
     }
+  }
+
+  static Future<List<FollowRequestItem>> fetchPendingIncoming() async {
+    final me = _client.auth.currentUser;
+    if (me == null) return const [];
+
+    try {
+      final rows = await _client
+          .from('follow_requests')
+          .select('id, requester_id, created_at')
+          .eq('target_id', me.id)
+          .eq('status', 'pending')
+          .order('created_at', ascending: false)
+          .limit(30);
+
+      if (rows.isEmpty) return const [];
+
+      final requesterIds =
+          rows.map((row) => row['requester_id'] as String).toList();
+      final profiles = await _fetchProfilesByIds(requesterIds);
+      final profileById = {for (final p in profiles) p.id: p};
+
+      return rows.map((row) {
+        final requesterId = row['requester_id'] as String;
+        final profile = profileById[requesterId];
+        final createdRaw = row['created_at'];
+        return FollowRequestItem(
+          id: row['id'] as String,
+          requesterId: requesterId,
+          displayName: profile?.displayName ?? 'FirstVue member',
+          username: profile?.username,
+          createdAt: createdRaw is String
+              ? DateTime.tryParse(createdRaw) ?? DateTime.now()
+              : DateTime.now(),
+        );
+      }).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<void> acceptRequest(String requestId) async {
+    final me = _client.auth.currentUser;
+    if (me == null) throw const AuthException('Sign in to manage requests.');
+
+    final request = await _client
+        .from('follow_requests')
+        .select('id, requester_id, target_id, status')
+        .eq('id', requestId)
+        .eq('target_id', me.id)
+        .eq('status', 'pending')
+        .maybeSingle();
+
+    if (request == null) return;
+
+    final requesterId = request['requester_id'] as String;
+
+    await _client.from('follow_requests').update({
+      'status': 'accepted',
+      'responded_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', requestId);
+
+    try {
+      await _client.from('profile_follows').insert({
+        'follower_id': requesterId,
+        'following_id': me.id,
+      });
+    } on PostgrestException catch (error) {
+      if (error.code != '23505') rethrow;
+    }
+  }
+
+  static Future<void> declineRequest(String requestId) async {
+    final me = _client.auth.currentUser;
+    if (me == null) throw const AuthException('Sign in to manage requests.');
+
+    await _client
+        .from('follow_requests')
+        .update({
+          'status': 'declined',
+          'responded_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', requestId)
+        .eq('target_id', me.id)
+        .eq('status', 'pending');
   }
 }

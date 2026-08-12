@@ -18,6 +18,7 @@ import '../widgets/profile_saved_section.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../config/app_config.dart';
 import '../widgets/firstvue_share_sheet.dart';
+import '../widgets/follow_requests_section.dart';
 import '../widgets/firstvue_settings_drawer.dart';
 import '../models/share_payload.dart';
 
@@ -407,6 +408,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.zero,
           children: [
+          if (user != null)
+            FollowRequestsSection(
+              onChanged: () {
+                _loadStats();
+                setState(() => _pullRefreshToken++);
+              },
+            ),
           Stack(
             children: [
               FacebookStyleProfileHeader(

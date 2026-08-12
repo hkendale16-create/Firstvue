@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'activity_notifications_service.dart';
 import 'community_news_media_service.dart';
+import 'post_metadata_service.dart';
 import 'saved_items_service.dart';
 
 class ProfileEngagementStats {
@@ -87,7 +88,7 @@ class CommunityNewsService {
     // RLS returns approved posts plus the signed-in author's own posts.
     final rows = await _client
         .from('community_news_posts')
-        .select('id, body, created_at, author_id, business_id')
+        .select('id, body, created_at, author_id, business_id, community_id')
         .order('created_at', ascending: false)
         .limit(limit);
 
@@ -102,7 +103,7 @@ class CommunityNewsService {
     try {
       final rows = await _client
           .from('community_news_posts')
-          .select('id, body, created_at, author_id, business_id')
+          .select('id, body, created_at, author_id, business_id, community_id')
           .eq('author_id', me.id)
           .order('created_at', ascending: false)
           .limit(limit);
@@ -127,10 +128,16 @@ class CommunityNewsService {
         .whereType<String>()
         .toSet()
         .toList();
+    final communityIds = rows
+        .map((row) => row['community_id'] as String?)
+        .whereType<String>()
+        .toSet()
+        .toList();
 
     final authorNames = await _fetchProfileNames(authorIds);
     final authorUsernames = await _fetchProfileUsernames(authorIds);
     final businessNames = await _fetchBusinessNames(businessIds);
+    final communityNames = await _fetchCommunityNames(communityIds);
     final sparkCounts = await _fetchSparkCounts(postIds);
     final mySparks = currentUserId == null
         ? const <String>{}
@@ -149,18 +156,21 @@ class CommunityNewsService {
       final id = row['id'] as String;
       final authorId = row['author_id'] as String;
       final businessId = row['business_id'] as String?;
+      final communityId = row['community_id'] as String?;
       final createdRaw = row['created_at'];
       final createdAt = createdRaw is String
           ? DateTime.tryParse(createdRaw) ?? DateTime.now()
           : DateTime.now();
+      final contextName = businessId != null
+          ? businessNames[businessId]
+          : (communityId != null ? communityNames[communityId] : null);
       return CommunityNewsPost(
         id: id,
         body: (row['body'] as String?) ?? '',
         authorId: authorId,
         authorName: authorNames[authorId] ?? 'FirstVue member',
         authorUsername: authorUsernames[authorId],
-        businessName:
-            businessId == null ? null : businessNames[businessId],
+        businessName: contextName,
         createdAt: createdAt,
         isMine: authorId == currentUserId,
         sparkCount: sparkCounts[id] ?? 0,
@@ -227,6 +237,24 @@ class CommunityNewsService {
           .from('businesses')
           .select('id, name')
           .inFilter('id', businessIds);
+      return {
+        for (final row in rows)
+          row['id'] as String: row['name'] as String,
+      };
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<Map<String, String>> _fetchCommunityNames(
+    List<String> communityIds,
+  ) async {
+    if (communityIds.isEmpty) return {};
+    try {
+      final rows = await _client
+          .from('communities')
+          .select('id, name')
+          .inFilter('id', communityIds);
       return {
         for (final row in rows)
           row['id'] as String: row['name'] as String,
@@ -303,7 +331,7 @@ class CommunityNewsService {
     try {
       final rows = await _client
           .from('community_news_posts')
-          .select('id, body, created_at, author_id, business_id')
+          .select('id, body, created_at, author_id, business_id, community_id')
           .eq('id', postId)
           .limit(1);
 
@@ -330,6 +358,7 @@ class CommunityNewsService {
   static Future<CommunityNewsPost> createPost(
     String body, {
     String? businessId,
+    String? communityId,
     List<XFile> files = const [],
   }) async {
     final me = _client.auth.currentUser;
@@ -341,18 +370,23 @@ class CommunityNewsService {
 
     await _ensureProfile(me);
 
+    final insertPayload = <String, dynamic>{
+      'author_id': me.id,
+      'body': trimmed,
+      'status': 'approved',
+    };
+    if (businessId != null) insertPayload['business_id'] = businessId;
+    if (communityId != null) insertPayload['community_id'] = communityId;
+
     final row = await _client
         .from('community_news_posts')
-        .insert({
-          'author_id': me.id,
-          'business_id': businessId,
-          'body': trimmed,
-          'status': 'approved',
-        })
-        .select('id, body, created_at, author_id, business_id')
+        .insert(insertPayload)
+        .select('id, body, created_at, author_id, business_id, community_id')
         .single();
 
     final postId = row['id'] as String;
+    await PostMetadataService.syncForPost(postId, trimmed);
+
     var media = const <CommunityNewsMediaItem>[];
     Object? mediaError;
     if (files.isNotEmpty) {
@@ -369,9 +403,15 @@ class CommunityNewsService {
     final authorNames = await _fetchProfileNames([me.id]);
     final authorUsernames = await _fetchProfileUsernames([me.id]);
     final insertedBusinessId = row['business_id'] as String?;
-    final businessNames = insertedBusinessId == null
-        ? const <String, String>{}
-        : await _fetchBusinessNames([insertedBusinessId]);
+    final insertedCommunityId = row['community_id'] as String?;
+    String? contextName;
+    if (insertedBusinessId != null) {
+      contextName =
+          (await _fetchBusinessNames([insertedBusinessId]))[insertedBusinessId];
+    } else if (insertedCommunityId != null) {
+      contextName =
+          (await _fetchCommunityNames([insertedCommunityId]))[insertedCommunityId];
+    }
 
     final post = CommunityNewsPost(
       id: postId,
@@ -379,9 +419,7 @@ class CommunityNewsService {
       authorId: me.id,
       authorName: authorNames[me.id] ?? 'FirstVue member',
       authorUsername: authorUsernames[me.id],
-      businessName: insertedBusinessId == null
-          ? null
-          : businessNames[insertedBusinessId],
+      businessName: contextName,
       createdAt: DateTime.parse(row['created_at'] as String),
       isMine: true,
       sparkCount: 0,
@@ -423,7 +461,7 @@ class CommunityNewsService {
     try {
       final rows = await _client
           .from('community_news_posts')
-          .select('id, body, created_at, author_id, business_id')
+          .select('id, body, created_at, author_id, business_id, community_id')
           .eq('author_id', authorId)
           .order('created_at', ascending: false)
           .limit(limit);
