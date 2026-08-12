@@ -11,6 +11,8 @@ import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/firstvue_inline_search_bar.dart';
 import '../widgets/portfolio_albums_section.dart';
 import '../widgets/signed_media_viewer.dart';
+import '../widgets/shoutout_card.dart';
+import '../services/shoutout_service.dart';
 
 class ProfessionalPublicProfileScreen extends StatefulWidget {
   final ProfessionalProfile profile;
@@ -326,6 +328,10 @@ class _ProfessionalPublicProfileScreenState
                   EntityProfileFeedSection(
                     scope: EntityFeedScope.professional,
                     entityId: profile.id,
+                  ),
+                  ShoutoutsReceivedSection(
+                    targetType: ShoutoutTargetType.professional,
+                    targetId: profile.id,
                   ),
                   const SizedBox(height: 28),
                   Container(

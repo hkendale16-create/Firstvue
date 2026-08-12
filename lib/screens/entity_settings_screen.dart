@@ -260,7 +260,7 @@ class _EntitySettingsScreenState extends State<EntitySettingsScreen> {
                 icon: Icons.groups_outlined,
                 title: 'Browse groups & communities',
                 onTap: () => _requireAuthThen(
-                  () => _open(const CommunitiesScreen()),
+                  () => _open(const CommunitiesScreen(allowCreate: true)),
                 ),
               ),
               _tile(

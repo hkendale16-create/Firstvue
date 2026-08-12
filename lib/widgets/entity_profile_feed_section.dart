@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../navigation/firstvue_page_route.dart';
 import '../screens/auth_screen.dart';
+import '../screens/create_post_screen.dart';
 import '../services/community_news_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'community_news_post_card.dart';
 import 'community_news_post_detail_sheet.dart';
 import 'feed_comments_sheet.dart';
-import 'profile_composer_media_actions.dart';
 import 'profile_recent_activity_section.dart';
 
 enum EntityFeedScope { user, business, professional, event, community }
@@ -44,9 +43,6 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
   int _selectedTab = 0;
   late Future<List<CommunityNewsPost>> _postsFuture;
   List<CommunityNewsPost> _posts = const [];
-  final _composer = TextEditingController();
-  List<XFile> _attachedMedia = const [];
-  bool _posting = false;
 
   @override
   void initState() {
@@ -63,12 +59,6 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
         oldWidget.scope != widget.scope) {
       _postsFuture = _loadPosts();
     }
-  }
-
-  @override
-  void dispose() {
-    _composer.dispose();
-    super.dispose();
   }
 
   Future<List<CommunityNewsPost>> _loadPosts() async {
@@ -100,7 +90,7 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
     await _postsFuture;
   }
 
-  Future<void> _submitPost() async {
+  Future<void> _openCreatePost() async {
     if (Supabase.instance.client.auth.currentUser == null) {
       await Navigator.push(
         context,
@@ -109,75 +99,36 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
       return;
     }
 
-    final text = _composer.text.trim();
-    if ((text.isEmpty && _attachedMedia.isEmpty) || _posting) return;
-
-    setState(() => _posting = true);
-    try {
-      CommunityNewsPost newPost;
-      try {
-        newPost = await switch (widget.scope) {
-          EntityFeedScope.business => CommunityNewsService.createPost(
-              text,
-              businessId: widget.entityId,
-              files: _attachedMedia,
-            ),
-          EntityFeedScope.professional => CommunityNewsService.createPost(
-              text,
-              professionalProfileId: widget.entityId,
-              files: _attachedMedia,
-            ),
-          EntityFeedScope.event => CommunityNewsService.createPost(
-              text,
-              eventId: widget.entityId,
-              files: _attachedMedia,
-            ),
-          EntityFeedScope.community => CommunityNewsService.createPost(
-              text,
-              communityId: widget.entityId,
-              files: _attachedMedia,
-            ),
-          EntityFeedScope.user => CommunityNewsService.createPost(
-              text,
-              files: _attachedMedia,
-            ),
-        };
-      } on CommunityNewsMediaUploadException catch (error) {
-        newPost = error.post;
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Post saved but media failed: ${error.cause}')),
-          );
-        }
-      }
-
-      _composer.clear();
-      if (!mounted) return;
-      setState(() {
-        _attachedMedia = const [];
-        _posts = [
-          newPost,
-          for (final post in _posts)
-            if (post.id != newPost.id) post,
-        ];
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Post published.')),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            error is AuthException
-                ? 'Sign in to post.'
-                : 'Unable to post right now.',
-          ),
+    final result = await Navigator.push<CommunityNewsPost>(
+      context,
+      FirstVuePageRoute(
+        builder: (_) => CreatePostScreen(
+          businessId: widget.scope == EntityFeedScope.business
+              ? widget.entityId
+              : null,
+          professionalProfileId: widget.scope == EntityFeedScope.professional
+              ? widget.entityId
+              : null,
+          communityId: widget.scope == EntityFeedScope.community
+              ? widget.entityId
+              : null,
+          eventId:
+              widget.scope == EntityFeedScope.event ? widget.entityId : null,
+          lockIdentity: widget.scope != EntityFeedScope.user,
         ),
-      );
-    } finally {
-      if (mounted) setState(() => _posting = false);
-    }
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _posts = [
+        result,
+        for (final post in _posts)
+          if (post.id != result.id) post,
+      ];
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Post published.')),
+    );
   }
 
   Future<void> _sparkPost(int index) async {
@@ -267,50 +218,39 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
             ),
           ),
           const SizedBox(height: 10),
-          TextField(
-            controller: _composer,
-            style: const TextStyle(color: Colors.white),
-            maxLines: 3,
-            decoration: InputDecoration(
-              hintText: 'Share news, links, photos, or videos…',
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: .38)),
-              filled: true,
-              fillColor: FirstVueColors.elevatedSurface,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _openCreatePost,
+              borderRadius: BorderRadius.circular(12),
+              child: Ink(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: FirstVueColors.elevatedSurface,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Share news, links, photos, or videos…',
+                  style: TextStyle(color: Colors.white.withValues(alpha: .38)),
+                ),
               ),
             ),
           ),
-          if (_attachedMedia.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              '${_attachedMedia.length} file${_attachedMedia.length == 1 ? '' : 's'} attached',
-              style: const TextStyle(color: Colors.white54, fontSize: 12),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton(
+              onPressed: _openCreatePost,
+              style: FilledButton.styleFrom(
+                backgroundColor: FirstVueColors.gold,
+                foregroundColor: Colors.black,
+              ),
+              child: const Text('Create post'),
             ),
-          ],
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: ProfileComposerMediaActions(
-                  enabled: !_posting,
-                  onMediaPicked: (files) {
-                    setState(
-                      () => _attachedMedia = [..._attachedMedia, ...files],
-                    );
-                  },
-                ),
-              ),
-              FilledButton(
-                onPressed: _posting ? null : _submitPost,
-                style: FilledButton.styleFrom(
-                  backgroundColor: FirstVueColors.gold,
-                  foregroundColor: Colors.black,
-                ),
-                child: Text(_posting ? 'Posting…' : 'Post'),
-              ),
-            ],
           ),
         ],
       ),

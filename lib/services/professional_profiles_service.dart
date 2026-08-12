@@ -106,6 +106,20 @@ class ProfessionalProfilesService {
     return row == null ? null : ProfessionalProfile.fromMap(row);
   }
 
+  static Future<ProfessionalProfile?> fetchById(String id) async {
+    if (id.trim().isEmpty) return null;
+    try {
+      final row = await _client
+          .from('professional_profiles')
+          .select()
+          .eq('id', id)
+          .maybeSingle();
+      return row == null ? null : ProfessionalProfile.fromMap(row);
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<void> saveMine({
     required String displayName,
     required ProfessionalType type,

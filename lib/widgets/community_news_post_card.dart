@@ -124,7 +124,7 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
                     child: Text(
                       post.authorName,
                       style: TextStyle(
-                        color: Colors.white,
+                        color: context.fv.primaryText,
                         fontWeight: FontWeight.w700,
                         fontSize: _isTimeline ? 15 : 14,
                       ),
@@ -196,7 +196,7 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
               Text(
                 ProfileActivityService.formatRelativeTime(post.createdAt),
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: .4),
+                  color: context.fv.tertiaryText,
                   fontSize: 11,
                 ),
               ),
@@ -206,7 +206,7 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
         if (widget.onDelete != null)
           IconButton(
             onPressed: widget.onDelete,
-            icon: const Icon(Icons.more_horiz, color: Colors.white54),
+            icon: Icon(Icons.more_horiz, color: context.fv.secondaryText),
             visualDensity: VisualDensity.compact,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
@@ -236,22 +236,48 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
   }
 
   Widget _buildPostContent() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (post.body.isNotEmpty) ...[
-          SizedBox(height: _isTimeline ? 10 : 8),
-          Padding(
+    final bgFill = CommunityNewsPost.backgroundFill(post.backgroundColor);
+    final bodyText = post.body.isNotEmpty
+        ? Padding(
             padding: EdgeInsets.symmetric(horizontal: _isTimeline ? 0 : 14),
             child: SocialRichText(
               text: post.body,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: .92),
+                color: context.fv.primaryText,
                 height: 1.45,
                 fontSize: _isTimeline ? 15 : 14,
               ),
             ),
-          ),
+          )
+        : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (bodyText != null) ...[
+          SizedBox(height: _isTimeline ? 10 : 8),
+          if (bgFill != null)
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: _isTimeline ? 0 : 14),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: bgFill,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: SocialRichText(
+                  text: post.body,
+                  style: TextStyle(
+                    color: context.fv.primaryText,
+                    height: 1.45,
+                    fontSize: _isTimeline ? 15 : 14,
+                  ),
+                ),
+              ),
+            )
+          else
+            bodyText,
         ],
         if (post.media.isNotEmpty) ...[
           SizedBox(height: _isTimeline ? 12 : 10),
@@ -274,7 +300,7 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
             child: Text(
               '${post.sparkCount} spark${post.sparkCount == 1 ? '' : 's'}',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: .45),
+                color: context.fv.tertiaryText,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
@@ -377,7 +403,7 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
           _buildPostActions(),
           _buildSparkPreview(),
           const SizedBox(height: 14),
-          Divider(height: 1, color: Colors.white.withValues(alpha: .08)),
+          Divider(height: 1, color: context.fv.borderSubtle),
         ],
       );
     }
@@ -441,7 +467,7 @@ class _ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = active
         ? (activeColor ?? FirstVueColors.gold)
-        : Colors.white.withValues(alpha: .65);
+        : context.fv.secondaryText;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -547,7 +573,7 @@ class _SparkAvatarStripState extends State<_SparkAvatarStrip> {
             Text(
               '+$extra',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: .55),
+                color: context.fv.secondaryText,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -706,11 +732,11 @@ Future<bool> confirmDeleteNewsPost(
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xFF10151B),
-      title: const Text('Delete post?', style: TextStyle(color: Colors.white)),
-      content: const Text(
+      backgroundColor: ctx.fv.surface,
+      title: Text('Delete post?', style: TextStyle(color: ctx.fv.primaryText)),
+      content: Text(
         'This removes your post and any attached photos or videos. This cannot be undone.',
-        style: TextStyle(color: Colors.white70),
+        style: TextStyle(color: ctx.fv.secondaryText),
       ),
       actions: [
         TextButton(

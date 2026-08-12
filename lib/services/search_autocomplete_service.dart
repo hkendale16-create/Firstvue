@@ -40,6 +40,8 @@ class SearchAutocompleteService {
     if (UsernameService.isUsernameQuery(trimmed)) {
       final handlePrefix = UsernameService.autocompletePrefix(trimmed);
       if (handlePrefix == null) return const [];
+      final handles = await _searchEntityHandles(handlePrefix);
+      if (handles.isNotEmpty) return handles;
       return _searchUsernames(handlePrefix);
     }
 
@@ -51,6 +53,7 @@ class SearchAutocompleteService {
     results.addAll(await _searchCommunities(lower));
     results.addAll(await _searchCommunityHubs(lower));
     results.addAll(await _searchHashtags(lower));
+    results.addAll(await _searchEntityHandles(lower));
 
     return results;
   }
@@ -127,12 +130,14 @@ class SearchAutocompleteService {
     try {
       final rows = await _client
           .from('businesses')
-          .select('id, name, business_type')
+          .select('id, name, business_type, services')
           .eq('status', 'approved')
-          .ilike('name', '$prefix%')
+          .or(
+            'name.ilike.%$prefix%,business_type.ilike.%$prefix%',
+          )
           .limit(8);
 
-      return rows
+      var results = rows
           .map(
             (row) => SearchAutocompleteResult(
               id: row['id'] as String,
@@ -142,6 +147,94 @@ class SearchAutocompleteService {
             ),
           )
           .toList();
+
+      // Also match services arrays client-side when name/type didn't fill the limit.
+      if (results.length < 8) {
+        try {
+          final serviceRows = await _client
+              .from('businesses')
+              .select('id, name, business_type, services')
+              .eq('status', 'approved')
+              .limit(40);
+          final existing = results.map((r) => r.id).toSet();
+          final lower = prefix.toLowerCase();
+          for (final row in serviceRows) {
+            if (results.length >= 8) break;
+            final id = row['id'] as String;
+            if (existing.contains(id)) continue;
+            final services = List<String>.from(
+              (row['services'] as List?) ?? const [],
+            );
+            final hit = services.any(
+              (service) => service.toLowerCase().contains(lower),
+            );
+            if (!hit) continue;
+            results.add(
+              SearchAutocompleteResult(
+                id: id,
+                label: row['name'] as String,
+                subtitle: row['business_type'] as String?,
+                type: SearchResultType.business,
+              ),
+            );
+          }
+        } catch (_) {}
+      }
+
+      return results.take(8).toList();
+    } catch (_) {
+      try {
+        final rows = await _client
+            .from('businesses')
+            .select('id, name, business_type')
+            .eq('status', 'approved')
+            .ilike('name', '%$prefix%')
+            .limit(8);
+        return rows
+            .map(
+              (row) => SearchAutocompleteResult(
+                id: row['id'] as String,
+                label: row['name'] as String,
+                subtitle: row['business_type'] as String?,
+                type: SearchResultType.business,
+              ),
+            )
+            .toList();
+      } catch (_) {
+        return const [];
+      }
+    }
+  }
+
+  static Future<List<SearchAutocompleteResult>> _searchEntityHandles(
+    String prefix,
+  ) async {
+    try {
+      final rows = await _client.rpc(
+        'suggest_entity_handles',
+        params: {'prefix': prefix, 'lim': 6},
+      );
+      if (rows is! List) return const [];
+      return rows.map((raw) {
+        final row = Map<String, dynamic>.from(raw as Map);
+        final handle = (row['handle'] as String?) ?? '';
+        final displayName = row['display_name'] as String?;
+        final entityType = row['entity_type'] as String? ?? 'user';
+        final type = switch (entityType) {
+          'business' => SearchResultType.business,
+          'community' => SearchResultType.communityHub,
+          'group' => SearchResultType.community,
+          _ => SearchResultType.profile,
+        };
+        return SearchAutocompleteResult(
+          id: (row['entity_id'] as String?) ?? handle,
+          label: handle.startsWith('@') ? handle : '@$handle',
+          subtitle: displayName == null
+              ? entityType
+              : '$displayName · $entityType',
+          type: type,
+        );
+      }).toList();
     } catch (_) {
       return const [];
     }
