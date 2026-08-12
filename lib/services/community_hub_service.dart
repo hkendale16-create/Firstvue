@@ -367,7 +367,7 @@ class CommunityHubService {
               query.order('created_at', ascending: false).limit(limit),
         );
       }
-      return _resolveHubImages(rows.map(CommunityHub.fromRow).toList());
+      return await _resolveHubImages(rows.map(CommunityHub.fromRow).toList());
     } catch (_) {
       return const [];
     }
@@ -380,7 +380,7 @@ class CommunityHubService {
         configure: (query) => query.eq('id', id).limit(1),
       );
       if (rows.isEmpty) return null;
-      return CommunityHub.fromRow(rows.first).withResolvedImages();
+      return await CommunityHub.fromRow(rows.first).withResolvedImages();
     } catch (_) {
       return null;
     }
@@ -395,7 +395,7 @@ class CommunityHubService {
       final hasState = state != null && state.isNotEmpty;
 
       if (!hasCity && !hasState) {
-        return fetchHubs(limit: limit);
+        return await fetchHubs(limit: limit);
       }
 
       Future<List<Map<String, dynamic>>> runNearby({
@@ -427,11 +427,11 @@ class CommunityHubService {
       }
 
       if (rows.isEmpty) {
-        return fetchHubs(limit: limit);
+        return await fetchHubs(limit: limit);
       }
-      return _resolveHubImages(rows.map(CommunityHub.fromRow).toList());
+      return await _resolveHubImages(rows.map(CommunityHub.fromRow).toList());
     } catch (_) {
-      return fetchHubs(limit: limit);
+      return await fetchHubs(limit: limit);
     }
   }
 
@@ -511,7 +511,7 @@ class CommunityHubService {
       if (error.code != '23505') rethrow;
     }
 
-    return CommunityHub.fromRow(row).withResolvedImages();
+    return await CommunityHub.fromRow(row).withResolvedImages();
   }
 
   static Future<CommunityHub> updateHub({
@@ -555,7 +555,7 @@ class CommunityHubService {
           .eq('id', hubId)
           .select(_columns)
           .single();
-      return CommunityHub.fromRow(row).withResolvedImages();
+      return await CommunityHub.fromRow(row).withResolvedImages();
     } catch (_) {
       patch.remove('cover_url');
       patch.remove('status');
@@ -566,7 +566,7 @@ class CommunityHubService {
           .eq('id', hubId)
           .select(_columnsLegacy)
           .single();
-      return CommunityHub.fromRow(row).withResolvedImages();
+      return await CommunityHub.fromRow(row).withResolvedImages();
     }
   }
 
@@ -589,7 +589,7 @@ class CommunityHubService {
           .eq('id', hubId)
           .select(_columns)
           .single();
-      return CommunityHub.fromRow(row).withResolvedImages();
+      return await CommunityHub.fromRow(row).withResolvedImages();
     } catch (_) {
       patch.remove('image_storage_path');
       patch.remove('image_storage_provider');
@@ -599,7 +599,7 @@ class CommunityHubService {
           .eq('id', hubId)
           .select(_columnsLegacy)
           .single();
-      return CommunityHub.fromRow(row).withResolvedImages();
+      return await CommunityHub.fromRow(row).withResolvedImages();
     }
   }
 

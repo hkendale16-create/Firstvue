@@ -9,9 +9,11 @@ import '../services/business_media_service.dart';
 import '../services/business_menu_service.dart';
 import '../services/business_reviews_service.dart';
 import '../services/business_social_links_service.dart';
+import '../services/entity_details_service.dart';
 import '../services/messaging_service.dart';
 import '../widgets/social_platform_icon.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/entity_details_form.dart';
 import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/firstvue_inline_search_bar.dart';
 import '../widgets/facebook_style_profile_header.dart';
@@ -281,6 +283,19 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
                   text: details.description?.trim().isNotEmpty == true
                       ? details.description!
                       : 'The owner has not added a business description yet.',
+                ),
+                FutureBuilder<Map<String, dynamic>>(
+                  future: EntityDetailsService.fetchBusinessDetails(details.id),
+                  builder: (context, snap) {
+                    final map = snap.data ?? const <String, dynamic>{};
+                    return EntityDetailsSection(
+                      title: 'Details',
+                      details: map,
+                      fields: EntityDetailSchemas.forBusinessType(
+                        details.businessType,
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 22),
                 EntityProfileFeedSection(

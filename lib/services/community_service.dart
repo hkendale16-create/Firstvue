@@ -368,7 +368,7 @@ class CommunityService {
             ),
           )
           .toList();
-      return _resolveCommunityImages(mapped);
+      return await _resolveCommunityImages(mapped);
     } catch (_) {
       return const [];
     }
@@ -395,7 +395,7 @@ class CommunityService {
           .toSet();
       final followIds = await _myFollowIds();
 
-      return _mapRow(
+      return await _mapRow(
         row,
         memberIds: memberIds,
         followIds: followIds,
@@ -442,7 +442,7 @@ class CommunityService {
             ),
           )
           .toList();
-      return _resolveCommunityImages(mapped);
+      return await _resolveCommunityImages(mapped);
     } catch (_) {
       return const [];
     }
@@ -902,7 +902,7 @@ class CommunityService {
             ),
           )
           .toList();
-      return _resolveCommunityImages(mapped);
+      return await _resolveCommunityImages(mapped);
     } catch (_) {
       return const [];
     }
@@ -957,7 +957,7 @@ class CommunityService {
             ),
           )
           .toList();
-      return _resolveCommunityImages(mapped);
+      return await _resolveCommunityImages(mapped);
     } catch (_) {
       return fetchCommunities(limit: limit);
     }

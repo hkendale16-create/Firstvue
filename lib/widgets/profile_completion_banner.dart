@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../services/profile_completion_service.dart';
+import '../services/profile_media_service.dart';
+import '../services/user_profile_service.dart';
 import '../theme/firstvue_theme.dart';
 
 /// Subtle borderless banner showing completion % and the next missing field.
@@ -50,7 +52,7 @@ class ProfileCompletionBanner extends StatelessWidget {
                   ),
                   Text(
                     '${result.filledCount}/${result.totalCount}',
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: FirstVueColors.gold,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -82,6 +84,72 @@ class ProfileCompletionBanner extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Loads user completion from existing profile + avatar fields.
+class UserProfileCompletionBanner extends StatefulWidget {
+  final String userId;
+  final VoidCallback? onTap;
+
+  const UserProfileCompletionBanner({
+    super.key,
+    required this.userId,
+    this.onTap,
+  });
+
+  @override
+  State<UserProfileCompletionBanner> createState() =>
+      _UserProfileCompletionBannerState();
+}
+
+class _UserProfileCompletionBannerState
+    extends State<UserProfileCompletionBanner> {
+  ProfileCompletionResult? _result;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant UserProfileCompletionBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.userId != widget.userId) _load();
+  }
+
+  Future<void> _load() async {
+    final profile = await UserProfileService.fetchProfileForUser(widget.userId);
+    final images = await ProfileMediaService.fetchProfileImagesForUser(
+      widget.userId,
+    );
+    if (!mounted) return;
+    final fields = <String, dynamic>{
+      'display_name': profile?.displayName,
+      'username': profile?.username,
+      'bio': profile?.bio,
+      'city': profile?.city,
+      'website': profile?.website,
+      'phone': profile?.phone,
+      'has_avatar': images.avatar != null,
+    };
+    setState(() {
+      _result = ProfileCompletionService.score(
+        type: ProfileEntityType.user,
+        fields: fields,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final result = _result;
+    if (result == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: ProfileCompletionBanner(result: result, onTap: widget.onTap),
     );
   }
 }
