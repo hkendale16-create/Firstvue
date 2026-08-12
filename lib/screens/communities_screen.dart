@@ -35,11 +35,23 @@ class _CommunitiesScreenState extends State<CommunitiesScreen> {
   }
 
   Future<void> _createGroup() async {
-    final created = await Navigator.push<bool>(
+    final created = await Navigator.push<Community>(
       context,
       FirstVuePageRoute(builder: (_) => const CreateCommunityScreen()),
     );
-    if (created == true) await _load();
+    if (created == null || !mounted) return;
+    await _load();
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      FirstVuePageRoute(
+        builder: (_) => CommunityDetailScreen(
+          communityId: created.id,
+          initialCommunity: created,
+        ),
+      ),
+    );
+    if (mounted) await _load();
   }
 
   @override

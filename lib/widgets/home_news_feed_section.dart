@@ -500,7 +500,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
           children: [
             const Expanded(
               child: Text(
-                'COMMUNITY FEED',
+                'NEWS FEED',
                 style: TextStyle(
                   color: FirstVueColors.ivory,
                   fontSize: 14,

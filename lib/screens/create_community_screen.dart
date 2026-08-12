@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../navigation/firstvue_page_route.dart';
 import '../services/community_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/location_autocomplete_field.dart';
+import '../widgets/media_picker_sheet.dart';
 import 'auth_screen.dart';
-import 'community_detail_screen.dart';
 
 class CreateCommunityScreen extends StatefulWidget {
   const CreateCommunityScreen({super.key});
@@ -20,6 +21,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
   final _descriptionController = TextEditingController();
   final _cityController = TextEditingController();
   final _stateController = TextEditingController();
+  XFile? _imageFile;
   bool _saving = false;
   String? _error;
 
@@ -30,6 +32,15 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
     _cityController.dispose();
     _stateController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final files = await showMediaPickerSheet(
+      context,
+      mode: MediaPickerMode.photosOnly,
+    );
+    if (files == null || files.isEmpty || !mounted) return;
+    setState(() => _imageFile = files.first);
   }
 
   Future<void> _create() async {
@@ -52,18 +63,10 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
         description: _descriptionController.text,
         city: _cityController.text,
         state: _stateController.text,
+        imageFile: _imageFile,
       );
       if (!mounted) return;
-      Navigator.pop(context, true);
-      Navigator.pushReplacement(
-        context,
-        FirstVuePageRoute(
-          builder: (_) => CommunityDetailScreen(
-            communityId: community.id,
-            initialCommunity: community,
-          ),
-        ),
-      );
+      Navigator.pop(context, community);
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -91,6 +94,38 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
             Text(_error!, style: const TextStyle(color: FirstVueColors.coral)),
             const SizedBox(height: 12),
           ],
+          Center(
+            child: GestureDetector(
+              onTap: _saving ? null : _pickImage,
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 42,
+                    backgroundColor: FirstVueColors.elevatedSurface,
+                    child: _imageFile == null
+                        ? const Icon(
+                            Icons.add_a_photo_outlined,
+                            color: FirstVueColors.teal,
+                            size: 28,
+                          )
+                        : const Icon(
+                            Icons.check_circle,
+                            color: FirstVueColors.teal,
+                            size: 28,
+                          ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _imageFile == null
+                        ? 'Add group profile image'
+                        : 'Image selected',
+                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
           TextField(
             controller: _nameController,
             style: const TextStyle(color: Colors.white),
