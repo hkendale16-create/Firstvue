@@ -7,11 +7,10 @@ import '../screens/create_community_screen.dart';
 import '../services/community_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'group_circle_avatar.dart';
+import 'home_community_feed_block.dart';
 
-/// Home discovery: Groups first, then Communities below.
-///
-/// Today both rows read from `public.communities` (Groups). The Communities
-/// row is the local discovery surface placed under Groups as requested.
+/// Home discovery: Groups first, then a single Community container with
+/// nearby communities + Facebook-style composer and news feed.
 class HomeCommunitiesSection extends StatefulWidget {
   final int refreshToken;
 
@@ -127,43 +126,100 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
             onEmptyTap: _openAll,
           ),
         const SizedBox(height: 28),
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'COMMUNITIES IN YOUR AREA',
+        // Single Facebook-style Community container: discovery + post + feed
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
+          decoration: BoxDecoration(
+            color: FirstVueColors.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: FirstVueColors.ivory.withValues(alpha: 0.08),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.28),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 3,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: FirstVueColors.gold,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'COMMUNITY',
+                      style: TextStyle(
+                        color: FirstVueColors.ivory,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.4,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _openAll,
+                    style: TextButton.styleFrom(
+                      foregroundColor: FirstVueColors.teal,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Explore',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Communities near you',
                 style: TextStyle(
-                  color: FirstVueColors.ivory,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.4,
+                  color: FirstVueColors.ivory.withValues(alpha: 0.55),
+                  fontSize: 12,
                 ),
               ),
-            ),
-            TextButton(
-              onPressed: _openAll,
-              child: const Text('Explore'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (_loading)
-          const SizedBox(
-            height: 110,
-            child: Center(
-              child: CircularProgressIndicator(color: FirstVueColors.teal),
-            ),
-          )
-        else
-          _CircleRow(
-            items: _communitiesNearby,
-            includeCreate: false,
-            emptyLabel: 'Local communities will appear here',
-            onCreate: _openCreateGroup,
-            onOpen: _openGroup,
-            onEmptyTap: _openAll,
-            defaultRingColor: FirstVueColors.gold,
+              const SizedBox(height: 12),
+              if (_loading)
+                const SizedBox(
+                  height: 110,
+                  child: Center(
+                    child: CircularProgressIndicator(color: FirstVueColors.teal),
+                  ),
+                )
+              else
+                _CircleRow(
+                  items: _communitiesNearby,
+                  includeCreate: false,
+                  emptyLabel: 'Local communities will appear here',
+                  onCreate: _openCreateGroup,
+                  onOpen: _openGroup,
+                  onEmptyTap: _openAll,
+                  defaultRingColor: FirstVueColors.gold,
+                ),
+              const SizedBox(height: 16),
+              Divider(
+                height: 1,
+                color: FirstVueColors.ivory.withValues(alpha: 0.1),
+              ),
+              const SizedBox(height: 14),
+              HomeCommunityFeedBlock(refreshToken: widget.refreshToken),
+            ],
           ),
+        ),
       ],
     );
   }
