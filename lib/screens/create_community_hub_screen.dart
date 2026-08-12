@@ -1,18 +1,14 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../navigation/firstvue_page_route.dart';
-import '../services/community_hub_service.dart';
-import '../services/community_leader_service.dart';
+import '../services/community_creation_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/location_autocomplete_field.dart';
-import '../widgets/media_picker_sheet.dart';
 import 'auth_screen.dart';
-import 'community_leader_request_screen.dart';
 
+/// Request form to create a Community. Communities are not active until an
+/// admin approves the request (enforced by Supabase RLS + review RPC).
 class CreateCommunityHubScreen extends StatefulWidget {
   const CreateCommunityHubScreen({super.key});
 
@@ -23,38 +19,36 @@ class CreateCommunityHubScreen extends StatefulWidget {
 
 class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
   final _name = TextEditingController();
-  final _bio = TextEditingController();
+  final _description = TextEditingController();
   final _category = TextEditingController();
   final _city = TextEditingController();
   final _state = TextEditingController();
   final _postal = TextEditingController();
-  final _rules = TextEditingController();
-  XFile? _imageFile;
-  Uint8List? _imageBytes;
+  final _reason = TextEditingController();
   bool _checking = true;
-  bool _approved = false;
-  bool _saving = false;
+  bool _submitting = false;
   String? _error;
+  CommunityCreationRequest? _existing;
 
   @override
   void initState() {
     super.initState();
-    _checkAccess();
+    _bootstrap();
   }
 
   @override
   void dispose() {
     _name.dispose();
-    _bio.dispose();
+    _description.dispose();
     _category.dispose();
     _city.dispose();
     _state.dispose();
     _postal.dispose();
-    _rules.dispose();
+    _reason.dispose();
     super.dispose();
   }
 
-  Future<void> _checkAccess() async {
+  Future<void> _bootstrap() async {
     if (Supabase.instance.client.auth.currentUser == null) {
       await Navigator.push(
         context,
@@ -67,76 +61,87 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
       }
     }
 
-    final approved = await CommunityLeaderService.isApprovedLeader();
+    final existing = await CommunityCreationService.fetchMyLatestRequest();
     if (!mounted) return;
-    if (!approved) {
-      final pending = await CommunityLeaderService.fetchMyLatestRequest();
-      if (!mounted) return;
-      if (pending?.isPending == true) {
-        setState(() {
-          _checking = false;
-          _approved = false;
-          _error = 'pending';
-        });
-        return;
-      }
-      await showCommunityLeaderRequiredDialog(context);
-      if (!mounted) return;
-      final again = await CommunityLeaderService.isApprovedLeader();
-      if (!mounted) return;
-      if (!again) {
-        Navigator.pop(context);
-        return;
-      }
-    }
     setState(() {
+      _existing = existing;
       _checking = false;
-      _approved = true;
     });
+
+    if (existing == null || existing.isPending != true) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: FirstVueColors.surface,
+          title: const Text(
+            'Community creation requires approval',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: const Text(
+            'Unlike Groups, Communities must be reviewed by FirstVue '
+            'administrators before they become active. Submit a request with '
+            'your proposed name, description, category, location, and reason. '
+            'You will be the Community Leader if approved.',
+            style: TextStyle(color: Colors.white70, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
-  Future<void> _pickImage() async {
-    final files = await showMediaPickerSheet(
-      context,
-      mode: MediaPickerMode.photosOnly,
-    );
-    if (files == null || files.isEmpty || !mounted) return;
-    final file = files.first;
-    final bytes = await file.readAsBytes();
-    if (!mounted) return;
-    setState(() {
-      _imageFile = file;
-      _imageBytes = bytes;
-    });
-  }
+  Future<void> _submit() async {
+    final name = _name.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = 'Community name is required.');
+      return;
+    }
+    if (_reason.text.trim().isEmpty) {
+      setState(() => _error = 'Please explain why this Community should exist.');
+      return;
+    }
 
-  Future<void> _create() async {
     setState(() {
-      _saving = true;
+      _submitting = true;
       _error = null;
     });
+
     try {
-      final hub = await CommunityHubService.createHub(
-        name: _name.text,
-        description: _bio.text,
-        category: _category.text,
-        city: _city.text,
-        state: _state.text,
-        postalCode: _postal.text,
-        rules: _rules.text,
-        imageFile: _imageFile,
+      final request = await CommunityCreationService.submitRequest(
+        name: name,
+        description: _description.text.trim(),
+        category: _category.text.trim(),
+        city: _city.text.trim(),
+        state: _state.text.trim(),
+        postalCode: _postal.text.trim(),
+        locationLabel: [
+          _city.text.trim(),
+          _state.text.trim(),
+        ].where((p) => p.isNotEmpty).join(', '),
+        reason: _reason.text.trim(),
       );
       if (!mounted) return;
-      Navigator.pop(context, hub);
+      setState(() {
+        _existing = request;
+        _submitting = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Community request submitted. It will appear after admin approval.',
+          ),
+        ),
+      );
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _saving = false;
-        _error = error is PostgrestException &&
-                (error.message.contains('policy') ||
-                    error.code == '42501')
-            ? 'Community Leader approval is required to create a Community.'
-            : 'Unable to create Community. Check the name and try again.';
+        _submitting = false;
+        _error = error.toString();
       });
     }
   }
@@ -154,115 +159,133 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
           ? const Center(
               child: CircularProgressIndicator(color: FirstVueColors.teal),
             )
-          : !_approved
-              ? ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    Text(
-                      _error == 'pending'
-                          ? 'Your Community Leader request is pending review.'
-                          : 'Community Leader approval is required.',
-                      style: const TextStyle(color: Colors.white70, height: 1.4),
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+              children: [
+                if (_existing?.isPending == true) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: FirstVueColors.surface,
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          FirstVuePageRoute(
-                            builder: (_) =>
-                                const CommunityLeaderRequestScreen(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Request pending review',
+                          style: TextStyle(
+                            color: FirstVueColors.gold,
+                            fontWeight: FontWeight.bold,
                           ),
-                        );
-                      },
-                      child: const Text('View request status'),
-                    ),
-                  ],
-                )
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-                  children: [
-                    if (_error != null && _error != 'pending') ...[
-                      Text(
-                        _error!,
-                        style: const TextStyle(color: FirstVueColors.coral),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    Center(
-                      child: GestureDetector(
-                        onTap: _saving ? null : _pickImage,
-                        child: CircleAvatar(
-                          radius: 46,
-                          backgroundColor: FirstVueColors.elevatedSurface,
-                          backgroundImage: _imageBytes != null
-                              ? MemoryImage(_imageBytes!)
-                              : null,
-                          child: _imageBytes == null
-                              ? const Icon(
-                                  Icons.add_a_photo_outlined,
-                                  color: FirstVueColors.teal,
-                                )
-                              : null,
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Center(
-                      child: Text(
-                        'Community profile photo',
-                        style: TextStyle(color: Colors.white54, fontSize: 12),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    _field(_name, 'Community name'),
-                    const SizedBox(height: 12),
-                    _field(_bio, 'Community bio / about', lines: 4),
-                    const SizedBox(height: 12),
-                    _field(_category, 'Categories / focus (optional)'),
-                    const SizedBox(height: 12),
-                    LocationAutocompleteField(
-                      controller: _city,
-                      label: 'City',
-                      type: LocationFieldType.city,
-                    ),
-                    const SizedBox(height: 12),
-                    LocationAutocompleteField(
-                      controller: _state,
-                      label: 'State',
-                      type: LocationFieldType.state,
-                    ),
-                    const SizedBox(height: 12),
-                    _field(_postal, 'ZIP / postal code (optional)'),
-                    const SizedBox(height: 12),
-                    _field(_rules, 'Rules (optional)', lines: 3),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: FilledButton(
-                        onPressed: _saving ? null : _create,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: FirstVueColors.coral,
+                        const SizedBox(height: 8),
+                        Text(
+                          '“${_existing!.proposedName}” is awaiting FirstVue admin approval. '
+                          'The Community will not be active until approved.',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            height: 1.4,
+                          ),
                         ),
-                        child: Text(
-                          _saving ? 'Creating…' : 'Create Community',
-                        ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
+                  const SizedBox(height: 20),
+                ],
+                if (_existing?.isApproved == true) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: FirstVueColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      'Your Community “${_existing!.proposedName}” was approved.',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+                Text(
+                  'Community creation requires approval',
+                  style: TextStyle(
+                    color: FirstVueColors.ivory.withValues(alpha: .7),
+                    height: 1.35,
+                  ),
                 ),
+                const SizedBox(height: 18),
+                _field(_name, 'Community name *'),
+                const SizedBox(height: 12),
+                _field(_description, 'Description / bio', maxLines: 4),
+                const SizedBox(height: 12),
+                _field(_category, 'Category'),
+                const SizedBox(height: 12),
+                LocationAutocompleteField(
+                  controller: _city,
+                  label: 'City',
+                  type: LocationFieldType.city,
+                ),
+                const SizedBox(height: 12),
+                LocationAutocompleteField(
+                  controller: _state,
+                  label: 'State',
+                  type: LocationFieldType.state,
+                ),
+                const SizedBox(height: 12),
+                _field(_postal, 'Postal code'),
+                const SizedBox(height: 12),
+                _field(
+                  _reason,
+                  'Reason for creating this Community *',
+                  maxLines: 4,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Proposed Community Leader: you (the requesting account)',
+                  style: TextStyle(
+                    color: FirstVueColors.teal.withValues(alpha: .9),
+                    fontSize: 12,
+                  ),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    style: const TextStyle(color: FirstVueColors.coral),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                FilledButton(
+                  onPressed: _submitting || _existing?.isPending == true
+                      ? null
+                      : _submit,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: FirstVueColors.coral,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                  child: Text(
+                    _submitting
+                        ? 'Submitting…'
+                        : _existing?.isPending == true
+                            ? 'Request pending'
+                            : 'Submit for approval',
+                  ),
+                ),
+              ],
+            ),
     );
   }
 
   Widget _field(
     TextEditingController controller,
     String label, {
-    int lines = 1,
+    int maxLines = 1,
   }) {
     return TextField(
       controller: controller,
-      maxLines: lines,
+      maxLines: maxLines,
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         labelText: label,
@@ -270,7 +293,7 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
         filled: true,
         fillColor: FirstVueColors.surface,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
         ),
       ),

@@ -99,8 +99,11 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
       _error = null;
     });
     try {
-      final posts = await CommunityNewsService.fetchCommunityFeedPosts(
+      // Ranked main Newsfeed: recency + unseen + relevance + controlled variety.
+      // Seed changes on each refresh so top results are not identical every time.
+      final posts = await CommunityNewsService.fetchRankedMainFeed(
         limit: widget.maxPosts,
+        seed: DateTime.now().millisecondsSinceEpoch.toDouble(),
       );
       final postIds = posts.map((p) => p.id).toList();
       final reposted = await RepostService.fetchMyRepostedIds(postIds);
