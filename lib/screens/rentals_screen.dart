@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_screen.dart';
+import 'conversation_screen.dart';
+import '../services/messaging_service.dart';
 import '../services/rentals_store.dart';
 
 enum _RentalPriceFilter { weekly, monthly }
@@ -790,50 +792,123 @@ class _RentalCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () async {
-                if (Supabase.instance.client.auth.currentUser == null) {
-                  Navigator.pop(sheetContext);
-                  await Navigator.push(
-                    context,
-                    FirstVuePageRoute(builder: (_) => const AuthScreen()),
-                  );
-                  if (!context.mounted) return;
-                  if (Supabase.instance.client.auth.currentUser == null) return;
-                  _showInquiry(context, listing);
-                  return;
-                }
-
-                try {
-                  await RentalsStore.sendInquiry(
-                    rentalId: listing.id,
-                    message: messageController.text.trim(),
-                  );
-                  if (!sheetContext.mounted) return;
-                  Navigator.pop(sheetContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Inquiry sent to the rental owner.'),
-                    ),
-                  );
-                } catch (_) {
-                  if (sheetContext.mounted) {
-                    ScaffoldMessenger.of(sheetContext).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Unable to send the inquiry. Please try again.',
-                        ),
-                      ),
-                    );
-                  }
-                }
-              },
-              child: const Text('SEND INQUIRY'),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () async {
+                      if (Supabase.instance.client.auth.currentUser == null) {
+                        Navigator.pop(sheetContext);
+                        await Navigator.push(
+                          context,
+                          FirstVuePageRoute(builder: (_) => const AuthScreen()),
+                        );
+                        return;
+                      }
+                      await _sendInquiry(
+                        context,
+                        sheetContext,
+                        listing,
+                        messageController.text.trim(),
+                        openMessage: false,
+                      );
+                    },
+                    child: const Text('SEND INQUIRY'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () async {
+                      if (Supabase.instance.client.auth.currentUser == null) {
+                        Navigator.pop(sheetContext);
+                        await Navigator.push(
+                          context,
+                          FirstVuePageRoute(builder: (_) => const AuthScreen()),
+                        );
+                        return;
+                      }
+                      await _sendInquiry(
+                        context,
+                        sheetContext,
+                        listing,
+                        messageController.text.trim(),
+                        openMessage: true,
+                      );
+                    },
+                    child: const Text('MESSAGE OWNER'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
       ),
     ).whenComplete(messageController.dispose);
+  }
+
+  Future<void> _sendInquiry(
+    BuildContext context,
+    BuildContext sheetContext,
+    RentalListing listing,
+    String message, {
+    required bool openMessage,
+  }) async {
+    if (message.isEmpty) {
+      ScaffoldMessenger.of(sheetContext).showSnackBar(
+        const SnackBar(content: Text('Add a message before sending.')),
+      );
+      return;
+    }
+
+    try {
+      final ownerId = await RentalsStore.sendInquiry(
+        rentalId: listing.id,
+        message: message,
+      );
+      if (!sheetContext.mounted) return;
+      Navigator.pop(sheetContext);
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            openMessage
+                ? 'Inquiry sent. Opening message thread…'
+                : 'Inquiry sent to the rental owner.',
+          ),
+        ),
+      );
+
+      if (openMessage &&
+          ownerId != null &&
+          ownerId.isNotEmpty &&
+          ownerId != Supabase.instance.client.auth.currentUser?.id) {
+        final threadId = await MessagingService.openThreadWithUser(
+          otherUserId: ownerId,
+        );
+        if (!context.mounted) return;
+        await Navigator.push(
+          context,
+          FirstVuePageRoute(
+            builder: (_) => ConversationScreen(
+              threadId: threadId,
+              title: listing.title,
+              subtitle: 'Rental inquiry',
+              initialMessage: message,
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (sheetContext.mounted) {
+        ScaffoldMessenger.of(sheetContext).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to send the inquiry. Please try again.'),
+          ),
+        );
+      }
+    }
   }
 }
 

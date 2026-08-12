@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'activity_notifications_service.dart';
+
 class FollowProfile {
   final String id;
   final String displayName;
@@ -101,6 +103,23 @@ class FollowService {
     return FollowStatus.notFollowing;
   }
 
+  static Future<String> _actorLabel(String userId) async {
+    try {
+      final row = await _client
+          .from('profiles')
+          .select('display_name, username')
+          .eq('id', userId)
+          .maybeSingle();
+      final username = row?['username'] as String?;
+      if (username != null && username.trim().isNotEmpty) {
+        return '@${username.trim()}';
+      }
+      return (row?['display_name'] as String?) ?? 'Someone';
+    } catch (_) {
+      return 'Someone';
+    }
+  }
+
   static Future<void> follow(String profileId) async {
     final me = _client.auth.currentUser;
     if (me == null) throw const AuthException('Sign in to follow profiles.');
@@ -124,6 +143,13 @@ class FollowService {
       } on PostgrestException catch (error) {
         if (error.code != '23505') rethrow;
       }
+      final actor = await _actorLabel(me.id);
+      await ActivityNotificationsService.notifyUser(
+        userId: profileId,
+        type: 'follow_request',
+        title: '$actor requested to follow you',
+        payload: {'profile_id': me.id},
+      );
       return;
     }
 
@@ -135,6 +161,14 @@ class FollowService {
     } on PostgrestException catch (error) {
       if (error.code != '23505') rethrow;
     }
+
+    final actor = await _actorLabel(me.id);
+    await ActivityNotificationsService.notifyUser(
+      userId: profileId,
+      type: 'follow',
+      title: '$actor started following you',
+      payload: {'profile_id': me.id},
+    );
   }
 
   static Future<void> unfollow(String profileId) async {
@@ -368,6 +402,14 @@ class FollowService {
     } on PostgrestException catch (error) {
       if (error.code != '23505') rethrow;
     }
+
+    final accepter = await _actorLabel(me.id);
+    await ActivityNotificationsService.notifyUser(
+      userId: requesterId,
+      type: 'follow_accepted',
+      title: '$accepter accepted your follow request',
+      payload: {'profile_id': me.id},
+    );
   }
 
   static Future<void> declineRequest(String requestId) async {

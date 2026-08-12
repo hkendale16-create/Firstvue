@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'activity_notifications_service.dart';
+import 'community_news_service.dart';
 
 class FeedComment {
   final String id;
@@ -289,6 +290,27 @@ class FeedCommentsService {
             payload: {'comment_id': inserted['id'], 'media_id': mediaId},
           );
         }
+      } else if (mediaId.startsWith('news-post:')) {
+        final postId = CommunityNewsService.normalizePostId(
+          mediaId.substring('news-post:'.length),
+        );
+        try {
+          final post = await _client
+              .from('community_news_posts')
+              .select('author_id')
+              .eq('id', postId)
+              .maybeSingle();
+          final recipient = post?['author_id'] as String?;
+          if (recipient != null && recipient != user.id) {
+            await ActivityNotificationsService.notifyUser(
+              userId: recipient,
+              type: 'news_comment',
+              title: 'New comment on your post',
+              body: trimmed,
+              payload: {'post_id': postId, 'comment_id': inserted['id']},
+            );
+          }
+        } catch (_) {}
       }
 
       final authorNames = await _fetchProfileNames([user.id]);

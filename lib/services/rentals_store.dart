@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/media_config.dart';
 import 'admin_auth_service.dart';
+import 'activity_notifications_service.dart';
 import 'media_storage_service.dart';
 
 class RentalMedia {
@@ -30,6 +31,7 @@ class RentalInquiry {
 
 class RentalListing {
   final String id;
+  final String ownerId;
   final String title;
   final String location;
   final String description;
@@ -40,6 +42,7 @@ class RentalListing {
 
   const RentalListing({
     required this.id,
+    required this.ownerId,
     required this.title,
     required this.location,
     required this.description,
@@ -58,6 +61,7 @@ class RentalListing {
 
     return RentalListing(
       id: map['id'] as String,
+      ownerId: (map['owner_id'] as String?) ?? '',
       title: map['title'] as String,
       location: locationParts.join(', '),
       description:
@@ -69,9 +73,10 @@ class RentalListing {
     );
   }
 
-  RentalListing copyWith({List<RentalMedia>? media}) {
+  RentalListing copyWith({List<RentalMedia>? media, String? ownerId}) {
     return RentalListing(
       id: id,
+      ownerId: ownerId ?? this.ownerId,
       title: title,
       location: location,
       description: description,
@@ -350,7 +355,7 @@ class RentalsStore {
     }
   }
 
-  static Future<void> sendInquiry({
+  static Future<String?> sendInquiry({
     required String rentalId,
     required String message,
   }) async {
@@ -359,11 +364,34 @@ class RentalsStore {
       throw const AuthException('Sign in before sending an inquiry.');
     }
 
+    final rental = await _client
+        .from('rentals')
+        .select('id, title, owner_id')
+        .eq('id', rentalId)
+        .maybeSingle();
+
     await _client.from('rental_inquiries').insert({
       'rental_id': rentalId,
       'requester_id': user.id,
       'message': message,
     });
+
+    final ownerId = rental?['owner_id'] as String?;
+    if (ownerId != null && ownerId != user.id) {
+      final rentalTitle = rental?['title'] as String? ?? 'your rental';
+      await ActivityNotificationsService.notifyUser(
+        userId: ownerId,
+        type: 'rental_inquiry',
+        title: 'Inquiry on $rentalTitle',
+        body: message,
+        payload: {
+          'rental_id': rentalId,
+          'requester_id': user.id,
+        },
+      );
+    }
+
+    return ownerId;
   }
 
   static String _mediaTypeFor(XFile file) {

@@ -56,6 +56,21 @@ class UsernameService {
     }
   }
 
+  static Future<String?> lookupProfileId(String username) async {
+    final normalized = normalize(username);
+    if (normalized == null) return null;
+    try {
+      final row = await _client
+          .from('profiles')
+          .select('id')
+          .eq('username', normalized)
+          .maybeSingle();
+      return row?['id'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<void> updateUsername(String username) async {
     final user = _client.auth.currentUser;
     if (user == null) {

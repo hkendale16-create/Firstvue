@@ -4,8 +4,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_screen.dart';
 import 'edit_profile_screen.dart';
+import 'followers_following_screen.dart';
 import '../services/community_news_service.dart';
 import '../services/profile_media_service.dart';
+import '../services/follow_service.dart';
 import '../services/user_profile_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/facebook_style_profile_header.dart';
@@ -42,6 +44,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _statsLoading = false;
   String? _displayName;
   bool _nameLoading = false;
+  int _followerCount = 0;
+  int _followingCount = 0;
   int _selectedTab = 0;
   int _pullRefreshToken = 0;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -94,12 +98,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
     setState(() => _statsLoading = true);
-    final stats = await CommunityNewsService.fetchMyEngagementStats();
+    final results = await Future.wait([
+      CommunityNewsService.fetchMyEngagementStats(),
+      FollowService.fetchFollowerCount(user.id),
+      FollowService.fetchFollowingCount(user.id),
+    ]);
     if (!mounted) return;
     setState(() {
-      _stats = stats;
+      _stats = results[0] as ProfileEngagementStats;
+      _followerCount = results[1] as int;
+      _followingCount = results[2] as int;
       _statsLoading = false;
     });
+  }
+
+  void _openFollowList(FollowListMode mode, String displayName) {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+    Navigator.push(
+      context,
+      FirstVuePageRoute(
+        builder: (_) => FollowersFollowingScreen(
+          profileId: user.id,
+          displayName: displayName,
+          mode: mode,
+        ),
+      ),
+    );
   }
 
   Future<void> _loadProfileImages() async {
@@ -437,7 +462,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           value: _statsLoading ? '—' : '${_stats.postCount}',
                         ),
                         ProfileStatItem(
-                          label: 'Sparks received',
+                          label: 'Followers',
+                          value: _statsLoading ? '—' : '$_followerCount',
+                          onTap: () => _openFollowList(
+                            FollowListMode.followers,
+                            displayName,
+                          ),
+                        ),
+                        ProfileStatItem(
+                          label: 'Following',
+                          value: _statsLoading ? '—' : '$_followingCount',
+                          onTap: () => _openFollowList(
+                            FollowListMode.following,
+                            displayName,
+                          ),
+                        ),
+                        ProfileStatItem(
+                          label: 'Sparks',
                           value: _statsLoading ? '—' : '${_stats.sparksReceived}',
                         ),
                       ],

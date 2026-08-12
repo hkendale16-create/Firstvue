@@ -9,6 +9,7 @@ class ActivityNotification {
   final String? body;
   final DateTime createdAt;
   final bool isRead;
+  final Map<String, dynamic> payload;
 
   const ActivityNotification({
     required this.id,
@@ -17,6 +18,7 @@ class ActivityNotification {
     required this.body,
     required this.createdAt,
     required this.isRead,
+    this.payload = const {},
   });
 }
 
@@ -32,7 +34,7 @@ class ActivityNotificationsService {
     try {
       final rows = await _client
           .from('activity_notifications')
-          .select('id, type, title, body, created_at, read_at')
+          .select('id, type, title, body, created_at, read_at, payload')
           .eq('user_id', user.id)
           .order('created_at', ascending: false)
           .limit(50);
@@ -116,6 +118,7 @@ class ActivityNotificationsService {
   }
 
   static ActivityNotification _mapRow(Map<String, dynamic> row) {
+    final payloadRaw = row['payload'];
     return ActivityNotification(
       id: row['id'] as String,
       type: row['type'] as String,
@@ -123,6 +126,11 @@ class ActivityNotificationsService {
       body: row['body'] as String?,
       createdAt: DateTime.parse(row['created_at'] as String),
       isRead: row['read_at'] != null,
+      payload: payloadRaw is Map<String, dynamic>
+          ? payloadRaw
+          : (payloadRaw is Map
+              ? Map<String, dynamic>.from(payloadRaw)
+              : const {}),
     );
   }
 }

@@ -6,8 +6,11 @@ import '../services/activity_notifications_service.dart';
 import '../services/messaging_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
-import 'auth_screen.dart';
-import 'messages_inbox_screen.dart';
+import '../screens/auth_screen.dart';
+import '../screens/conversation_screen.dart';
+import '../screens/member_public_profile_screen.dart';
+import '../screens/messages_inbox_screen.dart';
+import '../screens/post_detail_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -152,7 +155,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                   item.id,
                                 );
                               }
-                              if (mounted) _refresh();
+                              if (!mounted) return;
+                              if (!context.mounted) return;
+                              _openNotification(context, item);
+                              await _refresh();
                             },
                           );
                         }).toList(),
@@ -163,6 +169,65 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               ),
             ),
     );
+  }
+
+  void _openNotification(BuildContext context, ActivityNotification item) {
+    final payload = item.payload;
+    switch (item.type) {
+      case 'follow':
+      case 'follow_request':
+      case 'follow_accepted':
+        final profileId = payload['profile_id'] as String?;
+        if (profileId != null) {
+          Navigator.push(
+            context,
+            FirstVuePageRoute(
+              builder: (_) => MemberPublicProfileScreen(profileId: profileId),
+            ),
+          );
+        }
+      case 'mention':
+      case 'news_spark':
+      case 'news_comment':
+        final postId = payload['post_id'] as String?;
+        if (postId != null) {
+          Navigator.push(
+            context,
+            FirstVuePageRoute(
+              builder: (_) => PostDetailScreen(postId: postId),
+            ),
+          );
+        }
+      case 'rental_inquiry':
+        final requesterId = payload['requester_id'] as String?;
+        if (requesterId != null) {
+          _openMessageThread(context, requesterId, title: 'Rental inquiry');
+        }
+      default:
+        break;
+    }
+  }
+
+  Future<void> _openMessageThread(
+    BuildContext context,
+    String otherUserId, {
+    required String title,
+  }) async {
+    try {
+      final threadId = await MessagingService.openThreadWithUser(
+        otherUserId: otherUserId,
+      );
+      if (!context.mounted) return;
+      await Navigator.push(
+        context,
+        FirstVuePageRoute(
+          builder: (_) => ConversationScreen(
+            threadId: threadId,
+            title: title,
+          ),
+        ),
+      );
+    } catch (_) {}
   }
 }
 

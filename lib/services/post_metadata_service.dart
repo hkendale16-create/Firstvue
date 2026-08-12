@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'activity_notifications_service.dart';
+
 class ParsedPostMetadata {
   final List<String> hashtags;
   final List<String> mentionUsernames;
@@ -92,6 +94,18 @@ class PostMetadataService {
         'mentioned_profile_id': profile['id'],
         'mention_text': '@$username',
       });
+
+      final me = _client.auth.currentUser?.id;
+      final mentionedId = profile['id'] as String;
+      if (me != null && mentionedId != me) {
+        await ActivityNotificationsService.notifyUser(
+          userId: mentionedId,
+          type: 'mention',
+          title: 'You were mentioned in a post',
+          body: '@$username',
+          payload: {'post_id': postId, 'profile_id': me},
+        );
+      }
     } catch (_) {}
   }
 }

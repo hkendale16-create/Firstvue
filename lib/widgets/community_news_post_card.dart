@@ -4,6 +4,7 @@ import '../services/community_news_media_service.dart';
 import '../services/community_news_service.dart';
 import '../services/profile_activity_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'social_rich_text.dart';
 import 'feed_autoplay_video.dart';
 import 'signed_media_viewer.dart';
 
@@ -194,8 +195,8 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
           SizedBox(height: _isTimeline ? 10 : 8),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: _isTimeline ? 0 : 14),
-            child: Text(
-              post.body,
+            child: SocialRichText(
+              text: post.body,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: .92),
                 height: 1.45,

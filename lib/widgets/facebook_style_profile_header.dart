@@ -6,8 +6,13 @@ import 'signed_media_viewer.dart';
 class ProfileStatItem {
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
-  const ProfileStatItem({required this.label, required this.value});
+  const ProfileStatItem({
+    required this.label,
+    required this.value,
+    this.onTap,
+  });
 }
 
 class FacebookStyleProfileHeader extends StatelessWidget {
@@ -212,7 +217,7 @@ class _StatColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final column = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
@@ -232,6 +237,17 @@ class _StatColumn extends StatelessWidget {
           ),
         ),
       ],
+    );
+
+    if (stat.onTap == null) return column;
+
+    return InkWell(
+      onTap: stat.onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+        child: column,
+      ),
     );
   }
 }

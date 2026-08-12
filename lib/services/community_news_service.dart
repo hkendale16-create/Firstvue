@@ -190,6 +190,10 @@ class CommunityNewsService {
     return trimmed;
   }
 
+  static Future<List<CommunityNewsPost>> mapPostRowsPublic(List<dynamic> rows) {
+    return _mapPostRows(rows, currentUserId: _client.auth.currentUser?.id);
+  }
+
   static Future<Map<String, String>> _fetchProfileNames(
     List<String> authorIds,
   ) async {

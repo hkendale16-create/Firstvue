@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/app_config.dart';
 import '../navigation/firstvue_page_route.dart';
+import '../screens/followers_following_screen.dart';
+import '../services/web_seo_service.dart';
 import '../services/community_news_service.dart';
 import '../services/follow_service.dart';
 import '../services/profile_media_service.dart';
@@ -102,6 +105,11 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
       _followingCount = results[7] as int;
       _loading = false;
     });
+    WebSeoService.update(
+      title: '$_title · FirstVue',
+      description: _subtitle ?? 'FirstVue member profile',
+      canonicalUrl: AppConfig.memberShareUrl(widget.profileId),
+    );
   }
 
   Future<void> _toggleFollow() async {
@@ -416,10 +424,34 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
                 ProfileStatItem(
                   label: 'Followers',
                   value: _loading ? '—' : '$_followerCount',
+                  onTap: _loading
+                      ? null
+                      : () => Navigator.push(
+                            context,
+                            FirstVuePageRoute(
+                              builder: (_) => FollowersFollowingScreen(
+                                profileId: widget.profileId,
+                                displayName: _title,
+                                mode: FollowListMode.followers,
+                              ),
+                            ),
+                          ),
                 ),
                 ProfileStatItem(
                   label: 'Following',
                   value: _loading ? '—' : '$_followingCount',
+                  onTap: _loading
+                      ? null
+                      : () => Navigator.push(
+                            context,
+                            FirstVuePageRoute(
+                              builder: (_) => FollowersFollowingScreen(
+                                profileId: widget.profileId,
+                                displayName: _title,
+                                mode: FollowListMode.following,
+                              ),
+                            ),
+                          ),
                 ),
                 ProfileStatItem(
                   label: 'Sparks',

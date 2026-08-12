@@ -11,6 +11,7 @@ import '../theme/firstvue_theme.dart';
 import '../widgets/community_news_post_card.dart';
 import '../widgets/feed_comments_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../services/web_seo_service.dart';
 import '../widgets/firstvue_share_sheet.dart';
 
 class PostDetailScreen extends StatefulWidget {
@@ -56,6 +57,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         _loading = false;
         _error = post == null ? 'Post not found.' : null;
       });
+      if (post != null) {
+        WebSeoService.update(
+          title: '${post.authorName} on FirstVue',
+          description: post.body.length > 160
+              ? '${post.body.substring(0, 160)}…'
+              : post.body,
+          canonicalUrl: AppConfig.newsPostShareUrl(post.id),
+        );
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
