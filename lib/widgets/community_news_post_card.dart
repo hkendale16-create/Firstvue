@@ -136,6 +136,16 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
                     ),
                 ],
               ),
+              if (post.communityName != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  'Posted in ${post.communityName}',
+                  style: TextStyle(
+                    color: FirstVueColors.gold.withValues(alpha: .8),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
               if (post.authorUsername != null) ...[
                 const SizedBox(height: 2),
                 Text(

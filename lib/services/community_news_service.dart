@@ -24,6 +24,9 @@ class CommunityNewsPost {
   final String authorName;
   final String? authorUsername;
   final String? businessName;
+  final String? communityId;
+  final String? communityName;
+  final String? communityImageUrl;
   final DateTime createdAt;
   final bool isMine;
   final int sparkCount;
@@ -40,6 +43,9 @@ class CommunityNewsPost {
     required this.authorName,
     this.authorUsername,
     required this.businessName,
+    this.communityId,
+    this.communityName,
+    this.communityImageUrl,
     required this.createdAt,
     required this.isMine,
     required this.sparkCount,
@@ -59,6 +65,9 @@ class CommunityNewsPost {
     String? authorName,
     String? authorUsername,
     String? businessName,
+    String? communityId,
+    String? communityName,
+    String? communityImageUrl,
     DateTime? createdAt,
     bool? isMine,
     int? sparkCount,
@@ -75,6 +84,9 @@ class CommunityNewsPost {
       authorName: authorName ?? this.authorName,
       authorUsername: authorUsername ?? this.authorUsername,
       businessName: businessName ?? this.businessName,
+      communityId: communityId ?? this.communityId,
+      communityName: communityName ?? this.communityName,
+      communityImageUrl: communityImageUrl ?? this.communityImageUrl,
       createdAt: createdAt ?? this.createdAt,
       isMine: isMine ?? this.isMine,
       sparkCount: sparkCount ?? this.sparkCount,
@@ -98,24 +110,30 @@ class CommunityNewsService {
   static const _postColumnsBase =
       'id, body, created_at, author_id, business_id, community_id';
 
+  /// Builds a select query with filters applied *after* `.select()`.
+  ///
+  /// Calling `.order` / `.eq` / `.limit` on the pre-select builder (and
+  /// discarding the returned filter builder) breaks feed loading.
   static Future<List<dynamic>> _selectPosts(
-    void Function(dynamic query) configure,
+    dynamic Function(dynamic query) configure,
   ) async {
-    dynamic query = _client.from('community_news_posts');
-    configure(query);
+    Future<List<dynamic>> run(String columns) async {
+      dynamic query = _client.from('community_news_posts').select(columns);
+      query = configure(query);
+      final rows = await query;
+      if (rows is List) return rows;
+      return const [];
+    }
+
     try {
-      return await query.select(_postColumns);
+      return await run(_postColumns);
     } catch (_) {
       try {
-        query = _client.from('community_news_posts');
-        configure(query);
-        return await query.select(
+        return await run(
           'id, body, created_at, author_id, business_id, community_id, visibility',
         );
       } catch (_) {
-        query = _client.from('community_news_posts');
-        configure(query);
-        return await query.select(_postColumnsBase);
+        return await run(_postColumnsBase);
       }
     }
   }
@@ -236,6 +254,7 @@ class CommunityNewsService {
     final authorUsernames = await _fetchProfileUsernames(authorIds);
     final businessNames = await _fetchBusinessNames(businessIds);
     final communityNames = await _fetchCommunityNames(communityIds);
+    final communityImages = await _fetchCommunityImages(communityIds);
     final professionalNames = await _fetchProfessionalNames(professionalIds);
     final eventTitles = await _fetchEventTitles(eventIds);
     final sparkCounts = await _fetchSparkCounts(postIds);
@@ -256,52 +275,95 @@ class CommunityNewsService {
       currentUserId: currentUserId,
     );
 
-    return rows.map((row) {
-      final id = row['id'] as String;
-      final authorId = row['author_id'] as String;
-      final businessId = row['business_id'] as String?;
-      final communityId = row['community_id'] as String?;
-      final professionalProfileId = row['professional_profile_id'] as String?;
-      final eventId = row['event_id'] as String?;
-      final visibility = (row['visibility'] as String?) ?? 'public';
-      final createdRaw = row['created_at'];
-      final createdAt = createdRaw is String
-          ? DateTime.tryParse(createdRaw) ?? DateTime.now()
-          : DateTime.now();
-      final contextName = businessId != null
-          ? businessNames[businessId]
-          : professionalProfileId != null
-              ? professionalNames[professionalProfileId]
-              : eventId != null
-                  ? eventTitles[eventId]
-                  : (communityId != null ? communityNames[communityId] : null);
-      final media = mediaByPost[id] ?? const [];
-      final isMine = authorId == currentUserId;
-      final followsAuthor = followingAuthors.contains(authorId);
-      final rawBody = (row['body'] as String?) ?? '';
-      final body = resolveDisplayBody(
-        rawBody: rawBody,
-        visibility: visibility,
-        isMine: isMine,
-        followsAuthor: followsAuthor,
-        hasMedia: media.isNotEmpty,
-      );
-      return CommunityNewsPost(
-        id: id,
-        body: body,
-        authorId: authorId,
-        authorName: authorNames[authorId] ?? 'FirstVue member',
-        authorUsername: authorUsernames[authorId],
-        businessName: contextName,
-        createdAt: createdAt,
-        isMine: isMine,
-        sparkCount: sparkCounts[id] ?? 0,
-        sparkedByMe: mySparks.contains(id),
-        savedByMe: mySaves.contains(id),
-        visibility: visibility,
-        media: media,
-      );
-    }).toList();
+    final posts = <CommunityNewsPost>[];
+    for (final row in rows) {
+      try {
+        final id = row['id'] as String?;
+        final authorId = row['author_id'] as String?;
+        if (id == null || authorId == null) continue;
+
+        final businessId = row['business_id'] as String?;
+        final communityId = row['community_id'] as String?;
+        final professionalProfileId = row['professional_profile_id'] as String?;
+        final eventId = row['event_id'] as String?;
+        final visibility = (row['visibility'] as String?) ?? 'public';
+        final createdRaw = row['created_at'];
+        final createdAt = createdRaw is String
+            ? DateTime.tryParse(createdRaw) ?? DateTime.now()
+            : createdRaw is DateTime
+                ? createdRaw
+                : DateTime.now();
+        final contextName = businessId != null
+            ? businessNames[businessId]
+            : professionalProfileId != null
+                ? professionalNames[professionalProfileId]
+                : eventId != null
+                    ? eventTitles[eventId]
+                    : (communityId != null
+                        ? communityNames[communityId]
+                        : null);
+        final media = mediaByPost[id] ?? const [];
+        final isMine = authorId == currentUserId;
+        final followsAuthor = followingAuthors.contains(authorId);
+        final rawBody = (row['body'] as String?) ?? '';
+        final body = resolveDisplayBody(
+          rawBody: rawBody,
+          visibility: visibility,
+          isMine: isMine,
+          followsAuthor: followsAuthor,
+          hasMedia: media.isNotEmpty,
+        );
+        posts.add(
+          CommunityNewsPost(
+            id: id,
+            body: body,
+            authorId: authorId,
+            authorName: authorNames[authorId] ?? 'FirstVue member',
+            authorUsername: authorUsernames[authorId],
+            businessName: contextName,
+            communityId: communityId,
+            communityName:
+                communityId == null ? null : communityNames[communityId],
+            communityImageUrl:
+                communityId == null ? null : communityImages[communityId],
+            createdAt: createdAt,
+            isMine: isMine,
+            sparkCount: sparkCounts[id] ?? 0,
+            sparkedByMe: mySparks.contains(id),
+            savedByMe: mySaves.contains(id),
+            visibility: visibility,
+            media: media,
+          ),
+        );
+      } catch (error) {
+        assert(() {
+          // ignore: avoid_print
+          print('Skipping malformed news post row: $error');
+          return true;
+        }());
+      }
+    }
+    return posts;
+  }
+
+  static Future<Map<String, String>> _fetchCommunityImages(
+    List<String> communityIds,
+  ) async {
+    if (communityIds.isEmpty) return const {};
+    try {
+      final rows = await _client
+          .from('communities')
+          .select('id, image_url')
+          .inFilter('id', communityIds);
+      return {
+        for (final row in rows)
+          if (row['image_url'] is String &&
+              (row['image_url'] as String).trim().isNotEmpty)
+            row['id'] as String: row['image_url'] as String,
+      };
+    } catch (_) {
+      return const {};
+    }
   }
 
   static Future<Set<String>> _followingAuthorIds(
@@ -633,6 +695,7 @@ class CommunityNewsService {
     final insertedProfessionalId = row['professional_profile_id'] as String?;
     final insertedEventId = row['event_id'] as String?;
     String? contextName;
+    String? communityName;
     if (insertedBusinessId != null) {
       contextName =
           (await _fetchBusinessNames([insertedBusinessId]))[insertedBusinessId];
@@ -643,8 +706,8 @@ class CommunityNewsService {
       contextName =
           (await _fetchEventTitles([insertedEventId]))[insertedEventId];
     } else if (insertedCommunityId != null) {
-      contextName =
-          (await _fetchCommunityNames([insertedCommunityId]))[insertedCommunityId];
+      communityName = (await _fetchCommunityNames([insertedCommunityId]))[
+          insertedCommunityId];
     }
 
     final post = CommunityNewsPost(
@@ -654,6 +717,8 @@ class CommunityNewsService {
       authorName: authorNames[me.id] ?? 'FirstVue member',
       authorUsername: authorUsernames[me.id],
       businessName: contextName,
+      communityId: insertedCommunityId,
+      communityName: communityName,
       createdAt: DateTime.parse(row['created_at'] as String),
       isMine: true,
       sparkCount: 0,
@@ -755,6 +820,25 @@ class CommunityNewsService {
       final rows = await _selectPosts(
         (query) => query
             .eq('event_id', eventId)
+            .order('created_at', ascending: false)
+            .limit(limit),
+      );
+      return _mapPostRows(rows, currentUserId: me);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<List<CommunityNewsPost>> fetchPostsForCommunity(
+    String communityId, {
+    int limit = 20,
+  }) async {
+    if (communityId.trim().isEmpty) return const [];
+    final me = _client.auth.currentUser?.id;
+    try {
+      final rows = await _selectPosts(
+        (query) => query
+            .eq('community_id', communityId)
             .order('created_at', ascending: false)
             .limit(limit),
       );
