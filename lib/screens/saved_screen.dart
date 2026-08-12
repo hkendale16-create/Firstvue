@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/firstvue_theme.dart';
 import '../navigation/firstvue_page_route.dart';
 
 import '../services/saved_businesses_store.dart';
@@ -123,7 +124,7 @@ class _SavedBusinessCard extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF10151B),
+            color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
             borderRadius: BorderRadius.circular(19),
             border: Border.all(
               color: const Color(0xFFD8B56A).withValues(alpha: .16),

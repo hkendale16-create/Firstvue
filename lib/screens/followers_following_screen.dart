@@ -140,9 +140,9 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen> {
     };
 
     return Scaffold(
-      backgroundColor: FirstVueColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: FirstVueColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text('$title · ${widget.displayName}'),
       ),
       body: FirstVueRefreshScaffold(

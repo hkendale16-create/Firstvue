@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/firstvue_theme.dart';
 import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -51,9 +52,9 @@ class JoinFirstVueScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF080B0F),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
         title: const Text(
           'GET VERIFIED',
@@ -138,7 +139,7 @@ class _RoleCard extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: const Color(0xFF10151B),
+            color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: accent.withValues(alpha: .4), width: 1.4),
           ),

@@ -194,9 +194,9 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
         (community.isMember || community.creatorId == me);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF080B0F),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         foregroundColor: Colors.white,
         title: Text(community?.name ?? 'Group'),
         actions: [

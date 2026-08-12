@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/firstvue_theme.dart';
 
 import '../data/us_locations.dart';
 
@@ -59,7 +60,7 @@ class LocationAutocompleteField extends StatelessWidget {
         return Align(
           alignment: Alignment.topLeft,
           child: Material(
-            color: const Color(0xFF151B22),
+            color: Theme.of(context).extension<FirstVuePalette>()?.elevatedSurface ?? FirstVueColors.elevatedSurface,
             elevation: 6,
             borderRadius: BorderRadius.circular(12),
             child: ConstrainedBox(

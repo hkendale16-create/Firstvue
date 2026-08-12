@@ -100,9 +100,9 @@ class _MyProfessionalProfileViewScreenState
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF080B0F),
-        body: Center(
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: const Center(
           child: CircularProgressIndicator(color: Color(0xFFD8B56A)),
         ),
       );
@@ -111,9 +111,9 @@ class _MyProfessionalProfileViewScreenState
     final profile = _profile;
     if (profile == null) {
       return Scaffold(
-        backgroundColor: const Color(0xFF080B0F),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          backgroundColor: const Color(0xFF080B0F),
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           title: const Text('MY PROFESSIONAL PROFILE'),
         ),
         body: Center(
@@ -161,7 +161,7 @@ class _MyProfessionalProfileViewScreenState
     final avatarUrl = _profileImages.avatar?.signedUrl;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: FirstVueRefreshScaffold(
         onRefresh: _load,
         child: ListView(

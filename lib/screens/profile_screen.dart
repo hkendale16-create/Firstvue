@@ -556,7 +556,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: FirstVueColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       endDrawer: FirstVueSettingsDrawer(
         onSignOut: () {
           if (mounted) {

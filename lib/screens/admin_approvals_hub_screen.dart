@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../theme/firstvue_theme.dart';
 import '../services/business_submission_service.dart';
 import '../services/community_creation_service.dart';
 import '../services/community_hub_service.dart';
@@ -17,9 +18,9 @@ class AdminApprovalsHubScreen extends StatelessWidget {
     return DefaultTabController(
       length: 6,
       child: Scaffold(
-        backgroundColor: const Color(0xFF080B0F),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          backgroundColor: const Color(0xFF080B0F),
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           surfaceTintColor: Colors.transparent,
           title: const Text('APPROVAL CENTER'),
           bottom: const TabBar(
@@ -551,7 +552,7 @@ class _ApprovalCardState extends State<_ApprovalCard> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF10151B),
+        color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white12),
       ),

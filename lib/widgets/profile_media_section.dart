@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/firstvue_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../navigation/firstvue_page_route.dart';
@@ -228,7 +229,7 @@ class _ProfileMediaSectionState extends State<ProfileMediaSection> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10151B),
+                          color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: Colors.white.withValues(alpha: .07)),
                         ),

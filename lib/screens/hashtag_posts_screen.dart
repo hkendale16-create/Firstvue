@@ -40,9 +40,9 @@ class _HashtagPostsScreenState extends State<HashtagPostsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: FirstVueColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: FirstVueColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text('#${widget.tag}'),
       ),
       body: FirstVueRefreshScaffold(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -16,6 +17,7 @@ import 'screens/post_detail_screen.dart';
 import 'services/activity_notifications_service.dart';
 import 'services/deep_link_service.dart';
 import 'services/notification_service.dart';
+import 'theme/app_theme_controller.dart';
 import 'theme/firstvue_theme.dart';
 import 'widgets/firstvue_bottom_nav.dart';
 import 'widgets/firstvue_onboarding.dart';
@@ -34,6 +36,8 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Theme loads from local prefs only — never blocked on Supabase.
+  await appThemeController.load();
   await Supabase.initialize(
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.publishableKey,
@@ -47,12 +51,37 @@ class FirstVueApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'FirstVue',
-      theme: FirstVueTheme.elegantDark,
-      navigatorKey: _rootNavigatorKey,
-      home: const FirstVueHome(),
+    return ListenableBuilder(
+      listenable: appThemeController,
+      builder: (context, _) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'FirstVue',
+          theme: FirstVueTheme.elegantLight,
+          darkTheme: FirstVueTheme.elegantDark,
+          themeMode: appThemeController.themeMode,
+          navigatorKey: _rootNavigatorKey,
+          builder: (context, child) {
+            final brightness = Theme.of(context).brightness;
+            final overlay = brightness == Brightness.dark
+                ? SystemUiOverlayStyle.light.copyWith(
+                    statusBarColor: Colors.transparent,
+                    systemNavigationBarColor: context.fv.navBar,
+                    systemNavigationBarIconBrightness: Brightness.light,
+                  )
+                : SystemUiOverlayStyle.dark.copyWith(
+                    statusBarColor: Colors.transparent,
+                    systemNavigationBarColor: context.fv.navBar,
+                    systemNavigationBarIconBrightness: Brightness.dark,
+                  );
+            return AnnotatedRegion<SystemUiOverlayStyle>(
+              value: overlay,
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
+          home: const FirstVueHome(),
+        );
+      },
     );
   }
 }
@@ -206,7 +235,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: FirstVueColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       endDrawer: const FirstVueSettingsDrawer(),
       body: Stack(
         children: [

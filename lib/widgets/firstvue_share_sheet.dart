@@ -233,7 +233,7 @@ class _ShareOption extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF151B22),
+                  color: Theme.of(context).extension<FirstVuePalette>()?.elevatedSurface ?? FirstVueColors.elevatedSurface,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: FirstVueColors.gold, size: 22),

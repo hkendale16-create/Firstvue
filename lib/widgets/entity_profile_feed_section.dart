@@ -419,7 +419,7 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF10151B),
+                color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(

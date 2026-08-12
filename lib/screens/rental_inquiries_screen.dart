@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/firstvue_theme.dart';
 
 import '../services/rentals_store.dart';
 
@@ -42,9 +43,9 @@ class _RentalInquiriesScreenState extends State<RentalInquiriesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF080B0F),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
         title: const Text('RENTAL INQUIRIES'),
       ),
@@ -121,7 +122,7 @@ class _InquiryCard extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF10151B),
+            color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: isNew

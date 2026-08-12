@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/firstvue_theme.dart';
 import '../navigation/firstvue_page_route.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -707,9 +708,9 @@ class _BarberResultsScreenState extends State<BarberResultsScreen> {
     final businesses = _visibleBusinesses;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF080B0F),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -971,7 +972,7 @@ class _SearchField extends StatelessWidget {
     return Container(
       height: 56,
       decoration: BoxDecoration(
-        color: const Color(0xFF151B22),
+        color: Theme.of(context).extension<FirstVuePalette>()?.elevatedSurface ?? FirstVueColors.elevatedSurface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: const Color(0xFFD8B56A).withValues(alpha: .22),
@@ -1109,7 +1110,7 @@ class _ApprovedProfessionalCard extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF10151B),
+            color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
             borderRadius: BorderRadius.circular(21),
             border: Border.all(
               color: const Color(0xFFD8B56A).withValues(alpha: .4),
@@ -1122,7 +1123,7 @@ class _ApprovedProfessionalCard extends StatelessWidget {
                 height: 62,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF151B22),
+                  color: Theme.of(context).extension<FirstVuePalette>()?.elevatedSurface ?? FirstVueColors.elevatedSurface,
                   border: Border.all(
                     color: const Color(0xFFD8B56A).withValues(alpha: .65),
                   ),
@@ -1207,7 +1208,7 @@ class _ApprovedBusinessCard extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF10151B),
+            color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
             borderRadius: BorderRadius.circular(21),
             border: Border.all(
               color: const Color(0xFFD8B56A).withValues(alpha: .34),
