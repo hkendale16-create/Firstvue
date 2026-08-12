@@ -94,6 +94,8 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
           ),
         );
       case SearchResultType.business:
+      case SearchResultType.professional:
+      case SearchResultType.event:
       case SearchResultType.community:
       case SearchResultType.hashtag:
         _controller.text = result.label;

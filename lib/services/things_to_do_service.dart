@@ -46,6 +46,23 @@ class ThingsToDoService {
     }
   }
 
+  static Future<CommunityEvent?> fetchEventById(String id) async {
+    if (id.trim().isEmpty) return null;
+    try {
+      final row = await _client
+          .from('community_events')
+          .select(
+            'id, title, description, event_at, location_label, organizer_id, cover_storage_path, cover_storage_provider, businesses(name)',
+          )
+          .eq('id', id)
+          .maybeSingle();
+      if (row == null) return null;
+      return _mapRow(row);
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<bool> canPostEvents() async {
     final user = _client.auth.currentUser;
     if (user == null) return false;

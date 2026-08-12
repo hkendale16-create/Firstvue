@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 
+import '../screens/create_shoutout_screen.dart';
 import '../screens/firstvue_business_profile_screen.dart';
 import '../services/recommendations_service.dart';
+import '../services/shoutout_service.dart';
 import '../services/things_to_do_service.dart';
 import '../services/trending_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'shoutout_card.dart';
 
 class HomeDiscoverySection extends StatefulWidget {
   final VoidCallback onViewAllVue;
@@ -144,26 +147,136 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
-          'SHOUTOUTS',
-          style: TextStyle(
-            color: FirstVueColors.ivory,
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
-          ),
+        _HomeShoutoutsSection(refreshToken: widget.refreshToken),
+      ],
+    );
+  }
+}
+
+class _HomeShoutoutsSection extends StatefulWidget {
+  final int refreshToken;
+
+  const _HomeShoutoutsSection({required this.refreshToken});
+
+  @override
+  State<_HomeShoutoutsSection> createState() => _HomeShoutoutsSectionState();
+}
+
+class _HomeShoutoutsSectionState extends State<_HomeShoutoutsSection> {
+  late Future<List<Shoutout>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = ShoutoutService.fetchRecent(limit: 12);
+  }
+
+  @override
+  void didUpdateWidget(covariant _HomeShoutoutsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      _reload();
+    }
+  }
+
+  void _reload() {
+    setState(() {
+      _future = ShoutoutService.fetchRecent(limit: 12);
+    });
+  }
+
+  Future<void> _createShoutout() async {
+    final created = await Navigator.push<Shoutout>(
+      context,
+      FirstVuePageRoute(builder: (_) => const CreateShoutoutScreen()),
+    );
+    if (created != null && mounted) _reload();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'SHOUTOUTS',
+                style: TextStyle(
+                  color: FirstVueColors.ivory,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: _createShoutout,
+              style: TextButton.styleFrom(
+                foregroundColor: FirstVueColors.coral,
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'Add Shoutout',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 10),
-        _ShoutoutCard(
-          title: 'Highlighted comment',
-          body: '“FirstVue helped me find my barber in one tap.”',
-          accent: FirstVueColors.teal,
-        ),
-        const SizedBox(height: 8),
-        _ShoutoutCard(
-          title: 'Community shoutout',
-          body: 'Support local owners and leave a spark on their posts.',
-          accent: FirstVueColors.coral,
+        FutureBuilder<List<Shoutout>>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting &&
+                !snapshot.hasData) {
+              return const SizedBox(
+                height: 72,
+                child: Center(
+                  child: CircularProgressIndicator(color: FirstVueColors.teal),
+                ),
+              );
+            }
+
+            final items = snapshot.data ?? const <Shoutout>[];
+            if (items.isEmpty) {
+              return GestureDetector(
+                onTap: _createShoutout,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'Be the first to give a shoutout to a local favorite.',
+                    style: TextStyle(color: Colors.white54, height: 1.35),
+                  ),
+                ),
+              );
+            }
+
+            return SizedBox(
+              height: 148,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: items.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final shoutout = items[index];
+                  return Container(
+                    width: 280,
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                    decoration: BoxDecoration(
+                      color: FirstVueColors.surface.withValues(alpha: .55),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: SingleChildScrollView(
+                      child: ShoutoutCard(shoutout: shoutout, compact: true),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
         ),
       ],
     );
@@ -290,41 +403,6 @@ class _EventsSwipeList extends StatelessWidget {
           },
         );
       },
-    );
-  }
-}
-
-class _ShoutoutCard extends StatelessWidget {
-  final String title;
-  final String body;
-  final Color accent;
-
-  const _ShoutoutCard({
-    required this.title,
-    required this.body,
-    required this.accent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title.toUpperCase(),
-            style: TextStyle(
-              color: accent,
-              fontWeight: FontWeight.bold,
-              fontSize: 11,
-              letterSpacing: 1,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(body, style: const TextStyle(color: Colors.white70, height: 1.35)),
-        ],
-      ),
     );
   }
 }

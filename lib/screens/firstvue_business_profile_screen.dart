@@ -12,6 +12,8 @@ import '../services/messaging_service.dart';
 import '../widgets/social_platform_icon.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/entity_profile_feed_section.dart';
+import '../widgets/shoutout_card.dart';
+import '../services/shoutout_service.dart';
 import '../widgets/firstvue_inline_search_bar.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import 'auth_screen.dart';
@@ -284,6 +286,11 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
                   scope: EntityFeedScope.business,
                   entityId: details.id,
                   canPost: isOwnerPreview,
+                ),
+                ShoutoutsReceivedSection(
+                  targetType: ShoutoutTargetType.business,
+                  targetId: details.id,
+                  title: 'SHOUTOUTS RECEIVED',
                 ),
                 const SizedBox(height: 22),
                 const _ProfileSectionTitle('LOCATION'),

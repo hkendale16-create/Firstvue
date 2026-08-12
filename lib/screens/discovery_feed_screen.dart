@@ -3,6 +3,9 @@ import '../navigation/firstvue_page_route.dart';
 
 import '../config/app_config.dart';
 import '../services/discovery_feed_service.dart';
+import '../services/professional_profiles_service.dart';
+import '../services/things_to_do_service.dart';
+import '../widgets/event_profile_sheet.dart';
 import '../widgets/feed_comments_sheet.dart';
 import '../widgets/vue_video_player.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
@@ -10,8 +13,10 @@ import '../widgets/firstvue_share_sheet.dart';
 import '../models/share_payload.dart';
 import 'ai_search_screen.dart';
 import 'business_profile_screen.dart';
+import 'community_detail_screen.dart';
 import 'firstvue_business_profile_screen.dart';
 import 'member_public_profile_screen.dart';
+import 'professional_public_profile_screen.dart';
 
 enum _FeedMode { forYou, nearby, trending }
 
@@ -79,8 +84,8 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   void _onPageChanged() {
     if (!_pageController.hasClients) return;
     final page = _pageController.page?.round() ?? 0;
-    if (page != _currentPage) {
-      _currentPage = page;
+    if (page != _currentPage && mounted) {
+      setState(() => _currentPage = page);
     }
   }
 
@@ -127,60 +132,114 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
     );
   }
 
-  void _openProfile(_FeedItem item) {
+  Future<void> _openProfile(_FeedItem item) async {
     final connected = item.connected;
-    if (connected != null && connected.isMember) {
-      DiscoveryFeedService.recordProfileTap(connected);
-      openMemberProfile(
-        context,
-        profileId: connected.ownerId,
-        displayName: connected.ownerName,
-      );
-      return;
-    }
-    if (connected != null && connected.businessId.isNotEmpty) {
-      DiscoveryFeedService.recordProfileTap(connected);
+    if (connected == null) {
       Navigator.push(
         context,
         FirstVuePageRoute(
-          builder: (_) =>
-              FirstVueBusinessProfileScreen(businessId: connected.businessId),
+          builder: (_) => BusinessProfileScreen(
+            businessName: item.name,
+            rating: item.rating,
+            reviews: item.reviews,
+            verified: item.verified,
+            distance: item.distance,
+            specialty: item.specialty,
+            profileIcon: item.icon,
+            profileLabel: 'Discovered on Vue Feed',
+            aboutText:
+                'See services, pricing, reviews, photos, availability, and booking details from this business.',
+          ),
         ),
       );
       return;
     }
-    Navigator.push(
-      context,
-      FirstVuePageRoute(
-        builder: (_) => BusinessProfileScreen(
-          businessName: item.name,
-          rating: item.rating,
-          reviews: item.reviews,
-          verified: item.verified,
-          distance: item.distance,
-          specialty: item.specialty,
-          profileIcon: item.icon,
-          profileLabel: 'Discovered on Vue Feed',
-          aboutText:
-              'See services, pricing, reviews, photos, availability, and booking details from this business.',
-        ),
-      ),
-    );
+
+    DiscoveryFeedService.recordProfileTap(connected);
+
+    switch (connected.source) {
+      case VueFeedSource.member:
+        openMemberProfile(
+          context,
+          profileId: connected.entityId,
+          displayName: connected.entityName,
+        );
+      case VueFeedSource.business:
+        Navigator.push(
+          context,
+          FirstVuePageRoute(
+            builder: (_) => FirstVueBusinessProfileScreen(
+              businessId: connected.entityId,
+            ),
+          ),
+        );
+      case VueFeedSource.professional:
+        final profile = await ProfessionalProfilesService.fetchById(
+          connected.entityId,
+        );
+        if (!mounted) return;
+        if (profile == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Professional profile unavailable.')),
+          );
+          return;
+        }
+        Navigator.push(
+          context,
+          FirstVuePageRoute(
+            builder: (_) => ProfessionalPublicProfileScreen(
+              profile: profile,
+              icon: Icons.badge_outlined,
+            ),
+          ),
+        );
+      case VueFeedSource.event:
+        final event = await ThingsToDoService.fetchEventById(connected.entityId);
+        if (!mounted) return;
+        if (event == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Event unavailable.')),
+          );
+          return;
+        }
+        await EventProfileSheet.show(context, event: event);
+      case VueFeedSource.community:
+        Navigator.push(
+          context,
+          FirstVuePageRoute(
+            builder: (_) => CommunityDetailScreen(
+              communityId: connected.entityId,
+            ),
+          ),
+        );
+    }
   }
 
   List<_FeedItem> _connectedItems(List<DiscoveryFeedItem> items) => items
       .map(
         (item) => _FeedItem(
-          item.businessName,
+          item.entityName,
           item.isMember
               ? '${item.caption} • @${item.ownerName}'
               : '${item.caption} • @${item.ownerName}',
-          item.services.isEmpty ? item.businessType : item.services.join(' • '),
-          item.isMember ? 'Member' : 'Nearby',
+          item.services.isEmpty ? item.entitySubtitle : item.services.join(' • '),
+          switch (item.source) {
+            VueFeedSource.member => 'Member',
+            VueFeedSource.professional => 'Professional',
+            VueFeedSource.event => 'Event',
+            VueFeedSource.community => 'Community',
+            VueFeedSource.business => 'Nearby',
+          },
           item.rating,
           0,
           item.mediaUrl,
-          item.isMember ? Icons.person_rounded : Icons.storefront_rounded,
+          switch (item.source) {
+            VueFeedSource.member => Icons.person_rounded,
+            VueFeedSource.professional => Icons.badge_outlined,
+            VueFeedSource.event => Icons.local_activity_outlined,
+            VueFeedSource.community => Icons.groups_rounded,
+            VueFeedSource.business => Icons.storefront_rounded,
+          },
           item.verified,
           item.sponsored,
           connected: item,
@@ -298,9 +357,10 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                         final item = items[index];
                         final itemKey = item.connected?.mediaId ??
                             '${item.name}-${item.image}';
-                        return _InteractiveFeedCard(
+                    return _InteractiveFeedCard(
                           key: ValueKey(itemKey),
                           item: item,
+                          isActive: index == _currentPage,
                           onViewProfile: () => _openProfile(item),
                         );
                       },
@@ -511,10 +571,12 @@ class _Action extends StatelessWidget {
 class _InteractiveFeedCard extends StatefulWidget {
   final _FeedItem item;
   final VoidCallback onViewProfile;
+  final bool isActive;
   const _InteractiveFeedCard({
     super.key,
     required this.item,
     required this.onViewProfile,
+    this.isActive = true,
   });
 
   @override
@@ -537,9 +599,15 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
     final item = widget.item;
     final link = connected == null
         ? AppConfig.webBaseUrl
-        : connected.isMember
-            ? AppConfig.memberShareUrl(connected.ownerId)
-            : AppConfig.businessShareUrl(connected.businessId);
+        : switch (connected.source) {
+            VueFeedSource.member => AppConfig.memberShareUrl(connected.entityId),
+            VueFeedSource.business =>
+              AppConfig.businessShareUrl(connected.entityId),
+            VueFeedSource.professional ||
+            VueFeedSource.event ||
+            VueFeedSource.community =>
+              AppConfig.webBaseUrl,
+          };
 
     FirstVueShareSheet.show(
       context,
@@ -547,7 +615,7 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
         title: item.name,
         subtitle: item.caption,
         link: link,
-        detailLine: connected?.isMember == true
+        detailLine: connected?.source == VueFeedSource.member
             ? 'FirstVue member profile'
             : '★ ${item.rating} (${item.reviews} reviews) • ${item.distance} • ${item.specialty}',
       ),
@@ -584,8 +652,18 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
   Widget build(BuildContext context) {
     final item = widget.item;
     final connected = item.connected;
-    final isVideo = connected?.isVideo ?? false;
-    final isMember = connected?.isMember ?? false;
+    // Prefer stored media_type from the model — never infer from URL alone.
+    final isVideo = connected?.isVideo ?? (item.mediaType == 'video');
+    final viewLabel = connected?.viewActionLabel ?? 'View Profile';
+    final avatarIcon = connected == null
+        ? Icons.storefront
+        : switch (connected.source) {
+            VueFeedSource.member => Icons.person,
+            VueFeedSource.professional => Icons.badge_outlined,
+            VueFeedSource.event => Icons.local_activity_outlined,
+            VueFeedSource.community => Icons.groups_rounded,
+            VueFeedSource.business => Icons.storefront,
+          };
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
@@ -597,7 +675,8 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
             _VueFeedMediaBackground(
               assetPath: item.connected == null ? item.image : null,
               networkUrl: item.connected == null ? null : item.image,
-              isVideo: connected?.isVideo ?? false,
+              isVideo: isVideo,
+              isActive: widget.isActive,
             ),
             const IgnorePointer(
               child: DecoratedBox(
@@ -615,16 +694,6 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
                 ),
               ),
             ),
-            if (!isVideo)
-              const IgnorePointer(
-                child: Center(
-                  child: Icon(
-                    Icons.play_circle_outline_rounded,
-                    color: Color(0xCCFFFFFF),
-                    size: 64,
-                  ),
-                ),
-              ),
             Positioned(
               right: 13,
               bottom: 116,
@@ -693,7 +762,7 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
                             radius: 18,
                             backgroundColor: Colors.black45,
                             child: Icon(
-                              isMember ? Icons.person : Icons.storefront,
+                              avatarIcon,
                               color: Colors.white,
                               size: 18,
                             ),
@@ -740,7 +809,7 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    isMember
+                    connected?.source == VueFeedSource.member
                         ? '${item.specialty} • FirstVue member'
                         : '★ ${item.rating} (${item.reviews}) • ${item.distance} • ${item.specialty}',
                     maxLines: 2,
@@ -757,7 +826,7 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
                         foregroundColor: Colors.black,
                         visualDensity: VisualDensity.compact,
                       ),
-                      child: Text(isMember ? 'VIEW PROFILE' : 'VIEW BUSINESS'),
+                      child: Text(viewLabel.toUpperCase()),
                     ),
                   ),
                 ],
@@ -774,11 +843,13 @@ class _VueFeedMediaBackground extends StatelessWidget {
   final String? assetPath;
   final String? networkUrl;
   final bool isVideo;
+  final bool isActive;
 
   const _VueFeedMediaBackground({
     this.assetPath,
     this.networkUrl,
     this.isVideo = false,
+    this.isActive = true,
   });
 
   @override
@@ -803,9 +874,14 @@ class _VueFeedMediaBackground extends StatelessWidget {
         fit: BoxFit.cover,
         autoPlay: true,
         startMuted: true,
+        isActive: isActive,
+        showMuteControl: true,
+        showProgress: false,
+        muteAlignment: Alignment.topRight,
       );
     }
 
+    // Image posts: no play icon, mute, or progress controls.
     return Image.network(
       url,
       fit: BoxFit.cover,

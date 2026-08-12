@@ -26,6 +26,8 @@ import '../widgets/follow_requests_section.dart';
 import '../widgets/live_stream_eligibility_card.dart';
 import '../widgets/firstvue_settings_drawer.dart';
 import '../widgets/firstvue_inline_search_bar.dart';
+import '../widgets/shoutout_card.dart';
+import '../services/shoutout_service.dart';
 import '../models/share_payload.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -639,6 +641,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 8),
               ProfileSavedSection(refreshToken: widget.refreshToken),
             ],
+            if (user != null)
+              ShoutoutsReceivedSection(
+                targetType: ShoutoutTargetType.profile,
+                targetId: user.id,
+                refreshToken: _effectiveRefreshToken,
+                title: 'SHOUTOUTS RECEIVED',
+              ),
           ],
           if (user == null) ...[
             const SizedBox(height: 16),

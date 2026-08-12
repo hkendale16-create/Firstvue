@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
+import '../navigation/entity_navigation.dart';
 import '../navigation/firstvue_page_route.dart';
 
-import '../screens/community_detail_screen.dart';
-import '../screens/firstvue_business_profile_screen.dart';
-import '../screens/member_public_profile_screen.dart';
 import '../services/search_autocomplete_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'barber_results_screen.dart';
@@ -60,31 +58,11 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _openSuggestion(SearchAutocompleteResult result) {
-    switch (result.type) {
-      case SearchResultType.profile:
-        Navigator.push(
-          context,
-          FirstVuePageRoute(
-            builder: (_) => MemberPublicProfileScreen(profileId: result.id),
-          ),
-        );
-      case SearchResultType.business:
-        Navigator.push(
-          context,
-          FirstVuePageRoute(
-            builder: (_) => FirstVueBusinessProfileScreen(businessId: result.id),
-          ),
-        );
-      case SearchResultType.community:
-        Navigator.push(
-          context,
-          FirstVuePageRoute(
-            builder: (_) => CommunityDetailScreen(communityId: result.id),
-          ),
-        );
-      case SearchResultType.hashtag:
-        _search(result.label.replaceFirst('#', ''));
+    if (result.type == SearchResultType.hashtag) {
+      _search(result.label.replaceFirst('#', ''));
+      return;
     }
+    EntityNavigation.openSearchResult(context, result);
   }
 
   @override
