@@ -140,6 +140,13 @@ class _CommunityNewsPostDetailSheetState
     }
   }
 
+  Future<void> _deletePost() async {
+    final post = _post;
+    if (post == null) return;
+    final deleted = await confirmDeleteNewsPost(context, post);
+    if (deleted && mounted) Navigator.pop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -172,6 +179,12 @@ class _CommunityNewsPostDetailSheetState
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close, color: Colors.white54),
                 ),
+                if (_post?.isMine == true)
+                  IconButton(
+                    onPressed: _deletePost,
+                    icon: const Icon(Icons.delete_outline, color: Colors.white38),
+                    tooltip: 'Delete post',
+                  ),
               ],
             ),
           ),
@@ -205,6 +218,7 @@ class _CommunityNewsPostDetailSheetState
                           post: _post!,
                           onSpark: _toggleSpark,
                           onSave: _toggleSave,
+                          onDelete: _post!.isMine ? _deletePost : null,
                           onComment: () => FeedCommentsSheet.show(
                             context,
                             mediaId: _post!.commentsMediaId,

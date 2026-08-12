@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/firstvue_theme.dart';
+import 'signed_media_viewer.dart';
 
 class EditableMediaGridItem {
   final String id;
@@ -43,6 +44,11 @@ class EditableMediaGrid extends StatelessWidget {
           trendingHint,
           style: const TextStyle(color: Colors.white38, fontSize: 11, height: 1.35),
         ),
+        const SizedBox(height: 4),
+        const Text(
+          'Tap a photo or video to preview.',
+          style: TextStyle(color: Colors.white24, fontSize: 10),
+        ),
         const SizedBox(height: 8),
         GridView.builder(
           shrinkWrap: true,
@@ -60,27 +66,19 @@ class EditableMediaGrid extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  if (media.isVideo)
-                    const ColoredBox(
-                      color: Color(0xFF151B22),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.videocam_outlined, color: FirstVueColors.teal, size: 32),
-                          SizedBox(height: 4),
-                          Text('VIDEO', style: TextStyle(color: Colors.white54, fontSize: 10)),
-                        ],
-                      ),
-                    )
-                  else
-                    Image.network(
-                      media.signedUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const ColoredBox(
-                        color: Color(0xFF151B22),
-                        child: Icon(Icons.broken_image_outlined, color: Colors.white38),
-                      ),
+                  GestureDetector(
+                    onTap: () => openSignedMedia(
+                      context,
+                      url: media.signedUrl,
+                      isVideo: media.isVideo,
+                      title: media.isVideo ? 'VIDEO' : 'PHOTO',
                     ),
+                    child: SignedMediaThumbnail(
+                      url: media.signedUrl,
+                      isVideo: media.isVideo,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                   Positioned(
                     top: 4,
                     left: 4,

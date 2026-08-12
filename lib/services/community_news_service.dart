@@ -5,6 +5,16 @@ import 'activity_notifications_service.dart';
 import 'community_news_media_service.dart';
 import 'saved_items_service.dart';
 
+class ProfileEngagementStats {
+  final int postCount;
+  final int sparksReceived;
+
+  const ProfileEngagementStats({
+    required this.postCount,
+    required this.sparksReceived,
+  });
+}
+
 class CommunityNewsPost {
   final String id;
   final String body;
@@ -366,6 +376,50 @@ class CommunityNewsService {
       currentlySaved: post.savedByMe,
     );
     return post.copyWith(savedByMe: saved);
+  }
+
+  /// Post count and sparks received on the signed-in user's posts.
+  static Future<ProfileEngagementStats> fetchMyEngagementStats() async {
+    final me = _client.auth.currentUser;
+    if (me == null) {
+      return const ProfileEngagementStats(postCount: 0, sparksReceived: 0);
+    }
+
+    try {
+      final posts = await _client
+          .from('community_news_posts')
+          .select('id')
+          .eq('author_id', me.id);
+      final postIds =
+          posts.map((row) => row['id'] as String).toList(growable: false);
+      final postCount = postIds.length;
+
+      if (postIds.isEmpty) {
+        return ProfileEngagementStats(postCount: postCount, sparksReceived: 0);
+      }
+
+      final sparkRows = await _client
+          .from('community_news_post_sparks')
+          .select('post_id')
+          .inFilter('post_id', postIds);
+      return ProfileEngagementStats(
+        postCount: postCount,
+        sparksReceived: sparkRows.length,
+      );
+    } catch (_) {
+      return const ProfileEngagementStats(postCount: 0, sparksReceived: 0);
+    }
+  }
+
+  static Future<void> deletePost(String postId) async {
+    final me = _client.auth.currentUser;
+    if (me == null) throw const AuthException('Sign in to delete posts.');
+
+    await _client
+        .from('community_news_posts')
+        .delete()
+        .eq('id', postId)
+        .eq('author_id', me.id);
   }
 
   static Future<CommunityNewsPost> toggleSpark(CommunityNewsPost post) async {

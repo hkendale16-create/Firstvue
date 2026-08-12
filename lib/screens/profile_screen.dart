@@ -17,12 +17,17 @@ import 'my_businesses_screen.dart';
 import 'messages_inbox_screen.dart';
 import 'my_professional_profile_view_screen.dart';
 import '../services/admin_auth_service.dart';
+import '../services/community_news_service.dart';
 import '../services/profile_media_service.dart';
+import '../theme/firstvue_theme.dart';
+import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/media_picker_sheet.dart';
+import '../widgets/signed_media_viewer.dart' show openSignedMedia;
 import '../widgets/profile_media_section.dart';
 import '../widgets/profile_my_posts_section.dart';
 import '../widgets/profile_recent_activity_section.dart';
 import '../widgets/profile_saved_section.dart';
+import '../widgets/firstvue_refresh_scaffold.dart';
 
 class ProfileScreen extends StatefulWidget {
   final int refreshToken;
@@ -39,12 +44,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   ProfileImageSet _profileImages = const ProfileImageSet();
   bool _imagesLoading = false;
   bool _imageUpdating = false;
+  ProfileEngagementStats _stats = const ProfileEngagementStats(
+    postCount: 0,
+    sparksReceived: 0,
+  );
+  bool _statsLoading = false;
+  int _selectedTab = 0;
+  int _pullRefreshToken = 0;
+  bool _showSettings = false;
+
+  static const _tabLabels = ['POSTS', 'PHOTOS', 'ACTIVITY'];
 
   @override
   void initState() {
     super.initState();
     _loadAdminAccess();
     _loadProfileImages();
+    _loadStats();
   }
 
   @override
@@ -53,7 +69,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (oldWidget.refreshToken != widget.refreshToken) {
       _loadAdminAccess();
       _loadProfileImages();
+      _loadStats();
     }
+  }
+
+  Future<void> _loadStats() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      if (mounted) {
+        setState(() {
+          _stats = const ProfileEngagementStats(postCount: 0, sparksReceived: 0);
+        });
+      }
+      return;
+    }
+    setState(() => _statsLoading = true);
+    final stats = await CommunityNewsService.fetchMyEngagementStats();
+    if (!mounted) return;
+    setState(() {
+      _stats = stats;
+      _statsLoading = false;
+    });
   }
 
   Future<void> _loadProfileImages() async {
@@ -92,12 +128,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               title: const Text('Change profile photo', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(ctx, 'change'),
             ),
-            if (hasAvatar)
+            if (hasAvatar) ...[
+              ListTile(
+                leading: const Icon(Icons.visibility_outlined, color: Color(0xFF78B9BE)),
+                title: const Text('View profile photo', style: TextStyle(color: Colors.white)),
+                onTap: () => Navigator.pop(ctx, 'view'),
+              ),
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.white54),
                 title: const Text('Remove profile photo', style: TextStyle(color: Colors.white70)),
                 onTap: () => Navigator.pop(ctx, 'remove'),
               ),
+            ],
           ],
         ),
       ),
@@ -105,6 +147,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (!mounted || action == null) return;
     if (action == 'remove') {
       await _removeProfileImage(isAvatar: true);
+    } else if (action == 'view') {
+      final avatar = _profileImages.avatar;
+      if (avatar != null && mounted) {
+        openSignedMedia(
+          context,
+          url: avatar.signedUrl,
+          isVideo: avatar.isVideo,
+          title: 'PROFILE PHOTO',
+        );
+      }
     } else if (action == 'change') {
       await _changeProfileImage(isAvatar: true);
     }
@@ -131,12 +183,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               title: const Text('Change cover photo', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(ctx, 'change'),
             ),
-            if (hasCover)
+            if (hasCover) ...[
+              ListTile(
+                leading: const Icon(Icons.visibility_outlined, color: Color(0xFF78B9BE)),
+                title: const Text('View cover photo', style: TextStyle(color: Colors.white)),
+                onTap: () => Navigator.pop(ctx, 'view'),
+              ),
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.white54),
                 title: const Text('Remove cover photo', style: TextStyle(color: Colors.white70)),
                 onTap: () => Navigator.pop(ctx, 'remove'),
               ),
+            ],
           ],
         ),
       ),
@@ -144,13 +202,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (!mounted || action == null) return;
     if (action == 'remove') {
       await _removeProfileImage(isAvatar: false);
+    } else if (action == 'view') {
+      final cover = _profileImages.cover;
+      if (cover != null && mounted) {
+        openSignedMedia(
+          context,
+          url: cover.signedUrl,
+          isVideo: cover.isVideo,
+          title: 'COVER PHOTO',
+        );
+      }
     } else if (action == 'change') {
       await _changeProfileImage(isAvatar: false);
     }
   }
 
   Future<void> _changeProfileImage({required bool isAvatar}) async {
-    final files = await showMediaPickerSheet(context);
+    final files = await showImagePickerSheet(context);
     if (files == null || files.isEmpty || !mounted) return;
     setState(() => _imageUpdating = true);
     try {
@@ -237,6 +305,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) {
       setState(() {});
       await _loadAdminAccess();
+      await _loadStats();
     }
   }
 
@@ -244,283 +313,364 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Navigator.push(context, FirstVuePageRoute(builder: (_) => screen));
   }
 
+  int get _effectiveRefreshToken => widget.refreshToken + _pullRefreshToken;
+
+  Future<void> _refreshProfile() async {
+    await Future.wait([
+      _loadAdminAccess(),
+      _loadProfileImages(),
+      _loadStats(),
+    ]);
+    if (mounted) setState(() => _pullRefreshToken++);
+  }
+
+  void _shareProfilePlaceholder() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Profile sharing is coming soon.')),
+    );
+  }
+
+  void _editProfilePlaceholder() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Use cover and avatar taps to update your look.')),
+    );
+  }
+
+  Widget _buildTabContent() {
+    return switch (_selectedTab) {
+      0 => ProfileMyPostsSection(
+          refreshToken: _effectiveRefreshToken,
+          embedded: true,
+        ),
+      1 => ProfileMediaSection(
+          refreshToken: _effectiveRefreshToken,
+          embedded: true,
+        ),
+      _ => ProfileRecentActivitySection(
+          refreshToken: _effectiveRefreshToken,
+          embedded: true,
+        ),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
     final email = user?.email ?? '';
-    final displayName = email.isEmpty
-        ? 'Guest'
-        : email.split('@').first;
+    final displayName = email.isEmpty ? 'Guest' : email.split('@').first;
 
     return SafeArea(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
+      child: FirstVueRefreshScaffold(
+        onRefresh: _refreshProfile,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          children: [
           Stack(
-            clipBehavior: Clip.none,
             children: [
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _imageUpdating ? null : _showCoverOptions,
-                child: Container(
-                  height: 150,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    gradient: _profileImages.cover == null
-                        ? const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFF1A2530),
-                              Color(0xFF243540),
-                              Color(0xFF78B9BE),
-                            ],
-                          )
-                        : null,
-                    image: _profileImages.cover != null
-                        ? DecorationImage(
-                            image: NetworkImage(_profileImages.cover!.signedUrl),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
-                  ),
-                  child: _profileImages.cover == null && user != null
-                      ? Align(
-                          alignment: Alignment.bottomRight,
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Icon(
-                              Icons.add_photo_alternate_outlined,
-                              color: Colors.white.withValues(alpha: .45),
-                              size: 22,
-                            ),
+              FacebookStyleProfileHeader(
+                title: displayName,
+                subtitle: user == null
+                    ? 'Sign in to sync your FirstVue account'
+                    : email,
+                coverImageUrl: _profileImages.cover?.signedUrl,
+                avatarImageUrl: _profileImages.avatar?.signedUrl,
+                coverIsVideo: _profileImages.cover?.isVideo ?? false,
+                avatarIsVideo: _profileImages.avatar?.isVideo ?? false,
+                onCoverTap: _imageUpdating ? null : _showCoverOptions,
+                onAvatarTap: _imageUpdating ? null : _showAvatarOptions,
+                showImageLoading: _imagesLoading || _imageUpdating,
+                stats: user == null
+                    ? null
+                    : [
+                        ProfileStatItem(
+                          label: 'Posts',
+                          value: _statsLoading ? '—' : '${_stats.postCount}',
+                        ),
+                        ProfileStatItem(
+                          label: 'Sparks received',
+                          value: _statsLoading ? '—' : '${_stats.sparksReceived}',
+                        ),
+                      ],
+                actionButtons: user == null
+                    ? [
+                        FilledButton(
+                          onPressed: () => _handleAccountTap(user),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: FirstVueColors.gold,
+                            foregroundColor: Colors.black,
                           ),
-                        )
-                      : null,
-                ),
+                          child: const Text('Sign in or create account'),
+                        ),
+                      ]
+                    : [
+                        OutlinedButton.icon(
+                          onPressed: _editProfilePlaceholder,
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          label: const Text('Edit profile'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: BorderSide(color: Colors.white.withValues(alpha: .25)),
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _shareProfilePlaceholder,
+                          icon: const Icon(Icons.share_outlined, size: 18),
+                          label: const Text('Share profile'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: BorderSide(color: Colors.white.withValues(alpha: .25)),
+                          ),
+                        ),
+                      ],
               ),
-              if (_imagesLoading || _imageUpdating)
-                const Positioned(
-                  top: 12,
-                  right: 12,
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
               Positioned(
-                left: 20,
-                bottom: -36,
-                child: GestureDetector(
-                  onTap: _imageUpdating ? null : _showAvatarOptions,
-                  child: CircleAvatar(
-                    radius: 46,
-                    backgroundColor: const Color(0xFF080B0F),
-                    child: CircleAvatar(
-                      radius: 42,
-                      backgroundColor: const Color(0xFF241D22),
-                      backgroundImage: _profileImages.avatar != null
-                          ? NetworkImage(_profileImages.avatar!.signedUrl)
-                          : null,
-                      child: _profileImages.avatar == null
-                          ? Icon(
-                              user == null ? Icons.person_outline : Icons.person,
-                              color: const Color(0xFF78B9BE),
-                              size: 40,
-                            )
-                          : null,
-                    ),
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  onPressed: () => setState(() => _showSettings = !_showSettings),
+                  icon: Icon(
+                    _showSettings ? Icons.close : Icons.settings_outlined,
+                    color: Colors.white.withValues(alpha: .85),
                   ),
+                  tooltip: _showSettings ? 'Hide settings' : 'Settings',
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 48),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  displayName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  user == null
-                      ? 'Sign in to sync your FirstVue account'
-                      : email,
-                  style: const TextStyle(color: Colors.white54),
-                ),
-                if (user != null) ...[
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: () => _handleAccountTap(user),
-                    icon: const Icon(Icons.logout, size: 18),
-                    label: const Text('Sign out'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white70,
-                      side: BorderSide(color: Colors.white.withValues(alpha: .2)),
-                    ),
-                  ),
-                ] else ...[
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: () => _handleAccountTap(user),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFD8B56A),
-                      foregroundColor: Colors.black,
-                    ),
-                    child: const Text('Sign in or create account'),
-                  ),
-                ],
-              ],
-            ),
           ),
           if (user != null) ...[
-            const SizedBox(height: 28),
-            ProfileMediaSection(refreshToken: widget.refreshToken),
-            ProfileSavedSection(refreshToken: widget.refreshToken),
-            ProfileMyPostsSection(refreshToken: widget.refreshToken),
-            ProfileRecentActivitySection(refreshToken: widget.refreshToken),
+            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10151B),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: .08)),
+                ),
+                child: Row(
+                  children: [
+                    for (var i = 0; i < _tabLabels.length; i++)
+                      Expanded(
+                        child: _ProfileTabButton(
+                          label: _tabLabels[i],
+                          selected: _selectedTab == i,
+                          onTap: () => setState(() => _selectedTab = i),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: KeyedSubtree(
+                key: ValueKey(_selectedTab),
+                child: _buildTabContent(),
+              ),
+            ),
+            if (_selectedTab == 0) ...[
+              const SizedBox(height: 8),
+              ProfileSavedSection(refreshToken: widget.refreshToken),
+            ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+              child: OutlinedButton.icon(
+                onPressed: () => _handleAccountTap(user),
+                icon: const Icon(Icons.logout, size: 18),
+                label: const Text('Sign out'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white70,
+                  side: BorderSide(color: Colors.white.withValues(alpha: .2)),
+                ),
+              ),
+            ),
           ],
-          const SizedBox(height: 10),
-          _SettingsGroup(
-            title: 'Your profile',
-            children: [
-              _SettingsTile(
-                icon: Icons.how_to_reg_outlined,
-                title: 'Get verified',
-                subtitle: 'Business owner, professional, or organizer',
-                onTap: user == null
-                    ? () => _handleAccountTap(user)
-                    : () => _open(const JoinFirstVueScreen()),
-              ),
-              _SettingsTile(
-                icon: Icons.storefront_outlined,
-                title: 'My business profiles',
-                subtitle: 'Photos, address, menu & details',
-                onTap: user == null
-                    ? () => _handleAccountTap(user)
-                    : () => _open(const MyBusinessesScreen()),
-              ),
-              _SettingsTile(
-                icon: Icons.badge_outlined,
-                title: 'My professional profile',
-                subtitle: 'Individual barber or stylist profile',
-                onTap: user == null
-                    ? () => _handleAccountTap(user)
-                    : () => _open(const MyProfessionalProfileViewScreen()),
-              ),
-            ],
-          ),
-          _SettingsGroup(
-            title: 'Activity',
-            children: [
-              _SettingsTile(
-                icon: Icons.chat_bubble_outline,
-                title: 'Messages',
-                onTap: user == null
-                    ? () => _handleAccountTap(user)
-                    : () => _open(const MessagesInboxScreen()),
-              ),
-              _SettingsTile(
-                icon: Icons.trending_up_rounded,
-                title: 'Growth, plans & analytics',
-                onTap: user == null
-                    ? () => _handleAccountTap(user)
-                    : () => _open(const BusinessGrowthScreen()),
-              ),
-              _SettingsTile(
-                icon: Icons.key_outlined,
-                title: 'My rental listings',
-                onTap: user == null
-                    ? () => _handleAccountTap(user)
-                    : () => _open(const MyRentalListingsScreen()),
-              ),
-              _SettingsTile(
-                icon: Icons.mark_email_unread_outlined,
-                title: 'Rental inquiries',
-                onTap: user == null
-                    ? () => _handleAccountTap(user)
-                    : () => _open(const RentalInquiriesScreen()),
-              ),
-            ],
-          ),
-          _SettingsGroup(
-            title: 'Preferences',
-            children: [
-              _SettingsTile(
-                icon: Icons.location_on_outlined,
-                title: 'Location',
-                subtitle: 'Controlled by device permissions',
-              ),
-              _SettingsTile(
-                icon: Icons.notifications_outlined,
-                title: 'Notifications',
-                subtitle: 'Push alerts for messages & updates',
-              ),
-            ],
-          ),
-          if (_adminLoaded && _isAdmin)
+          if (_showSettings || user == null) ...[
+            const SizedBox(height: 16),
             _SettingsGroup(
-              title: 'Admin tools',
-              titleColor: const Color(0xFFD8B56A),
+              title: 'Your profile',
               children: [
                 _SettingsTile(
-                  icon: Icons.admin_panel_settings_outlined,
-                  title: 'Approval center',
-                  subtitle: 'Business, professional & organizer',
-                  onTap: () => _open(const AdminApprovalsHubScreen()),
-                ),
-                _SettingsTile(
-                  icon: Icons.verified_outlined,
-                  title: 'Business approvals',
-                  onTap: () => _open(const AdminBusinessSubmissionsScreen()),
-                ),
-                _SettingsTile(
                   icon: Icons.how_to_reg_outlined,
-                  title: 'Professional approvals',
-                  onTap: () => _open(const AdminProfessionalProfilesScreen()),
+                  title: 'Get verified',
+                  subtitle: 'Business owner, professional, or organizer',
+                  onTap: user == null
+                      ? () => _handleAccountTap(user)
+                      : () => _open(const JoinFirstVueScreen()),
                 ),
                 _SettingsTile(
-                  icon: Icons.reviews_outlined,
-                  title: 'Review approvals',
-                  onTap: () => _open(const AdminBusinessReviewsScreen()),
+                  icon: Icons.storefront_outlined,
+                  title: 'My business profiles',
+                  subtitle: 'Photos, address, menu & details',
+                  onTap: user == null
+                      ? () => _handleAccountTap(user)
+                      : () => _open(const MyBusinessesScreen()),
                 ),
                 _SettingsTile(
-                  icon: Icons.admin_panel_settings_outlined,
-                  title: 'Rental approvals',
-                  onTap: () => _open(const AdminRentalsScreen()),
+                  icon: Icons.badge_outlined,
+                  title: 'My professional profile',
+                  subtitle: 'Individual barber or stylist profile',
+                  onTap: user == null
+                      ? () => _handleAccountTap(user)
+                      : () => _open(const MyProfessionalProfileViewScreen()),
                 ),
               ],
             ),
-          _SettingsGroup(
-            title: 'Legal & support',
+            _SettingsGroup(
+              title: 'Activity',
+              children: [
+                _SettingsTile(
+                  icon: Icons.chat_bubble_outline,
+                  title: 'Messages',
+                  onTap: user == null
+                      ? () => _handleAccountTap(user)
+                      : () => _open(const MessagesInboxScreen()),
+                ),
+                _SettingsTile(
+                  icon: Icons.trending_up_rounded,
+                  title: 'Growth, plans & analytics',
+                  onTap: user == null
+                      ? () => _handleAccountTap(user)
+                      : () => _open(const BusinessGrowthScreen()),
+                ),
+                _SettingsTile(
+                  icon: Icons.key_outlined,
+                  title: 'My rental listings',
+                  onTap: user == null
+                      ? () => _handleAccountTap(user)
+                      : () => _open(const MyRentalListingsScreen()),
+                ),
+                _SettingsTile(
+                  icon: Icons.mark_email_unread_outlined,
+                  title: 'Rental inquiries',
+                  onTap: user == null
+                      ? () => _handleAccountTap(user)
+                      : () => _open(const RentalInquiriesScreen()),
+                ),
+              ],
+            ),
+            _SettingsGroup(
+              title: 'Preferences',
+              children: [
+                _SettingsTile(
+                  icon: Icons.location_on_outlined,
+                  title: 'Location',
+                  subtitle: 'Controlled by device permissions',
+                ),
+                _SettingsTile(
+                  icon: Icons.notifications_outlined,
+                  title: 'Notifications',
+                  subtitle: 'Push alerts for messages & updates',
+                ),
+              ],
+            ),
+            if (_adminLoaded && _isAdmin)
+              _SettingsGroup(
+                title: 'Admin tools',
+                titleColor: const Color(0xFFD8B56A),
+                children: [
+                  _SettingsTile(
+                    icon: Icons.admin_panel_settings_outlined,
+                    title: 'Approval center',
+                    subtitle: 'Business, professional & organizer',
+                    onTap: () => _open(const AdminApprovalsHubScreen()),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.verified_outlined,
+                    title: 'Business approvals',
+                    onTap: () => _open(const AdminBusinessSubmissionsScreen()),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.how_to_reg_outlined,
+                    title: 'Professional approvals',
+                    onTap: () => _open(const AdminProfessionalProfilesScreen()),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.reviews_outlined,
+                    title: 'Review approvals',
+                    onTap: () => _open(const AdminBusinessReviewsScreen()),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.admin_panel_settings_outlined,
+                    title: 'Rental approvals',
+                    onTap: () => _open(const AdminRentalsScreen()),
+                  ),
+                ],
+              ),
+            _SettingsGroup(
+              title: 'Legal & support',
+              children: [
+                _SettingsTile(
+                  icon: Icons.privacy_tip_outlined,
+                  title: 'Privacy policy',
+                  onTap: () => _open(
+                    const LegalPolicyScreen(type: LegalPolicyType.privacy),
+                  ),
+                ),
+                _SettingsTile(
+                  icon: Icons.description_outlined,
+                  title: 'Terms of service',
+                  onTap: () => _open(
+                    const LegalPolicyScreen(type: LegalPolicyType.terms),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 28),
+        ],
+      ),
+      ),
+    );
+  }
+}
+
+class _ProfileTabButton extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ProfileTabButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
             children: [
-              _SettingsTile(
-                icon: Icons.privacy_tip_outlined,
-                title: 'Privacy policy',
-                onTap: () => _open(
-                  const LegalPolicyScreen(type: LegalPolicyType.privacy),
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? FirstVueColors.gold : Colors.white54,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  letterSpacing: 1,
                 ),
               ),
-              _SettingsTile(
-                icon: Icons.description_outlined,
-                title: 'Terms of service',
-                onTap: () => _open(
-                  const LegalPolicyScreen(type: LegalPolicyType.terms),
+              const SizedBox(height: 6),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                height: 3,
+                width: selected ? 36 : 0,
+                decoration: BoxDecoration(
+                  color: FirstVueColors.gold,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 28),
-        ],
+        ),
       ),
     );
   }

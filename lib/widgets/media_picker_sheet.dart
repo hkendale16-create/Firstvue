@@ -3,7 +3,90 @@ import 'package:image_picker/image_picker.dart';
 
 import '../theme/firstvue_theme.dart';
 
-Future<List<XFile>?> showMediaPickerSheet(BuildContext context) {
+enum MediaPickerMode { photosAndVideos, photosOnly }
+
+Future<List<XFile>?> showMediaPickerSheet(
+  BuildContext context, {
+  MediaPickerMode mode = MediaPickerMode.photosAndVideos,
+}) {
+  if (mode == MediaPickerMode.photosOnly) {
+    return showImagePickerSheet(context);
+  }
+  return _showFullMediaPicker(context);
+}
+
+Future<List<XFile>?> showImagePickerSheet(BuildContext context) {
+  final picker = ImagePicker();
+  return showModalBottomSheet<List<XFile>>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: const Color(0xFF10151B),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'CHOOSE A PHOTO',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'JPEG, PNG, WebP, GIF, or HEIC — up to 50 MB.',
+              style: TextStyle(color: Colors.white54, fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 14),
+            _PickerButton(
+              icon: Icons.photo_library_outlined,
+              iconColor: FirstVueColors.gold,
+              label: 'Photo from gallery',
+              onTap: () async {
+                final photo = await picker.pickImage(
+                  source: ImageSource.gallery,
+                  imageQuality: 90,
+                );
+                if (sheetContext.mounted) {
+                  Navigator.pop(
+                    sheetContext,
+                    photo == null ? null : [photo],
+                  );
+                }
+              },
+            ),
+            _PickerButton(
+              icon: Icons.photo_camera_outlined,
+              iconColor: FirstVueColors.teal,
+              label: 'Take a photo',
+              onTap: () async {
+                final photo = await picker.pickImage(
+                  source: ImageSource.camera,
+                  imageQuality: 90,
+                );
+                if (sheetContext.mounted) {
+                  Navigator.pop(
+                    sheetContext,
+                    photo == null ? null : [photo],
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Future<List<XFile>?> _showFullMediaPicker(BuildContext context) {
   final picker = ImagePicker();
   return showModalBottomSheet<List<XFile>>(
     context: context,

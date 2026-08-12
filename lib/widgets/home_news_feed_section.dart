@@ -6,6 +6,7 @@ import '../navigation/firstvue_page_route.dart';
 import '../screens/auth_screen.dart';
 import '../services/community_news_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../utils/app_environment.dart';
 import 'community_news_post_card.dart';
 import 'feed_comments_sheet.dart';
 import 'local_media_thumbnail.dart';
@@ -52,6 +53,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
   }
 
   void _subscribeToNewsFeed() {
+    if (isWidgetTestBinding) return;
     _newsChannel?.unsubscribe();
     _newsChannel = Supabase.instance.client
         .channel('home-news-feed')
