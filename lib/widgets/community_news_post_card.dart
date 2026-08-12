@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../navigation/firstvue_page_route.dart';
+import '../screens/community_detail_screen.dart';
 import '../services/community_news_media_service.dart';
 import '../services/community_news_service.dart';
 import '../services/profile_activity_service.dart';
@@ -136,6 +138,31 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
                     ),
                 ],
               ),
+              if (post.communityName != null) ...[
+                const SizedBox(height: 2),
+                GestureDetector(
+                  onTap: post.communityId == null
+                      ? null
+                      : () {
+                          Navigator.push(
+                            context,
+                            FirstVuePageRoute(
+                              builder: (_) => CommunityDetailScreen(
+                                communityId: post.communityId!,
+                              ),
+                            ),
+                          );
+                        },
+                  child: Text(
+                    '${post.authorName} in ${post.communityName}',
+                    style: TextStyle(
+                      color: FirstVueColors.gold.withValues(alpha: .85),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
               if (post.authorUsername != null) ...[
                 const SizedBox(height: 2),
                 Text(

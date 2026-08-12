@@ -126,7 +126,7 @@ class DiscoveryFeedService {
               (owner['display_name'] as String?) ?? 'FirstVue owner',
       };
 
-      return Future.wait(
+      return await Future.wait(
         rows.map((row) async {
           final business = row['businesses'] as Map<String, dynamic>;
           final businessId = business['id'] as String;
@@ -214,7 +214,7 @@ class DiscoveryFeedService {
               (row['display_name'] as String?) ?? 'FirstVue member',
       };
 
-      return Future.wait(rows.map((row) async {
+      return await Future.wait(rows.map((row) async {
         final profileId = row['profile_id'] as String;
         final embedded = row['profiles'] as Map<String, dynamic>?;
         final displayName = embedded?['display_name'] as String? ??

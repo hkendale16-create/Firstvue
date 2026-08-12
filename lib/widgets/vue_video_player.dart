@@ -54,6 +54,7 @@ class _VueVideoPlayerState extends State<VueVideoPlayer> {
     _controller = controller;
     try {
       await controller.initialize();
+      await controller.setLooping(true);
       await controller.setVolume(_muted ? 0 : 1);
       if (!mounted || _controller != controller) {
         await controller.dispose();

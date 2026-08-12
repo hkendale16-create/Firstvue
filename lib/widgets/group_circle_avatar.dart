@@ -2,69 +2,141 @@ import 'package:flutter/material.dart';
 
 import '../theme/firstvue_theme.dart';
 
-/// Circular avatar tile used on Home Groups / Communities rows.
-class GroupCircleTile extends StatelessWidget {
-  final String label;
+/// True circular group/community profile image with optional ring.
+class GroupCircleAvatar extends StatelessWidget {
   final String? imageUrl;
-  final Color ringColor;
-  final bool isCreate;
-  final VoidCallback onTap;
+  final double size;
+  final IconData fallbackIcon;
+  final Color? ringColor;
+  final VoidCallback? onTap;
 
-  const GroupCircleTile({
+  const GroupCircleAvatar({
     super.key,
-    required this.label,
-    required this.onTap,
-    this.imageUrl,
-    this.ringColor = Colors.white24,
-    this.isCreate = false,
+    required this.imageUrl,
+    this.size = 68,
+    this.fallbackIcon = Icons.groups_rounded,
+    this.ringColor,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final hasImage = (imageUrl ?? '').trim().isNotEmpty;
+    final hasImage = imageUrl != null && imageUrl!.trim().isNotEmpty;
+    final ring = ringColor ?? Colors.white24;
 
+    Widget avatar = Container(
+      width: size,
+      height: size,
+      padding: const EdgeInsets.all(2.5),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [
+            ring.withValues(alpha: .95),
+            ring.withValues(alpha: .35),
+          ],
+        ),
+      ),
+      child: Container(
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Color(0xFF080B0F),
+        ),
+        padding: const EdgeInsets.all(2),
+        child: ClipOval(
+          child: SizedBox(
+            width: size - 9,
+            height: size - 9,
+            child: hasImage
+                ? Image.network(
+                    imageUrl!,
+                    fit: BoxFit.cover,
+                    width: size - 9,
+                    height: size - 9,
+                    filterQuality: FilterQuality.low,
+                    errorBuilder: (_, _, _) => ColoredBox(
+                      color: FirstVueColors.elevatedSurface,
+                      child: Icon(
+                        fallbackIcon,
+                        color: FirstVueColors.teal,
+                        size: size * 0.35,
+                      ),
+                    ),
+                  )
+                : ColoredBox(
+                    color: FirstVueColors.elevatedSurface,
+                    child: Icon(
+                      fallbackIcon,
+                      color: FirstVueColors.teal,
+                      size: size * 0.35,
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
+
+    if (onTap == null) return avatar;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(60),
-      child: SizedBox(
-        width: 84,
+      customBorder: const CircleBorder(),
+      child: avatar,
+    );
+  }
+}
+
+/// Label under a circular group/community avatar for Home rows.
+class GroupCircleTile extends StatelessWidget {
+  final String label;
+  final String? imageUrl;
+  final VoidCallback onTap;
+  final Color? ringColor;
+  final bool isCreate;
+  final double width;
+
+  const GroupCircleTile({
+    super.key,
+    required this.label,
+    required this.imageUrl,
+    required this.onTap,
+    this.ringColor,
+    this.isCreate = false,
+    this.width = 78,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(40),
         child: Column(
           children: [
-            Container(
-              width: 68,
-              height: 68,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isCreate ? FirstVueColors.coral : ringColor,
-                  width: 2.5,
+            if (isCreate)
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: FirstVueColors.coral, width: 2),
+                  color: FirstVueColors.elevatedSurface,
                 ),
-                color: FirstVueColors.elevatedSurface,
-                image: hasImage && !isCreate
-                    ? DecorationImage(
-                        image: NetworkImage(imageUrl!),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
+                child: const Icon(Icons.add, color: FirstVueColors.coral),
+              )
+            else
+              GroupCircleAvatar(
+                imageUrl: imageUrl,
+                ringColor: ringColor,
               ),
-              child: isCreate
-                  ? const Icon(Icons.add, color: FirstVueColors.coral, size: 28)
-                  : (!hasImage
-                      ? Icon(
-                          Icons.groups_rounded,
-                          color: FirstVueColors.teal.withValues(alpha: .9),
-                          size: 28,
-                        )
-                      : null),
-            ),
             const SizedBox(height: 8),
             Text(
               label,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: .88),
+              style: const TextStyle(
+                color: Colors.white,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 height: 1.15,

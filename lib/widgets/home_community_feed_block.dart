@@ -13,6 +13,7 @@ import '../theme/firstvue_theme.dart';
 import 'community_news_post_card.dart';
 import 'community_news_post_detail_sheet.dart';
 import 'feed_comments_sheet.dart';
+import 'feed_impression_tracker.dart';
 import 'local_media_thumbnail.dart';
 import 'media_picker_sheet.dart';
 import 'profile_avatar_thumbnail.dart';
@@ -98,8 +99,11 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
       _error = null;
     });
     try {
-      final posts = await CommunityNewsService.fetchCommunityFeedPosts(
+      // Ranked main Newsfeed: recency + unseen + relevance + controlled variety.
+      // Seed changes on each refresh so top results are not identical every time.
+      final posts = await CommunityNewsService.fetchRankedMainFeed(
         limit: widget.maxPosts,
+        seed: DateTime.now().millisecondsSinceEpoch.toDouble(),
       );
       final postIds = posts.map((p) => p.id).toList();
       final reposted = await RepostService.fetchMyRepostedIds(postIds);
@@ -512,7 +516,7 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
             ),
             const SizedBox(width: 8),
             const Text(
-              'NEWS FEED',
+              'MAIN NEWSFEED',
               style: TextStyle(
                 color: FirstVueColors.ivory,
                 fontWeight: FontWeight.w800,
@@ -557,30 +561,34 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
             children: [
               for (var index = 0; index < _posts.length; index++) ...[
                 if (index > 0) const SizedBox(height: 10),
-                CommunityNewsPostCard(
-                  post: _posts[index],
-                  style: CommunityNewsPostCardStyle.timeline,
-                  onTap: () => CommunityNewsPostDetailSheet.show(
-                    context,
-                    postId: _posts[index].id,
-                    initialPost: _posts[index],
+                FeedImpressionTracker(
+                  postId: _posts[index].id,
+                  feedSource: 'main',
+                  child: CommunityNewsPostCard(
+                    post: _posts[index],
+                    style: CommunityNewsPostCardStyle.timeline,
+                    onTap: () => CommunityNewsPostDetailSheet.show(
+                      context,
+                      postId: _posts[index].id,
+                      initialPost: _posts[index],
+                    ),
+                    onAuthorTap: _posts[index].authorId.isNotEmpty
+                        ? () => openMemberProfile(
+                              context,
+                              profileId: _posts[index].authorId,
+                              displayName: _posts[index].authorName,
+                            )
+                        : null,
+                    onSpark: () => _sparkPost(index),
+                    onSave: () => _savePost(index),
+                    onComment: () => FeedCommentsSheet.show(
+                      context,
+                      mediaId: _posts[index].commentsMediaId,
+                      businessName: _posts[index].authorName,
+                    ),
+                    onRepost: () => _repostPost(index),
+                    repostedByMe: _repostedPostIds.contains(_posts[index].id),
                   ),
-                  onAuthorTap: _posts[index].authorId.isNotEmpty
-                      ? () => openMemberProfile(
-                            context,
-                            profileId: _posts[index].authorId,
-                            displayName: _posts[index].authorName,
-                          )
-                      : null,
-                  onSpark: () => _sparkPost(index),
-                  onSave: () => _savePost(index),
-                  onComment: () => FeedCommentsSheet.show(
-                    context,
-                    mediaId: _posts[index].commentsMediaId,
-                    businessName: _posts[index].authorName,
-                  ),
-                  onRepost: () => _repostPost(index),
-                  repostedByMe: _repostedPostIds.contains(_posts[index].id),
                 ),
               ],
             ],

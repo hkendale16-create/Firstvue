@@ -10,22 +10,21 @@ import 'screens/profile_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/saved_screen.dart';
 import 'screens/explore_screen.dart';
-import 'screens/whats_now_screen.dart';
 import 'screens/firstvue_business_profile_screen.dart';
 import 'screens/member_public_profile_screen.dart';
 import 'screens/post_detail_screen.dart';
 import 'services/activity_notifications_service.dart';
 import 'services/deep_link_service.dart';
 import 'services/notification_service.dart';
-import 'services/recommendations_service.dart';
 import 'theme/firstvue_theme.dart';
 import 'widgets/firstvue_bottom_nav.dart';
 import 'widgets/firstvue_onboarding.dart';
 import 'widgets/firstvue_refresh_scaffold.dart';
 import 'widgets/firstvue_settings_drawer.dart';
 import 'widgets/floating_messages_bubble.dart';
-import 'widgets/home_communities_section.dart';
+import 'widgets/home_community_feed_block.dart';
 import 'widgets/home_discovery_section.dart';
+import 'widgets/home_discovery_swipe.dart';
 import 'widgets/firstvue_inline_search_bar.dart';
 import 'widgets/home_city_chip.dart';
 import 'widgets/firstvue_animated_header_title.dart';
@@ -328,93 +327,16 @@ class _FirstVueHomeState extends State<FirstVueHome> {
 
               const SizedBox(height: 30),
 
-              HomeCommunitiesSection(refreshToken: _homeRefreshToken),
-
-              const SizedBox(height: 30),
-
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => setState(() => selectedIndex = 1),
-                  borderRadius: BorderRadius.circular(16),
-                  child: Ink(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: FirstVueColors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withValues(alpha: .08)),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.explore_outlined,
-                          color: FirstVueColors.teal.withValues(alpha: .9),
-                          size: 28,
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Explore & rate local pros',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Barbers, beauty, dining, rentals & more',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: .55),
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          color: Colors.white.withValues(alpha: .45),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              HomeDiscoverySwipe(
+                refreshToken: _homeRefreshToken,
+                onOpenExplore: () => setState(() => selectedIndex = 1),
+                onOpenVue: () => setState(() => selectedIndex = 2),
               ),
 
               const SizedBox(height: 30),
 
-              const Text(
-                "WHAT'S NOW",
-                style: TextStyle(
-                  fontFamily: 'CormorantGaramond',
-                  color: FirstVueColors.gold,
-                  fontSize: 19,
-                  letterSpacing: 1.8,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              HomeCommunityFeedBlock(refreshToken: _homeRefreshToken),
 
-              const SizedBox(height: 16),
-
-              _WhatsNowEntryCard(
-                onTap: () {
-                  RecommendationsService.recordCategoryVisit('whats_now');
-                  Navigator.push(
-                    context,
-                    FirstVuePageRoute(
-                      builder: (_) => const WhatsNowScreen(),
-                    ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 30),
-
-              const YouMightLikeSection(),
               const SizedBox(height: 12),
             ],
           ),
@@ -671,107 +593,6 @@ class _FuturisticButtonState extends State<FuturisticButton> {
                         fontSize: 10.5,
                         height: 1.15,
                         shadows: const [Shadow(color: Colors.black, blurRadius: 8)],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _WhatsNowEntryCard extends StatefulWidget {
-  final VoidCallback onTap;
-
-  const _WhatsNowEntryCard({required this.onTap});
-
-  @override
-  State<_WhatsNowEntryCard> createState() => _WhatsNowEntryCardState();
-}
-
-class _WhatsNowEntryCardState extends State<_WhatsNowEntryCard> {
-  bool pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: widget.onTap,
-      onTapDown: (_) => setState(() => pressed = true),
-      onTapUp: (_) => setState(() => pressed = false),
-      onTapCancel: () => setState(() => pressed = false),
-      child: AnimatedScale(
-        scale: pressed ? .98 : 1,
-        duration: const Duration(milliseconds: 100),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          clipBehavior: Clip.antiAlias,
-          height: 168,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: pressed ? .22 : .10),
-            ),
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Image.asset(
-                'assets/images/explore_things_to_do.jpg',
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) =>
-                    ColoredBox(color: FirstVueColors.elevatedSurface),
-              ),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    stops: const [0.2, 0.55, 1.0],
-                    colors: [
-                      Colors.black.withValues(alpha: .12),
-                      Colors.black.withValues(alpha: .42),
-                      Colors.black.withValues(alpha: .9),
-                    ],
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const ElegantSymbol(
-                      icon: Icons.bolt_rounded,
-                      accent: FirstVueColors.gold,
-                      size: 44,
-                      flat: true,
-                    ),
-                    const Spacer(),
-                    const Text(
-                      "TRENDING & EVENTS",
-                      style: TextStyle(
-                        fontFamily: 'CormorantGaramond',
-                        color: FirstVueColors.ivory,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: .8,
-                        shadows: [Shadow(color: Colors.black, blurRadius: 10)],
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'See what\'s hot and happening near you',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: .78),
-                        fontSize: 12,
-                        shadows: const [
-                          Shadow(color: Colors.black, blurRadius: 8),
-                        ],
                       ),
                     ),
                   ],

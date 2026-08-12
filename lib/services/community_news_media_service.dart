@@ -48,7 +48,7 @@ class CommunityNewsMediaService {
           .order('sort_order')
           .order('created_at');
 
-      return _groupRows(rows);
+      return await _groupRows(rows);
     } catch (_) {
       try {
         final rows = await _client
@@ -60,7 +60,7 @@ class CommunityNewsMediaService {
             .order('sort_order')
             .order('created_at');
 
-        return _groupRows(rows);
+        return await _groupRows(rows);
       } catch (_) {
         // Table or policy may not exist yet — posts still load without attachments.
         return {};

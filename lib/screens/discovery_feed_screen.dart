@@ -584,7 +584,6 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
   Widget build(BuildContext context) {
     final item = widget.item;
     final connected = item.connected;
-    final isVideo = connected?.isVideo ?? false;
     final isMember = connected?.isMember ?? false;
 
     return Padding(
@@ -615,16 +614,6 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
                 ),
               ),
             ),
-            if (!isVideo)
-              const IgnorePointer(
-                child: Center(
-                  child: Icon(
-                    Icons.play_circle_outline_rounded,
-                    color: Color(0xCCFFFFFF),
-                    size: 64,
-                  ),
-                ),
-              ),
             Positioned(
               right: 13,
               bottom: 116,

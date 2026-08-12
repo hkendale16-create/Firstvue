@@ -32,7 +32,7 @@ class HashtagService {
             .map((row) => row['post_id'] as String)
             .toList();
         if (postIds.isNotEmpty) {
-          return _fetchPostsByIds(postIds);
+          return await _fetchPostsByIds(postIds);
         }
       }
     } catch (_) {}
@@ -46,7 +46,7 @@ class HashtagService {
           .order('created_at', ascending: false)
           .limit(limit);
 
-      return CommunityNewsService.mapPostRowsPublic(rows);
+      return await CommunityNewsService.mapPostRowsPublic(rows);
     } catch (_) {
       return const [];
     }
@@ -62,6 +62,6 @@ class HashtagService {
         .inFilter('id', postIds)
         .eq('status', 'approved')
         .order('created_at', ascending: false);
-    return CommunityNewsService.mapPostRowsPublic(rows);
+    return await CommunityNewsService.mapPostRowsPublic(rows);
   }
 }

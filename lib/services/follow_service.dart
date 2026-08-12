@@ -344,7 +344,7 @@ class FollowService {
         offset: offset,
       );
       final ids = rows.map((row) => row[column] as String).toList();
-      return _fetchProfilesByIds(ids);
+      return await _fetchProfilesByIds(ids);
     } catch (_) {
       return const [];
     }

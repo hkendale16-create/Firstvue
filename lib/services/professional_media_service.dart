@@ -60,7 +60,7 @@ class ProfessionalMediaService {
           .order('sort_order')
           .order('created_at');
 
-      return _mapRows(rows, professionalProfileId);
+      return await _mapRows(rows, professionalProfileId);
     } catch (_) {
       final rows = await _client
           .from('professional_media')
@@ -71,7 +71,7 @@ class ProfessionalMediaService {
           .order('sort_order')
           .order('created_at');
 
-      return _mapRows(rows, professionalProfileId);
+      return await _mapRows(rows, professionalProfileId);
     }
   }
 

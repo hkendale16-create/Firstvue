@@ -59,7 +59,7 @@ class ProfileMediaService {
           .order('sort_order')
           .order('created_at');
 
-      return _mapRows(rows, user.id);
+      return await _mapRows(rows, user.id);
     } catch (_) {
       // media_role column may not exist yet — fall back without role filter.
       final rows = await _client
@@ -71,7 +71,7 @@ class ProfileMediaService {
           .order('sort_order')
           .order('created_at');
 
-      return _mapRows(rows, user.id);
+      return await _mapRows(rows, user.id);
     }
   }
 
@@ -121,7 +121,7 @@ class ProfileMediaService {
           .order('sort_order')
           .order('created_at');
 
-      return _mapRows(rows, profileId);
+      return await _mapRows(rows, profileId);
     } catch (_) {
       final rows = await _client
           .from('profile_media')
@@ -132,7 +132,7 @@ class ProfileMediaService {
           .order('sort_order')
           .order('created_at');
 
-      return _mapRows(rows, profileId);
+      return await _mapRows(rows, profileId);
     }
   }
 
