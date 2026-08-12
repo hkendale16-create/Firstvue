@@ -117,8 +117,14 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     try {
       final posts = await CommunityNewsService.fetchPosts();
       final postIds = posts.map((p) => p.id).toList();
-      final reposted = await RepostService.fetchMyRepostedIds(postIds);
-      final repostCounts = await RepostService.fetchRepostCounts(postIds);
+      Set<String> reposted = const {};
+      Map<String, int> repostCounts = const {};
+      try {
+        reposted = await RepostService.fetchMyRepostedIds(postIds);
+        repostCounts = await RepostService.fetchRepostCounts(postIds);
+      } catch (_) {
+        // Repost metadata is optional; never block the News Feed.
+      }
       if (!mounted) return;
       setState(() {
         _posts = posts
@@ -128,13 +134,18 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
             .toList();
         _repostedPostIds = reposted;
         _loadingPosts = false;
+        // Empty feed is not an error — only surface errors when fetch fails
+        // and we have nothing to show.
         _loadError = null;
       });
     } catch (error) {
       if (mounted) {
         setState(() {
           _loadingPosts = false;
-          _loadError = error.toString();
+          // Keep previously loaded posts visible if a refresh fails.
+          if (_posts.isEmpty) {
+            _loadError = error.toString();
+          }
         });
       }
     }
@@ -500,7 +511,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
           children: [
             const Expanded(
               child: Text(
-                'COMMUNITY FEED',
+                'NEWS FEED',
                 style: TextStyle(
                   color: FirstVueColors.ivory,
                   fontSize: 14,
@@ -662,7 +673,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
           )
         else if (_posts.isEmpty)
           const Text(
-            'Community posts will appear here.',
+            'Posts from FirstVue members, businesses, and more will appear here.',
             style: TextStyle(color: Colors.white54),
           )
         else
