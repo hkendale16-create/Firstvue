@@ -102,7 +102,7 @@ class FeedCommentsService {
           .eq('media_id', mediaId)
           .order('created_at', ascending: true);
 
-      return _mapCommentRows(rows, me: me);
+      return await _mapCommentRows(rows, me: me);
     } on PostgrestException catch (error) {
       throw FeedCommentsException(userMessageForError(error), cause: error);
     }

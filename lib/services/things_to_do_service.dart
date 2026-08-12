@@ -40,7 +40,7 @@ class ThingsToDoService {
           .eq('status', 'approved')
           .order('event_at', ascending: true)
           .limit(40);
-      return Future.wait(rows.map(_mapRow));
+      return await Future.wait(rows.map(_mapRow));
     } catch (_) {
       return _prototypeEvents;
     }

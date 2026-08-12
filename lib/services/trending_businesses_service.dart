@@ -58,7 +58,7 @@ class TrendingBusinessesService {
         limit: limit,
         orderByCreatedAt: true,
       );
-      return _mapRowsWithLocation(rows, limit);
+      return await _mapRowsWithLocation(rows, limit);
     } catch (_) {
       return const [];
     }
@@ -85,7 +85,7 @@ class TrendingBusinessesService {
           .eq('coming_soon', true)
           .order('created_at', ascending: false)
           .limit(limit * 2);
-      return _mapRowsWithLocation(rows, limit);
+      return await _mapRowsWithLocation(rows, limit);
     } catch (_) {
       return const [];
     }
@@ -114,7 +114,7 @@ class TrendingBusinessesService {
         limit: limit,
         orderByPopularity: orderByPopularity,
       );
-      return _mapRowsWithLocation(rows, limit);
+      return await _mapRowsWithLocation(rows, limit);
     } catch (_) {
       return const [];
     }

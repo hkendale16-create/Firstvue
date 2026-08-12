@@ -162,7 +162,7 @@ class ProfileActivityService {
           .toList();
       final businessNames = await _fetchBusinessNames(businessIds);
 
-      return _mapNewsPostRows(
+      return await _mapNewsPostRows(
         rows,
         titleForRow: (row, _) {
           final businessId = row['business_id'] as String?;
@@ -237,7 +237,7 @@ class ProfileActivityService {
           .order('created_at', ascending: false)
           .limit(limit);
 
-      return _mapNewsPostRows(
+      return await _mapNewsPostRows(
         rows,
         titleForRow: (row, _) {
           final profile = row['profiles'] as Map<String, dynamic>?;
@@ -263,7 +263,7 @@ class ProfileActivityService {
           .eq('status', 'approved')
           .order('created_at', ascending: false)
           .limit(limit);
-      return _mapNewsPostRows(
+      return await _mapNewsPostRows(
         rows,
         titleForRow: (row, _) {
           final profile = row['profiles'] as Map<String, dynamic>?;
@@ -289,7 +289,7 @@ class ProfileActivityService {
           .eq('status', 'approved')
           .order('created_at', ascending: false)
           .limit(limit);
-      return _mapNewsPostRows(
+      return await _mapNewsPostRows(
         rows,
         titleForRow: (row, _) {
           final profile = row['profiles'] as Map<String, dynamic>?;
@@ -328,7 +328,7 @@ class ProfileActivityService {
           .order('created_at', ascending: false)
           .limit(limit);
 
-      return Future.wait(rows.map((row) async {
+      return await Future.wait(rows.map((row) async {
         final businessId = row['business_id'] as String;
         final mediaType = (row['media_type'] as String?) ?? 'image';
         final label = mediaType == 'video' ? 'video' : 'photo';
@@ -373,7 +373,7 @@ class ProfileActivityService {
           .order('created_at', ascending: false)
           .limit(limit);
 
-      return Future.wait(rows.map((row) async {
+      return await Future.wait(rows.map((row) async {
         final mediaType = (row['media_type'] as String?) ?? 'image';
         final label = mediaType == 'video' ? 'video' : 'photo';
         final path = row['storage_path'] as String?;
@@ -417,7 +417,7 @@ class ProfileActivityService {
           .order('created_at', ascending: false)
           .limit(limit);
 
-      return Future.wait(rows.map((row) async {
+      return await Future.wait(rows.map((row) async {
         final mediaType = (row['media_type'] as String?) ?? 'image';
         final label = mediaType == 'video' ? 'video' : 'photo';
         final path = row['storage_path'] as String?;

@@ -175,7 +175,7 @@ class _SwipePageShell extends StatelessWidget {
                   ),
                 ),
               ),
-              if (trailing != null) trailing!,
+              ?trailing,
             ],
           ),
           const SizedBox(height: 14),

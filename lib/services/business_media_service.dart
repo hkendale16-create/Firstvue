@@ -58,7 +58,7 @@ class BusinessMediaService {
           .order('sort_order')
           .order('created_at');
 
-      return _mapRows(rows, businessId);
+      return await _mapRows(rows, businessId);
     } catch (_) {
       final rows = await _client
           .from('business_media')
@@ -69,7 +69,7 @@ class BusinessMediaService {
           .order('sort_order')
           .order('created_at');
 
-      return _mapRows(rows, businessId);
+      return await _mapRows(rows, businessId);
     }
   }
 
