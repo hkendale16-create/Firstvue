@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../data/us_locations.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../services/community_service.dart';
 import '../theme/firstvue_theme.dart';

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../data/us_locations.dart';
 import '../services/profile_media_service.dart';
 import '../services/user_profile_service.dart';
 import '../services/username_service.dart';

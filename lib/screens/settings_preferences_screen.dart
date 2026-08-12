@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../data/us_locations.dart';
 import '../services/user_preferences_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/location_autocomplete_field.dart';

@@ -5,16 +5,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'config/app_config.dart';
 import 'config/supabase_config.dart';
-import 'screens/barber_results_screen.dart';
-import 'screens/beauty_discovery_screen.dart';
 import 'screens/discovery_feed_screen.dart';
-import 'screens/other_services_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/notifications_screen.dart';
-import 'screens/rentals_screen.dart';
 import 'screens/saved_screen.dart';
 import 'screens/search_screen.dart';
-import 'screens/things_to_do_screen.dart';
 import 'screens/explore_screen.dart';
 import 'screens/whats_now_screen.dart';
 import 'screens/firstvue_business_profile_screen.dart';
@@ -66,24 +61,6 @@ class FirstVueHome extends StatefulWidget {
 
   @override
   State<FirstVueHome> createState() => _FirstVueHomeState();
-}
-
-class _ExploreCategory {
-  final String title;
-  final String subtitle;
-  final String imagePath;
-  final Color accent;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _ExploreCategory({
-    required this.title,
-    required this.subtitle,
-    required this.imagePath,
-    required this.accent,
-    required this.icon,
-    required this.onTap,
-  });
 }
 
 class _FirstVueHomeState extends State<FirstVueHome> {
@@ -180,89 +157,6 @@ class _FirstVueHomeState extends State<FirstVueHome> {
   }
 
   void _goHome() => setState(() => selectedIndex = 0);
-
-  List<_ExploreCategory> _exploreCategories(BuildContext context) {
-    return [
-      _ExploreCategory(
-        title: 'BARBER & BEAUTY',
-        subtitle: 'Barbers, salons & stylists',
-        imagePath: 'assets/images/explore_beauty.jpg',
-        accent: FirstVueColors.coral,
-        icon: Icons.auto_awesome_rounded,
-        onTap: () {
-          RecommendationsService.recordCategoryVisit('beauty');
-          Navigator.push(
-            context,
-            FirstVuePageRoute(
-              builder: (_) => const BeautyDiscoveryScreen(),
-            ),
-          );
-        },
-      ),
-      _ExploreCategory(
-        title: 'FINE AND DINE',
-        subtitle: 'Bars, restaurants & dining',
-        imagePath: 'assets/images/explore_restaurants.jpg',
-        accent: FirstVueColors.gold,
-        icon: Icons.restaurant_rounded,
-        onTap: () {
-          RecommendationsService.recordCategoryVisit('restaurant');
-          Navigator.push(
-            context,
-            FirstVuePageRoute(
-              builder: (_) => const BarberResultsScreen(
-                category: DiscoveryCategory.restaurants,
-              ),
-            ),
-          );
-        },
-      ),
-      _ExploreCategory(
-        title: 'AVAILABLE RENTALS',
-        subtitle: 'Booths & suite spaces',
-        imagePath: 'assets/images/explore_rentals.jpg',
-        accent: FirstVueColors.teal,
-        icon: Icons.key_outlined,
-        onTap: () {
-          RecommendationsService.recordCategoryVisit('rentals');
-          Navigator.push(
-            context,
-            FirstVuePageRoute(builder: (_) => const RentalsScreen()),
-          );
-        },
-      ),
-      _ExploreCategory(
-        title: 'THINGS TO DO',
-        subtitle: 'Events, experiences & activities',
-        imagePath: 'assets/images/explore_things_to_do.jpg',
-        accent: FirstVueColors.coral,
-        icon: Icons.local_activity_outlined,
-        onTap: () {
-          RecommendationsService.recordCategoryVisit('events');
-          Navigator.push(
-            context,
-            FirstVuePageRoute(builder: (_) => const ThingsToDoScreen()),
-          );
-        },
-      ),
-      _ExploreCategory(
-        title: 'OTHER SERVICES',
-        subtitle: 'Home, auto & more',
-        imagePath: 'assets/images/explore_barbershops.jpg',
-        accent: FirstVueColors.teal,
-        icon: Icons.home_repair_service_outlined,
-        onTap: () {
-          RecommendationsService.recordCategoryVisit('services');
-          Navigator.push(
-            context,
-            FirstVuePageRoute(
-              builder: (_) => const OtherServicesScreen(),
-            ),
-          );
-        },
-      ),
-    ];
-  }
 
   Future<void> _openInitialDeepLink() async {
     final webBusiness = AppConfig.initialBusinessIdFromUri();
