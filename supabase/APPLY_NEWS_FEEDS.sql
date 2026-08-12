@@ -208,7 +208,8 @@ select
   p.status,
   coalesce(pr.display_name, 'Member') as author_name,
   pr.username as author_username,
-  pr.avatar_url as author_avatar_url,
+  -- Avatars live in profile_media (media_role = 'avatar'), not profiles.avatar_url
+  pm.storage_path as author_avatar_path,
   c.name as community_name,
   (
     select count(*)::int
@@ -218,6 +219,9 @@ select
 from public.community_news_posts p
 left join public.profiles pr on pr.id = p.author_id
 left join public.communities c on c.id = p.community_id
+left join public.profile_media pm
+  on pm.profile_id = p.author_id
+ and pm.media_role = 'avatar'
 where p.status = 'approved'
   and p.community_id is not null
 order by p.created_at desc;
