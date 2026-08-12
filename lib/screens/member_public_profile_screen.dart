@@ -15,6 +15,7 @@ import '../widgets/community_news_post_detail_sheet.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/feed_comments_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/profile_photo_actions.dart';
 import '../widgets/signed_media_viewer.dart';
 import 'auth_screen.dart';
 
@@ -69,6 +70,7 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
   int _followerCount = 0;
   int _followingCount = 0;
   bool _followBusy = false;
+  bool _imageUpdating = false;
 
   bool get _isSelf =>
       Supabase.instance.client.auth.currentUser?.id == widget.profileId;
@@ -307,6 +309,95 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
     );
   }
 
+  Future<void> _handlePhotoTap({required bool isAvatar}) async {
+    if (!_isSelf) {
+      if (isAvatar) {
+        _viewAvatar();
+      } else {
+        _viewCover();
+      }
+      return;
+    }
+    if (_imageUpdating) return;
+
+    final existing = isAvatar ? _profileImages.avatar : _profileImages.cover;
+    final action = await showProfilePhotoActionSheet(
+      context,
+      changeLabel: isAvatar ? 'Change profile photo' : 'Change cover photo',
+      viewLabel: isAvatar ? 'View profile photo' : 'View cover photo',
+      removeLabel: isAvatar ? 'Remove profile photo' : 'Remove cover photo',
+      hasExisting: existing != null,
+    );
+    if (!mounted || action == null) return;
+
+    if (action == ProfilePhotoAction.view) {
+      if (existing == null) return;
+      await viewProfilePhoto(
+        context,
+        url: existing.signedUrl,
+        isVideo: existing.isVideo,
+        title: isAvatar ? 'PROFILE PHOTO' : 'COVER PHOTO',
+      );
+      return;
+    }
+
+    if (action == ProfilePhotoAction.remove) {
+      setState(() => _imageUpdating = true);
+      try {
+        if (isAvatar) {
+          await ProfileMediaService.removeAvatar();
+        } else {
+          await ProfileMediaService.removeCover();
+        }
+        await _loadAll();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isAvatar ? 'Profile photo removed.' : 'Cover photo removed.',
+            ),
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not remove photo: $e')),
+        );
+      } finally {
+        if (mounted) setState(() => _imageUpdating = false);
+      }
+      return;
+    }
+
+    final picked = await pickProfilePhoto(context, allowVideo: isAvatar);
+    if (picked == null || !mounted) return;
+
+    setState(() => _imageUpdating = true);
+    try {
+      if (isAvatar) {
+        await ProfileMediaService.setAvatar(picked);
+      } else {
+        await ProfileMediaService.setCover(picked);
+      }
+      await _loadAll();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isAvatar ? 'Profile photo updated.' : 'Cover photo updated.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update photo: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _imageUpdating = false);
+    }
+  }
+
   Widget _buildPostsTab() {
     if (_posts.isEmpty) {
       return Padding(
@@ -413,9 +504,17 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
               avatarImageUrl: _profileImages.avatar?.signedUrl,
               coverIsVideo: _profileImages.cover?.isVideo ?? false,
               avatarIsVideo: _profileImages.avatar?.isVideo ?? false,
-              onCoverTap: _profileImages.cover != null ? _viewCover : null,
-              onAvatarTap: _profileImages.avatar != null ? _viewAvatar : null,
-              showImageLoading: _loading,
+              onCoverTap: _imageUpdating
+                  ? null
+                  : (_isSelf || _profileImages.cover != null)
+                      ? () => _handlePhotoTap(isAvatar: false)
+                      : null,
+              onAvatarTap: _imageUpdating
+                  ? null
+                  : (_isSelf || _profileImages.avatar != null)
+                      ? () => _handlePhotoTap(isAvatar: true)
+                      : null,
+              showImageLoading: _loading || _imageUpdating,
               stats: [
                 ProfileStatItem(
                   label: 'Posts',

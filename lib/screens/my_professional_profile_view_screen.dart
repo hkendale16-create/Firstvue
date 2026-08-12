@@ -6,6 +6,7 @@ import '../services/professional_profiles_service.dart';
 import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/profile_photo_actions.dart';
 import 'professional_profile_editor_screen.dart';
 import 'professional_public_profile_screen.dart';
 import 'professional_showcase_editor_screen.dart';
@@ -24,6 +25,7 @@ class _MyProfessionalProfileViewScreenState
   List<ProfessionalMediaItem> _media = const [];
   ProfessionalImageSet _profileImages = const ProfessionalImageSet();
   bool _loading = true;
+  bool _imageUpdating = false;
   int _refreshToken = 0;
 
   @override
@@ -92,6 +94,94 @@ class _MyProfessionalProfileViewScreenState
     if (mounted) {
       setState(() => _refreshToken++);
       await _load();
+    }
+  }
+
+  Future<void> _handlePhotoTap({required bool isAvatar}) async {
+    final profile = _profile;
+    if (profile == null || _imageUpdating) return;
+
+    final existing = isAvatar ? _profileImages.avatar : _profileImages.cover;
+    final action = await showProfilePhotoActionSheet(
+      context,
+      changeLabel: isAvatar ? 'Change profile photo' : 'Change cover photo',
+      viewLabel: isAvatar ? 'View profile photo' : 'View cover photo',
+      removeLabel: isAvatar ? 'Remove profile photo' : 'Remove cover photo',
+      hasExisting: existing != null,
+    );
+    if (!mounted || action == null) return;
+
+    if (action == ProfilePhotoAction.view) {
+      if (existing == null) return;
+      await viewProfilePhoto(
+        context,
+        url: existing.signedUrl,
+        isVideo: existing.isVideo,
+        title: isAvatar ? 'PROFILE PHOTO' : 'COVER PHOTO',
+      );
+      return;
+    }
+
+    if (action == ProfilePhotoAction.remove) {
+      setState(() => _imageUpdating = true);
+      try {
+        if (isAvatar) {
+          await ProfessionalMediaService.removeAvatar(profile.id);
+        } else {
+          await ProfessionalMediaService.removeCover(profile.id);
+        }
+        await _load();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isAvatar ? 'Profile photo removed.' : 'Cover photo removed.',
+            ),
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not remove photo: $e')),
+        );
+      } finally {
+        if (mounted) setState(() => _imageUpdating = false);
+      }
+      return;
+    }
+
+    final picked = await pickProfilePhoto(context, allowVideo: isAvatar);
+    if (picked == null || !mounted) return;
+
+    setState(() => _imageUpdating = true);
+    try {
+      if (isAvatar) {
+        await ProfessionalMediaService.setAvatar(
+          professionalProfileId: profile.id,
+          file: picked,
+        );
+      } else {
+        await ProfessionalMediaService.setCover(
+          professionalProfileId: profile.id,
+          file: picked,
+        );
+      }
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isAvatar ? 'Profile photo updated.' : 'Cover photo updated.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update photo: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _imageUpdating = false);
     }
   }
 
@@ -174,8 +264,15 @@ class _MyProfessionalProfileViewScreenState
               avatarIcon: _iconForType(profile.type),
               avatarImageUrl: avatarUrl,
               coverImageUrl: coverUrl,
-              onAvatarTap: _openEditor,
-              onCoverTap: _openEditor,
+              avatarIsVideo: _profileImages.avatar?.isVideo ?? false,
+              coverIsVideo: _profileImages.cover?.isVideo ?? false,
+              onAvatarTap: _imageUpdating
+                  ? null
+                  : () => _handlePhotoTap(isAvatar: true),
+              onCoverTap: _imageUpdating
+                  ? null
+                  : () => _handlePhotoTap(isAvatar: false),
+              showImageLoading: _imageUpdating,
               coverGradient: const [
                 Color(0xFF2A241B),
                 Color(0xFF10151B),

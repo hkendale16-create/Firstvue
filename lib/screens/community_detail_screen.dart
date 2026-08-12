@@ -7,6 +7,7 @@ import '../services/community_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/firstvue_share_sheet.dart';
+import '../widgets/profile_photo_actions.dart';
 import 'auth_screen.dart';
 import '../navigation/firstvue_page_route.dart';
 
@@ -29,6 +30,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
   List<CommunityMember> _members = const [];
   bool _loading = true;
   bool _actionLoading = false;
+  bool _imageUpdating = false;
 
   @override
   void initState() {
@@ -129,6 +131,94 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     );
   }
 
+  bool get _isCreator {
+    final community = _community;
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (community == null || userId == null) return false;
+    return community.creatorId == userId;
+  }
+
+  Future<void> _handleGroupPhotoTap() async {
+    final community = _community;
+    if (community == null || _imageUpdating) return;
+
+    final hasPhoto = (community.imageUrl ?? '').trim().isNotEmpty;
+    if (!_isCreator) {
+      if (!hasPhoto) return;
+      await viewProfilePhoto(
+        context,
+        url: community.imageUrl!,
+        isVideo: false,
+        title: 'GROUP PHOTO',
+      );
+      return;
+    }
+
+    final action = await showProfilePhotoActionSheet(
+      context,
+      changeLabel: 'Change group photo',
+      viewLabel: 'View group photo',
+      removeLabel: 'Remove group photo',
+      hasExisting: hasPhoto,
+    );
+    if (!mounted || action == null) return;
+
+    if (action == ProfilePhotoAction.view) {
+      if (!hasPhoto) return;
+      await viewProfilePhoto(
+        context,
+        url: community.imageUrl!,
+        isVideo: false,
+        title: 'GROUP PHOTO',
+      );
+      return;
+    }
+
+    if (action == ProfilePhotoAction.remove) {
+      setState(() => _imageUpdating = true);
+      try {
+        final updated =
+            await CommunityService.removeCommunityImage(community.id);
+        if (!mounted) return;
+        setState(() => _community = updated);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Group photo removed.')),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not remove photo: $e')),
+        );
+      } finally {
+        if (mounted) setState(() => _imageUpdating = false);
+      }
+      return;
+    }
+
+    final picked = await pickProfilePhoto(context, allowVideo: false);
+    if (picked == null || !mounted) return;
+
+    setState(() => _imageUpdating = true);
+    try {
+      final updated = await CommunityService.updateCommunityImage(
+        communityId: community.id,
+        file: picked,
+      );
+      if (!mounted) return;
+      setState(() => _community = updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Group photo updated.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update photo: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _imageUpdating = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final community = _community;
@@ -173,10 +263,65 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                           children: [
                             Row(
                               children: [
-                                Icon(
-                                  Icons.groups_rounded,
-                                  color: FirstVueColors.teal.withValues(alpha: .95),
-                                  size: 36,
+                                GestureDetector(
+                                  onTap: (_isCreator ||
+                                          (community.imageUrl ?? '')
+                                              .trim()
+                                              .isNotEmpty)
+                                      ? _handleGroupPhotoTap
+                                      : null,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 28,
+                                        backgroundColor:
+                                            FirstVueColors.elevatedSurface,
+                                        backgroundImage: (community.imageUrl ??
+                                                    '')
+                                                .trim()
+                                                .isNotEmpty
+                                            ? NetworkImage(community.imageUrl!)
+                                            : null,
+                                        child: (community.imageUrl ?? '')
+                                                .trim()
+                                                .isEmpty
+                                            ? Icon(
+                                                Icons.groups_rounded,
+                                                color: FirstVueColors.teal
+                                                    .withValues(alpha: .95),
+                                                size: 28,
+                                              )
+                                            : null,
+                                      ),
+                                      if (_imageUpdating)
+                                        const SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: FirstVueColors.gold,
+                                          ),
+                                        )
+                                      else if (_isCreator)
+                                        Positioned(
+                                          right: 0,
+                                          bottom: 0,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(3),
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF10151B),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.photo_camera_outlined,
+                                              size: 12,
+                                              color: FirstVueColors.gold,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(

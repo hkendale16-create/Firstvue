@@ -1,4 +1,9 @@
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../config/media_config.dart';
+import 'media_storage_service.dart';
+import 'media_type_helpers.dart';
 
 class Community {
   final String id;
@@ -6,6 +11,7 @@ class Community {
   final String? description;
   final String? city;
   final String? state;
+  final String? imageUrl;
   final String creatorId;
   final int memberCount;
   final bool isMember;
@@ -18,6 +24,7 @@ class Community {
     this.description,
     this.city,
     this.state,
+    this.imageUrl,
     required this.creatorId,
     this.memberCount = 0,
     this.isMember = false,
@@ -39,17 +46,36 @@ class Community {
     final createdRaw = row['created_at'];
     return Community(
       id: row['id'] as String,
-      name: row['name'] as String,
+      name: (row['name'] as String?) ?? 'Group',
       description: row['description'] as String?,
       city: row['city'] as String?,
       state: row['state'] as String?,
-      creatorId: row['creator_id'] as String,
+      imageUrl: row['image_url'] as String?,
+      creatorId: (row['creator_id'] as String?) ?? '',
       memberCount: (row['member_count'] as num?)?.toInt() ?? 0,
       isMember: isMember,
       isFollowing: isFollowing,
       createdAt: createdRaw is String
           ? DateTime.tryParse(createdRaw) ?? DateTime.now()
-          : DateTime.now(),
+          : createdRaw is DateTime
+              ? createdRaw
+              : DateTime.now(),
+    );
+  }
+
+  Community copyWith({String? imageUrl}) {
+    return Community(
+      id: id,
+      name: name,
+      description: description,
+      city: city,
+      state: state,
+      imageUrl: imageUrl ?? this.imageUrl,
+      creatorId: creatorId,
+      memberCount: memberCount,
+      isMember: isMember,
+      isFollowing: isFollowing,
+      createdAt: createdAt,
     );
   }
 }
@@ -74,6 +100,9 @@ class CommunityService {
   CommunityService._();
 
   static final _client = Supabase.instance.client;
+
+  static const _communityColumns =
+      'id, name, description, city, state, image_url, creator_id, member_count, created_at';
 
   static Future<void> _ensureProfile(User user) async {
     final displayName = user.email?.split('@').first;
@@ -131,7 +160,7 @@ class CommunityService {
     try {
       final rows = await _client
           .from('communities')
-          .select('id, name, description, city, state, creator_id, member_count, created_at')
+          .select(_communityColumns)
           .order('created_at', ascending: false)
           .limit(limit);
 
@@ -158,7 +187,7 @@ class CommunityService {
     try {
       final row = await _client
           .from('communities')
-          .select('id, name, description, city, state, creator_id, member_count, created_at')
+          .select(_communityColumns)
           .eq('id', id)
           .maybeSingle();
       if (row == null) return null;
@@ -200,7 +229,7 @@ class CommunityService {
           'creator_id': me.id,
           'member_count': 1,
         })
-        .select('id, name, description, city, state, creator_id, member_count, created_at')
+            .select(_communityColumns)
         .single();
 
     try {
@@ -321,7 +350,7 @@ class CommunityService {
       if (memberIds.isNotEmpty) {
         final rows = await _client
             .from('communities')
-            .select('id, name, description, city, state, creator_id, member_count, created_at')
+            .select(_communityColumns)
             .inFilter('id', memberIds)
             .limit(limit);
 
@@ -339,5 +368,102 @@ class CommunityService {
     } catch (_) {}
 
     return fetchCommunities(limit: limit);
+  }
+
+  static Future<Community> updateCommunityImage({
+    required String communityId,
+    required XFile file,
+  }) async {
+    final me = _client.auth.currentUser;
+    if (me == null) {
+      throw const AuthException('Sign in to update the group photo.');
+    }
+
+    final imageUrl = await CommunityMediaService.uploadGroupImage(
+      communityIdHint: communityId,
+      file: file,
+    );
+
+    final row = await _client
+        .from('communities')
+        .update({'image_url': imageUrl})
+        .eq('id', communityId)
+        .select(_communityColumns)
+        .single();
+
+    final memberIds = await _myMembershipIds();
+    final followIds = await _myFollowIds();
+    return Community.fromRow(
+      row,
+      isMember: memberIds.contains(communityId),
+      isFollowing: followIds.contains(communityId),
+    );
+  }
+
+  static Future<Community> removeCommunityImage(String communityId) async {
+    final me = _client.auth.currentUser;
+    if (me == null) {
+      throw const AuthException('Sign in to remove the group photo.');
+    }
+
+    final row = await _client
+        .from('communities')
+        .update({'image_url': null})
+        .eq('id', communityId)
+        .select(_communityColumns)
+        .single();
+
+    final memberIds = await _myMembershipIds();
+    final followIds = await _myFollowIds();
+    return Community.fromRow(
+      row,
+      isMember: memberIds.contains(communityId),
+      isFollowing: followIds.contains(communityId),
+    );
+  }
+}
+
+class CommunityMediaService {
+  CommunityMediaService._();
+
+  static const _maxBytes = 10 * 1024 * 1024;
+  static final _client = Supabase.instance.client;
+
+  static Future<String> uploadGroupImage({
+    required String communityIdHint,
+    required XFile file,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw const AuthException('Sign in to upload a group image.');
+    }
+
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) throw const StorageException('Selected file is empty.');
+    if (bytes.length > _maxBytes) {
+      throw const StorageException('Group image must be 10 MB or smaller.');
+    }
+
+    final mediaType = mediaTypeForFile(file);
+    if (mediaType != 'image') {
+      throw const StorageException('Group profile image must be a photo.');
+    }
+
+    final upload = await MediaStorageService.uploadBytes(
+      bucket: MediaBucket.profile,
+      bytes: bytes,
+      contentType: mimeTypeForFile(file, mediaType),
+      fileName: file.name,
+      index: 0,
+      subfolder: 'community-avatars/$communityIdHint',
+      context: {'profile_id': user.id},
+    );
+
+    return MediaStorageService.createReadUrl(
+      bucket: MediaBucket.profile,
+      path: upload.path,
+      provider: upload.provider,
+      context: {'profile_id': user.id},
+    );
   }
 }
