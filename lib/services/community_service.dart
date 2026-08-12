@@ -6,6 +6,7 @@ class Community {
   final String? description;
   final String? city;
   final String? state;
+  final String? imageUrl;
   final String creatorId;
   final int memberCount;
   final bool isMember;
@@ -18,6 +19,7 @@ class Community {
     this.description,
     this.city,
     this.state,
+    this.imageUrl,
     required this.creatorId,
     this.memberCount = 0,
     this.isMember = false,
@@ -39,11 +41,12 @@ class Community {
     final createdRaw = row['created_at'];
     return Community(
       id: row['id'] as String,
-      name: row['name'] as String,
+      name: (row['name'] as String?) ?? 'Group',
       description: row['description'] as String?,
       city: row['city'] as String?,
       state: row['state'] as String?,
-      creatorId: row['creator_id'] as String,
+      imageUrl: row['image_url'] as String?,
+      creatorId: (row['creator_id'] as String?) ?? '',
       memberCount: (row['member_count'] as num?)?.toInt() ?? 0,
       isMember: isMember,
       isFollowing: isFollowing,
@@ -75,6 +78,30 @@ class CommunityService {
 
   static final _client = Supabase.instance.client;
 
+  static const _communityColumns =
+      'id, name, description, city, state, image_url, creator_id, member_count, created_at';
+
+  static const _communityColumnsBase =
+      'id, name, description, city, state, creator_id, member_count, created_at';
+
+  static Future<List<dynamic>> _selectCommunities(
+    dynamic Function(dynamic query) configure,
+  ) async {
+    Future<List<dynamic>> run(String columns) async {
+      dynamic query = _client.from('communities').select(columns);
+      query = configure(query);
+      final rows = await query;
+      if (rows is List) return rows;
+      return const [];
+    }
+
+    try {
+      return await run(_communityColumns);
+    } catch (_) {
+      return await run(_communityColumnsBase);
+    }
+  }
+
   static Future<void> _ensureProfile(User user) async {
     final displayName = user.email?.split('@').first;
     try {
@@ -102,11 +129,19 @@ class CommunityService {
     if (me == null) return {};
 
     try {
-      final rows = await _client
-          .from('community_members')
-          .select('community_id')
-          .eq('user_id', me.id);
-      return rows.map((r) => r['community_id'] as String).toSet();
+      try {
+        final rows = await _client
+            .from('community_members')
+            .select('community_id')
+            .eq('profile_id', me.id);
+        return rows.map((r) => r['community_id'] as String).toSet();
+      } catch (_) {
+        final rows = await _client
+            .from('community_members')
+            .select('community_id')
+            .eq('user_id', me.id);
+        return rows.map((r) => r['community_id'] as String).toSet();
+      }
     } catch (_) {
       return {};
     }
@@ -117,11 +152,19 @@ class CommunityService {
     if (me == null) return {};
 
     try {
-      final rows = await _client
-          .from('community_follows')
-          .select('community_id')
-          .eq('user_id', me.id);
-      return rows.map((r) => r['community_id'] as String).toSet();
+      try {
+        final rows = await _client
+            .from('community_follows')
+            .select('community_id')
+            .eq('profile_id', me.id);
+        return rows.map((r) => r['community_id'] as String).toSet();
+      } catch (_) {
+        final rows = await _client
+            .from('community_follows')
+            .select('community_id')
+            .eq('user_id', me.id);
+        return rows.map((r) => r['community_id'] as String).toSet();
+      }
     } catch (_) {
       return {};
     }
@@ -302,42 +345,115 @@ class CommunityService {
     }
   }
 
-  static Future<List<Community>> fetchHomePreview({int limit = 8}) async {
+  static Future<List<Community>> fetchYourCommunities({int limit = 20}) async {
     final me = _client.auth.currentUser;
-    if (me == null) {
-      return fetchCommunities(limit: limit);
-    }
+    if (me == null) return const [];
 
     try {
-      final memberRows = await _client
-          .from('community_members')
-          .select('community_id')
-          .eq('user_id', me.id)
-          .limit(limit);
+      List<dynamic> memberRows = const [];
+      try {
+        memberRows = await _client
+            .from('community_members')
+            .select('community_id')
+            .eq('user_id', me.id)
+            .limit(limit);
+      } catch (_) {
+        memberRows = await _client
+            .from('community_members')
+            .select('community_id')
+            .eq('profile_id', me.id)
+            .limit(limit);
+      }
 
       final memberIds =
           memberRows.map((r) => r['community_id'] as String).toList();
+      if (memberIds.isEmpty) return const [];
 
-      if (memberIds.isNotEmpty) {
-        final rows = await _client
-            .from('communities')
-            .select('id, name, description, city, state, creator_id, member_count, created_at')
-            .inFilter('id', memberIds)
-            .limit(limit);
+      final rows = await _selectCommunities(
+        (query) => query.inFilter('id', memberIds).limit(limit),
+      );
+      final followIds = await _myFollowIds();
+      return rows
+          .map(
+            (row) => Community.fromRow(
+              row,
+              isMember: true,
+              isFollowing: followIds.contains(row['id'] as String),
+            ),
+          )
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
 
-        final followIds = await _myFollowIds();
-        return rows
-            .map(
-              (row) => Community.fromRow(
-                row,
-                isMember: true,
-                isFollowing: followIds.contains(row['id'] as String),
-              ),
-            )
-            .toList();
+  /// Nearby/local discovery for Home. Prefers city/state match when available.
+  static Future<List<Community>> fetchNearbyCommunities({
+    int limit = 16,
+  }) async {
+    try {
+      final user = _client.auth.currentUser;
+      String? city;
+      String? state;
+      if (user != null) {
+        try {
+          final row = await _client
+              .from('user_preferences')
+              .select('preferred_city, preferred_state, browse_everywhere')
+              .eq('profile_id', user.id)
+              .maybeSingle();
+          if (row != null && row['browse_everywhere'] != true) {
+            city = row['preferred_city'] as String?;
+            state = row['preferred_state'] as String?;
+          }
+        } catch (_) {}
       }
-    } catch (_) {}
 
+      final memberIds = (await _myMembershipIds()).toSet();
+      final followIds = await _myFollowIds();
+
+      final rows = await _selectCommunities((query) {
+        dynamic q = query.order('member_count', ascending: false).limit(limit * 2);
+        if ((city ?? '').trim().isNotEmpty) {
+          q = q.ilike('city', city!.trim());
+        } else if ((state ?? '').trim().isNotEmpty) {
+          q = q.ilike('state', state!.trim());
+        }
+        return q;
+      });
+
+      final mapped = <Community>[];
+      for (final row in rows) {
+        final id = row['id'] as String?;
+        if (id == null) continue;
+        // Keep nearby discovery distinct from "your groups".
+        if (memberIds.contains(id)) continue;
+        mapped.add(
+          Community.fromRow(
+            row,
+            isMember: false,
+            isFollowing: followIds.contains(id),
+          ),
+        );
+        if (mapped.length >= limit) break;
+      }
+
+      if (mapped.isNotEmpty) return mapped;
+
+      // Fallback: broad public list excluding memberships.
+      final fallback = await fetchCommunities(limit: limit * 2);
+      return fallback
+          .where((c) => !memberIds.contains(c.id))
+          .take(limit)
+          .toList();
+    } catch (_) {
+      return fetchCommunities(limit: limit);
+    }
+  }
+
+  static Future<List<Community>> fetchHomePreview({int limit = 8}) async {
+    final yours = await fetchYourCommunities(limit: limit);
+    if (yours.isNotEmpty) return yours;
     return fetchCommunities(limit: limit);
   }
 }
