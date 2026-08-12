@@ -39,14 +39,16 @@ class FeedCommentsSheet extends StatefulWidget {
 
 class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
   final _controller = TextEditingController();
-  late Future<List<FeedComment>> _commentsFuture;
+  List<FeedComment> _comments = const [];
+  bool _loading = true;
+  bool _loadFailed = false;
   bool _posting = false;
   String? _replyParentId;
 
   @override
   void initState() {
     super.initState();
-    _commentsFuture = FeedCommentsService.fetchComments(widget.mediaId);
+    _loadComments();
   }
 
   @override
@@ -55,11 +57,25 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
     super.dispose();
   }
 
-  Future<void> _refresh() async {
-    setState(
-      () => _commentsFuture = FeedCommentsService.fetchComments(widget.mediaId),
-    );
-    await _commentsFuture;
+  Future<void> _loadComments() async {
+    setState(() {
+      _loading = true;
+      _loadFailed = false;
+    });
+    try {
+      final comments = await FeedCommentsService.fetchComments(widget.mediaId);
+      if (!mounted) return;
+      setState(() {
+        _comments = comments;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadFailed = true;
+      });
+    }
   }
 
   Future<void> _post() async {
@@ -75,14 +91,20 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
     if (text.isEmpty || _posting) return;
     setState(() => _posting = true);
     try {
-      await FeedCommentsService.postComment(
+      final newComment = await FeedCommentsService.postComment(
         mediaId: widget.mediaId,
         body: text,
         parentId: _replyParentId,
       );
       _controller.clear();
       _replyParentId = null;
-      await _refresh();
+      if (!mounted) return;
+      setState(() {
+        _comments = [
+          ..._comments,
+          newComment,
+        ];
+      });
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -96,6 +118,74 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
 
   List<FeedComment> _repliesFor(List<FeedComment> all, String parentId) {
     return all.where((comment) => comment.parentId == parentId).toList();
+  }
+
+  Widget _buildCommentsList(ScrollController scrollController) {
+    if (_loadFailed) {
+      return Center(
+        child: TextButton(
+          onPressed: _loadComments,
+          child: const Text('Unable to load comments. Tap to retry.'),
+        ),
+      );
+    }
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFFD8B56A)),
+      );
+    }
+
+    final topLevel =
+        _comments.where((comment) => comment.parentId == null).toList();
+    if (topLevel.isEmpty) {
+      return ListView(
+        controller: scrollController,
+        children: const [
+          SizedBox(height: 80),
+          Center(
+            child: Text(
+              'Be the first to comment.',
+              style: TextStyle(color: Colors.white54),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ListView.separated(
+      controller: scrollController,
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      itemCount: topLevel.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final comment = topLevel[index];
+        final replies = _repliesFor(_comments, comment.id);
+        return _CommentBlock(
+          comment: comment,
+          replies: replies,
+          onSpark: () async {
+            await FeedCommentsService.toggleSpark(comment);
+            await _loadComments();
+          },
+          onReply: () {
+            setState(() {
+              _replyParentId = comment.id;
+              _controller.text = '@${comment.authorName} ';
+            });
+          },
+          onSparkReply: (reply) async {
+            await FeedCommentsService.toggleSpark(reply);
+            await _loadComments();
+          },
+          onReplyToReply: (reply) {
+            setState(() {
+              _replyParentId = reply.id;
+              _controller.text = '@${reply.authorName} ';
+            });
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -142,75 +232,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
                 ),
               ),
               Expanded(
-                child: FutureBuilder<List<FeedComment>>(
-                  future: _commentsFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: TextButton(
-                          onPressed: _refresh,
-                          child: const Text('Unable to load comments. Tap to retry.'),
-                        ),
-                      );
-                    }
-                    if (!snapshot.hasData) {
-                      return const Center(
-                        child: CircularProgressIndicator(color: Color(0xFFD8B56A)),
-                      );
-                    }
-                    final comments = snapshot.data!;
-                    final topLevel =
-                        comments.where((comment) => comment.parentId == null).toList();
-                    if (topLevel.isEmpty) {
-                      return ListView(
-                        controller: scrollController,
-                        children: const [
-                          SizedBox(height: 80),
-                          Center(
-                            child: Text(
-                              'Be the first to comment.',
-                              style: TextStyle(color: Colors.white54),
-                            ),
-                          ),
-                        ],
-                      );
-                    }
-                    return ListView.separated(
-                      controller: scrollController,
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                      itemCount: topLevel.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final comment = topLevel[index];
-                        final replies = _repliesFor(comments, comment.id);
-                        return _CommentBlock(
-                          comment: comment,
-                          replies: replies,
-                          onSpark: () async {
-                            await FeedCommentsService.toggleSpark(comment);
-                            await _refresh();
-                          },
-                          onReply: () {
-                            setState(() {
-                              _replyParentId = comment.id;
-                              _controller.text = '@${comment.authorName} ';
-                            });
-                          },
-                          onSparkReply: (reply) async {
-                            await FeedCommentsService.toggleSpark(reply);
-                            await _refresh();
-                          },
-                          onReplyToReply: (reply) {
-                            setState(() {
-                              _replyParentId = reply.id;
-                              _controller.text = '@${reply.authorName} ';
-                            });
-                          },
-                        );
-                      },
-                    );
-                  },
-                ),
+                child: _buildCommentsList(scrollController),
               ),
               SafeArea(
                 top: false,

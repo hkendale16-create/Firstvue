@@ -8,6 +8,15 @@
 --   2. 20260811_professional_showcase.sql
 --   3. 20260811_social_discovery_monetization.sql
 --   4. 20260811_ai_commerce_owner_connections.sql
+--   5. 20260814_business_media_owner_access.sql
+--   6. 20260815_community_news_author_read.sql
+--   7. 20260815_news_spark_public_read.sql
+--   8. 20260816_user_saved_items.sql
+--   9. 20260816_rental_admin_and_message_search.sql
+--  10. 20260816_feed_comments_text_media_id.sql
+--
+-- Prerequisite (run separately if news feed tables missing):
+--   20260813_menus_news_feed.sql
 
 -- =============================================================================
 -- 1. professional_media_availability
@@ -438,3 +447,249 @@ select b.id, b.name, b.business_type, b.description, b.services,
 from public.businesses b
 left join public.business_locations l on l.business_id = b.id
 where b.status = 'approved';
+
+-- =============================================================================
+-- 5. business_media_owner_access
+-- =============================================================================
+
+update storage.buckets
+set
+  allowed_mime_types = array[
+    'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif',
+    'video/mp4', 'video/quicktime', 'video/webm', 'video/3gpp', 'video/x-msvideo',
+    'video/x-matroska', 'video/x-m4v'
+  ]
+where id = 'business-media';
+
+drop policy if exists "Owners view their business media files" on storage.objects;
+create policy "Owners view their business media files"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'business-media'
+    and (
+      (storage.foldername(name))[1] = auth.uid()::text
+      or exists (
+        select 1
+        from public.business_media media
+        join public.businesses business on business.id = media.business_id
+        where media.storage_path = name
+          and business.created_by = auth.uid()
+      )
+    )
+  );
+
+drop policy if exists "Owners read their business media records" on public.business_media;
+create policy "Owners read their business media records"
+  on public.business_media for select to authenticated
+  using (
+    exists (
+      select 1 from public.businesses business
+      where business.id = business_id and business.created_by = auth.uid()
+    )
+  );
+
+-- =============================================================================
+-- 6. community_news_author_read
+-- =============================================================================
+
+drop policy if exists "Authors read their news posts" on public.community_news_posts;
+create policy "Authors read their news posts"
+  on public.community_news_posts for select to authenticated
+  using (author_id = auth.uid());
+
+-- =============================================================================
+-- 7. news_spark_public_read
+-- =============================================================================
+
+drop policy if exists "Public reads news spark counts" on public.community_news_post_sparks;
+create policy "Public reads news spark counts"
+  on public.community_news_post_sparks for select
+  using (true);
+
+-- =============================================================================
+-- 8. user_saved_items
+-- =============================================================================
+
+create table if not exists public.user_saved_items (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  content_type text not null check (content_type in ('news_post', 'business')),
+  content_id text not null,
+  created_at timestamptz not null default now(),
+  unique (user_id, content_type, content_id)
+);
+
+alter table public.user_saved_items enable row level security;
+
+drop policy if exists "Users read own saved items" on public.user_saved_items;
+create policy "Users read own saved items"
+  on public.user_saved_items for select to authenticated
+  using (user_id = auth.uid());
+
+drop policy if exists "Users save items" on public.user_saved_items;
+create policy "Users save items"
+  on public.user_saved_items for insert to authenticated
+  with check (user_id = auth.uid());
+
+drop policy if exists "Users unsave items" on public.user_saved_items;
+create policy "Users unsave items"
+  on public.user_saved_items for delete to authenticated
+  using (user_id = auth.uid());
+
+create index if not exists user_saved_items_user_created_idx
+  on public.user_saved_items (user_id, created_at desc);
+
+-- =============================================================================
+-- 9. rental_admin_and_message_search
+-- Requires is_firstvue_admin() from 20260811_phase1_security_hardening.sql
+-- =============================================================================
+
+drop policy if exists "FirstVue admins manage rentals" on public.rentals;
+create policy "FirstVue admins manage rentals"
+  on public.rentals for all to authenticated
+  using (public.is_firstvue_admin())
+  with check (public.is_firstvue_admin());
+
+drop policy if exists "FirstVue admins manage rental media" on public.rental_media;
+drop policy if exists "FirstVue admins manage rental media records" on public.rental_media;
+create policy "FirstVue admins manage rental media"
+  on public.rental_media for all to authenticated
+  using (public.is_firstvue_admin())
+  with check (public.is_firstvue_admin());
+
+drop policy if exists "FirstVue admins read rental media files" on storage.objects;
+drop policy if exists "FirstVue admins view rental media files" on storage.objects;
+create policy "FirstVue admins read rental media files"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'rental-media'
+    and public.is_firstvue_admin()
+  );
+
+drop policy if exists "FirstVue admins read pending rentals" on public.rentals;
+create policy "FirstVue admins read pending rentals"
+  on public.rentals for select to authenticated
+  using (public.is_firstvue_admin() and status = 'pending');
+
+create or replace function public.search_message_recipients(search_query text)
+returns table (
+  profile_id uuid,
+  display_name text,
+  account_type text,
+  business_id uuid,
+  business_name text
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select distinct on (p.id)
+    p.id as profile_id,
+    p.display_name,
+    p.account_type,
+    b.id as business_id,
+    b.name as business_name
+  from public.profiles p
+  left join public.businesses b
+    on b.created_by = p.id
+   and b.status = 'approved'
+  left join auth.users u on u.id = p.id
+  where auth.uid() is not null
+    and p.id <> auth.uid()
+    and p.display_name is not null
+    and char_length(trim(search_query)) >= 2
+    and (
+      p.display_name ilike '%' || trim(search_query) || '%'
+      or u.email ilike '%' || trim(search_query) || '%'
+    )
+  order by p.id, b.created_at desc nulls last
+  limit 25;
+$$;
+
+revoke all on function public.search_message_recipients(text) from public;
+grant execute on function public.search_message_recipients(text) to authenticated;
+
+-- =============================================================================
+-- 10. feed_comments_text_media_id
+-- Requires feed_comments from 20260811_messaging_and_comments.sql
+-- and community_news_posts from 20260813_menus_news_feed.sql
+-- =============================================================================
+
+-- We avoid ALTER COLUMN ... TYPE (blocked by RLS policies). Add text column, copy,
+-- drop uuid column CASCADE, rename, recreate policies.
+
+alter table public.feed_comments
+  drop constraint if exists feed_comments_media_id_fkey;
+
+alter table public.feed_comments
+  add column if not exists media_id_text text;
+
+update public.feed_comments
+set media_id_text = media_id::text
+where media_id_text is null;
+
+alter table public.feed_comments
+  drop column if exists media_id cascade;
+
+alter table public.feed_comments
+  rename column media_id_text to media_id;
+
+alter table public.feed_comments
+  alter column media_id set not null;
+
+create or replace function public.feed_comment_target_is_commentable(p_media_id text)
+returns boolean
+language sql
+stable
+set search_path = public
+as $$
+  select
+    case
+      when p_media_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+        exists (
+          select 1
+          from public.business_media m
+          join public.businesses b on b.id = m.business_id
+          where m.id::text = p_media_id
+            and b.status = 'approved'
+        )
+      when p_media_id like 'news-post:%' then
+        exists (
+          select 1
+          from public.community_news_posts p
+          where p.id::text = split_part(p_media_id, ':', 2)
+            and (
+              p.status = 'approved'
+              or p.author_id = auth.uid()
+            )
+        )
+      when p_media_id like 'meet-owner:%' then
+        exists (
+          select 1
+          from public.businesses b
+          where b.id::text = split_part(p_media_id, ':', 2)
+            and b.status = 'approved'
+        )
+      else false
+    end;
+$$;
+
+drop policy if exists "Authenticated users read feed comments" on public.feed_comments;
+drop policy if exists "Authenticated users post feed comments" on public.feed_comments;
+drop policy if exists "Authors delete their feed comments" on public.feed_comments;
+
+create policy "Authenticated users read feed comments"
+  on public.feed_comments for select to authenticated
+  using (public.feed_comment_target_is_commentable(media_id));
+
+create policy "Authenticated users post feed comments"
+  on public.feed_comments for insert to authenticated
+  with check (
+    author_id = auth.uid()
+    and public.feed_comment_target_is_commentable(media_id)
+  );
+
+create policy "Authors delete their feed comments"
+  on public.feed_comments for delete to authenticated
+  using (author_id = auth.uid());

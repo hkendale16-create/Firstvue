@@ -1,5 +1,42 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+class MessageRecipient {
+  final String userId;
+  final String displayName;
+  final String? accountType;
+  final String? businessId;
+  final String? businessName;
+
+  const MessageRecipient({
+    required this.userId,
+    required this.displayName,
+    this.accountType,
+    this.businessId,
+    this.businessName,
+  });
+
+  factory MessageRecipient.fromProfileRow(Map<String, dynamic> row) {
+    return MessageRecipient(
+      userId: row['id'] as String,
+      displayName: (row['display_name'] as String?) ?? 'FirstVue member',
+      accountType: row['account_type'] as String?,
+    );
+  }
+
+  factory MessageRecipient.fromBusinessRow(Map<String, dynamic> row) {
+    final profile = row['profiles'] as Map<String, dynamic>?;
+    return MessageRecipient(
+      userId: row['created_by'] as String,
+      displayName:
+          (profile?['display_name'] as String?) ??
+          (row['name'] as String? ?? 'Business owner'),
+      accountType: 'business_owner',
+      businessId: row['id'] as String,
+      businessName: row['name'] as String?,
+    );
+  }
+}
+
 class MessageThreadSummary {
   final String id;
   final String otherUserId;
@@ -56,6 +93,9 @@ class MessagingService {
   }) async {
     final me = currentUserId;
     if (me == null) throw const MessagingAuthException();
+    if (otherUserId == me) {
+      throw ArgumentError('You cannot message yourself.');
+    }
 
     final ordered = _orderedPair(me, otherUserId);
     final existing = await _client
@@ -76,6 +116,68 @@ class MessagingService {
         .select('id')
         .single();
     return inserted['id'] as String;
+  }
+
+  static Future<List<MessageRecipient>> searchRecipients(String query) async {
+    final me = currentUserId;
+    if (me == null) return [];
+    final trimmed = query.trim();
+    if (trimmed.length < 2) return [];
+
+    try {
+      final rows = await _client.rpc(
+        'search_message_recipients',
+        params: {'search_query': trimmed},
+      );
+      if (rows is! List) return [];
+      return rows
+          .map((row) => MessageRecipient(
+                userId: row['profile_id'] as String,
+                displayName:
+                    (row['display_name'] as String?) ?? 'FirstVue member',
+                accountType: row['account_type'] as String?,
+                businessId: row['business_id'] as String?,
+                businessName: row['business_name'] as String?,
+              ))
+          .where((recipient) => recipient.userId != me)
+          .toList();
+    } catch (_) {
+      return _searchRecipientsFallback(trimmed, me);
+    }
+  }
+
+  static Future<List<MessageRecipient>> fetchBusinessOwners({
+    String? query,
+  }) async {
+    final me = currentUserId;
+    if (me == null) return [];
+
+    var request = _client
+        .from('businesses')
+        .select('id, name, created_by, profiles(display_name)')
+        .eq('status', 'approved')
+        .neq('created_by', me);
+    final trimmed = query?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) {
+      request = request.ilike('name', '%$trimmed%');
+    }
+
+    final rows = await request.order('name').limit(30);
+    return rows.map(MessageRecipient.fromBusinessRow).toList();
+  }
+
+  static Future<List<MessageRecipient>> _searchRecipientsFallback(
+    String query,
+    String me,
+  ) async {
+    final profiles = await _client
+        .from('profiles')
+        .select('id, display_name, account_type')
+        .neq('id', me)
+        .not('display_name', 'is', null)
+        .ilike('display_name', '%$query%')
+        .limit(20);
+    return profiles.map(MessageRecipient.fromProfileRow).toList();
   }
 
   static Future<List<MessageThreadSummary>> fetchInbox() async {

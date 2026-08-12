@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'admin_rentals_screen.dart';
+import 'admin_approvals_hub_screen.dart';
 import 'admin_business_submissions_screen.dart';
 import 'admin_business_reviews_screen.dart';
 import 'admin_professional_profiles_screen.dart';
 import 'auth_screen.dart';
-import 'business_owner_start_screen.dart';
+import 'join_firstvue_screen.dart';
 import 'business_growth_screen.dart';
 import 'legal_policy_screen.dart';
 import 'rental_inquiries_screen.dart';
@@ -15,9 +16,13 @@ import 'my_businesses_screen.dart';
 import 'messages_inbox_screen.dart';
 import 'professional_profile_editor_screen.dart';
 import '../services/admin_auth_service.dart';
+import '../widgets/profile_recent_activity_section.dart';
+import '../widgets/profile_saved_section.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final int refreshToken;
+
+  const ProfileScreen({super.key, this.refreshToken = 0});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -31,6 +36,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadAdminAccess();
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      _loadAdminAccess();
+    }
   }
 
   Future<void> _loadAdminAccess() async {
@@ -58,308 +71,294 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _open(Widget screen) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
-    final email = user?.email;
-    final displayName = email == null || email.isEmpty
-        ? 'YOUR FIRSTVUE'
-        : email.split('@').first.toUpperCase();
+    final email = user?.email ?? '';
+    final displayName = email.isEmpty
+        ? 'Guest'
+        : email.split('@').first;
 
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+        padding: EdgeInsets.zero,
         children: [
-          const Text(
-            'PROFILE',
-            style: TextStyle(
-              fontFamily: 'CormorantGaramond',
-              color: Colors.white,
-              fontSize: 25,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 2,
-            ),
-          ),
-          const SizedBox(height: 25),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => _handleAccountTap(user),
-              borderRadius: BorderRadius.circular(22),
-              child: Ink(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10151B),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: const Color(0xFF78B9BE).withValues(alpha: .28),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                height: 150,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF1A2530),
+                      Color(0xFF243540),
+                      Color(0xFF78B9BE),
+                    ],
                   ),
-                ),
-                child: Column(
-                  children: [
-                    const CircleAvatar(
-                      radius: 34,
-                      backgroundColor: Color(0xFF241D22),
-                      child: Icon(
-                        Icons.person_outline,
-                        color: Color(0xFF78B9BE),
-                        size: 36,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      displayName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      email ?? 'Tap to sign in and create your FirstVue profile',
-                      style: const TextStyle(color: Colors.white54),
-                    ),
-                  ],
                 ),
               ),
-            ),
-          ),
-          const SizedBox(height: 26),
-          const Text(
-            'ACCOUNT',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.5,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _ProfileRow(
-            icon: user == null ? Icons.login : Icons.logout,
-            title: user == null ? 'Sign in or create an account' : 'Sign out',
-            subtitle: user == null
-                ? 'Use your secure FirstVue account'
-                : 'Signed in as $email',
-            onTap: () => _handleAccountTap(user),
-          ),
-          const SizedBox(height: 10),
-          _ProfileRow(
-            icon: Icons.chat_bubble_outline,
-            title: 'Messages',
-            subtitle: user == null
-                ? 'Sign in to message business owners directly'
-                : 'Direct conversations with owners and members',
-            onTap: user == null
-                ? () => _handleAccountTap(user)
-                : () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const MessagesInboxScreen(),
-                      ),
-                    );
-                  },
-          ),
-          const SizedBox(height: 10),
-          _ProfileRow(
-            icon: Icons.badge_outlined,
-            title: 'My professional profile',
-            subtitle: user == null
-                ? 'Sign in to create your public professional identity'
-                : 'Barbers, stylists, and beauty professionals',
-            onTap: user == null
-                ? () => _handleAccountTap(user)
-                : () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ProfessionalProfileEditorScreen(),
-                      ),
-                    );
-                  },
-          ),
-          const SizedBox(height: 10),
-          _ProfileRow(
-            icon: Icons.edit_note_outlined,
-            title: 'My business profiles',
-            subtitle: user == null
-                ? 'Sign in to manage your public details'
-                : 'Add your about details and public address',
-            onTap: user == null
-                ? () => _handleAccountTap(user)
-                : () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const MyBusinessesScreen(),
-                      ),
-                    );
-                  },
-          ),
-          const SizedBox(height: 10),
-          _ProfileRow(
-            icon: Icons.trending_up_rounded,
-            title: 'Growth, plans & analytics',
-            subtitle: user == null
-                ? 'Sign in to access business monetization tools'
-                : 'Pro plans, promotions, leads, bookings and performance',
-            onTap: user == null
-                ? () => _handleAccountTap(user)
-                : () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const BusinessGrowthScreen(),
+              Positioned(
+                left: 20,
+                bottom: -36,
+                child: CircleAvatar(
+                  radius: 46,
+                  backgroundColor: const Color(0xFF080B0F),
+                  child: CircleAvatar(
+                    radius: 42,
+                    backgroundColor: const Color(0xFF241D22),
+                    child: Icon(
+                      user == null ? Icons.person_outline : Icons.person,
+                      color: const Color(0xFF78B9BE),
+                      size: 40,
                     ),
                   ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
-          if (_adminLoaded && _isAdmin) ...[
-            _ProfileRow(
-              icon: Icons.how_to_reg_outlined,
-              title: 'Professional approvals',
-              subtitle: 'FIRSTVUE administrator access only',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const AdminProfessionalProfilesScreen(),
+          const SizedBox(height: 48),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  displayName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                   ),
-                );
-              },
-            ),
-            const SizedBox(height: 10),
-            _ProfileRow(
-              icon: Icons.verified_outlined,
-              title: 'Business approvals',
-              subtitle: 'FirstVue administrator access only',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const AdminBusinessSubmissionsScreen(),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  user == null
+                      ? 'Sign in to sync your FirstVue account'
+                      : email,
+                  style: const TextStyle(color: Colors.white54),
+                ),
+                if (user != null) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () => _handleAccountTap(user),
+                    icon: const Icon(Icons.logout, size: 18),
+                    label: const Text('Sign out'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white70,
+                      side: BorderSide(color: Colors.white.withValues(alpha: .2)),
+                    ),
                   ),
-                );
-              },
-            ),
-            const SizedBox(height: 10),
-            _ProfileRow(
-              icon: Icons.reviews_outlined,
-              title: 'Review approvals',
-              subtitle: 'FirstVue administrator access only',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const AdminBusinessReviewsScreen(),
+                ] else ...[
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: () => _handleAccountTap(user),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFD8B56A),
+                      foregroundColor: Colors.black,
+                    ),
+                    child: const Text('Sign in or create account'),
                   ),
-                );
-              },
+                ],
+              ],
             ),
-            const SizedBox(height: 10),
-            _ProfileRow(
-              icon: Icons.admin_panel_settings_outlined,
-              title: 'Rental approvals',
-              subtitle: 'FirstVue administrator access only',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AdminRentalsScreen()),
-                );
-              },
-            ),
-            const SizedBox(height: 10),
+          ),
+          if (user != null) ...[
+            const SizedBox(height: 28),
+            ProfileSavedSection(refreshToken: widget.refreshToken),
+            ProfileRecentActivitySection(refreshToken: widget.refreshToken),
           ],
-          _ProfileRow(
-            icon: Icons.mark_email_unread_outlined,
-            title: 'Rental inquiries',
-            subtitle: user == null
-                ? 'Sign in to view messages on your rentals'
-                : 'Messages from interested professionals',
-            onTap: user == null
-                ? () => _handleAccountTap(user)
-                : () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const RentalInquiriesScreen(),
-                      ),
-                    );
-                  },
-          ),
           const SizedBox(height: 10),
-          _ProfileRow(
-            icon: Icons.key_outlined,
-            title: 'My rental listings',
-            subtitle: user == null
-                ? 'Sign in to view your listing statuses'
-                : 'View pending, approved, and rejected rentals',
-            onTap: user == null
-                ? () => _handleAccountTap(user)
-                : () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const MyRentalListingsScreen(),
-                      ),
-                    );
-                  },
+          _SettingsGroup(
+            title: 'Your profile',
+            children: [
+              _SettingsTile(
+                icon: Icons.how_to_reg_outlined,
+                title: 'Get verified',
+                subtitle: 'Business owner, professional, or organizer',
+                onTap: user == null
+                    ? () => _handleAccountTap(user)
+                    : () => _open(const JoinFirstVueScreen()),
+              ),
+              _SettingsTile(
+                icon: Icons.storefront_outlined,
+                title: 'My business profiles',
+                subtitle: 'Photos, address, menu & details',
+                onTap: user == null
+                    ? () => _handleAccountTap(user)
+                    : () => _open(const MyBusinessesScreen()),
+              ),
+              _SettingsTile(
+                icon: Icons.badge_outlined,
+                title: 'My professional profile',
+                subtitle: 'Individual barber or stylist profile',
+                onTap: user == null
+                    ? () => _handleAccountTap(user)
+                    : () => _open(const ProfessionalProfileEditorScreen()),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
-          _ProfileRow(
-            icon: Icons.location_on_outlined,
-            title: 'Location preferences',
-            subtitle: 'Controlled by your device permissions',
+          _SettingsGroup(
+            title: 'Activity',
+            children: [
+              _SettingsTile(
+                icon: Icons.chat_bubble_outline,
+                title: 'Messages',
+                onTap: user == null
+                    ? () => _handleAccountTap(user)
+                    : () => _open(const MessagesInboxScreen()),
+              ),
+              _SettingsTile(
+                icon: Icons.trending_up_rounded,
+                title: 'Growth, plans & analytics',
+                onTap: user == null
+                    ? () => _handleAccountTap(user)
+                    : () => _open(const BusinessGrowthScreen()),
+              ),
+              _SettingsTile(
+                icon: Icons.key_outlined,
+                title: 'My rental listings',
+                onTap: user == null
+                    ? () => _handleAccountTap(user)
+                    : () => _open(const MyRentalListingsScreen()),
+              ),
+              _SettingsTile(
+                icon: Icons.mark_email_unread_outlined,
+                title: 'Rental inquiries',
+                onTap: user == null
+                    ? () => _handleAccountTap(user)
+                    : () => _open(const RentalInquiriesScreen()),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
-          _ProfileRow(
-            icon: Icons.verified_user_outlined,
-            title: 'Business owner tools',
-            subtitle: 'Claim and verification are coming soon',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const BusinessOwnerStartScreen(),
+          _SettingsGroup(
+            title: 'Preferences',
+            children: [
+              _SettingsTile(
+                icon: Icons.location_on_outlined,
+                title: 'Location',
+                subtitle: 'Controlled by device permissions',
+              ),
+              _SettingsTile(
+                icon: Icons.notifications_outlined,
+                title: 'Notifications',
+                subtitle: 'Push alerts for messages & updates',
+              ),
+            ],
+          ),
+          if (_adminLoaded && _isAdmin)
+            _SettingsGroup(
+              title: 'Admin tools',
+              titleColor: const Color(0xFFD8B56A),
+              children: [
+                _SettingsTile(
+                  icon: Icons.admin_panel_settings_outlined,
+                  title: 'Approval center',
+                  subtitle: 'Business, professional & organizer',
+                  onTap: () => _open(const AdminApprovalsHubScreen()),
                 ),
-              );
-            },
-          ),
-          const SizedBox(height: 26),
-          const Text(
-            'LEGAL',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.5,
+                _SettingsTile(
+                  icon: Icons.verified_outlined,
+                  title: 'Business approvals',
+                  onTap: () => _open(const AdminBusinessSubmissionsScreen()),
+                ),
+                _SettingsTile(
+                  icon: Icons.how_to_reg_outlined,
+                  title: 'Professional approvals',
+                  onTap: () => _open(const AdminProfessionalProfilesScreen()),
+                ),
+                _SettingsTile(
+                  icon: Icons.reviews_outlined,
+                  title: 'Review approvals',
+                  onTap: () => _open(const AdminBusinessReviewsScreen()),
+                ),
+                _SettingsTile(
+                  icon: Icons.admin_panel_settings_outlined,
+                  title: 'Rental approvals',
+                  onTap: () => _open(const AdminRentalsScreen()),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 12),
-          _ProfileRow(
-            icon: Icons.privacy_tip_outlined,
-            title: 'Privacy policy',
-            subtitle: 'How FirstVue handles your data',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const LegalPolicyScreen(
-                  type: LegalPolicyType.privacy,
+          _SettingsGroup(
+            title: 'Legal & support',
+            children: [
+              _SettingsTile(
+                icon: Icons.privacy_tip_outlined,
+                title: 'Privacy policy',
+                onTap: () => _open(
+                  const LegalPolicyScreen(type: LegalPolicyType.privacy),
                 ),
+              ),
+              _SettingsTile(
+                icon: Icons.description_outlined,
+                title: 'Terms of service',
+                onTap: () => _open(
+                  const LegalPolicyScreen(type: LegalPolicyType.terms),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsGroup extends StatelessWidget {
+  final String title;
+  final Color? titleColor;
+  final List<Widget> children;
+
+  const _SettingsGroup({
+    required this.title,
+    required this.children,
+    this.titleColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(
+              title.toUpperCase(),
+              style: TextStyle(
+                color: titleColor ?? Colors.white54,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+                fontSize: 12,
               ),
             ),
           ),
-          const SizedBox(height: 10),
-          _ProfileRow(
-            icon: Icons.description_outlined,
-            title: 'Terms of service',
-            subtitle: 'Rules for using FirstVue',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const LegalPolicyScreen(
-                  type: LegalPolicyType.terms,
-                ),
-              ),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF10151B),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: .07)),
+            ),
+            child: Column(
+              children: [
+                for (var i = 0; i < children.length; i++) ...[
+                  children[i],
+                  if (i < children.length - 1)
+                    Divider(
+                      height: 1,
+                      indent: 56,
+                      color: Colors.white.withValues(alpha: .08),
+                    ),
+                ],
+              ],
             ),
           ),
         ],
@@ -368,16 +367,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-class _ProfileRow extends StatelessWidget {
+class _SettingsTile extends StatelessWidget {
   final IconData icon;
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final VoidCallback? onTap;
 
-  const _ProfileRow({
+  const _SettingsTile({
     required this.icon,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     this.onTap,
   });
 
@@ -386,18 +385,13 @@ class _ProfileRow extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(17),
         onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF10151B),
-            borderRadius: BorderRadius.circular(17),
-            border: Border.all(color: Colors.white.withValues(alpha: .07)),
-          ),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
-              Icon(icon, color: const Color(0xFFD8B56A)),
+              Icon(icon, color: const Color(0xFFD8B56A), size: 22),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -408,20 +402,24 @@ class _ProfileRow extends StatelessWidget {
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w600,
+                        fontSize: 15,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 12,
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Colors.white38),
+              if (onTap != null)
+                const Icon(Icons.chevron_right, color: Colors.white38, size: 20),
             ],
           ),
         ),

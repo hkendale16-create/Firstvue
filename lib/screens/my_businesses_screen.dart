@@ -5,6 +5,8 @@ import '../services/business_media_service.dart';
 import '../services/business_menu_service.dart';
 import '../services/business_social_links_service.dart';
 import '../services/business_submission_service.dart';
+import '../widgets/location_autocomplete_field.dart';
+import 'join_firstvue_screen.dart';
 
 class MyBusinessesScreen extends StatefulWidget {
   const MyBusinessesScreen({super.key});
@@ -36,17 +38,75 @@ class _MyBusinessesScreenState extends State<MyBusinessesScreen> {
     body: FutureBuilder<List<OwnedBusiness>>(
       future: _businesses,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
             child: CircularProgressIndicator(color: Color(0xFFD8B56A)),
           );
         }
-        final businesses = snapshot.data!;
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.white54, size: 40),
+                  const SizedBox(height: 12),
+                  Text(
+                    snapshot.error.toString(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white54),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(onPressed: _refresh, child: const Text('TRY AGAIN')),
+                ],
+              ),
+            ),
+          );
+        }
+        final businesses = snapshot.data ?? const [];
         if (businesses.isEmpty) {
-          return const Center(
-            child: Text(
-              'Submit a business to manage its profile.',
-              style: TextStyle(color: Colors.white54),
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.storefront_outlined,
+                    color: Color(0xFFD8B56A),
+                    size: 48,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'No business profiles yet',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Submit a business as a Business Owner to manage photos, address, and details here.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white54, height: 1.4),
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton(
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const JoinFirstVueScreen(),
+                        ),
+                      );
+                      if (mounted) _refresh();
+                    },
+                    child: const Text('SUBMIT A BUSINESS'),
+                  ),
+                ],
+              ),
             ),
           );
         }
@@ -130,6 +190,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
   final _youtube = TextEditingController();
   final _menuLines = TextEditingController();
   final _specialLines = TextEditingController();
+  final _imagePicker = ImagePicker();
   late Future<List<BusinessMediaItem>> _media;
   @override
   void initState() {
@@ -285,14 +346,80 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
     }
   }
 
-  Future<void> _addPhotos() async {
-    final images = await ImagePicker().pickMultiImage(imageQuality: 90);
-    if (images.isEmpty || !mounted) return;
+  Future<void> _showMediaPicker() async {
+    final files = await showModalBottomSheet<List<XFile>>(
+      context: context,
+      backgroundColor: const Color(0xFF10151B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'ADD PHOTOS OR VIDEOS',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.1,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Uploads go live on your profile immediately — no separate approval needed.',
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 14),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined, color: Color(0xFFD8B56A)),
+                title: const Text('Photos from gallery', style: TextStyle(color: Colors.white)),
+                onTap: () async {
+                  final photos = await _imagePicker.pickMultiImage(imageQuality: 90);
+                  if (sheetContext.mounted) {
+                    Navigator.pop(sheetContext, photos);
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.videocam_outlined, color: Color(0xFF78B9BE)),
+                title: const Text('Video from gallery', style: TextStyle(color: Colors.white)),
+                onTap: () async {
+                  final video = await _imagePicker.pickVideo(source: ImageSource.gallery);
+                  if (sheetContext.mounted) {
+                    Navigator.pop(sheetContext, video == null ? <XFile>[] : [video]);
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.perm_media_outlined, color: Color(0xFFE5C16F)),
+                title: const Text(
+                  'Photos & videos (all types)',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () async {
+                  final media = await _imagePicker.pickMultipleMedia(
+                    imageQuality: 90,
+                  );
+                  if (sheetContext.mounted) {
+                    Navigator.pop(sheetContext, media);
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (files == null || files.isEmpty || !mounted) return;
     setState(() => _uploading = true);
     try {
-      await BusinessMediaService.uploadImages(
+      await BusinessMediaService.uploadMedia(
         businessId: widget.business.id,
-        images: images,
+        files: files,
       );
       if (!mounted) return;
       setState(
@@ -301,15 +428,15 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '${images.length} photo${images.length == 1 ? '' : 's'} added.',
+            '${files.length} file${files.length == 1 ? '' : 's'} added.',
           ),
         ),
       );
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Unable to add photos: $error')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to add media: $error')),
+        );
       }
     } finally {
       if (mounted) setState(() => _uploading = false);
@@ -327,7 +454,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to delete this photo.')),
+          const SnackBar(content: Text('Unable to delete this file.')),
         );
       }
     }
@@ -399,27 +526,31 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
             style: TextStyle(color: Colors.white54, fontSize: 12),
           ),
           const SizedBox(height: 10),
-          _Field(
-            controller: _menuLines,
-            label: 'Menu items',
-            lines: 5,
-          ),
+          _Field(controller: _menuLines, label: 'Menu items', lines: 5),
           const SizedBox(height: 12),
-          _Field(
-            controller: _specialLines,
-            label: 'Specials',
-            lines: 4,
-          ),
+          _Field(controller: _specialLines, label: 'Specials', lines: 4),
         ],
         const SizedBox(height: 12),
-        _Field(controller: _address, label: 'Street address'),
+        LocationAutocompleteField(
+          controller: _address,
+          label: 'Street address',
+          type: LocationFieldType.address,
+        ),
         const SizedBox(height: 12),
-        _Field(controller: _city, label: 'City'),
+        LocationAutocompleteField(
+          controller: _city,
+          label: 'City',
+          type: LocationFieldType.city,
+        ),
         const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
-              child: _Field(controller: _state, label: 'State'),
+              child: LocationAutocompleteField(
+                controller: _state,
+                label: 'State',
+                type: LocationFieldType.state,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -427,17 +558,12 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 18),
-        const Text(
-          'Only add an address you are comfortable showing publicly once the business is approved.',
-          style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.4),
-        ),
         const SizedBox(height: 24),
         Row(
           children: [
             const Expanded(
               child: Text(
-                'BUSINESS PHOTOS',
+                'PHOTOS & VIDEOS',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -446,14 +572,14 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
               ),
             ),
             TextButton.icon(
-              onPressed: _uploading ? null : _addPhotos,
+              onPressed: _uploading ? null : _showMediaPicker,
               icon: _uploading
                   ? const SizedBox.square(
                       dimension: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.add_photo_alternate_outlined),
-              label: Text(_uploading ? 'UPLOADING' : 'ADD PHOTOS'),
+              label: Text(_uploading ? 'UPLOADING' : 'ADD MEDIA'),
             ),
           ],
         ),
@@ -463,7 +589,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return const Text(
-                'Unable to load business photos.',
+                'Unable to load business media.',
                 style: TextStyle(color: Colors.white54),
               );
             }
@@ -474,7 +600,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
             }
             if (snapshot.data!.isEmpty) {
               return const Text(
-                'Add JPEG, PNG, or WebP photos to your public profile.',
+                'Add photos or videos — they appear immediately on your profile.',
                 style: TextStyle(color: Colors.white54, fontSize: 12),
               );
             }
@@ -494,23 +620,36 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Image.network(
-                        media.signedUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => const ColoredBox(
-                          color: Color(0xFF151B22),
-                          child: Icon(
-                            Icons.broken_image_outlined,
-                            color: Colors.white38,
+                      if (media.isVideo)
+                        ColoredBox(
+                          color: const Color(0xFF151B22),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.videocam_outlined, color: Color(0xFF78B9BE), size: 32),
+                              SizedBox(height: 4),
+                              Text('VIDEO', style: TextStyle(color: Colors.white54, fontSize: 10)),
+                            ],
+                          ),
+                        )
+                      else
+                        Image.network(
+                          media.signedUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const ColoredBox(
+                            color: Color(0xFF151B22),
+                            child: Icon(
+                              Icons.broken_image_outlined,
+                              color: Colors.white38,
+                            ),
                           ),
                         ),
-                      ),
                       Positioned(
                         top: 4,
                         right: 4,
                         child: IconButton.filledTonal(
                           visualDensity: VisualDensity.compact,
-                          tooltip: 'Delete photo',
+                          tooltip: 'Delete',
                           onPressed: () => _deletePhoto(media),
                           icon: const Icon(Icons.delete_outline, size: 18),
                         ),

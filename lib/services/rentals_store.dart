@@ -127,7 +127,18 @@ class RentalsStore {
         .eq('status', 'pending')
         .order('created_at', ascending: false)
         .map((rows) => rows.map(RentalListing.fromMap).toList())
-        .asyncMap(_attachMedia);
+        .asyncMap(_attachMediaSafely);
+  }
+
+  static Future<List<RentalListing>> fetchPendingListings() async {
+    final rows = await _client
+        .from('rentals')
+        .select()
+        .eq('status', 'pending')
+        .order('created_at', ascending: false);
+    return _attachMediaSafely(
+      rows.map(RentalListing.fromMap).toList(),
+    );
   }
 
   static Future<bool> isCurrentUserAdmin() => AdminAuthService.isAdmin();
@@ -139,7 +150,25 @@ class RentalsStore {
     if (!const {'approved', 'rejected', 'archived'}.contains(status)) {
       throw ArgumentError.value(status, 'status', 'Unsupported rental status');
     }
-    await _client.from('rentals').update({'status': status}).eq('id', rentalId);
+    if (!await AdminAuthService.isAdmin()) {
+      throw const AuthException('Administrator access is required.');
+    }
+
+    final updated = await _client
+        .from('rentals')
+        .update({
+          'status': status,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', rentalId)
+        .select('id')
+        .maybeSingle();
+    if (updated == null) {
+      throw const PostgrestException(
+        message:
+            'Rental status was not updated. Confirm admin access and Supabase rental policies.',
+      );
+    }
   }
 
   static Future<List<RentalInquiry>> fetchOwnerInquiries() async {
@@ -223,6 +252,16 @@ class RentalsStore {
               listing.copyWith(media: mediaByRental[listing.id] ?? const []),
         )
         .toList();
+  }
+
+  static Future<List<RentalListing>> _attachMediaSafely(
+    List<RentalListing> listings,
+  ) async {
+    try {
+      return await _attachMedia(listings);
+    } catch (_) {
+      return listings;
+    }
   }
 
   static Future<void> recordAccessConsent() async {

@@ -26,6 +26,13 @@ class AdminAuthService {
     if (!isSignedIn) return false;
     if (hasJwtAdminClaim) return true;
 
+    try {
+      final fromServer = await _client.rpc('is_firstvue_admin');
+      if (fromServer == true) return true;
+    } catch (_) {
+      // RPC may be unavailable before phase1 migration is applied.
+    }
+
     final user = _client.auth.currentUser!;
     final profile = await _client
         .from('profiles')
@@ -34,5 +41,10 @@ class AdminAuthService {
         .maybeSingle();
 
     return profile?['account_type'] == 'admin';
+  }
+
+  /// Call after granting admin in Supabase so JWT app_metadata is picked up.
+  static Future<void> refreshSession() async {
+    await _client.auth.refreshSession();
   }
 }

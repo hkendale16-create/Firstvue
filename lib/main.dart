@@ -78,6 +78,7 @@ class _ExploreCategory {
 
 class _FirstVueHomeState extends State<FirstVueHome> {
   int selectedIndex = 2;
+  int _profileRefreshToken = 0;
   int _notificationBadge = 0;
 
   @override
@@ -246,7 +247,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
         1 => const SearchScreen(),
         2 => const DiscoveryFeedScreen(),
         3 => const SavedScreen(),
-        4 => const ProfileScreen(),
+        4 => ProfileScreen(refreshToken: _profileRefreshToken),
         _ => SafeArea(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -434,7 +435,10 @@ class _FirstVueHomeState extends State<FirstVueHome> {
 
       bottomNavigationBar: FirstVueBottomNav(
         selectedIndex: selectedIndex,
-        onSelected: (index) => setState(() => selectedIndex = index),
+        onSelected: (index) => setState(() {
+          selectedIndex = index;
+          if (index == 4) _profileRefreshToken++;
+        }),
       ),
     );
   }

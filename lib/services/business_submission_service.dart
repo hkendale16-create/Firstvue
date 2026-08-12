@@ -50,6 +50,13 @@ class BusinessSubmissionService {
       throw const AuthException('Sign in before submitting a business.');
     }
 
+    await _client.from('profiles').upsert({
+      'id': user.id,
+      'display_name': contactName,
+      'account_type': 'business_owner',
+      'updated_at': DateTime.now().toIso8601String(),
+    });
+
     final business = await _client
         .from('businesses')
         .insert({
@@ -127,24 +134,48 @@ class BusinessSubmissionService {
   static Future<List<OwnedBusiness>> fetchMyBusinesses() async {
     final user = _client.auth.currentUser;
     if (user == null) return const [];
-    final rows = await _client
-        .from('businesses')
-        .select('id, name, business_type, status, description, services')
-        .eq('created_by', user.id)
-        .order('created_at', ascending: false);
-    return rows
-        .map(
-          (row) => OwnedBusiness(
-            id: row['id'] as String,
-            name: row['name'] as String,
-            businessType:
-                (row['business_type'] as String?) ?? 'Service business',
-            status: row['status'] as String,
-            description: (row['description'] as String?) ?? '',
-            services: List<String>.from((row['services'] as List?) ?? const []),
-          ),
-        )
-        .toList();
+    try {
+      final rows = await _client
+          .from('businesses')
+          .select('id, name, business_type, status, description, services')
+          .eq('created_by', user.id)
+          .order('created_at', ascending: false);
+      if (rows.isNotEmpty) {
+        return rows.map(_ownedBusinessFromRow).toList();
+      }
+
+      final submissions = await _client
+          .from('business_verification_submissions')
+          .select(
+            'business_id, businesses(id, name, business_type, status, description, services)',
+          )
+          .eq('submitter_id', user.id)
+          .order('created_at', ascending: false);
+      final seen = <String>{};
+      final businesses = <OwnedBusiness>[];
+      for (final submission in submissions) {
+        final business = submission['businesses'];
+        if (business is! Map) continue;
+        final id = business['id'] as String?;
+        if (id == null || seen.contains(id)) continue;
+        seen.add(id);
+        businesses.add(_ownedBusinessFromRow(Map<String, dynamic>.from(business)));
+      }
+      return businesses;
+    } catch (error) {
+      throw StateError('Unable to load your businesses: $error');
+    }
+  }
+
+  static OwnedBusiness _ownedBusinessFromRow(Map<String, dynamic> row) {
+    return OwnedBusiness(
+      id: row['id'] as String,
+      name: row['name'] as String,
+      businessType: (row['business_type'] as String?) ?? 'Service business',
+      status: (row['status'] as String?) ?? 'pending',
+      description: (row['description'] as String?) ?? '',
+      services: List<String>.from((row['services'] as List?) ?? const []),
+    );
   }
 
   static Future<Map<String, String>> fetchLocation(String businessId) async {

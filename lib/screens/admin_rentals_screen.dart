@@ -3,8 +3,26 @@ import 'package:flutter/material.dart';
 import '../services/rentals_store.dart';
 import '../widgets/admin_gate.dart';
 
-class AdminRentalsScreen extends StatelessWidget {
+class AdminRentalsScreen extends StatefulWidget {
   const AdminRentalsScreen({super.key});
+
+  @override
+  State<AdminRentalsScreen> createState() => _AdminRentalsScreenState();
+}
+
+class _AdminRentalsScreenState extends State<AdminRentalsScreen> {
+  late Future<List<RentalListing>> _pendingFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _pendingFuture = RentalsStore.fetchPendingListings();
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _pendingFuture = RentalsStore.fetchPendingListings());
+    await _pendingFuture;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,65 +34,87 @@ class AdminRentalsScreen extends StatelessWidget {
         title: const Text('RENTAL APPROVALS'),
       ),
       body: AdminGate(
-        child: const _PendingRentalsList(),
-      ),
-    );
-  }
-}
-
-class _PendingRentalsList extends StatelessWidget {
-  const _PendingRentalsList();
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<List<RentalListing>>(
-      stream: RentalsStore.watchPendingListings(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const Center(
-            child: Text(
-              'Unable to load pending rentals.',
-              style: TextStyle(color: Colors.white54),
-            ),
-          );
-        }
-        if (!snapshot.hasData) {
-          return const Center(
-            child: CircularProgressIndicator(color: Color(0xFFD8B56A)),
-          );
-        }
-        final listings = snapshot.data!;
-        if (listings.isEmpty) {
-          return const Center(
-            child: Text(
-              'No pending rental listings.',
-              style: TextStyle(color: Colors.white54),
-            ),
-          );
-        }
-        return ListView.separated(
-          padding: const EdgeInsets.all(20),
-          itemCount: listings.length + 1,
-          separatorBuilder: (_, _) => const SizedBox(height: 14),
-          itemBuilder: (context, index) {
-            if (index == 0) {
-              return const Text(
-                'Review listings carefully. Approval makes a listing visible to signed-in rental viewers.',
-                style: TextStyle(color: Colors.white54, height: 1.4),
+        child: FutureBuilder<List<RentalListing>>(
+          future: _pendingFuture,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Unable to load pending rentals.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white54),
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: _refresh,
+                        child: const Text('Tap to retry'),
+                      ),
+                    ],
+                  ),
+                ),
               );
             }
-            return _ApprovalCard(listing: listings[index - 1]);
+            if (!snapshot.hasData) {
+              return const Center(
+                child: CircularProgressIndicator(color: Color(0xFFD8B56A)),
+              );
+            }
+            final listings = snapshot.data!;
+            if (listings.isEmpty) {
+              return RefreshIndicator(
+                color: const Color(0xFFD8B56A),
+                onRefresh: _refresh,
+                child: ListView(
+                  children: const [
+                    SizedBox(height: 240),
+                    Center(
+                      child: Text(
+                        'No pending rental listings.',
+                        style: TextStyle(color: Colors.white54),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return RefreshIndicator(
+              color: const Color(0xFFD8B56A),
+              onRefresh: _refresh,
+              child: ListView.separated(
+                padding: const EdgeInsets.all(20),
+                itemCount: listings.length + 1,
+                separatorBuilder: (_, _) => const SizedBox(height: 14),
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return const Text(
+                      'Review listings carefully. Approval makes a listing visible to signed-in rental viewers.',
+                      style: TextStyle(color: Colors.white54, height: 1.4),
+                    );
+                  }
+                  return _ApprovalCard(
+                    listing: listings[index - 1],
+                    onUpdated: _refresh,
+                  );
+                },
+              ),
+            );
           },
-        );
-      },
+        ),
+      ),
     );
   }
 }
 
 class _ApprovalCard extends StatefulWidget {
   final RentalListing listing;
+  final Future<void> Function() onUpdated;
 
-  const _ApprovalCard({required this.listing});
+  const _ApprovalCard({required this.listing, required this.onUpdated});
 
   @override
   State<_ApprovalCard> createState() => _ApprovalCardState();
@@ -90,11 +130,25 @@ class _ApprovalCardState extends State<_ApprovalCard> {
         rentalId: widget.listing.id,
         status: status,
       );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              status == 'approved'
+                  ? 'Rental approved.'
+                  : 'Rental rejected.',
+            ),
+          ),
+        );
+      }
+      await widget.onUpdated();
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Unable to update this rental. Please try again.'),
+            content: Text(
+              'Unable to update this rental. Confirm admin access and try again.',
+            ),
           ),
         );
       }

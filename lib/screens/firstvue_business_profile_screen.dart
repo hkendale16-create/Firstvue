@@ -8,6 +8,7 @@ import '../services/business_menu_service.dart';
 import '../services/business_reviews_service.dart';
 import '../services/business_social_links_service.dart';
 import '../services/messaging_service.dart';
+import '../widgets/profile_recent_activity_section.dart';
 import '../widgets/social_platform_icon.dart';
 import 'auth_screen.dart';
 import 'conversation_screen.dart';
@@ -144,6 +145,11 @@ class _BusinessProfileContent extends StatelessWidget {
                   text: details.description?.trim().isNotEmpty == true
                       ? details.description!
                       : 'The owner has not added a business description yet.',
+                ),
+                const SizedBox(height: 22),
+                ProfileRecentActivitySection(
+                  scope: ProfileActivityScope.business,
+                  businessId: details.id,
                 ),
                 const SizedBox(height: 22),
                 const _ProfileSectionTitle('LOCATION'),
@@ -513,24 +519,66 @@ class _BusinessMediaGallery extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           itemCount: media.length,
           separatorBuilder: (_, _) => const SizedBox(width: 10),
-          itemBuilder: (context, index) => GestureDetector(
-            onTap: () => showDialog<void>(
+          itemBuilder: (context, index) {
+            final item = media[index];
+            return GestureDetector(
+            onTap: () {
+              if (item.isVideo) {
+                showDialog<void>(
+                  context: context,
+                  builder: (_) => Dialog(
+                    backgroundColor: const Color(0xFF10151B),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.videocam_outlined, color: Color(0xFF78B9BE), size: 48),
+                          const SizedBox(height: 12),
+                          const Text('Video', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          Text(item.signedUrl, style: const TextStyle(color: Colors.white54, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+                return;
+              }
+              showDialog<void>(
               context: context,
               builder: (_) => Dialog(
                 backgroundColor: Colors.transparent,
                 insetPadding: const EdgeInsets.all(16),
                 child: InteractiveViewer(
                   child: Image.network(
-                    media[index].signedUrl,
+                    item.signedUrl,
                     fit: BoxFit.contain,
                   ),
                 ),
               ),
-            ),
+            );
+            },
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Image.network(
-                media[index].signedUrl,
+              child: item.isVideo
+                  ? SizedBox(
+                      width: 250,
+                      height: 190,
+                      child: ColoredBox(
+                        color: const Color(0xFF10151B),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.videocam_outlined, color: Color(0xFF78B9BE), size: 40),
+                            SizedBox(height: 8),
+                            Text('VIDEO', style: TextStyle(color: Colors.white54)),
+                          ],
+                        ),
+                      ),
+                    )
+                  : Image.network(
+                item.signedUrl,
                 width: 250,
                 height: 190,
                 fit: BoxFit.cover,
@@ -546,7 +594,8 @@ class _BusinessMediaGallery extends StatelessWidget {
                 ),
               ),
             ),
-          ),
+          );
+          },
         ),
       );
     },

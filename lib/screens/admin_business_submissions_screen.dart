@@ -44,10 +44,22 @@ class _AdminBusinessSubmissionsScreenState
           builder: (context, snapshot) {
             if (snapshot.hasError) {
                 return Center(
-                  child: TextButton(
-                    onPressed: _refresh,
-                    child: const Text(
-                      'Unable to load submissions. Tap to retry.',
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Unable to load business submissions. Confirm admin access in Supabase and sign out/in.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white54),
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: _refresh,
+                          child: const Text('Tap to retry'),
+                        ),
+                      ],
                     ),
                   ),
                 );

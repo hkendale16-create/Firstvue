@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/messaging_service.dart';
 import 'conversation_screen.dart';
+import 'new_message_screen.dart';
 
 class MessagesInboxScreen extends StatefulWidget {
   const MessagesInboxScreen({super.key});
@@ -32,6 +33,19 @@ class _MessagesInboxScreenState extends State<MessagesInboxScreen> {
         backgroundColor: const Color(0xFF080B0F),
         surfaceTintColor: Colors.transparent,
         title: const Text('MESSAGES'),
+        actions: [
+          IconButton(
+            tooltip: 'New message',
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NewMessageScreen()),
+              );
+              await _refresh();
+            },
+            icon: const Icon(Icons.edit_outlined, color: Color(0xFFD8B56A)),
+          ),
+        ],
       ),
       body: FutureBuilder<List<MessageThreadSummary>>(
         future: _inboxFuture,
@@ -61,7 +75,7 @@ class _MessagesInboxScreenState extends State<MessagesInboxScreen> {
                     child: Padding(
                       padding: EdgeInsets.symmetric(horizontal: 28),
                       child: Text(
-                        'No conversations yet. Message a business owner from their verified profile or Vue feed.',
+                        'No conversations yet. Tap the compose icon to find a member or business owner.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.white54, height: 1.4),
                       ),
