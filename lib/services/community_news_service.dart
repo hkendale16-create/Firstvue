@@ -139,6 +139,20 @@ class CommunityNewsService {
     }
   }
 
+  static void logFeedError(Object error, {String context = 'NewsFeed'}) {
+    if (error is PostgrestException) {
+      // ignore: avoid_print
+      print(
+        '[$context] PostgrestException '
+        'code=${error.code} message=${error.message} '
+        'details=${error.details} hint=${error.hint}',
+      );
+      return;
+    }
+    // ignore: avoid_print
+    print('[$context] $error');
+  }
+
   static Future<Map<String, dynamic>> _insertPostReturning(
     Map<String, dynamic> insertPayload,
   ) async {
@@ -199,7 +213,7 @@ class CommunityNewsService {
       (query) => query.order('created_at', ascending: false).limit(limit),
     );
 
-    return _mapPostRows(rows, currentUserId: me);
+    return await _mapPostRows(rows, currentUserId: me);
   }
 
   /// Ranked Home/main Newsfeed (recency + unseen + relevance + controlled variance).
@@ -219,10 +233,10 @@ class CommunityNewsService {
         },
       );
       if (result is! List || result.isEmpty) return const [];
-      return _mapPostRows(result, currentUserId: me);
+      return await _mapPostRows(result, currentUserId: me);
     } catch (_) {
       // Fall back to chronological main feed if ranking RPC is unavailable.
-      return fetchPosts(limit: limit);
+      return await fetchPosts(limit: limit);
     }
   }
 
@@ -282,7 +296,7 @@ class CommunityNewsService {
         ordered.add(row);
       }
 
-      return _mapPostRows(ordered, currentUserId: me);
+      return await _mapPostRows(ordered, currentUserId: me);
     } catch (_) {
       return const [];
     }
@@ -301,7 +315,7 @@ class CommunityNewsService {
             .limit(limit),
       );
 
-      return _mapPostRows(rows, currentUserId: me.id);
+      return await _mapPostRows(rows, currentUserId: me.id);
     } catch (_) {
       return const [];
     }
@@ -857,7 +871,7 @@ class CommunityNewsService {
             .limit(limit),
       );
 
-      return _mapPostRows(rows, currentUserId: me);
+      return await _mapPostRows(rows, currentUserId: me);
     } catch (_) {
       return const [];
     }
@@ -876,7 +890,7 @@ class CommunityNewsService {
             .order('created_at', ascending: false)
             .limit(limit),
       );
-      return _mapPostRows(rows, currentUserId: me);
+      return await _mapPostRows(rows, currentUserId: me);
     } catch (_) {
       return const [];
     }
@@ -895,7 +909,7 @@ class CommunityNewsService {
             .order('created_at', ascending: false)
             .limit(limit),
       );
-      return _mapPostRows(rows, currentUserId: me);
+      return await _mapPostRows(rows, currentUserId: me);
     } catch (_) {
       return const [];
     }
@@ -914,7 +928,7 @@ class CommunityNewsService {
             .order('created_at', ascending: false)
             .limit(limit),
       );
-      return _mapPostRows(rows, currentUserId: me);
+      return await _mapPostRows(rows, currentUserId: me);
     } catch (_) {
       return const [];
     }
@@ -933,7 +947,7 @@ class CommunityNewsService {
             .order('created_at', ascending: false)
             .limit(limit),
       );
-      return _mapPostRows(rows, currentUserId: me);
+      return await _mapPostRows(rows, currentUserId: me);
     } catch (_) {
       return const [];
     }
@@ -958,7 +972,7 @@ class CommunityNewsService {
             .order('created_at', ascending: false)
             .limit(limit),
       );
-      return _mapPostRows(rows, currentUserId: me);
+      return await _mapPostRows(rows, currentUserId: me);
     } catch (_) {
       return const [];
     }
