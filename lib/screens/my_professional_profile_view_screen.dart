@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 
 import '../services/professional_media_service.dart';
 import '../services/professional_profiles_service.dart';
@@ -78,7 +79,7 @@ class _MyProfessionalProfileViewScreenState
   Future<void> _openEditor() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
+      FirstVuePageRoute(
         builder: (_) => const ProfessionalProfileEditorScreen(),
       ),
     );
@@ -184,7 +185,7 @@ class _MyProfessionalProfileViewScreenState
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
+                        FirstVuePageRoute(
                           builder: (_) => ProfessionalPublicProfileScreen(
                             profile: profile,
                             icon: _iconForType(profile.type),
@@ -305,7 +306,7 @@ class _MyProfessionalProfileViewScreenState
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
+                      FirstVuePageRoute(
                         builder: (_) => ProfessionalShowcaseEditorScreen(
                           profile: profile,
                         ),

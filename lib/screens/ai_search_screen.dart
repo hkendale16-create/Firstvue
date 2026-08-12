@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 import '../services/smart_search_service.dart';
 import 'firstvue_business_profile_screen.dart';
 
@@ -116,7 +117,7 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
                           return ListTile(
                             onTap: () => Navigator.push(
                               context,
-                              MaterialPageRoute(
+                              FirstVuePageRoute(
                                 builder: (_) => FirstVueBusinessProfileScreen(
                                   businessId: item.id,
                                 ),

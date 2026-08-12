@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/feed_comments_service.dart';
@@ -55,7 +56,7 @@ class _MeetTheOwnerScreenState extends State<MeetTheOwnerScreen> {
     if (Supabase.instance.client.auth.currentUser == null) {
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const AuthScreen()),
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
       );
       return;
     }
@@ -68,7 +69,7 @@ class _MeetTheOwnerScreenState extends State<MeetTheOwnerScreen> {
     if (!mounted) return;
     await Navigator.push(
       context,
-      MaterialPageRoute(
+      FirstVuePageRoute(
         builder: (_) => ConversationScreen(
           threadId: threadId,
           title: widget.ownerName,
@@ -82,7 +83,7 @@ class _MeetTheOwnerScreenState extends State<MeetTheOwnerScreen> {
     if (Supabase.instance.client.auth.currentUser == null) {
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const AuthScreen()),
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
       );
       return;
     }

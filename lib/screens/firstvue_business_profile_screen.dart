@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -305,7 +306,7 @@ class _BusinessReviewsSectionState extends State<_BusinessReviewsSection> {
     if (!BusinessReviewsService.isSignedIn) {
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const AuthScreen()),
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
       );
       if (!mounted || !BusinessReviewsService.isSignedIn) return;
     }
@@ -771,7 +772,7 @@ class _MessageOwnerButtonState extends State<_MessageOwnerButton> {
     if (Supabase.instance.client.auth.currentUser == null) {
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const AuthScreen()),
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
       );
       return;
     }
@@ -798,7 +799,7 @@ class _MessageOwnerButtonState extends State<_MessageOwnerButton> {
       if (!mounted) return;
       await Navigator.push(
         context,
-        MaterialPageRoute(
+        FirstVuePageRoute(
           builder: (_) => ConversationScreen(
             threadId: threadId,
             title: widget.businessName,
@@ -876,7 +877,7 @@ class _MeetOwnerButtonState extends State<_MeetOwnerButton> {
       if (!mounted) return;
       await Navigator.push(
         context,
-        MaterialPageRoute(
+        FirstVuePageRoute(
           builder: (_) => MeetTheOwnerScreen(
             businessId: widget.businessId,
             businessName: widget.businessName,

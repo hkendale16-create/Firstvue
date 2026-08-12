@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 
 import '../services/messaging_service.dart';
 import 'conversation_screen.dart';
@@ -59,7 +60,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       if (!mounted) return;
       await Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
+        FirstVuePageRoute(
           builder: (_) => ConversationScreen(
             threadId: threadId,
             title: recipient.displayName,

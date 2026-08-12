@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/activity_notifications_service.dart';
@@ -74,7 +75,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     onPressed: () async {
                       await Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const AuthScreen()),
+                        FirstVuePageRoute(builder: (_) => const AuthScreen()),
                       );
                       if (mounted) _refresh();
                     },
@@ -94,7 +95,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     actionLabel: 'OPEN INBOX',
                     onAction: () => Navigator.push(
                       context,
-                      MaterialPageRoute(
+                      FirstVuePageRoute(
                         builder: (_) => const MessagesInboxScreen(),
                       ),
                     ),
@@ -117,7 +118,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             unread: true,
                             onTap: () => Navigator.push(
                               context,
-                              MaterialPageRoute(
+                              FirstVuePageRoute(
                                 builder: (_) => const MessagesInboxScreen(),
                               ),
                             ),

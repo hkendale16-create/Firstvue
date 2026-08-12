@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'config/app_config.dart';
@@ -113,7 +115,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
 
   void _openBusinessProfile(String businessId) {
     _rootNavigatorKey.currentState?.push(
-      MaterialPageRoute(
+      FirstVuePageRoute(
         builder: (_) => FirstVueBusinessProfileScreen(businessId: businessId),
       ),
     );
@@ -154,7 +156,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
           RecommendationsService.recordCategoryVisit('beauty');
           Navigator.push(
             context,
-            MaterialPageRoute(
+            FirstVuePageRoute(
               builder: (_) => const BeautyDiscoveryScreen(),
             ),
           );
@@ -170,7 +172,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
           RecommendationsService.recordCategoryVisit('restaurant');
           Navigator.push(
             context,
-            MaterialPageRoute(
+            FirstVuePageRoute(
               builder: (_) => const BarberResultsScreen(
                 category: DiscoveryCategory.restaurants,
               ),
@@ -188,7 +190,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
           RecommendationsService.recordCategoryVisit('rentals');
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const RentalsScreen()),
+            FirstVuePageRoute(builder: (_) => const RentalsScreen()),
           );
         },
       ),
@@ -202,7 +204,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
           RecommendationsService.recordCategoryVisit('events');
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const ThingsToDoScreen()),
+            FirstVuePageRoute(builder: (_) => const ThingsToDoScreen()),
           );
         },
       ),
@@ -216,7 +218,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
           RecommendationsService.recordCategoryVisit('services');
           Navigator.push(
             context,
-            MaterialPageRoute(
+            FirstVuePageRoute(
               builder: (_) => const OtherServicesScreen(),
             ),
           );
@@ -245,7 +247,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
       backgroundColor: FirstVueColors.background,
 
       body: switch (selectedIndex) {
-        1 => const SearchScreen(),
+        1 => const WhatsNowScreen(),
         2 => const DiscoveryFeedScreen(),
         3 => const SavedScreen(),
         4 => ProfileScreen(refreshToken: _profileRefreshToken),
@@ -293,7 +295,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
                     onPressed: () async {
                       await Navigator.push(
                         context,
-                        MaterialPageRoute(
+                        FirstVuePageRoute(
                           builder: (_) => const NotificationsScreen(),
                         ),
                       );
@@ -334,7 +336,12 @@ class _FirstVueHomeState extends State<FirstVueHome> {
               Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: () => setState(() => selectedIndex = 1),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      FirstVuePageRoute(builder: (_) => const SearchScreen()),
+                    );
+                  },
                   borderRadius: BorderRadius.circular(24),
                   child: Ink(
                     height: 46,
@@ -447,7 +454,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
                   RecommendationsService.recordCategoryVisit('whats_now');
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
+                    FirstVuePageRoute(
                       builder: (_) => const WhatsNowScreen(),
                     ),
                   );

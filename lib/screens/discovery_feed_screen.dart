@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 import 'package:flutter/services.dart';
 
 import '../config/app_config.dart';
@@ -78,7 +79,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
     if (query.isEmpty) return;
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => AiSearchScreen(initialPrompt: query)),
+      FirstVuePageRoute(builder: (_) => AiSearchScreen(initialPrompt: query)),
     );
   }
 
@@ -88,7 +89,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
       DiscoveryFeedService.recordProfileTap(connected);
       Navigator.push(
         context,
-        MaterialPageRoute(
+        FirstVuePageRoute(
           builder: (_) =>
               FirstVueBusinessProfileScreen(businessId: connected.businessId),
         ),
@@ -97,7 +98,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
     }
     Navigator.push(
       context,
-      MaterialPageRoute(
+      FirstVuePageRoute(
         builder: (_) => BusinessProfileScreen(
           businessName: item.name,
           rating: item.rating,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 
 import 'barber_results_screen.dart';
 
@@ -25,7 +26,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
     Navigator.push(
       context,
-      MaterialPageRoute(
+      FirstVuePageRoute(
         builder: (_) =>
             BarberResultsScreen(initialQuery: value, category: _category),
       ),
@@ -172,7 +173,7 @@ class _SearchScreenState extends State<SearchScreen> {
   void _openCategory(DiscoveryCategory category) {
     Navigator.push(
       context,
-      MaterialPageRoute(
+      FirstVuePageRoute(
         builder: (_) => BarberResultsScreen(category: category),
       ),
     );

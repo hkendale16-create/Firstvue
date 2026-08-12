@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_screen.dart';
@@ -15,7 +16,7 @@ class JoinFirstVueScreen extends StatelessWidget {
     if (Supabase.instance.client.auth.currentUser == null) {
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const AuthScreen()),
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
       );
       if (!context.mounted ||
           Supabase.instance.client.auth.currentUser == null) {
@@ -28,19 +29,19 @@ class JoinFirstVueScreen extends StatelessWidget {
       case FirstVueJoinRole.businessOwner:
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const BusinessOwnerStartScreen()),
+          FirstVuePageRoute(builder: (_) => const BusinessOwnerStartScreen()),
         );
       case FirstVueJoinRole.professional:
         Navigator.push(
           context,
-          MaterialPageRoute(
+          FirstVuePageRoute(
             builder: (_) => const ProfessionalProfileEditorScreen(),
           ),
         );
       case FirstVueJoinRole.organizer:
         Navigator.push(
           context,
-          MaterialPageRoute(
+          FirstVuePageRoute(
             builder: (_) => const OrganizerApplicationScreen(),
           ),
         );

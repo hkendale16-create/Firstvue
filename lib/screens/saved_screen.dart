@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 
 import '../services/saved_businesses_store.dart';
 import 'business_profile_screen.dart';
@@ -94,7 +95,7 @@ class _SavedBusinessCard extends StatelessWidget {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
+            FirstVuePageRoute(
               builder: (_) => BusinessProfileScreen(
                 businessName: business.businessName,
                 rating: business.rating,

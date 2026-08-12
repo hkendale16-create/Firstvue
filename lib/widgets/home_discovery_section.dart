@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 
 import '../screens/firstvue_business_profile_screen.dart';
 import '../services/recommendations_service.dart';
@@ -204,7 +205,7 @@ class _BusinessSwipeList extends StatelessWidget {
               accent: accent,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(
+                FirstVuePageRoute(
                   builder: (_) => FirstVueBusinessProfileScreen(
                     businessId: business.id,
                   ),
@@ -518,7 +519,7 @@ class _YouMightLikeSectionState extends State<YouMightLikeSection> {
                     child: InkWell(
                       onTap: () => Navigator.push(
                         context,
-                        MaterialPageRoute(
+                        FirstVuePageRoute(
                           builder: (_) => FirstVueBusinessProfileScreen(
                             businessId: business.id,
                           ),

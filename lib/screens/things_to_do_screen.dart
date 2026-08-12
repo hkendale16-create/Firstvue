@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/things_to_do_service.dart';
@@ -34,7 +35,7 @@ class _ThingsToDoScreenState extends State<ThingsToDoScreen> {
     if (Supabase.instance.client.auth.currentUser == null) {
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const AuthScreen()),
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
       );
       if (!mounted) return;
     }

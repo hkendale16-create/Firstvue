@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/professional_media_service.dart';
@@ -455,7 +456,7 @@ class _ProfessionalProfileEditorScreenState
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(
+                          FirstVuePageRoute(
                             builder: (_) => ProfessionalShowcaseEditorScreen(
                               profile: _existing!,
                             ),

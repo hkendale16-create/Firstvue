@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -23,7 +24,7 @@ class _RentalsScreenState extends State<RentalsScreen> {
     if (Supabase.instance.client.auth.currentUser == null) {
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const AuthScreen()),
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
       );
       if (Supabase.instance.client.auth.currentUser == null) return;
     }
@@ -96,7 +97,7 @@ class _RentalsScreenState extends State<RentalsScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const PostRentalScreen()),
+                FirstVuePageRoute(builder: (_) => const PostRentalScreen()),
               );
             },
           ),
@@ -445,7 +446,7 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
     if (Supabase.instance.client.auth.currentUser == null) {
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const AuthScreen()),
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
       );
       if (Supabase.instance.client.auth.currentUser == null) return;
     }
@@ -795,7 +796,7 @@ class _RentalCard extends StatelessWidget {
                   Navigator.pop(sheetContext);
                   await Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const AuthScreen()),
+                    FirstVuePageRoute(builder: (_) => const AuthScreen()),
                   );
                   if (!context.mounted) return;
                   if (Supabase.instance.client.auth.currentUser == null) return;

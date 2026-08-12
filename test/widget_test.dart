@@ -61,5 +61,12 @@ void main() {
 
     expect(find.text("WHAT'S NOW"), findsOneWidget);
     expect(find.text('TRENDING & EVENTS'), findsOneWidget);
+
+    final nowNav = find.text('NOW');
+    await tester.ensureVisible(nowNav);
+    await tester.tap(nowNav);
+    await tester.pumpAndSettle();
+
+    expect(find.text("WHAT'S NOW"), findsWidgets);
   });
 }

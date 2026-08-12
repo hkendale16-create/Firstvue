@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 
 import '../services/approved_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -59,7 +60,7 @@ class BrowseAllServicesScreen extends StatelessWidget {
                 child: InkWell(
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(
+                    FirstVuePageRoute(
                       builder: (_) => FirstVueBusinessProfileScreen(
                         businessId: business.id,
                       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 
 import '../theme/firstvue_theme.dart';
 import 'ai_search_screen.dart';
@@ -40,7 +41,7 @@ class OtherServicesScreen extends StatelessWidget {
                 'Search verified businesses by name, city, state, or ZIP.',
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
+              FirstVuePageRoute(
                 builder: (_) => const BrowseAllServicesScreen(),
               ),
             ),
@@ -54,7 +55,7 @@ class OtherServicesScreen extends StatelessWidget {
                 'Automotive, home, fitness, pet care, and more near you.',
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
+              FirstVuePageRoute(
                 builder: (_) => const BarberResultsScreen(
                   category: DiscoveryCategory.otherServices,
                 ),
@@ -69,7 +70,7 @@ class OtherServicesScreen extends StatelessWidget {
             description: 'Describe what you need and FirstVue finds a match.',
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
+              FirstVuePageRoute(
                 builder: (_) => const AiSearchScreen(
                   initialPrompt: 'Find trusted local services near me',
                 ),

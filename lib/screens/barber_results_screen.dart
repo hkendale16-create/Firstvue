@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'business_profile_screen.dart';
@@ -847,7 +848,7 @@ class _BarberResultsScreenState extends State<BarberResultsScreen> {
                                   onPressed: () {
                                     Navigator.push(
                                       context,
-                                      MaterialPageRoute(
+                                      FirstVuePageRoute(
                                         builder: (_) =>
                                             FirstVueBusinessProfileScreen(
                                               businessId: business.id,
@@ -880,7 +881,7 @@ class _BarberResultsScreenState extends State<BarberResultsScreen> {
                                   onPressed: () {
                                     Navigator.push(
                                       context,
-                                      MaterialPageRoute(
+                                      FirstVuePageRoute(
                                         builder: (_) =>
                                             ProfessionalPublicProfileScreen(
                                               profile: profile,
@@ -915,7 +916,7 @@ class _BarberResultsScreenState extends State<BarberResultsScreen> {
                                   onPressed: () {
                                     Navigator.push(
                                       context,
-                                      MaterialPageRoute(
+                                      FirstVuePageRoute(
                                         builder: (_) => BusinessProfileScreen(
                                           businessName: business.name,
                                           rating: business.rating,

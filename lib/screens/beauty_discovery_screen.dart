@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 
 import '../theme/firstvue_theme.dart';
 import 'barber_results_screen.dart';
@@ -121,7 +122,7 @@ class BeautyDiscoveryScreen extends StatelessWidget {
                   icon: item.icon,
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(
+                    FirstVuePageRoute(
                       builder: (_) =>
                           BarberResultsScreen(category: item.category),
                     ),

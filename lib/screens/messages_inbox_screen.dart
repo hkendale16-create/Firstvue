@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 
 import '../services/messaging_service.dart';
 import 'conversation_screen.dart';
@@ -39,7 +40,7 @@ class _MessagesInboxScreenState extends State<MessagesInboxScreen> {
             onPressed: () async {
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const NewMessageScreen()),
+                FirstVuePageRoute(builder: (_) => const NewMessageScreen()),
               );
               await _refresh();
             },
@@ -101,7 +102,7 @@ class _MessagesInboxScreenState extends State<MessagesInboxScreen> {
                     onTap: () async {
                       await Navigator.push(
                         context,
-                        MaterialPageRoute(
+                        FirstVuePageRoute(
                           builder: (_) => ConversationScreen(
                             threadId: thread.id,
                             title: thread.otherDisplayName,

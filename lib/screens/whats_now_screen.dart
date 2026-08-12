@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 
 import '../screens/firstvue_business_profile_screen.dart';
 import '../services/community_news_service.dart';
@@ -266,7 +267,7 @@ class _TrendingFeedCard extends StatelessWidget {
       child: InkWell(
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(
+          FirstVuePageRoute(
             builder: (_) => FirstVueBusinessProfileScreen(
               businessId: business.id,
             ),

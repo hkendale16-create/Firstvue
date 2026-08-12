@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/approved_businesses_service.dart';
@@ -100,7 +101,7 @@ class _MyBusinessesScreenState extends State<MyBusinessesScreen> {
                     onPressed: () async {
                       await Navigator.push(
                         context,
-                        MaterialPageRoute(
+                        FirstVuePageRoute(
                           builder: (_) => const JoinFirstVueScreen(),
                         ),
                       );
@@ -150,7 +151,7 @@ class _MyBusinessesScreenState extends State<MyBusinessesScreen> {
                 onTap: () async {
                   await Navigator.push(
                     context,
-                    MaterialPageRoute(
+                    FirstVuePageRoute(
                       builder: (_) =>
                           MyBusinessProfileViewScreen(business: business),
                     ),

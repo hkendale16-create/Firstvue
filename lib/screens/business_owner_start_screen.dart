@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../constants/business_types.dart';
@@ -59,7 +60,7 @@ class BusinessOwnerStartScreen extends StatelessWidget {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
+                  FirstVuePageRoute(
                     builder: (_) => const _ClaimBusinessScreen(),
                   ),
                 );
@@ -74,7 +75,7 @@ class BusinessOwnerStartScreen extends StatelessWidget {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const _NewBusinessScreen()),
+                  FirstVuePageRoute(builder: (_) => const _NewBusinessScreen()),
                 );
               },
             ),
@@ -88,7 +89,7 @@ class BusinessOwnerStartScreen extends StatelessWidget {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const PostRentalScreen()),
+                  FirstVuePageRoute(builder: (_) => const PostRentalScreen()),
                 );
               },
             ),
@@ -230,7 +231,7 @@ class _ClaimBusinessScreen extends StatelessWidget {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
+                FirstVuePageRoute(
                   builder: (_) => _VerificationFormScreen(
                     businessName: business.$1,
                     isClaim: true,
@@ -279,7 +280,7 @@ class _NewBusinessScreenState extends State<_NewBusinessScreen> {
     }
     Navigator.push(
       context,
-      MaterialPageRoute(
+      FirstVuePageRoute(
         builder: (_) => _VerificationFormScreen(
           businessName: name,
           businessType: _category,
@@ -427,7 +428,7 @@ class _VerificationFormScreenState extends State<_VerificationFormScreen> {
     if (!widget.isClaim && Supabase.instance.client.auth.currentUser == null) {
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const AuthScreen()),
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
       );
       if (!mounted || Supabase.instance.client.auth.currentUser == null) return;
     }
@@ -445,7 +446,7 @@ class _VerificationFormScreenState extends State<_VerificationFormScreen> {
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(
+        FirstVuePageRoute(
           builder: (_) => _PendingVerificationScreen(
             businessName: widget.businessName,
             isClaim: widget.isClaim,

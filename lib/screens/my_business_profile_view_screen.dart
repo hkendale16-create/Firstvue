@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/firstvue_page_route.dart';
 
 import '../services/business_media_service.dart';
 import '../services/business_submission_service.dart';
@@ -72,7 +73,7 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
   Future<void> _openEdit() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
+      FirstVuePageRoute(
         builder: (_) => EditBusinessProfileScreen(business: widget.business),
       ),
     );
@@ -128,7 +129,7 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(
+                          FirstVuePageRoute(
                             builder: (_) => FirstVueBusinessProfileScreen(
                               businessId: business.id,
                               isOwnerPreview: true,
@@ -151,7 +152,7 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
+                            FirstVuePageRoute(
                               builder: (_) => FirstVueBusinessProfileScreen(
                                 businessId: business.id,
                               ),
