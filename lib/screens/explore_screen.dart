@@ -34,8 +34,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Future<List<_ExploreTile>> _loadTiles() async {
+    final fallback = _fallbackTiles(context);
     try {
       final posts = await CommunityNewsService.fetchPosts(limit: 24);
+      if (!mounted) return fallback;
       final fromPosts = posts
           .where((post) => post.media.isNotEmpty)
           .map(
@@ -59,9 +61,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
           )
           .toList();
       if (fromPosts.length >= 4) return fromPosts;
-      return [...fromPosts, ..._fallbackTiles(context)];
+      return [...fromPosts, ...fallback];
     } catch (_) {
-      return _fallbackTiles(context);
+      return fallback;
     }
   }
 

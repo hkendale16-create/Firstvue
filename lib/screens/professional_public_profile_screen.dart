@@ -34,7 +34,6 @@ class ProfessionalPublicProfileScreen extends StatefulWidget {
 class _ProfessionalPublicProfileScreenState
     extends State<ProfessionalPublicProfileScreen> {
   ProfessionalImageSet _profileImages = const ProfessionalImageSet();
-  bool _loadingImages = true;
 
   @override
   void initState() {
@@ -46,10 +45,7 @@ class _ProfessionalPublicProfileScreenState
     final images =
         await ProfessionalMediaService.fetchProfileImages(widget.profile.id);
     if (!mounted) return;
-    setState(() {
-      _profileImages = images;
-      _loadingImages = false;
-    });
+    setState(() => _profileImages = images);
   }
 
   @override
