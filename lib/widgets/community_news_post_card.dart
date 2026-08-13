@@ -91,7 +91,7 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
   }
 
   String _authorInitial() {
-    final trimmed = post.authorName.trim();
+    final trimmed = post.displayAuthorName.trim();
     if (trimmed.isEmpty) return '?';
     return trimmed[0].toUpperCase();
   }
@@ -99,6 +99,7 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
   Widget _buildAuthorHeader() {
     final horizontalPadding = _isTimeline ? 0.0 : 14.0;
     final topPadding = _isTimeline ? 0.0 : 14.0;
+    final handle = post.displayAuthorHandle;
 
     final row = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -124,7 +125,7 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
                 children: [
                   Expanded(
                     child: Text(
-                      post.authorName,
+                      post.displayAuthorName,
                       style: TextStyle(
                         color: context.fv.primaryText,
                         fontWeight: FontWeight.w700,
@@ -132,20 +133,36 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
                       ),
                     ),
                   ),
-                  if (post.businessName != null)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: Text(
-                        post.businessName!,
-                        style: TextStyle(
-                          color: FirstVueColors.teal.withValues(alpha: .85),
-                          fontSize: 11,
-                        ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: FirstVueColors.teal.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      post.entityTypeLabel,
+                      style: TextStyle(
+                        color: FirstVueColors.teal.withValues(alpha: .95),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
+                  ),
                 ],
               ),
-              if (post.communityName != null) ...[
+              if (handle != null)
+                Text(
+                  handle,
+                  style: TextStyle(
+                    color: context.fv.secondaryText,
+                    fontSize: 12,
+                  ),
+                ),
+              if (post.communityName != null &&
+                  post.resolvedAuthorProfileType != 'community') ...[
                 const SizedBox(height: 4),
                 GestureDetector(
                   onTap: post.communityId == null

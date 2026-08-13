@@ -302,6 +302,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       style: TextStyle(color: fv.primaryText),
                     ),
                   ),
+                  if (_selectedIdentity != null &&
+                      !_selectedIdentity!.isPersonal)
+                    DropdownMenuItem(
+                      value: PublishDestination.entityOnly,
+                      child: Text(
+                        'Entity feed only',
+                        style: TextStyle(color: fv.primaryText),
+                      ),
+                    ),
                   DropdownMenuItem(
                     value: PublishDestination.vue,
                     child: Text(

@@ -63,11 +63,11 @@ class CommunityHub {
   });
 
   String? get locationLabel {
-    final parts = [city, state, if ((metroArea ?? '').trim().isNotEmpty &&
-            metroArea != city)
-          metroArea]
-        .whereType<String>()
-        .where((p) => p.trim().isNotEmpty);
+    final parts = [
+      city,
+      state,
+      if ((metroArea ?? '').trim().isNotEmpty && metroArea != city) metroArea,
+    ].whereType<String>().where((p) => p.trim().isNotEmpty);
     if (parts.isEmpty) return null;
     return parts.take(2).join(', ');
   }
@@ -110,8 +110,8 @@ class CommunityHub {
       createdAt: createdRaw is String
           ? DateTime.tryParse(createdRaw) ?? DateTime.now()
           : createdRaw is DateTime
-              ? createdRaw
-              : DateTime.now(),
+          ? createdRaw
+          : DateTime.now(),
       imageStorageProvider: MediaStorageProvider.parse(
         row['image_storage_provider'] as String?,
       ),
@@ -123,14 +123,16 @@ class CommunityHub {
 
   Future<CommunityHub> withResolvedImages() async {
     final resolvedImage = await EntityImageUrl.resolve(
-      storagePath:
-          EntityImageUrl.looksLikeStoragePath(imageUrl) ? imageUrl : null,
+      storagePath: EntityImageUrl.looksLikeStoragePath(imageUrl)
+          ? imageUrl
+          : null,
       legacyUrl: imageUrl,
       provider: imageStorageProvider,
     );
     final resolvedCover = await EntityImageUrl.resolve(
-      storagePath:
-          EntityImageUrl.looksLikeStoragePath(coverUrl) ? coverUrl : null,
+      storagePath: EntityImageUrl.looksLikeStoragePath(coverUrl)
+          ? coverUrl
+          : null,
       legacyUrl: coverUrl,
       provider: coverStorageProvider,
     );
@@ -190,8 +192,7 @@ class CommunityHub {
       status: status ?? this.status,
       followerCount: followerCount ?? this.followerCount,
       memberCount: memberCount ?? this.memberCount,
-      showManagersPublicly:
-          showManagersPublicly ?? this.showManagersPublicly,
+      showManagersPublicly: showManagersPublicly ?? this.showManagersPublicly,
       createdAt: createdAt,
       imageStorageProvider: imageStorageProvider,
       coverStorageProvider: coverStorageProvider,
@@ -240,8 +241,7 @@ class CommunityGroupMembership {
   });
 
   bool get isPending => status == 'pending';
-  bool get isApproved =>
-      status == 'approved' || status == 'approved_for_feed';
+  bool get isApproved => status == 'approved' || status == 'approved_for_feed';
   bool get isApprovedForFeed => status == 'approved_for_feed';
 
   factory CommunityGroupMembership.fromRow(Map<String, dynamic> row) {
@@ -266,13 +266,13 @@ class CommunityGroupMembership {
       approvedAt: approvedRaw is String
           ? DateTime.tryParse(approvedRaw)
           : approvedRaw is DateTime
-              ? approvedRaw
-              : null,
+          ? approvedRaw
+          : null,
       createdAt: createdRaw is String
           ? DateTime.tryParse(createdRaw) ?? DateTime.now()
           : createdRaw is DateTime
-              ? createdRaw
-              : DateTime.now(),
+          ? createdRaw
+          : DateTime.now(),
       group: group,
     );
   }
@@ -310,13 +310,13 @@ class CommunityFeedPostRef {
       createdAt: createdRaw is String
           ? DateTime.tryParse(createdRaw) ?? DateTime.now()
           : createdRaw is DateTime
-              ? createdRaw
-              : DateTime.now(),
+          ? createdRaw
+          : DateTime.now(),
       removedFromCommunityAt: removedRaw is String
           ? DateTime.tryParse(removedRaw)
           : removedRaw is DateTime
-              ? removedRaw
-              : null,
+          ? removedRaw
+          : null,
     );
   }
 }
@@ -443,9 +443,7 @@ class CommunityHubService {
           .map((r) => r['community_id'] as String)
           .toList();
 
-      final ids = <String>{
-        ...roleRows.map((r) => r['hub_id'] as String),
-      };
+      final ids = <String>{...roleRows.map((r) => r['hub_id'] as String)};
 
       if (groupIds.isNotEmpty) {
         final linkedGroups = await _client
@@ -484,10 +482,7 @@ class CommunityHubService {
     try {
       final ok = await _client.rpc(
         'is_active_hub_manager',
-        params: {
-          'p_hub_id': hubId,
-          'p_profile_id': id,
-        },
+        params: {'p_hub_id': hubId, 'p_profile_id': id},
       );
       if (ok is bool) return ok;
     } catch (_) {}
@@ -507,9 +502,7 @@ class CommunityHubService {
           role == 'leader' ||
           role == 'admin';
     } catch (error, stack) {
-      debugPrint(
-        'CommunityHubService.isActiveManager failed: $error\n$stack',
-      );
+      debugPrint('CommunityHubService.isActiveManager failed: $error\n$stack');
       return false;
     }
   }
@@ -613,9 +606,7 @@ class CommunityHubService {
       }
       return await _resolveHubImages(rows.map(CommunityHub.fromRow).toList());
     } catch (error, stack) {
-      debugPrint(
-        'CommunityHubService.fetchNearbyHubs failed: $error\n$stack',
-      );
+      debugPrint('CommunityHubService.fetchNearbyHubs failed: $error\n$stack');
       return await fetchHubs(limit: limit);
     }
   }
@@ -798,8 +789,9 @@ class CommunityHubService {
             .select('display_name, username')
             .eq('id', profileId)
             .maybeSingle();
-        final avatars =
-            await ProfileMediaService.fetchAvatarUrlsForProfiles([profileId]);
+        final avatars = await ProfileMediaService.fetchAvatarUrlsForProfiles([
+          profileId,
+        ]);
         return CommunityHubLeader(
           profileId: profileId,
           displayName:
@@ -840,13 +832,13 @@ class CommunityHubService {
           .select('display_name, username')
           .eq('id', profileId)
           .maybeSingle();
-      final avatars =
-          await ProfileMediaService.fetchAvatarUrlsForProfiles([profileId]);
+      final avatars = await ProfileMediaService.fetchAvatarUrlsForProfiles([
+        profileId,
+      ]);
 
       return CommunityHubLeader(
         profileId: profileId,
-        displayName:
-            (profile?['display_name'] as String?) ?? 'FirstVue member',
+        displayName: (profile?['display_name'] as String?) ?? 'FirstVue member',
         username: profile?['username'] as String?,
         avatarUrl: avatars[profileId],
         role: (chosen['role'] as String?) ?? 'leader',
@@ -906,22 +898,18 @@ class CommunityHubService {
       throw const AuthException('Sign in to manage Community Groups.');
     }
 
-    final status =
-        canPostToCommunityFeed ? 'approved_for_feed' : 'approved';
+    final status = canPostToCommunityFeed ? 'approved_for_feed' : 'approved';
     final row = await _client
         .from('community_groups')
-        .upsert(
-          {
-            'community_id': hubId,
-            'group_id': groupId,
-            'status': status,
-            'can_post_to_community_feed': canPostToCommunityFeed,
-            'approved_by': me.id,
-            'approved_at': DateTime.now().toIso8601String(),
-            'removed_at': null,
-          },
-          onConflict: 'community_id,group_id',
-        )
+        .upsert({
+          'community_id': hubId,
+          'group_id': groupId,
+          'status': status,
+          'can_post_to_community_feed': canPostToCommunityFeed,
+          'approved_by': me.id,
+          'approved_at': DateTime.now().toIso8601String(),
+          'removed_at': null,
+        }, onConflict: 'community_id,group_id')
         .select(_groupMembershipWithGroup)
         .single();
     return CommunityGroupMembership.fromRow(row);
@@ -939,16 +927,13 @@ class CommunityHubService {
 
     final row = await _client
         .from('community_groups')
-        .upsert(
-          {
-            'community_id': hubId,
-            'group_id': groupId,
-            'status': 'pending',
-            'can_post_to_community_feed': false,
-            'removed_at': null,
-          },
-          onConflict: 'community_id,group_id',
-        )
+        .upsert({
+          'community_id': hubId,
+          'group_id': groupId,
+          'status': 'pending',
+          'can_post_to_community_feed': false,
+          'removed_at': null,
+        }, onConflict: 'community_id,group_id')
         .select(_groupMembershipWithGroup)
         .single();
     return CommunityGroupMembership.fromRow(row);
@@ -1000,11 +985,15 @@ class CommunityHubService {
     required String hubId,
     required String groupId,
   }) async {
-    await _client.from('community_groups').update({
-      'status': 'removed',
-      'can_post_to_community_feed': false,
-      'removed_at': DateTime.now().toIso8601String(),
-    }).eq('community_id', hubId).eq('group_id', groupId);
+    await _client
+        .from('community_groups')
+        .update({
+          'status': 'removed',
+          'can_post_to_community_feed': false,
+          'removed_at': DateTime.now().toIso8601String(),
+        })
+        .eq('community_id', hubId)
+        .eq('group_id', groupId);
   }
 
   /// Feed refs for a Community hub (not soft-removed).
@@ -1036,10 +1025,13 @@ class CommunityHubService {
     }
     if (feedPostId.trim().isEmpty) return;
 
-    await _client.from('community_feed_posts').update({
-      'removed_from_community_at': DateTime.now().toIso8601String(),
-      'removed_by': me.id,
-    }).eq('id', feedPostId);
+    await _client
+        .from('community_feed_posts')
+        .update({
+          'removed_from_community_at': DateTime.now().toIso8601String(),
+          'removed_by': me.id,
+        })
+        .eq('id', feedPostId);
   }
 
   static Future<List<Map<String, dynamic>>> fetchPendingLinkRequests(
@@ -1063,7 +1055,7 @@ class CommunityHubService {
 
   /// Admin: all pending community↔hub group link requests.
   static Future<List<Map<String, dynamic>>>
-      fetchAllPendingLinkRequestsForAdmin() async {
+  fetchAllPendingLinkRequestsForAdmin() async {
     final rows = await _client
         .from('community_group_link_requests')
         .select(
@@ -1081,10 +1073,7 @@ class CommunityHubService {
   }) async {
     await _client.rpc(
       'review_community_group_link_request',
-      params: {
-        'p_request_id': requestId,
-        'p_approve': approve,
-      },
+      params: {'p_request_id': requestId, 'p_approve': approve},
     );
   }
 
@@ -1094,7 +1083,9 @@ class CommunityHubService {
     try {
       final rows = await _client
           .from('community_hub_roles')
-          .select('profile_id, role, status, created_at, profiles(display_name)')
+          .select(
+            'profile_id, role, status, created_at, profiles(display_name)',
+          )
           .eq('hub_id', hubId)
           .eq('status', 'pending')
           .order('created_at', ascending: false);
@@ -1126,11 +1117,62 @@ class CommunityHubService {
   }) async {
     await _client.rpc(
       'invite_hub_leader',
-      params: {
-        'p_hub_id': hubId,
-        'p_profile_id': profileId,
-        'p_role': role,
-      },
+      params: {'p_hub_id': hubId, 'p_profile_id': profileId, 'p_role': role},
     );
+  }
+
+  static Future<bool> isFollowing(String hubId) async {
+    final me = _client.auth.currentUser;
+    if (me == null || hubId.trim().isEmpty) return false;
+    try {
+      final row = await _client
+          .from('community_hub_follows')
+          .select('hub_id')
+          .eq('hub_id', hubId)
+          .eq('profile_id', me.id)
+          .maybeSingle();
+      return row != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<bool> follow(String hubId) async {
+    final me = _client.auth.currentUser;
+    if (me == null) {
+      throw const AuthException('Sign in to follow a Community.');
+    }
+    try {
+      await _client.from('community_hub_follows').insert({
+        'hub_id': hubId,
+        'profile_id': me.id,
+      });
+    } on PostgrestException catch (error) {
+      if (error.code != '23505') rethrow;
+    }
+    return true;
+  }
+
+  static Future<bool> unfollow(String hubId) async {
+    final me = _client.auth.currentUser;
+    if (me == null) {
+      throw const AuthException('Sign in to unfollow a Community.');
+    }
+    await _client
+        .from('community_hub_follows')
+        .delete()
+        .eq('hub_id', hubId)
+        .eq('profile_id', me.id);
+    return false;
+  }
+
+  static Future<bool> toggleFollow(
+    String hubId, {
+    required bool currentlyFollowing,
+  }) async {
+    if (currentlyFollowing) {
+      return unfollow(hubId);
+    }
+    return follow(hubId);
   }
 }

@@ -58,14 +58,17 @@ class _FirstVueBusinessProfileScreenState
   void initState() {
     super.initState();
     if (widget.previewDetails == null) {
-      _detailsFuture =
-          ApprovedBusinessesService.fetchPublicBusiness(widget.businessId);
+      _detailsFuture = ApprovedBusinessesService.fetchPublicBusiness(
+        widget.businessId,
+      );
     }
   }
 
   Future<void> _refresh() async {
     if (widget.previewDetails != null) return;
-    final next = ApprovedBusinessesService.fetchPublicBusiness(widget.businessId);
+    final next = ApprovedBusinessesService.fetchPublicBusiness(
+      widget.businessId,
+    );
     setState(() => _detailsFuture = next);
     await next;
   }
@@ -176,8 +179,7 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
   }
 
   Future<void> _loadFollowerCount() async {
-    final count =
-        await BusinessFollowService.followerCount(widget.details.id);
+    final count = await BusinessFollowService.followerCount(widget.details.id);
     if (!mounted) return;
     setState(() => _followerCount = count);
   }
@@ -226,8 +228,9 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
   }
 
   Future<void> _loadImages() async {
-    final images =
-        await BusinessMediaService.fetchProfileImages(widget.details.id);
+    final images = await BusinessMediaService.fetchProfileImages(
+      widget.details.id,
+    );
     if (!mounted) return;
     setState(() {
       _profileImages = images;
@@ -251,7 +254,8 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
             name: details.name,
             handle:
                 '${socialHandleFromName(details.name)} • ${details.businessType}${details.address != null && details.address!.isNotEmpty ? ' • ${details.address}' : ''}',
-            bio: details.description ??
+            bio:
+                details.description ??
                 (details.services.isEmpty
                     ? null
                     : details.services.take(4).join(', ')),
@@ -261,16 +265,12 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
             stats: [
               ProfileStatItem(
                 label: 'posts',
-                value: details.services.isEmpty ? '—' : '${details.services.length}',
+                value: details.services.isEmpty
+                    ? '—'
+                    : '${details.services.length}',
               ),
-              ProfileStatItem(
-                label: 'followers',
-                value: '$_followerCount',
-              ),
-              ProfileStatItem(
-                label: 'rating',
-                value: '4.9',
-              ),
+              ProfileStatItem(label: 'followers', value: '$_followerCount'),
+              ProfileStatItem(label: 'rating', value: '4.9'),
             ],
             actions: [
               if (isApproved && !isOwnerPreview) ...[
@@ -477,7 +477,8 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
           const SizedBox(height: 10),
           _ProfileInfoCard(
             icon: Icons.location_on_outlined,
-            text: details.address ??
+            text:
+                details.address ??
                 'The owner has not added a public address yet.',
           ),
           const SizedBox(height: 22),
@@ -495,7 +496,9 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
                       .map((service) => _ServiceChip(text: service))
                       .toList(),
                 ),
-          if (!BusinessMenuService.isDiningBusinessType(details.businessType)) ...[
+          if (!BusinessMenuService.isDiningBusinessType(
+            details.businessType,
+          )) ...[
             const SizedBox(height: 22),
             EntityProfileFeedSection(
               scope: EntityFeedScope.business,
@@ -521,6 +524,14 @@ class _BusinessReviewsSection extends StatefulWidget {
 class _BusinessReviewsSectionState extends State<_BusinessReviewsSection> {
   late Future<List<BusinessReview>> _reviews =
       BusinessReviewsService.fetchApprovedReviews(widget.businessId);
+
+  @override
+  void didUpdateWidget(covariant _BusinessReviewsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.businessId != widget.businessId) {
+      _reviews = BusinessReviewsService.fetchApprovedReviews(widget.businessId);
+    }
+  }
 
   Future<void> _startReview() async {
     if (!BusinessReviewsService.isSignedIn) {
@@ -756,7 +767,9 @@ class _ReviewCard extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
+      color:
+          Theme.of(context).extension<FirstVuePalette>()?.surface ??
+          FirstVueColors.surface,
       borderRadius: BorderRadius.circular(18),
       border: Border.all(color: Colors.white.withValues(alpha: .08)),
     ),
@@ -829,79 +842,105 @@ class _BusinessMediaGallery extends StatelessWidget {
           itemBuilder: (context, index) {
             final item = media[index];
             return GestureDetector(
-            onTap: () {
-              if (item.isVideo) {
-                showDialog<void>(
-                  context: context,
-                  builder: (_) => Dialog(
-                    backgroundColor: const Color(0xFF10151B),
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.videocam_outlined, color: Color(0xFF78B9BE), size: 48),
-                          const SizedBox(height: 12),
-                          const Text('Video', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          Text(item.signedUrl, style: const TextStyle(color: Colors.white54, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-                return;
-              }
-              showDialog<void>(
-              context: context,
-              builder: (_) => Dialog(
-                backgroundColor: Colors.transparent,
-                insetPadding: const EdgeInsets.all(16),
-                child: InteractiveViewer(
-                  child: Image.network(
-                    item.signedUrl,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-            );
-            },
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: item.isVideo
-                  ? SizedBox(
-                      width: 250,
-                      height: 190,
-                      child: ColoredBox(
-                        color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
+              onTap: () {
+                if (item.isVideo) {
+                  showDialog<void>(
+                    context: context,
+                    builder: (_) => Dialog(
+                      backgroundColor: const Color(0xFF10151B),
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
                         child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.videocam_outlined, color: Color(0xFF78B9BE), size: 40),
-                            SizedBox(height: 8),
-                            Text('VIDEO', style: TextStyle(color: Colors.white54)),
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.videocam_outlined,
+                              color: Color(0xFF78B9BE),
+                              size: 48,
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Video',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              item.signedUrl,
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 11,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ],
                         ),
                       ),
-                    )
-                  : Image.network(
-                item.signedUrl,
-                width: 250,
-                height: 190,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const SizedBox(
-                  width: 250,
-                  child: ColoredBox(
-                    color: Color(0xFF10151B),
-                    child: Icon(
-                      Icons.broken_image_outlined,
-                      color: Colors.white38,
+                    ),
+                  );
+                  return;
+                }
+                showDialog<void>(
+                  context: context,
+                  builder: (_) => Dialog(
+                    backgroundColor: Colors.transparent,
+                    insetPadding: const EdgeInsets.all(16),
+                    child: InteractiveViewer(
+                      child: Image.network(item.signedUrl, fit: BoxFit.contain),
                     ),
                   ),
-                ),
+                );
+              },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: item.isVideo
+                    ? SizedBox(
+                        width: 250,
+                        height: 190,
+                        child: ColoredBox(
+                          color:
+                              Theme.of(
+                                context,
+                              ).extension<FirstVuePalette>()?.surface ??
+                              FirstVueColors.surface,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(
+                                Icons.videocam_outlined,
+                                color: Color(0xFF78B9BE),
+                                size: 40,
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'VIDEO',
+                                style: TextStyle(color: Colors.white54),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : Image.network(
+                        item.signedUrl,
+                        width: 250,
+                        height: 190,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const SizedBox(
+                          width: 250,
+                          child: ColoredBox(
+                            color: Color(0xFF10151B),
+                            child: Icon(
+                              Icons.broken_image_outlined,
+                              color: Colors.white38,
+                            ),
+                          ),
+                        ),
+                      ),
               ),
-            ),
-          );
+            );
           },
         ),
       );
@@ -916,13 +955,13 @@ class _ProfileSectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(
-        text,
-        style: TextStyle(
-          color: context.fv.primaryText,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.5,
-        ),
-      );
+    text,
+    style: TextStyle(
+      color: context.fv.primaryText,
+      fontWeight: FontWeight.bold,
+      letterSpacing: 1.5,
+    ),
+  );
 }
 
 class _ProfileInfoCard extends StatelessWidget {
@@ -1034,9 +1073,7 @@ class _MessageOwnerButtonState extends State<_MessageOwnerButton> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unable to start a message right now.'),
-          ),
+          const SnackBar(content: Text('Unable to start a message right now.')),
         );
       }
     } finally {
@@ -1113,7 +1150,9 @@ class _MeetOwnerButtonState extends State<_MeetOwnerButton> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Meet the owner is unavailable right now.')),
+          const SnackBar(
+            content: Text('Meet the owner is unavailable right now.'),
+          ),
         );
       }
     } finally {
@@ -1271,9 +1310,7 @@ class _DiningMenuSection extends StatelessWidget {
                                           ),
                                         ),
                                       ),
-                                      if (item.priceLabel
-                                              ?.trim()
-                                              .isNotEmpty ==
+                                      if (item.priceLabel?.trim().isNotEmpty ==
                                           true)
                                         Text(
                                           item.priceLabel!,

@@ -394,25 +394,59 @@ class _EventsFeedList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder(
-      future: ThingsToDoService.fetchApprovedEvents(),
+      future: Future.wait([
+        ThingsToDoService.fetchRecentlyPostedEvents(limit: 12),
+        ThingsToDoService.fetchApprovedEvents(),
+      ]),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(
             child: CircularProgressIndicator(color: FirstVueColors.teal),
           );
         }
-        final events = snapshot.data!;
-        if (events.isEmpty) {
+        final recent = snapshot.data![0];
+        final upcoming = snapshot.data![1];
+        if (recent.isEmpty && upcoming.isEmpty) {
           return Text(
             'Local events will appear here.',
             style: TextStyle(color: context.fv.secondaryText),
           );
         }
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final event in events) ...[
-              SocialEventCard(event: event),
-              const SizedBox(height: 12),
+            if (recent.isNotEmpty) ...[
+              Text(
+                'Recently Posted',
+                style: TextStyle(
+                  color: context.fv.primaryText,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 10),
+              for (final event in recent) ...[
+                SocialEventCard(event: event),
+                const SizedBox(height: 12),
+              ],
+              const SizedBox(height: 8),
+            ],
+            if (upcoming.isNotEmpty) ...[
+              Text(
+                'Upcoming',
+                style: TextStyle(
+                  color: context.fv.primaryText,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 10),
+              for (final event in upcoming) ...[
+                SocialEventCard(event: event),
+                const SizedBox(height: 12),
+              ],
             ],
           ],
         );

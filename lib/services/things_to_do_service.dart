@@ -8,6 +8,7 @@ class CommunityEvent {
   final String title;
   final String? description;
   final DateTime? eventAt;
+  final DateTime? createdAt;
   final String? locationLabel;
   final String? businessName;
   final String? coverImageUrl;
@@ -18,6 +19,7 @@ class CommunityEvent {
     required this.title,
     required this.description,
     required this.eventAt,
+    this.createdAt,
     required this.locationLabel,
     required this.businessName,
     this.coverImageUrl,
@@ -35,15 +37,51 @@ class ThingsToDoService {
       final rows = await _client
           .from('community_events')
           .select(
-            'id, title, description, event_at, location_label, organizer_id, cover_storage_path, cover_storage_provider, businesses(name)',
+            'id, title, description, event_at, created_at, location_label, organizer_id, cover_storage_path, cover_storage_provider, businesses(name)',
           )
           .eq('status', 'approved')
           .order('event_at', ascending: true)
           .limit(40);
       return await Future.wait(rows.map(_mapRow));
     } catch (_) {
-      return _prototypeEvents;
+      try {
+        final rows = await _client
+            .from('community_events')
+            .select(
+              'id, title, description, event_at, location_label, organizer_id, cover_storage_path, cover_storage_provider, businesses(name)',
+            )
+            .eq('status', 'approved')
+            .order('event_at', ascending: true)
+            .limit(40);
+        return await Future.wait(rows.map(_mapRow));
+      } catch (_) {
+        return _prototypeEvents;
+      }
     }
+  }
+
+  /// Eligible published events sorted by posting timestamp (not event date).
+  static Future<List<CommunityEvent>> fetchRecentlyPostedEvents({
+    int limit = 20,
+  }) async {
+    final events = await fetchApprovedEvents();
+    final now = DateTime.now();
+    final eligible = events.where((event) {
+      if (event.eventAt != null && event.eventAt!.isBefore(now)) {
+        // Expired events should not stay discoverable.
+        return false;
+      }
+      return true;
+    }).toList();
+    eligible.sort((a, b) {
+      final aStamp =
+          a.createdAt ?? a.eventAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bStamp =
+          b.createdAt ?? b.eventAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bStamp.compareTo(aStamp);
+    });
+    if (eligible.length <= limit) return eligible;
+    return eligible.take(limit).toList();
   }
 
   static Future<bool> canPostEvents() async {
@@ -117,6 +155,9 @@ class ThingsToDoService {
       eventAt: row['event_at'] == null
           ? null
           : DateTime.parse(row['event_at'] as String),
+      createdAt: row['created_at'] == null
+          ? null
+          : DateTime.tryParse(row['created_at'] as String),
       locationLabel: row['location_label'] as String?,
       businessName: business?['name'] as String?,
       coverImageUrl: coverUrl,
