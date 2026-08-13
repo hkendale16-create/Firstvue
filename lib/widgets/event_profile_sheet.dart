@@ -71,6 +71,7 @@ class _EventProfileSheetState extends State<EventProfileSheet> {
   Widget build(BuildContext context) {
     final event = widget.event;
     final isPrototype = event.id.startsWith('proto-');
+    final fv = context.fv;
 
     return Column(
       children: [
@@ -79,7 +80,7 @@ class _EventProfileSheetState extends State<EventProfileSheet> {
           width: 40,
           height: 4,
           decoration: BoxDecoration(
-            color: Colors.white24,
+            color: fv.borderSubtle,
             borderRadius: BorderRadius.circular(2),
           ),
         ),
@@ -101,6 +102,17 @@ class _EventProfileSheetState extends State<EventProfileSheet> {
                         height: 160,
                         width: double.infinity,
                         fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => ColoredBox(
+                          color: fv.elevatedSurface,
+                          child: SizedBox(
+                            height: 160,
+                            child: Icon(
+                              Icons.event_outlined,
+                              color: fv.mutedIcon,
+                              size: 40,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -111,8 +123,8 @@ class _EventProfileSheetState extends State<EventProfileSheet> {
                     children: [
                       Text(
                         event.title,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: fv.primaryText,
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
                         ),
@@ -128,16 +140,16 @@ class _EventProfileSheetState extends State<EventProfileSheet> {
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.location_on_outlined,
                               size: 16,
-                              color: Colors.white54,
+                              color: fv.secondaryText,
                             ),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
                                 event.locationLabel!,
-                                style: const TextStyle(color: Colors.white54),
+                                style: TextStyle(color: fv.secondaryText),
                               ),
                             ),
                           ],
@@ -148,8 +160,8 @@ class _EventProfileSheetState extends State<EventProfileSheet> {
                         const SizedBox(height: 12),
                         Text(
                           event.description!,
-                          style: const TextStyle(
-                            color: Colors.white70,
+                          style: TextStyle(
+                            color: fv.secondaryText,
                             height: 1.45,
                           ),
                         ),
@@ -161,7 +173,9 @@ class _EventProfileSheetState extends State<EventProfileSheet> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: _loadingSocial
-                        ? const LinearProgressIndicator(color: FirstVueColors.teal)
+                        ? const LinearProgressIndicator(
+                            color: FirstVueColors.teal,
+                          )
                         : Wrap(
                             spacing: 8,
                             runSpacing: 8,
@@ -171,15 +185,22 @@ class _EventProfileSheetState extends State<EventProfileSheet> {
                                   _social.following
                                       ? 'Following'
                                       : 'Follow event',
+                                  style: TextStyle(color: fv.primaryText),
                                 ),
                                 selected: _social.following,
+                                selectedColor: FirstVueColors.gold.withValues(
+                                  alpha: .25,
+                                ),
+                                checkmarkColor: FirstVueColors.gold,
+                                backgroundColor: fv.elevatedSurface,
+                                side: BorderSide(color: fv.borderSubtle),
                                 onSelected: (selected) async {
                                   try {
                                     final next =
                                         await EventSocialService.toggleFollow(
-                                      widget.event.id,
-                                      following: selected,
-                                    );
+                                          widget.event.id,
+                                          following: selected,
+                                        );
                                     if (!mounted) return;
                                     setState(() {
                                       _social = EventSocialState(
@@ -189,8 +210,9 @@ class _EventProfileSheetState extends State<EventProfileSheet> {
                                     });
                                   } catch (_) {
                                     if (!mounted) return;
-                                    ScaffoldMessenger.maybeOf(this.context)
-                                        ?.showSnackBar(
+                                    ScaffoldMessenger.maybeOf(
+                                      this.context,
+                                    )?.showSnackBar(
                                       const SnackBar(
                                         content: Text(
                                           'Could not update event follow.',
@@ -218,9 +240,7 @@ class _EventProfileSheetState extends State<EventProfileSheet> {
                     child: Text(
                       'Preview event — post a real event to see its news feed.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: .45),
-                      ),
+                      style: TextStyle(color: fv.tertiaryText),
                     ),
                   ),
               ],

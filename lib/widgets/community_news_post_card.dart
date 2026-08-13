@@ -60,9 +60,8 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
 
   CommunityNewsPost get post => widget.post;
 
-  CommunityNewsPostCardStyle get _style => widget.compact
-      ? CommunityNewsPostCardStyle.compact
-      : widget.style;
+  CommunityNewsPostCardStyle get _style =>
+      widget.compact ? CommunityNewsPostCardStyle.compact : widget.style;
 
   bool get _isTimeline => _style == CommunityNewsPostCardStyle.timeline;
 
@@ -198,10 +197,7 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
               const SizedBox(height: 2),
               Text(
                 ProfileActivityService.formatRelativeTime(post.createdAt),
-                style: TextStyle(
-                  color: context.fv.tertiaryText,
-                  fontSize: 11,
-                ),
+                style: TextStyle(color: context.fv.tertiaryText, fontSize: 11),
               ),
             ],
           ),
@@ -231,10 +227,7 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
 
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        onTap: widget.onAuthorTap,
-        child: header,
-      ),
+      child: InkWell(onTap: widget.onAuthorTap, child: header),
     );
   }
 
@@ -264,7 +257,10 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
               padding: EdgeInsets.symmetric(horizontal: _isTimeline ? 0 : 14),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: bgFill,
                   borderRadius: BorderRadius.circular(12),
@@ -289,8 +285,9 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
             timeline: _isTimeline,
             compact: _style == CommunityNewsPostCardStyle.compact,
             sparkFlash: _sparkFlash,
-            onDoubleTapSpark:
-                widget.onSpark != null ? _handleDoubleTapSpark : null,
+            onDoubleTapSpark: widget.onSpark != null
+                ? _handleDoubleTapSpark
+                : null,
           ),
         ],
         if (post.sparkCount > 0 &&
@@ -368,8 +365,8 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
                   label: widget.repostedByMe
                       ? 'Reposted'
                       : (post.repostCount > 0
-                          ? 'Repost · ${post.repostCount}'
-                          : 'Repost'),
+                            ? 'Repost · ${post.repostCount}'
+                            : 'Repost'),
                   active: widget.repostedByMe,
                   activeColor: FirstVueColors.teal,
                   onTap: widget.onRepost!,
@@ -433,9 +430,7 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
     final card = Container(
       width: double.infinity,
       padding: const EdgeInsets.only(bottom: 8),
-      decoration: const BoxDecoration(
-        color: Colors.transparent,
-      ),
+      decoration: const BoxDecoration(color: Colors.transparent),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -445,15 +440,12 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
           else
             Material(
               color: Colors.transparent,
-              child: InkWell(
-                onTap: widget.onTap,
-                child: _buildPostContent(),
-              ),
+              child: InkWell(onTap: widget.onTap, child: _buildPostContent()),
             ),
           _buildPostActions(),
           _buildSparkPreview(),
           const SizedBox(height: 8),
-          Divider(height: 1, color: Color(0x14FFFFFF)),
+          Divider(height: 1, color: context.fv.borderSubtle),
         ],
       ),
     );
@@ -464,7 +456,12 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
   Widget _buildSparkPreview() {
     if (post.sparkCount <= 0) return const SizedBox.shrink();
     return Padding(
-      padding: EdgeInsets.fromLTRB(_isTimeline ? 0 : 14, 0, _isTimeline ? 0 : 14, 4),
+      padding: EdgeInsets.fromLTRB(
+        _isTimeline ? 0 : 14,
+        0,
+        _isTimeline ? 0 : 14,
+        4,
+      ),
       child: _SparkAvatarStrip(postId: post.id, total: post.sparkCount),
     );
   }
@@ -562,7 +559,9 @@ class _SparkAvatarStripState extends State<_SparkAvatarStrip> {
   Widget build(BuildContext context) {
     if (!_loaded || _users.isEmpty) return const SizedBox.shrink();
 
-    final extra = widget.total > _users.length ? widget.total - _users.length : 0;
+    final extra = widget.total > _users.length
+        ? widget.total - _users.length
+        : 0;
 
     return GestureDetector(
       onTap: () => SparkUsersSheet.show(context, postId: widget.postId),
@@ -579,7 +578,9 @@ class _SparkAvatarStripState extends State<_SparkAvatarStrip> {
                     left: i * 16.0,
                     child: CircleAvatar(
                       radius: 13,
-                      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                      backgroundColor: Theme.of(
+                        context,
+                      ).scaffoldBackgroundColor,
                       child: ProfileAvatarThumbnail(
                         imageUrl: _users[i].avatarUrl,
                         displayName: _users[i].displayName,
@@ -689,9 +690,7 @@ class _MediaTile extends StatelessWidget {
         } else {
           openFullScreenImageViewer(
             context,
-            items: [
-              FullScreenMediaItem(url: item.signedUrl, isVideo: false),
-            ],
+            items: [FullScreenMediaItem(url: item.signedUrl, isVideo: false)],
             title: 'PHOTO',
           );
         }
@@ -779,9 +778,9 @@ Future<bool> confirmDeleteNewsPost(
   try {
     await CommunityNewsService.deletePost(post.id);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Post deleted.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Post deleted.')));
     }
     return true;
   } catch (_) {

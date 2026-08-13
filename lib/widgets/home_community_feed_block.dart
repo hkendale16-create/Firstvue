@@ -119,7 +119,9 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
           .select('display_name')
           .eq('id', user.id)
           .maybeSingle();
-      final imagesFuture = ProfileMediaService.fetchProfileImagesForUser(user.id);
+      final imagesFuture = ProfileMediaService.fetchProfileImagesForUser(
+        user.id,
+      );
       final row = await rowFuture;
       final images = await imagesFuture;
       if (!mounted) return;
@@ -181,6 +183,11 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
     );
   }
 
+  Future<bool> _ensureSignedInForAction() async {
+    await _ensureSignedIn();
+    return Supabase.instance.client.auth.currentUser != null;
+  }
+
   Future<void> _openCreatePost() async {
     await _ensureSignedIn();
     if (Supabase.instance.client.auth.currentUser == null || !mounted) return;
@@ -190,9 +197,9 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
     );
     if (created == null || !mounted) return;
     if (!created.publishDestination.appearsOnHome) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Posted to VUE.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Posted to VUE.')));
       return;
     }
     setState(() {
@@ -228,6 +235,10 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
 
   Future<void> _sparkPost(int index) async {
     if (index < 0 || index >= _posts.length) return;
+    if (Supabase.instance.client.auth.currentUser == null) {
+      if (!await _ensureSignedInForAction()) return;
+      if (!mounted || index >= _posts.length) return;
+    }
     final post = _posts[index];
     final previous = post;
     final willSpark = !post.sparkedByMe;
@@ -258,7 +269,9 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
             if (i == index) previous else _posts[i],
         ];
       });
-      await _ensureSignedIn();
+      if (await _ensureSignedInForAction() && mounted) {
+        await _sparkPost(index);
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -272,6 +285,10 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
 
   Future<void> _savePost(int index) async {
     if (index < 0 || index >= _posts.length) return;
+    if (Supabase.instance.client.auth.currentUser == null) {
+      if (!await _ensureSignedInForAction()) return;
+      if (!mounted || index >= _posts.length) return;
+    }
     final post = _posts[index];
     final previous = post;
     final optimistic = post.copyWith(savedByMe: !post.savedByMe);
@@ -298,7 +315,9 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
             if (i == index) previous else _posts[i],
         ];
       });
-      await _ensureSignedIn();
+      if (await _ensureSignedInForAction() && mounted) {
+        await _savePost(index);
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -320,15 +339,10 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
           : {..._repostedPostIds, post.id};
     });
     try {
-      await RepostService.toggleRepost(
-        post.id,
-        currentlyReposted: wasReposted,
-      );
+      await RepostService.toggleRepost(post.id, currentlyReposted: wasReposted);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(wasReposted ? 'Repost removed' : 'Reposted'),
-        ),
+        SnackBar(content: Text(wasReposted ? 'Repost removed' : 'Reposted')),
       );
     } catch (_) {
       if (!mounted) return;
@@ -450,11 +464,7 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
               const Spacer(),
               IconButton(
                 onPressed: _loading ? null : _loadFeed,
-                icon: Icon(
-                  Icons.refresh,
-                  color: fv.mutedIcon,
-                  size: 20,
-                ),
+                icon: Icon(Icons.refresh, color: fv.mutedIcon, size: 20),
                 tooltip: 'Refresh feed',
                 visualDensity: VisualDensity.compact,
               ),
@@ -497,10 +507,10 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
                     ),
                     onAuthorTap: _posts[index].authorId.isNotEmpty
                         ? () => openMemberProfile(
-                              context,
-                              profileId: _posts[index].authorId,
-                              displayName: _posts[index].authorName,
-                            )
+                            context,
+                            profileId: _posts[index].authorId,
+                            displayName: _posts[index].authorName,
+                          )
                         : null,
                     onSpark: () => _sparkPost(index),
                     onSave: () => _savePost(index),
@@ -605,9 +615,7 @@ class _EmptyFeedState extends StatelessWidget {
       decoration: BoxDecoration(
         color: FirstVueColors.elevatedSurface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: FirstVueColors.ivory.withValues(alpha: 0.08),
-        ),
+        border: Border.all(color: FirstVueColors.ivory.withValues(alpha: 0.08)),
       ),
       child: Column(
         children: [
