@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/media_config.dart';
+import '../utils/location_match.dart';
 import 'community_editor_service.dart';
 import 'community_service.dart';
 import 'entity_image_url.dart';
@@ -21,12 +23,16 @@ class CommunityHub {
   final String? city;
   final String? state;
   final String? postalCode;
+  final String? metroArea;
+  final String? handle;
   final String? rules;
   final String visibility;
   final String createdByProfileId;
   final String? leaderUserId;
   final String status;
   final int followerCount;
+  final int memberCount;
+  final bool showManagersPublicly;
   final DateTime createdAt;
   final MediaStorageProvider imageStorageProvider;
   final MediaStorageProvider coverStorageProvider;
@@ -41,23 +47,34 @@ class CommunityHub {
     this.city,
     this.state,
     this.postalCode,
+    this.metroArea,
+    this.handle,
     this.rules,
     this.visibility = 'public',
     required this.createdByProfileId,
     this.leaderUserId,
     this.status = 'active',
     this.followerCount = 0,
+    this.memberCount = 0,
+    this.showManagersPublicly = false,
     required this.createdAt,
     this.imageStorageProvider = MediaStorageProvider.supabase,
     this.coverStorageProvider = MediaStorageProvider.supabase,
   });
 
   String? get locationLabel {
-    final parts =
-        [city, state].whereType<String>().where((p) => p.trim().isNotEmpty);
+    final parts = [city, state, if ((metroArea ?? '').trim().isNotEmpty &&
+            metroArea != city)
+          metroArea]
+        .whereType<String>()
+        .where((p) => p.trim().isNotEmpty);
     if (parts.isEmpty) return null;
-    return parts.join(', ');
+    return parts.take(2).join(', ');
   }
+
+  bool get isActive => status == 'active';
+  bool get isPublic => visibility == 'public';
+  bool get isDiscoverable => isActive && isPublic;
 
   factory CommunityHub.fromRow(Map<String, dynamic> row) {
     final createdRaw = row['created_at'];
@@ -80,13 +97,16 @@ class CommunityHub {
       city: row['city'] as String?,
       state: row['state'] as String?,
       postalCode: row['postal_code'] as String?,
+      metroArea: row['metro_area'] as String?,
+      handle: row['handle'] as String?,
       rules: row['rules'] as String?,
       visibility: (row['visibility'] as String?) ?? 'public',
       createdByProfileId: (row['created_by_profile_id'] as String?) ?? '',
-      leaderUserId: row['leader_user_id'] as String? ??
-          (row['created_by_profile_id'] as String?),
+      leaderUserId: row['leader_user_id'] as String?,
       status: (row['status'] as String?) ?? 'active',
       followerCount: (row['follower_count'] as num?)?.toInt() ?? 0,
+      memberCount: (row['member_count'] as num?)?.toInt() ?? 0,
+      showManagersPublicly: row['show_managers_publicly'] as bool? ?? false,
       createdAt: createdRaw is String
           ? DateTime.tryParse(createdRaw) ?? DateTime.now()
           : createdRaw is DateTime
@@ -125,12 +145,16 @@ class CommunityHub {
       city: city,
       state: state,
       postalCode: postalCode,
+      metroArea: metroArea,
+      handle: handle,
       rules: rules,
       visibility: visibility,
       createdByProfileId: createdByProfileId,
       leaderUserId: leaderUserId,
       status: status,
       followerCount: followerCount,
+      memberCount: memberCount,
+      showManagersPublicly: showManagersPublicly,
       createdAt: createdAt,
       imageStorageProvider: imageStorageProvider,
       coverStorageProvider: coverStorageProvider,
@@ -143,6 +167,9 @@ class CommunityHub {
     String? description,
     String? status,
     int? followerCount,
+    int? memberCount,
+    bool? showManagersPublicly,
+    String? leaderUserId,
   }) {
     return CommunityHub(
       id: id,
@@ -154,12 +181,17 @@ class CommunityHub {
       city: city,
       state: state,
       postalCode: postalCode,
+      metroArea: metroArea,
+      handle: handle,
       rules: rules,
       visibility: visibility,
       createdByProfileId: createdByProfileId,
-      leaderUserId: leaderUserId,
+      leaderUserId: leaderUserId ?? this.leaderUserId,
       status: status ?? this.status,
       followerCount: followerCount ?? this.followerCount,
+      memberCount: memberCount ?? this.memberCount,
+      showManagersPublicly:
+          showManagersPublicly ?? this.showManagersPublicly,
       createdAt: createdAt,
       imageStorageProvider: imageStorageProvider,
       coverStorageProvider: coverStorageProvider,
@@ -298,12 +330,20 @@ class CommunityHubService {
       'id, name, description, category, image_url, cover_url, '
       'image_storage_path, image_storage_provider, '
       'cover_storage_path, cover_storage_provider, '
-      'city, state, postal_code, rules, visibility, created_by_profile_id, '
-      'leader_user_id, status, follower_count, created_at';
+      'city, state, postal_code, metro_area, handle, rules, visibility, '
+      'created_by_profile_id, leader_user_id, status, follower_count, '
+      'member_count, show_managers_publicly, created_at';
 
   static const _columnsLegacy =
       'id, name, description, category, image_url, city, state, postal_code, '
       'rules, visibility, created_by_profile_id, follower_count, created_at';
+
+  static const _columnsNoMetro =
+      'id, name, description, category, image_url, cover_url, '
+      'image_storage_path, image_storage_provider, '
+      'cover_storage_path, cover_storage_provider, '
+      'city, state, postal_code, rules, visibility, created_by_profile_id, '
+      'leader_user_id, status, follower_count, created_at';
 
   static const _groupMembershipColumns =
       'id, community_id, group_id, status, can_post_to_community_feed, '
@@ -347,7 +387,11 @@ class CommunityHubService {
     try {
       return await run(_columns);
     } catch (_) {
-      return await run(_columnsLegacy);
+      try {
+        return await run(_columnsNoMetro);
+      } catch (_) {
+        return await run(_columnsLegacy);
+      }
     }
   }
 
@@ -368,8 +412,125 @@ class CommunityHubService {
         );
       }
       return await _resolveHubImages(rows.map(CommunityHub.fromRow).toList());
+    } catch (error, stack) {
+      debugPrint('CommunityHubService.fetchHubs failed: $error\n$stack');
+      rethrow;
+    }
+  }
+
+  /// Approved communities the user manages (active hub role) or has joined
+  /// through a linked group membership. Pending leader roles are excluded.
+  static Future<List<CommunityHub>> fetchYourHubs({int limit = 20}) async {
+    final me = _client.auth.currentUser;
+    if (me == null) return const [];
+
+    try {
+      final roleRows = await _client
+          .from('community_hub_roles')
+          .select('hub_id')
+          .eq('profile_id', me.id)
+          .eq('status', 'active')
+          .limit(limit);
+
+      final memberGroupRows = await _client
+          .from('community_members')
+          .select('community_id')
+          .eq('profile_id', me.id)
+          .eq('status', 'active')
+          .limit(80);
+
+      final groupIds = memberGroupRows
+          .map((r) => r['community_id'] as String)
+          .toList();
+
+      final ids = <String>{
+        ...roleRows.map((r) => r['hub_id'] as String),
+      };
+
+      if (groupIds.isNotEmpty) {
+        final linkedGroups = await _client
+            .from('communities')
+            .select('hub_id')
+            .inFilter('id', groupIds)
+            .not('hub_id', 'is', null)
+            .limit(limit);
+        for (final row in linkedGroups) {
+          final hubId = row['hub_id'] as String?;
+          if (hubId != null && hubId.isNotEmpty) ids.add(hubId);
+        }
+      }
+
+      if (ids.isEmpty) return const [];
+
+      final rows = await _selectHubRows(
+        configure: (query) => query
+            .inFilter('id', ids.toList())
+            .eq('status', 'active')
+            .order('created_at', ascending: false)
+            .limit(limit),
+      );
+      return await _resolveHubImages(rows.map(CommunityHub.fromRow).toList());
+    } catch (error, stack) {
+      debugPrint('CommunityHubService.fetchYourHubs failed: $error\n$stack');
+      rethrow;
+    }
+  }
+
+  /// True when the user has an active management role on the hub.
+  /// Pending creators / leaders must not manage.
+  static Future<bool> isActiveManager(String hubId, {String? profileId}) async {
+    final id = profileId ?? _client.auth.currentUser?.id;
+    if (id == null || hubId.trim().isEmpty) return false;
+    try {
+      final ok = await _client.rpc(
+        'is_active_hub_manager',
+        params: {
+          'p_hub_id': hubId,
+          'p_profile_id': id,
+        },
+      );
+      if (ok is bool) return ok;
+    } catch (_) {}
+
+    try {
+      final row = await _client
+          .from('community_hub_roles')
+          .select('role, status')
+          .eq('hub_id', hubId)
+          .eq('profile_id', id)
+          .eq('status', 'active')
+          .maybeSingle();
+      if (row == null) return false;
+      final role = (row['role'] as String?) ?? '';
+      return role == 'creator' ||
+          role == 'lead_leader' ||
+          role == 'leader' ||
+          role == 'admin';
+    } catch (error, stack) {
+      debugPrint(
+        'CommunityHubService.isActiveManager failed: $error\n$stack',
+      );
+      return false;
+    }
+  }
+
+  static Future<bool> hasPendingManagement(
+    String hubId, {
+    String? profileId,
+  }) async {
+    final id = profileId ?? _client.auth.currentUser?.id;
+    if (id == null || hubId.trim().isEmpty) return false;
+    try {
+      final row = await _client
+          .from('community_hub_roles')
+          .select('status')
+          .eq('hub_id', hubId)
+          .eq('profile_id', id)
+          .eq('status', 'pending')
+          .maybeSingle();
+      return row != null;
     } catch (_) {
-      return const [];
+      return false;
     }
   }
 
@@ -381,25 +542,24 @@ class CommunityHubService {
       );
       if (rows.isEmpty) return null;
       return await CommunityHub.fromRow(rows.first).withResolvedImages();
-    } catch (_) {
-      return null;
+    } catch (error, stack) {
+      debugPrint('CommunityHubService.fetchHubById failed: $error\n$stack');
+      rethrow;
     }
   }
 
   static Future<List<CommunityHub>> fetchNearbyHubs({int limit = 16}) async {
     try {
       final prefs = await UserPreferencesService.fetch();
-      final city = prefs.locationCity?.trim();
-      final state = prefs.locationState?.trim();
-      final hasCity = city != null && city.isNotEmpty;
-      final hasState = state != null && state.isNotEmpty;
+      final orFilter = LocationMatch.postgrestOrFilter(prefs);
 
-      if (!hasCity && !hasState) {
+      if (orFilter == null) {
         return await fetchHubs(limit: limit);
       }
 
       Future<List<Map<String, dynamic>>> runNearby({
         required bool filterActive,
+        required bool applyLocation,
       }) {
         return _selectHubRows(
           configure: (query) {
@@ -407,12 +567,8 @@ class CommunityHubService {
             if (filterActive) {
               q = q.eq('status', 'active');
             }
-            if (hasCity && hasState) {
-              q = q.or('city.ilike.%$city%,state.ilike.%$state%');
-            } else if (hasCity) {
-              q = q.ilike('city', '%$city%');
-            } else {
-              q = q.ilike('state', '%$state%');
+            if (applyLocation) {
+              q = q.or(orFilter);
             }
             return q.order('created_at', ascending: false).limit(limit);
           },
@@ -421,16 +577,45 @@ class CommunityHubService {
 
       List<Map<String, dynamic>> rows;
       try {
-        rows = await runNearby(filterActive: true);
+        rows = await runNearby(filterActive: true, applyLocation: true);
       } catch (_) {
-        rows = await runNearby(filterActive: false);
+        // metro_area may be absent pre-migration; retry without it via legacy.
+        try {
+          final city = prefs.locationCity?.trim();
+          final state = prefs.locationState?.trim();
+          rows = await _selectHubRows(
+            configure: (query) {
+              var q = query.eq('status', 'active');
+              if (city != null &&
+                  city.isNotEmpty &&
+                  state != null &&
+                  state.isNotEmpty) {
+                q = q.or('city.ilike.%$city%,state.ilike.%$state%');
+              } else if (city != null && city.isNotEmpty) {
+                q = q.ilike('city', '%$city%');
+              } else if (state != null && state.isNotEmpty) {
+                q = q.ilike('state', '%$state%');
+              }
+              return q.order('created_at', ascending: false).limit(limit);
+            },
+          );
+        } catch (_) {
+          rows = await runNearby(filterActive: false, applyLocation: false);
+        }
       }
 
       if (rows.isEmpty) {
+        debugPrint(
+          'CommunityHubService.fetchNearbyHubs: location filter empty; '
+          'falling back to active hubs.',
+        );
         return await fetchHubs(limit: limit);
       }
       return await _resolveHubImages(rows.map(CommunityHub.fromRow).toList());
-    } catch (_) {
+    } catch (error, stack) {
+      debugPrint(
+        'CommunityHubService.fetchNearbyHubs failed: $error\n$stack',
+      );
       return await fetchHubs(limit: limit);
     }
   }
@@ -645,11 +830,8 @@ class CommunityHubService {
       }
       chosen ??= roleRows.isNotEmpty ? roleRows.first : null;
       if (chosen == null) {
-        if (hub == null || hub.createdByProfileId.isEmpty) return null;
-        chosen = {
-          'profile_id': hub.createdByProfileId,
-          'role': 'creator',
-        };
+        // Do not treat a pending creator / created_by alone as the public leader.
+        return null;
       }
 
       final profileId = chosen['profile_id'] as String;

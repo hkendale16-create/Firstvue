@@ -23,8 +23,10 @@ class HomeCommunitiesSection extends StatefulWidget {
 class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
   List<Community> _yours = const [];
   List<Community> _nearbyGroups = const [];
+  List<CommunityHub> _yourHubs = const [];
   List<CommunityHub> _nearbyHubs = const [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -41,19 +43,32 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
-    final results = await Future.wait([
-      CommunityService.fetchYourCommunities(limit: 16),
-      CommunityService.fetchNearbyCommunities(limit: 16),
-      CommunityHubService.fetchNearbyHubs(limit: 12),
-    ]);
-    if (!mounted) return;
     setState(() {
-      _yours = results[0] as List<Community>;
-      _nearbyGroups = results[1] as List<Community>;
-      _nearbyHubs = results[2] as List<CommunityHub>;
-      _loading = false;
+      _loading = true;
+      _error = null;
     });
+    try {
+      final results = await Future.wait([
+        CommunityService.fetchYourCommunities(limit: 16),
+        CommunityService.fetchNearbyCommunities(limit: 16),
+        CommunityHubService.fetchYourHubs(limit: 12),
+        CommunityHubService.fetchNearbyHubs(limit: 12),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _yours = results[0] as List<Community>;
+        _nearbyGroups = results[1] as List<Community>;
+        _yourHubs = results[2] as List<CommunityHub>;
+        _nearbyHubs = results[3] as List<CommunityHub>;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = error.toString();
+      });
+    }
   }
 
   Future<void> _openCreateGroup() async {
@@ -88,10 +103,8 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
       await Navigator.push(
         context,
         FirstVuePageRoute(
-          builder: (_) => CommunityHubDetailScreen(
-            hubId: created.id,
-            initialHub: created,
-          ),
+          builder: (_) =>
+              CommunityHubDetailScreen(hubId: created.id, initialHub: created),
         ),
       );
       if (mounted) await _load();
@@ -125,10 +138,8 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
     Navigator.push(
       context,
       FirstVuePageRoute(
-        builder: (_) => CommunityHubDetailScreen(
-          hubId: hub.id,
-          initialHub: hub,
-        ),
+        builder: (_) =>
+            CommunityHubDetailScreen(hubId: hub.id, initialHub: hub),
       ),
     ).then((_) {
       if (mounted) _load();
@@ -137,26 +148,53 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_error != null) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: fv.surface,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Could not load communities',
+                  style: TextStyle(
+                    color: fv.primaryText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _error!,
+                  style: TextStyle(color: fv.secondaryText, fontSize: 12),
+                ),
+                TextButton(onPressed: _load, child: const Text('Retry')),
+              ],
+            ),
+          ),
+        ],
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 'YOUR COMMUNITY GROUPS',
                 style: TextStyle(
-                  color: FirstVueColors.ivory,
+                  color: fv.primaryText,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.4,
                 ),
               ),
             ),
-            TextButton(
-              onPressed: _openAll,
-              child: const Text('See all'),
-            ),
+            TextButton(onPressed: _openAll, child: const Text('See all')),
           ],
         ),
         const SizedBox(height: 12),
@@ -176,11 +214,41 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
             onOpen: _openGroup,
             onEmptyTap: _openAll,
           ),
+        if (_yourHubs.isNotEmpty) ...[
+          const SizedBox(height: 26),
+          Text(
+            'MY COMMUNITIES',
+            style: TextStyle(
+              color: fv.primaryText,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.4,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 118,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _yourHubs.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 14),
+              itemBuilder: (context, index) {
+                final hub = _yourHubs[index];
+                return GroupCircleTile(
+                  label: hub.name,
+                  imageUrl: hub.imageUrl,
+                  ringColor: FirstVueColors.gold,
+                  onTap: () => _openHub(hub),
+                );
+              },
+            ),
+          ),
+        ],
         const SizedBox(height: 26),
-        const Text(
+        Text(
           'GROUPS IN YOUR AREA',
           style: TextStyle(
-            color: FirstVueColors.ivory,
+            color: fv.primaryText,
             fontSize: 14,
             fontWeight: FontWeight.bold,
             letterSpacing: 1.4,
@@ -206,21 +274,18 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
         const SizedBox(height: 26),
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 'COMMUNITIES IN YOUR AREA',
                 style: TextStyle(
-                  color: FirstVueColors.ivory,
+                  color: fv.primaryText,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.4,
                 ),
               ),
             ),
-            TextButton(
-              onPressed: _openCreateHub,
-              child: const Text('Create'),
-            ),
+            TextButton(onPressed: _openCreateHub, child: const Text('Create')),
           ],
         ),
         const SizedBox(height: 12),
@@ -234,9 +299,10 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
         else if (_nearbyHubs.isEmpty)
           GestureDetector(
             onTap: _openCreateHub,
-            child: const Text(
-              'Local Communities will appear here. Create one if you are an approved Community Leader.',
-              style: TextStyle(color: Colors.white54),
+            child: Text(
+              'Approved Communities in your area will appear here. '
+              'Community approval is separate from Community Leader approval.',
+              style: TextStyle(color: fv.secondaryText),
             ),
           )
         else
@@ -284,10 +350,7 @@ class _GroupCircleRow extends StatelessWidget {
     if (groups.isEmpty && !includeCreate) {
       return GestureDetector(
         onTap: onEmptyTap,
-        child: Text(
-          emptyLabel,
-          style: const TextStyle(color: Colors.white54),
-        ),
+        child: Text(emptyLabel, style: const TextStyle(color: Colors.white54)),
       );
     }
 
@@ -322,8 +385,8 @@ class _GroupCircleRow extends StatelessWidget {
             ringColor: group.isMember
                 ? FirstVueColors.teal
                 : group.isFollowing
-                    ? FirstVueColors.gold
-                    : Colors.white24,
+                ? FirstVueColors.gold
+                : Colors.white24,
             onTap: () => onOpen(group),
           );
         },

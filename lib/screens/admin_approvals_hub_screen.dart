@@ -15,6 +15,7 @@ class AdminApprovalsHubScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return DefaultTabController(
       length: 6,
       child: Scaffold(
@@ -22,13 +23,14 @@ class AdminApprovalsHubScreen extends StatelessWidget {
         appBar: AppBar(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           surfaceTintColor: Colors.transparent,
+          foregroundColor: fv.primaryText,
           title: const Text('APPROVAL CENTER'),
-          bottom: const TabBar(
+          bottom: TabBar(
             isScrollable: true,
-            labelColor: Color(0xFFD8B56A),
-            unselectedLabelColor: Colors.white54,
-            indicatorColor: Color(0xFF78B9BE),
-            tabs: [
+            labelColor: FirstVueColors.gold,
+            unselectedLabelColor: fv.secondaryText,
+            indicatorColor: FirstVueColors.teal,
+            tabs: const [
               Tab(text: 'BUSINESS'),
               Tab(text: 'PROFESSIONAL'),
               Tab(text: 'ORGANIZER'),
@@ -63,6 +65,47 @@ String _approvalErrorMessage(Object error) {
   return error.toString();
 }
 
+String _formatDate(DateTime? value) {
+  if (value == null) return 'Unknown date';
+  final local = value.toLocal();
+  final y = local.year.toString().padLeft(4, '0');
+  final m = local.month.toString().padLeft(2, '0');
+  final d = local.day.toString().padLeft(2, '0');
+  return '$y-$m-$d';
+}
+
+Widget _approvalEmpty(BuildContext context, String message) {
+  final fv = context.fv;
+  return Center(
+    child: Text(
+      message,
+      style: TextStyle(color: fv.secondaryText),
+      textAlign: TextAlign.center,
+    ),
+  );
+}
+
+Widget _approvalError(BuildContext context, Object error, VoidCallback retry) {
+  final fv = context.fv;
+  return Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _approvalErrorMessage(error),
+            style: TextStyle(color: fv.secondaryText),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          FilledButton(onPressed: retry, child: const Text('Retry')),
+        ],
+      ),
+    ),
+  );
+}
+
 class _BusinessApprovalsTab extends StatefulWidget {
   @override
   State<_BusinessApprovalsTab> createState() => _BusinessApprovalsTabState();
@@ -78,7 +121,9 @@ class _BusinessApprovalsTabState extends State<_BusinessApprovalsTab> {
   }
 
   Future<void> _refresh() async {
-    setState(() => _future = BusinessSubmissionService.fetchPendingSubmissions());
+    setState(
+      () => _future = BusinessSubmissionService.fetchPendingSubmissions(),
+    );
     await _future;
   }
 
@@ -95,17 +140,15 @@ class _BusinessApprovalsTabState extends State<_BusinessApprovalsTab> {
     return FutureBuilder<List<PendingBusinessSubmission>>(
       future: _future,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _approvalError(context, snapshot.error!, _refresh);
+        }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         final items = snapshot.data!;
         if (items.isEmpty) {
-          return const Center(
-            child: Text(
-              'No pending business submissions.',
-              style: TextStyle(color: Colors.white54),
-            ),
-          );
+          return _approvalEmpty(context, 'No pending business submissions.');
         }
         return ListView.separated(
           padding: const EdgeInsets.all(20),
@@ -114,8 +157,12 @@ class _BusinessApprovalsTabState extends State<_BusinessApprovalsTab> {
           itemBuilder: (context, index) {
             final item = items[index];
             return _ApprovalCard(
+              requestType: 'Business creation',
               title: item.name,
-              subtitle: '${item.businessType}\n${item.contactName} • ${item.contactEmail}',
+              applicant: item.contactName,
+              target: item.businessType,
+              submittedAtLabel: 'Pending review',
+              status: 'pending',
               onApprove: () => _review(item.businessId, true),
               onReject: () => _review(item.businessId, false),
             );
@@ -151,17 +198,15 @@ class _ProfessionalApprovalsTabState extends State<_ProfessionalApprovalsTab> {
     return FutureBuilder<List<ProfessionalProfile>>(
       future: _future,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _approvalError(context, snapshot.error!, _refresh);
+        }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         final items = snapshot.data!;
         if (items.isEmpty) {
-          return const Center(
-            child: Text(
-              'No pending professional profiles.',
-              style: TextStyle(color: Colors.white54),
-            ),
-          );
+          return _approvalEmpty(context, 'No pending professional profiles.');
         }
         return ListView.separated(
           padding: const EdgeInsets.all(20),
@@ -170,8 +215,12 @@ class _ProfessionalApprovalsTabState extends State<_ProfessionalApprovalsTab> {
           itemBuilder: (context, index) {
             final item = items[index];
             return _ApprovalCard(
+              requestType: 'Professional profile',
               title: item.displayName,
-              subtitle: '${item.type.label} • ${item.city}, ${item.state}',
+              applicant: item.displayName,
+              target: '${item.type.label} • ${item.city}, ${item.state}',
+              submittedAtLabel: 'Pending review',
+              status: item.status,
               onApprove: () async {
                 await ProfessionalProfilesService.moderate(item.id, 'approved');
                 await _refresh();
@@ -212,17 +261,15 @@ class _OrganizerApprovalsTabState extends State<_OrganizerApprovalsTab> {
     return FutureBuilder<List<OrganizerApplication>>(
       future: _future,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _approvalError(context, snapshot.error!, _refresh);
+        }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         final items = snapshot.data!;
         if (items.isEmpty) {
-          return const Center(
-            child: Text(
-              'No pending organizer applications.',
-              style: TextStyle(color: Colors.white54),
-            ),
-          );
+          return _approvalEmpty(context, 'No pending organizer applications.');
         }
         return ListView.separated(
           padding: const EdgeInsets.all(20),
@@ -231,9 +278,14 @@ class _OrganizerApprovalsTabState extends State<_OrganizerApprovalsTab> {
           itemBuilder: (context, index) {
             final item = items[index];
             return _ApprovalCard(
-              title: item.displayName,
-              subtitle:
-                  '${item.organizationName ?? 'Community organizer'}\n${item.reason ?? ''}',
+              requestType: 'Organizer',
+              title: (item.organizationName ?? '').trim().isNotEmpty
+                  ? item.organizationName!.trim()
+                  : item.displayName,
+              applicant: item.displayName,
+              target: item.organizationName ?? 'Organizer application',
+              submittedAtLabel: _formatDate(item.createdAt),
+              status: 'pending',
               onApprove: () async {
                 await OrganizerApplicationService.review(
                   applicationId: item.id,
@@ -284,16 +336,17 @@ class _CommunityLeaderApprovalsTabState
     return FutureBuilder<List<CommunityLeaderRequest>>(
       future: _future,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _approvalError(context, snapshot.error!, _refresh);
+        }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         final items = snapshot.data!;
         if (items.isEmpty) {
-          return const Center(
-            child: Text(
-              'No pending Community Leader requests.',
-              style: TextStyle(color: Colors.white54),
-            ),
+          return _approvalEmpty(
+            context,
+            'No pending Community Leader requests.',
           );
         }
         return ListView.separated(
@@ -305,13 +358,17 @@ class _CommunityLeaderApprovalsTabState
             final location = [
               item.requestedCity,
               item.requestedState,
-              item.requestedLocation,
-            ].whereType<String>().where((s) => s.trim().isNotEmpty).join(', ');
+            ].whereType<String>().where((p) => p.trim().isNotEmpty).join(', ');
             return _ApprovalCard(
+              requestType: 'Community Leader',
               title: 'Leader request',
-              subtitle:
-                  '${location.isEmpty ? 'Location not specified' : location}\n'
-                  '${item.reason ?? ''}\n${item.experience ?? ''}',
+              applicant: item.profileId,
+              target: location.isEmpty
+                  ? (item.requestedLocation ?? 'No location provided')
+                  : location,
+              submittedAtLabel: _formatDate(item.createdAt),
+              status: item.status,
+              notes: item.reason,
               onApprove: () async {
                 await CommunityLeaderService.review(
                   requestId: item.id,
@@ -360,16 +417,17 @@ class _CommunityCreationApprovalsTabState
     return FutureBuilder<List<CommunityCreationRequest>>(
       future: _future,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _approvalError(context, snapshot.error!, _refresh);
+        }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         final items = snapshot.data!;
         if (items.isEmpty) {
-          return const Center(
-            child: Text(
-              'No pending Community creation requests.',
-              style: TextStyle(color: Colors.white54),
-            ),
+          return _approvalEmpty(
+            context,
+            'No pending Community creation requests.',
           );
         }
         return ListView.separated(
@@ -378,20 +436,28 @@ class _CommunityCreationApprovalsTabState
           separatorBuilder: (_, _) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
             final item = items[index];
-            final location = [
-              item.city,
-              item.state,
-              item.locationLabel,
-            ].whereType<String>().where((s) => s.trim().isNotEmpty).join(', ');
             return _ApprovalCard(
-              title: item.proposedName.isEmpty
-                  ? 'Community request'
-                  : item.proposedName,
-              subtitle:
-                  '${item.category?.trim().isNotEmpty == true ? item.category! : 'Uncategorized'}\n'
-                  '${location.isEmpty ? 'Location not specified' : location}\n'
-                  '${item.reason ?? ''}\n'
-                  'Requester: ${item.requestingUserId}',
+              requestType: 'Community creation',
+              title: item.proposedName,
+              applicant: item.requestingUserId,
+              target:
+                  [
+                        item.category,
+                        item.locationLabel ??
+                            [item.city, item.state]
+                                .whereType<String>()
+                                .where((p) => p.isNotEmpty)
+                                .join(', '),
+                      ]
+                      .whereType<String>()
+                      .where((p) => p.trim().isNotEmpty)
+                      .join(' • '),
+              submittedAtLabel: _formatDate(item.createdAt),
+              status: item.status,
+              notes:
+                  'Approving publishes the Community. Leadership stays pending '
+                  'until the separate Community Leader request is approved.\n'
+                  '${item.reason ?? ''}',
               onApprove: () async {
                 await CommunityCreationService.review(
                   requestId: item.id,
@@ -441,28 +507,14 @@ class _GroupLinkApprovalsTabState extends State<_GroupLinkApprovalsTab> {
       future: _future,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(
-                _approvalErrorMessage(snapshot.error!),
-                style: const TextStyle(color: Colors.white54),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          );
+          return _approvalError(context, snapshot.error!, _refresh);
         }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         final items = snapshot.data!;
         if (items.isEmpty) {
-          return const Center(
-            child: Text(
-              'No pending group link requests.',
-              style: TextStyle(color: Colors.white54),
-            ),
-          );
+          return _approvalEmpty(context, 'No pending group link requests.');
         }
         return ListView.separated(
           padding: const EdgeInsets.all(20),
@@ -474,16 +526,26 @@ class _GroupLinkApprovalsTabState extends State<_GroupLinkApprovalsTab> {
             final community = item['communities'];
             final hub = item['community_hubs'];
             final communityName = community is Map
-                ? (community['name'] as String?) ?? 'Community'
-                : 'Community';
+                ? (community['name'] as String?) ?? 'Group'
+                : 'Group';
             final hubName = hub is Map
-                ? (hub['name'] as String?) ?? 'Hub'
-                : 'Hub';
+                ? (hub['name'] as String?) ?? 'Community'
+                : 'Community';
             final requester =
                 (item['requested_by_profile_id'] as String?) ?? 'unknown';
+            final createdRaw = item['created_at'];
+            final createdAt = createdRaw is String
+                ? DateTime.tryParse(createdRaw)
+                : createdRaw is DateTime
+                ? createdRaw
+                : null;
             return _ApprovalCard(
+              requestType: 'Group link',
               title: communityName,
-              subtitle: 'Link to hub: $hubName\nRequester: $requester',
+              applicant: requester,
+              target: hubName,
+              submittedAtLabel: _formatDate(createdAt),
+              status: (item['status'] as String?) ?? 'pending',
               onApprove: () async {
                 await CommunityHubService.reviewLinkRequest(
                   requestId: id,
@@ -507,16 +569,26 @@ class _GroupLinkApprovalsTabState extends State<_GroupLinkApprovalsTab> {
 }
 
 class _ApprovalCard extends StatefulWidget {
+  final String requestType;
   final String title;
-  final String subtitle;
+  final String applicant;
+  final String target;
+  final String submittedAtLabel;
+  final String status;
+  final String? notes;
   final Future<void> Function() onApprove;
   final Future<void> Function() onReject;
 
   const _ApprovalCard({
+    required this.requestType,
     required this.title,
-    required this.subtitle,
+    required this.applicant,
+    required this.target,
+    required this.submittedAtLabel,
+    required this.status,
     required this.onApprove,
     required this.onReject,
+    this.notes,
   });
 
   @override
@@ -526,22 +598,23 @@ class _ApprovalCard extends StatefulWidget {
 class _ApprovalCardState extends State<_ApprovalCard> {
   bool _busy = false;
 
-  Future<void> _run(Future<void> Function() action, {required bool approved}) async {
+  Future<void> _run(
+    Future<void> Function() action, {
+    required bool approved,
+  }) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
       await action();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(approved ? 'Approved.' : 'Rejected.'),
-        ),
+        SnackBar(content: Text(approved ? 'Approved.' : 'Denied.')),
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_approvalErrorMessage(error))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_approvalErrorMessage(error))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -549,26 +622,58 @@ class _ApprovalCardState extends State<_ApprovalCard> {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
+        color: fv.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
+            widget.requestType.toUpperCase(),
+            style: TextStyle(
+              color: FirstVueColors.gold,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.1,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
             widget.title,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: fv.primaryText,
               fontWeight: FontWeight.bold,
               fontSize: 16,
             ),
           ),
-          const SizedBox(height: 6),
-          Text(widget.subtitle, style: const TextStyle(color: Colors.white54)),
+          const SizedBox(height: 8),
+          Text(
+            'Applicant: ${widget.applicant}',
+            style: TextStyle(color: fv.secondaryText),
+          ),
+          Text(
+            'Target: ${widget.target}',
+            style: TextStyle(color: fv.secondaryText),
+          ),
+          Text(
+            'Submitted: ${widget.submittedAtLabel}',
+            style: TextStyle(color: fv.secondaryText),
+          ),
+          Text(
+            'Status: ${widget.status}',
+            style: TextStyle(color: fv.secondaryText),
+          ),
+          if (widget.notes != null && widget.notes!.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              widget.notes!.trim(),
+              style: TextStyle(color: fv.secondaryText, height: 1.35),
+            ),
+          ],
           const SizedBox(height: 12),
           Row(
             children: [
@@ -578,12 +683,15 @@ class _ApprovalCardState extends State<_ApprovalCard> {
                       ? null
                       : () => _run(widget.onReject, approved: false),
                   child: _busy
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: fv.primaryText,
+                          ),
                         )
-                      : const Text('REJECT'),
+                      : const Text('DENY'),
                 ),
               ),
               const SizedBox(width: 10),
@@ -596,7 +704,10 @@ class _ApprovalCardState extends State<_ApprovalCard> {
                       ? const SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
                       : const Text('APPROVE'),
                 ),

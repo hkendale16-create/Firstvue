@@ -69,7 +69,9 @@ class _ExploreGridVideoState extends State<ExploreGridVideo> {
   bool _visible = false;
   bool _holdsSlot = false;
   Timer? _hideDisposeTimer;
+  Timer? _previewLoopTimer;
   VoidCallback? _queuedAcquire;
+  static const _previewLoop = Duration(seconds: 3);
 
   @override
   void didUpdateWidget(covariant ExploreGridVideo oldWidget) {
@@ -84,9 +86,26 @@ class _ExploreGridVideoState extends State<ExploreGridVideo> {
   @override
   void dispose() {
     _hideDisposeTimer?.cancel();
+    _stopPreviewLoop();
     _cancelQueueEntry();
     _disposeController();
     super.dispose();
+  }
+
+  void _stopPreviewLoop() {
+    _previewLoopTimer?.cancel();
+    _previewLoopTimer = null;
+  }
+
+  void _startPreviewLoop(VideoPlayerController controller) {
+    _stopPreviewLoop();
+    _previewLoopTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      if (!_visible || !_ready) return;
+      final position = controller.value.position;
+      if (position >= _previewLoop) {
+        controller.seekTo(Duration.zero);
+      }
+    });
   }
 
   void _cancelQueueEntry() {
@@ -105,12 +124,14 @@ class _ExploreGridVideoState extends State<ExploreGridVideo> {
         _requestController();
       } else if (_ready) {
         _controller?.play();
+        if (_controller != null) _startPreviewLoop(_controller!);
       }
       return;
     }
 
     _visible = false;
     _controller?.pause();
+    _stopPreviewLoop();
     _hideDisposeTimer?.cancel();
     _hideDisposeTimer = Timer(const Duration(milliseconds: 700), () {
       if (!mounted || _visible) return;
@@ -157,7 +178,7 @@ class _ExploreGridVideoState extends State<ExploreGridVideo> {
     try {
       await controller.initialize();
       await controller.setVolume(0);
-      await controller.setLooping(true);
+      await controller.setLooping(false);
       if (!mounted || _controller != controller) {
         await controller.dispose();
         if (_holdsSlot) {
@@ -172,7 +193,9 @@ class _ExploreGridVideoState extends State<ExploreGridVideo> {
         _loading = false;
       });
       if (_visible) {
+        await controller.seekTo(Duration.zero);
         await controller.play();
+        _startPreviewLoop(controller);
       }
     } catch (_) {
       await controller.dispose();
@@ -191,6 +214,7 @@ class _ExploreGridVideoState extends State<ExploreGridVideo> {
   }
 
   void _disposeController() {
+    _stopPreviewLoop();
     final controller = _controller;
     if (controller != null) {
       controller.dispose();

@@ -66,15 +66,15 @@ class CommunityCreationRequest {
       reviewedAt: reviewedRaw is String
           ? DateTime.tryParse(reviewedRaw)
           : reviewedRaw is DateTime
-              ? reviewedRaw
-              : null,
+          ? reviewedRaw
+          : null,
       denialReason: row['denial_reason'] as String?,
       createdCommunityId: row['created_community_id'] as String?,
       createdAt: createdRaw is String
           ? DateTime.tryParse(createdRaw) ?? DateTime.now()
           : createdRaw is DateTime
-              ? createdRaw
-              : DateTime.now(),
+          ? createdRaw
+          : DateTime.now(),
       proposedVisibility: (row['proposed_visibility'] as String?) ?? 'public',
     );
   }
@@ -194,16 +194,12 @@ class CommunityCreationService {
   }
 
   static Future<List<CommunityCreationRequest>> fetchPendingForAdmin() async {
-    try {
-      final rows = await _client
-          .from('community_creation_requests')
-          .select(_columns)
-          .eq('status', 'pending')
-          .order('created_at', ascending: false);
-      return rows.map(CommunityCreationRequest.fromRow).toList();
-    } catch (_) {
-      return const [];
-    }
+    final rows = await _client
+        .from('community_creation_requests')
+        .select(_columns)
+        .eq('status', 'pending')
+        .order('created_at', ascending: false);
+    return rows.map(CommunityCreationRequest.fromRow).toList();
   }
 
   /// Approves or denies a creation request. On approve, returns the new hub id.

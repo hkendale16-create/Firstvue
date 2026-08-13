@@ -71,18 +71,12 @@ class LocalMediaThumbnail extends StatelessWidget {
   Widget _videoPlaceholder() {
     return const ColoredBox(
       color: Color(0xFF151B22),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Center(
-            child: Icon(Icons.videocam_outlined, color: Color(0xFF78B9BE), size: 28),
-          ),
-          Positioned(
-            bottom: 6,
-            right: 6,
-            child: Icon(Icons.play_circle_fill, color: Colors.white70, size: 18),
-          ),
-        ],
+      child: Center(
+        child: Icon(
+          Icons.videocam_outlined,
+          color: Color(0xFF78B9BE),
+          size: 28,
+        ),
       ),
     );
   }
