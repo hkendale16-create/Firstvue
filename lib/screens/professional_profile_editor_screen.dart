@@ -260,7 +260,18 @@ class _ProfessionalProfileEditorScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('PROFESSIONAL PROFILE')),
+      appBar: AppBar(
+        centerTitle: true,
+        title: const Text(
+          'PROFESSIONAL SETUP',
+          style: TextStyle(
+            fontFamily: 'CormorantGaramond',
+            color: FirstVueColors.gold,
+            letterSpacing: 2,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Form(
@@ -609,11 +620,7 @@ class _ProfessionalProfileEditorScreenState
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.send_outlined),
-                      label: Text(
-                        _existing == null
-                            ? 'SUBMIT FOR APPROVAL'
-                            : 'SAVE & RESUBMIT',
-                      ),
+                      label: const Text('Submit for review'),
                     ),
                   ),
                   const SizedBox(height: 12),

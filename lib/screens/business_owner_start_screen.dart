@@ -26,36 +26,31 @@ class BusinessOwnerStartScreen extends StatelessWidget {
           'BUSINESS TOOLS',
           style: TextStyle(
             fontFamily: 'CormorantGaramond',
+            color: FirstVueColors.gold,
             fontSize: 22,
             fontWeight: FontWeight.w600,
-            letterSpacing: 1.5,
+            letterSpacing: 2.2,
           ),
         ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'SHOWCASE YOUR BUSINESS',
-              style: TextStyle(
-                fontSize: 21,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-              ),
-            ),
-            const SizedBox(height: 10),
             Text(
-              'Submit an unlisted business for verification. Nothing is public until FirstVue approves it.',
+              'Showcase your business. Submit for verification — nothing is public until approved.',
+              textAlign: TextAlign.center,
               style: TextStyle(color: context.fv.secondaryText, height: 1.5),
             ),
             const SizedBox(height: 28),
             _WorkflowOption(
-              icon: Icons.fact_check_outlined,
-              title: 'CLAIM A LISTED BUSINESS',
-              description: 'Match your business, then send a claim for review.',
-              accent: const Color(0xFFD8B56A),
+              icon: Icons.storefront_outlined,
+              title: 'Claim a listed business',
+              description: 'Match your shop, then send a claim for review.',
+              accent: FirstVueColors.gold,
+              actionLabel: 'Claim',
+              filledAction: false,
               onTap: () {
                 Navigator.push(
                   context,
@@ -67,10 +62,12 @@ class BusinessOwnerStartScreen extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             _WorkflowOption(
-              icon: Icons.add_business_outlined,
-              title: 'ADD AN UNLISTED BUSINESS',
+              icon: Icons.note_add_outlined,
+              title: 'Add an unlisted business',
               description: 'Submit required details for FirstVue verification.',
-              accent: const Color(0xFF78B9BE),
+              accent: FirstVueColors.teal,
+              actionLabel: 'Start',
+              filledAction: true,
               onTap: () {
                 Navigator.push(
                   context,
@@ -81,10 +78,11 @@ class BusinessOwnerStartScreen extends StatelessWidget {
             const SizedBox(height: 14),
             _WorkflowOption(
               icon: Icons.key_outlined,
-              title: 'POST AN AVAILABLE RENTAL',
-              description:
-                  'Create a booth or suite rental listing with weekly or monthly pricing.',
-              accent: const Color(0xFF78B9BE),
+              title: 'Post an available rental',
+              description: 'Booth or suite with weekly or monthly pricing.',
+              accent: FirstVueColors.gold,
+              actionLabel: 'Create',
+              filledAction: false,
               onTap: () {
                 Navigator.push(
                   context,
@@ -106,6 +104,8 @@ class _WorkflowOption extends StatelessWidget {
   final String title;
   final String description;
   final Color accent;
+  final String actionLabel;
+  final bool filledAction;
   final VoidCallback onTap;
 
   const _WorkflowOption({
@@ -113,35 +113,45 @@ class _WorkflowOption extends StatelessWidget {
     required this.title,
     required this.description,
     required this.accent,
+    required this.actionLabel,
+    required this.filledAction,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(21),
+        borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: Ink(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
-            borderRadius: BorderRadius.circular(21),
-            border: Border.all(color: accent.withValues(alpha: .28)),
+            color: fv.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: fv.borderSubtle),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: .04),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           child: Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: accent.withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(14),
+                  color: accent,
+                  shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: accent),
+                child: Icon(icon, color: Colors.white, size: 22),
               ),
-              const SizedBox(width: 15),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,23 +159,43 @@ class _WorkflowOption extends StatelessWidget {
                     Text(
                       title,
                       style: TextStyle(
-                        color: context.fv.primaryText,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
+                        color: fv.primaryText,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       description,
                       style: TextStyle(
-                        color: context.fv.secondaryText,
+                        color: fv.secondaryText,
                         height: 1.35,
+                        fontSize: 12,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: FirstVueColors.gold),
+              const SizedBox(width: 8),
+              filledAction
+                  ? FilledButton(
+                      onPressed: onTap,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: accent,
+                        foregroundColor: Colors.white,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child: Text(actionLabel),
+                    )
+                  : OutlinedButton(
+                      onPressed: onTap,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: FirstVueColors.gold,
+                        side: const BorderSide(color: FirstVueColors.gold),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child: Text(actionLabel),
+                    ),
             ],
           ),
         ),

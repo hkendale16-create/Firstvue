@@ -15,7 +15,6 @@ import '../widgets/social_platform_icon.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/entity_details_form.dart';
 import '../widgets/entity_profile_feed_section.dart';
-import '../widgets/firstvue_inline_search_bar.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/entity_profile_tab_bar.dart';
 import '../widgets/social_chrome.dart';
@@ -160,7 +159,6 @@ class _BusinessProfileContent extends StatefulWidget {
 
 class _BusinessProfileContentState extends State<_BusinessProfileContent> {
   BusinessImageSet _profileImages = const BusinessImageSet();
-  bool _loadingImages = true;
   int _selectedTab = 0;
   bool _following = false;
 
@@ -174,13 +172,55 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
     assert(tabs.isNotEmpty);
   }
 
+  Future<void> _openOwnerMessage() async {
+    if (Supabase.instance.client.auth.currentUser == null) {
+      await Navigator.push(
+        context,
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
+      );
+      return;
+    }
+    try {
+      final ownerId = await MessagingService.fetchBusinessOwnerId(
+        widget.details.id,
+      );
+      if (ownerId == null) throw StateError('missing owner');
+      if (ownerId == MessagingService.currentUserId) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This is your business profile.')),
+        );
+        return;
+      }
+      final threadId = await MessagingService.openThreadWithUser(
+        otherUserId: ownerId,
+        businessId: widget.details.id,
+      );
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        FirstVuePageRoute(
+          builder: (_) => ConversationScreen(
+            threadId: threadId,
+            title: widget.details.name,
+            subtitle: 'Business owner',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to start a message right now.')),
+      );
+    }
+  }
+
   Future<void> _loadImages() async {
     final images =
         await BusinessMediaService.fetchProfileImages(widget.details.id);
     if (!mounted) return;
     setState(() {
       _profileImages = images;
-      _loadingImages = false;
     });
   }
 
@@ -197,14 +237,29 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         SliverToBoxAdapter(
-          child: FacebookStyleProfileHeader(
-            title: details.name,
-            subtitle: details.businessType,
-            avatarIcon: Icons.storefront_outlined,
+          child: SocialProfileHeader(
+            name: details.name,
+            handle:
+                '${socialHandleFromName(details.name)} • ${details.businessType}${details.address != null && details.address!.isNotEmpty ? ' • ${details.address}' : ''}',
+            bio: details.description ??
+                (details.services.isEmpty
+                    ? null
+                    : details.services.take(4).join(', ')),
             avatarImageUrl: _profileImages.avatar?.signedUrl,
             coverImageUrl: _profileImages.cover?.signedUrl,
-            showImageLoading: _loadingImages,
-            actionButtons: [
+            verified: isApproved,
+            stats: [
+              ProfileStatItem(
+                label: 'posts',
+                value: details.services.isEmpty ? '—' : '${details.services.length}',
+              ),
+              const ProfileStatItem(label: 'followers', value: '—'),
+              ProfileStatItem(
+                label: 'rating',
+                value: '4.9',
+              ),
+            ],
+            actions: [
               if (isApproved && !isOwnerPreview) ...[
                 SocialFollowButton(
                   label: _following ? 'Following' : 'Follow',
@@ -214,15 +269,22 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
                 SocialFollowButton(
                   label: 'Message',
                   filled: false,
+                  onPressed: _openOwnerMessage,
+                ),
+                SocialFollowButton(
+                  label: 'Book',
                   onPressed: () {
-                    final tabs = EntityProfileTabs.forBusinessType(
-                      details.businessType,
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          details.address == null || details.address!.isEmpty
+                              ? 'Message ${details.name} to book.'
+                              : 'Book at ${details.address}.',
+                        ),
+                      ),
                     );
-                    final about = tabs.indexOf('ABOUT');
-                    if (about >= 0) setState(() => _selectedTab = about);
                   },
                 ),
-                const SocialFollowButton(label: 'Book'),
               ],
             ],
           ),
@@ -270,11 +332,6 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
                   const SizedBox(height: 16),
                 ],
                 const SizedBox(height: 8),
-                const FirstVueInlineSearchBar(
-                  padding: EdgeInsets.zero,
-                  hintText: 'Search businesses, people, #tags…',
-                ),
-                const SizedBox(height: 12),
                 EntityProfileTabBar(
                   labels: tabs,
                   selectedIndex: _selectedTab.clamp(0, tabs.length - 1),

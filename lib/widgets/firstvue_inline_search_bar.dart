@@ -10,12 +10,14 @@ class FirstVueInlineSearchBar extends StatefulWidget {
   final String hintText;
   final bool autofocus;
   final EdgeInsetsGeometry padding;
+  final bool showOpenButton;
 
   const FirstVueInlineSearchBar({
     super.key,
-    this.hintText = 'Search @handles, people, businesses, #tags…',
+    this.hintText = 'Search for people, places, or services.',
     this.autofocus = false,
     this.padding = const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    this.showOpenButton = true,
   });
 
   @override
@@ -41,7 +43,7 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
     return InputDecoration(
       hintText: hintText,
       hintStyle: TextStyle(color: fv.tertiaryText),
-      prefixIcon: const Icon(Icons.search, color: FirstVueColors.teal),
+      prefixIcon: Icon(Icons.search, color: fv.mutedIcon),
       suffixIcon: suffixIcon,
       filled: true,
       fillColor: fv.inputFill,
@@ -142,11 +144,13 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                       )
-                    : IconButton(
-                        onPressed: () => _openFullSearch(),
-                        icon: const Icon(Icons.open_in_new, size: 18),
-                        tooltip: 'Open search',
-                      ),
+                    : widget.showOpenButton
+                        ? IconButton(
+                            onPressed: () => _openFullSearch(),
+                            icon: const Icon(Icons.open_in_new, size: 18),
+                            tooltip: 'Open search',
+                          )
+                        : null,
               ),
             ),
           ),

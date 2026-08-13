@@ -46,8 +46,8 @@ class FirstVueBottomNav extends StatelessWidget {
                 ),
                 _NavItem(
                   label: 'EXPLORE',
-                  icon: Icons.explore_outlined,
-                  selectedIcon: Icons.explore_rounded,
+                  icon: Icons.search,
+                  selectedIcon: Icons.search,
                   selected: selectedIndex == 1,
                   selectedColor: FirstVueColors.teal,
                   onTap: () => onSelected(1),
@@ -55,8 +55,8 @@ class FirstVueBottomNav extends StatelessWidget {
                 const Expanded(child: SizedBox(width: 72)),
                 _NavItem(
                   label: 'FAVORITES',
-                  icon: Icons.bookmark_border_rounded,
-                  selectedIcon: Icons.bookmark_rounded,
+                  icon: Icons.favorite_border_rounded,
+                  selectedIcon: Icons.favorite_rounded,
                   selected: selectedIndex == 3,
                   selectedColor: FirstVueColors.gold,
                   onTap: () => onSelected(3),
@@ -73,7 +73,7 @@ class FirstVueBottomNav extends StatelessWidget {
             ),
           ),
           Positioned(
-            bottom: 22 + bottomInset,
+            bottom: 18 + bottomInset,
             child: _VueCenterTab(
               selected: selectedIndex == _vueIndex,
               onTap: () => onSelected(_vueIndex),
@@ -143,44 +143,40 @@ class _VueCenterTab extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        customBorder: const CircleBorder(),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 56,
-              height: 64,
+            Container(
+              width: 58,
+              height: 58,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: selected ? FirstVueColors.gold : fv.background,
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(
-                  color: FirstVueColors.gold,
-                  width: selected ? 2 : 1.4,
-                ),
+                color: FirstVueColors.gold,
+                shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
                     color: FirstVueColors.gold.withValues(
-                      alpha: selected ? .35 : .18,
+                      alpha: selected ? .42 : .28,
                     ),
-                    blurRadius: selected ? 16 : 10,
+                    blurRadius: selected ? 16 : 12,
                     spreadRadius: selected ? 1 : 0,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child: Text(
+              child: const Text(
                 'V',
                 style: TextStyle(
                   fontFamily: 'CormorantGaramond',
-                  color: selected ? Colors.white : FirstVueColors.gold,
-                  fontSize: 34,
+                  color: Colors.white,
+                  fontSize: 32,
                   fontWeight: FontWeight.w700,
                   height: 1,
                 ),
               ),
             ),
-            const SizedBox(height: 5),
+            const SizedBox(height: 4),
             Text(
               'VUE',
               style: TextStyle(

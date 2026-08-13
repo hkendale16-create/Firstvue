@@ -51,51 +51,47 @@ class JoinFirstVueScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: fv.background,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: fv.background,
         surfaceTintColor: Colors.transparent,
+        centerTitle: true,
         title: const Text(
           'GET VERIFIED',
           style: TextStyle(
             fontFamily: 'CormorantGaramond',
-            letterSpacing: 1.4,
+            color: FirstVueColors.gold,
+            letterSpacing: 2.4,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
-            const Text(
-              'WHO ARE YOU ON FIRSTVUE?',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.1,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Tap the option that matches you. Each path goes to the correct approval queue — business submissions never go to professional review.',
-              style: TextStyle(color: context.fv.secondaryText, height: 1.45),
-            ),
+          Text(
+            'Who are you on FirstVue? Each path goes to the right approval queue.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: fv.secondaryText, height: 1.45),
+          ),
           const SizedBox(height: 24),
           _RoleCard(
             icon: Icons.storefront_outlined,
             title: 'BUSINESS OWNER',
             description:
                 'You own or manage a shop, restaurant, bar, salon, or service location.',
-            accent: const Color(0xFFD8B56A),
+            accent: FirstVueColors.gold,
             onTap: () => _openRole(context, FirstVueJoinRole.businessOwner),
           ),
           const SizedBox(height: 12),
           _RoleCard(
-            icon: Icons.person_outline,
+            icon: Icons.content_cut,
             title: 'PROFESSIONAL',
             description:
                 'You are an individual barber, stylist, or beauty pro — not a full business location.',
-            accent: const Color(0xFF78B9BE),
+            accent: FirstVueColors.teal,
             onTap: () => _openRole(context, FirstVueJoinRole.professional),
           ),
           const SizedBox(height: 12),
@@ -104,8 +100,14 @@ class JoinFirstVueScreen extends StatelessWidget {
             title: 'ORGANIZER',
             description:
                 'You host events and post things to do in your community.',
-            accent: const Color(0xFFE5C16F),
+            accent: FirstVueColors.gold,
             onTap: () => _openRole(context, FirstVueJoinRole.organizer),
+          ),
+          const SizedBox(height: 28),
+          Text(
+            'Nothing is public until FirstVue approves it.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: fv.tertiaryText, fontSize: 12),
           ),
         ],
       ),
@@ -130,56 +132,83 @@ class _RoleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         child: Ink(
-          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: accent.withValues(alpha: .4), width: 1.4),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: .14),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: accent),
+            color: fv.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: fv.borderSubtle),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: .04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: context.fv.primaryText,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: .6,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        color: context.fv.secondaryText,
-                        height: 1.35,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.touch_app_outlined, color: accent.withValues(alpha: .8)),
             ],
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              children: [
+                Container(
+                  width: 6,
+                  decoration: BoxDecoration(
+                    color: accent,
+                    borderRadius: const BorderRadius.horizontal(
+                      left: Radius.circular(18),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 16, 12, 16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: .14),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(icon, color: accent),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: TextStyle(
+                                  color: fv.primaryText,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: .6,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                description,
+                                style: TextStyle(
+                                  color: fv.secondaryText,
+                                  height: 1.35,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, color: fv.mutedIcon),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

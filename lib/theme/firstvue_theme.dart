@@ -216,7 +216,7 @@ class FirstVueTheme {
           primary: FirstVueColors.gold,
           secondary: FirstVueColors.teal,
           tertiary: FirstVueColors.coral,
-          onPrimary: Color(0xFF17130B),
+          onPrimary: Colors.white,
           onSecondary: Color(0xFF071315),
           onSurface: Color(0xFF16131F),
           error: Color(0xFFC04545),
@@ -368,7 +368,7 @@ class FirstVueTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: FirstVueColors.gold,
-          foregroundColor: isDark ? buttonForeground : const Color(0xFF17130B),
+          foregroundColor: buttonForeground,
           textStyle: const TextStyle(
             fontWeight: FontWeight.w700,
             letterSpacing: .6,
@@ -381,7 +381,7 @@ class FirstVueTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: FirstVueColors.gold,
-          foregroundColor: isDark ? buttonForeground : const Color(0xFF17130B),
+          foregroundColor: buttonForeground,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),

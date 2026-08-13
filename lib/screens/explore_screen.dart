@@ -1,81 +1,161 @@
 import 'package:flutter/material.dart';
 
 import '../navigation/firstvue_page_route.dart';
+import '../services/community_news_service.dart';
 import '../services/recommendations_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
-import '../widgets/home_discovery_section.dart';
 import '../widgets/social_chrome.dart';
 import 'barber_results_screen.dart';
 import 'beauty_discovery_screen.dart';
 import 'discovery_feed_screen.dart';
 import 'other_services_screen.dart';
+import 'people_to_follow_screen.dart';
+import 'post_detail_screen.dart';
 import 'rentals_screen.dart';
 import 'things_to_do_screen.dart';
 
-class ExploreScreen extends StatelessWidget {
+class ExploreScreen extends StatefulWidget {
   final VoidCallback? onOpenVueFeed;
 
   const ExploreScreen({super.key, this.onOpenVueFeed});
 
   @override
-  Widget build(BuildContext context) {
-    final categories = _categories(context);
+  State<ExploreScreen> createState() => _ExploreScreenState();
+}
 
+class _ExploreScreenState extends State<ExploreScreen> {
+  late Future<List<_ExploreTile>> _tilesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _tilesFuture = _loadTiles();
+  }
+
+  Future<List<_ExploreTile>> _loadTiles() async {
+    final fallback = _fallbackTiles(context);
+    try {
+      final posts = await CommunityNewsService.fetchPosts(limit: 24);
+      if (!mounted) return fallback;
+      final fromPosts = posts
+          .where((post) => post.media.isNotEmpty)
+          .map(
+            (post) => _ExploreTile(
+              handle: socialHandleFromName(
+                post.authorUsername ?? post.authorName,
+              ),
+              imageUrl: post.media.first.signedUrl,
+              avatarUrl: post.communityImageUrl,
+              likeLabel: post.sparkCount > 0 ? _formatCount(post.sparkCount) : null,
+              isVideo: post.media.first.isVideo,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  FirstVuePageRoute(
+                    builder: (_) => PostDetailScreen(postId: post.id),
+                  ),
+                );
+              },
+            ),
+          )
+          .toList();
+      if (fromPosts.length >= 4) return fromPosts;
+      return [...fromPosts, ...fallback];
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  static String _formatCount(int count) {
+    if (count >= 1000) {
+      final k = count / 1000;
+      return '${k.toStringAsFixed(k >= 10 ? 0 : 1)}k';
+    }
+    return '$count';
+  }
+
+  List<_ExploreTile> _fallbackTiles(BuildContext context) {
+    final categories = _categories(context);
+    const likes = ['2.1k', '1.7k', '843', '2.4k', null, '612'];
+    return [
+      for (var i = 0; i < categories.length; i++)
+        _ExploreTile(
+          handle: socialHandleFromName(categories[i].handle),
+          assetImage: categories[i].imagePath,
+          likeLabel: i < likes.length ? likes[i] : null,
+          showFollowOverlay: i == 1,
+          dateLabel: i == 4 ? 'MAY 24' : null,
+          onTap: categories[i].onTap,
+        ),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return SafeArea(
       child: FirstVueRefreshScaffold(
-        onRefresh: () async {},
+        onRefresh: () async {
+          final next = _loadTiles();
+          setState(() => _tilesFuture = next);
+          await next;
+        },
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           children: [
-            Text(
-              'EXPLORE',
-              style: TextStyle(
-                fontFamily: 'CormorantGaramond',
-                color: FirstVueColors.gold,
-                fontSize: 28,
-                letterSpacing: 2,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Discover local pros, follow their work, book with confidence.',
-              style: TextStyle(
-                color: context.fv.secondaryText,
-                height: 1.4,
-                fontSize: 13,
-              ),
+            const SocialPageHeader(
+              title: 'EXPLORE',
+              subtitle:
+                  'Discover local pros, follow their work, book with confidence.',
             ),
             const SizedBox(height: 16),
-            const PeopleToFollowRow(),
+            const SocialSearchBar(),
+            const SizedBox(height: 20),
+            PeopleToFollowRow(
+              onSeeAll: () {
+                Navigator.push(
+                  context,
+                  FirstVuePageRoute(
+                    builder: (_) => const PeopleToFollowScreen(),
+                  ),
+                );
+              },
+            ),
             const SizedBox(height: 22),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: MediaQuery.sizeOf(context).width >= 420 ? 2 : 2,
-                mainAxisSpacing: 14,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.78,
-              ),
-              itemCount: categories.length,
-              itemBuilder: (context, index) {
-                final category = categories[index];
-                return SocialMasonryTile(
-                  title: category.title,
-                  subtitle: category.subtitle,
-                  assetImage: category.imagePath,
-                  likeLabel: index.isEven ? '2.1k' : null,
-                  onTap: category.onTap,
+            FutureBuilder<List<_ExploreTile>>(
+              future: _tilesFuture,
+              builder: (context, snapshot) {
+                final tiles = snapshot.data ?? _fallbackTiles(context);
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 14,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.78,
+                  ),
+                  itemCount: tiles.length,
+                  itemBuilder: (context, index) {
+                    final tile = tiles[index];
+                    return SocialPostTile(
+                      handle: tile.handle,
+                      avatarUrl: tile.avatarUrl,
+                      imageUrl: tile.imageUrl,
+                      assetImage: tile.assetImage,
+                      likeLabel: tile.likeLabel,
+                      dateLabel: tile.dateLabel,
+                      showPlay: tile.isVideo,
+                      showFollowOverlay: tile.showFollowOverlay,
+                      onTap: tile.onTap,
+                    );
+                  },
                 );
               },
             ),
             const SizedBox(height: 18),
-            _VueFeedBanner(onTap: onOpenVueFeed),
-            const SizedBox(height: 28),
-            const YouMightLikeSection(),
+            _VueFeedBanner(onTap: widget.onOpenVueFeed),
           ],
         ),
       ),
@@ -85,11 +165,8 @@ class ExploreScreen extends StatelessWidget {
   static List<_ExploreCategory> _categories(BuildContext context) {
     return [
       _ExploreCategory(
-        title: 'BARBER & BEAUTY',
-        subtitle: 'Barbers, salons & stylists',
+        handle: 'marcusreedcuts',
         imagePath: 'assets/images/explore_beauty.jpg',
-        accent: FirstVueColors.coral,
-        icon: Icons.auto_awesome_rounded,
         onTap: () {
           RecommendationsService.recordCategoryVisit('beauty');
           Navigator.push(
@@ -99,11 +176,8 @@ class ExploreScreen extends StatelessWidget {
         },
       ),
       _ExploreCategory(
-        title: 'FINE AND DINE',
-        subtitle: 'Bars, restaurants & dining',
+        handle: 'velvetroomsalon',
         imagePath: 'assets/images/explore_restaurants.jpg',
-        accent: FirstVueColors.gold,
-        icon: Icons.restaurant_rounded,
         onTap: () {
           RecommendationsService.recordCategoryVisit('restaurant');
           Navigator.push(
@@ -117,11 +191,8 @@ class ExploreScreen extends StatelessWidget {
         },
       ),
       _ExploreCategory(
-        title: 'AVAILABLE RENTALS',
-        subtitle: 'Booths & suite spaces',
+        handle: 'glowtheorystudio',
         imagePath: 'assets/images/explore_rentals.jpg',
-        accent: FirstVueColors.teal,
-        icon: Icons.key_outlined,
         onTap: () {
           RecommendationsService.recordCategoryVisit('rentals');
           Navigator.push(
@@ -131,11 +202,8 @@ class ExploreScreen extends StatelessWidget {
         },
       ),
       _ExploreCategory(
-        title: 'THINGS TO DO',
-        subtitle: 'Events, experiences & activities',
+        handle: 'table45atl',
         imagePath: 'assets/images/explore_things_to_do.jpg',
-        accent: FirstVueColors.coral,
-        icon: Icons.local_activity_outlined,
         onTap: () {
           RecommendationsService.recordCategoryVisit('events');
           Navigator.push(
@@ -145,11 +213,8 @@ class ExploreScreen extends StatelessWidget {
         },
       ),
       _ExploreCategory(
-        title: 'OTHER SERVICES',
-        subtitle: 'Home, auto & more',
+        handle: 'atlparkfest',
         imagePath: 'assets/images/explore_barbershops.jpg',
-        accent: FirstVueColors.teal,
-        icon: Icons.home_repair_service_outlined,
         onTap: () {
           RecommendationsService.recordCategoryVisit('services');
           Navigator.push(
@@ -158,116 +223,55 @@ class ExploreScreen extends StatelessWidget {
           );
         },
       ),
+      _ExploreCategory(
+        handle: 'stayvueatl',
+        imagePath: 'assets/images/explore_salons.jpg',
+        onTap: () {
+          RecommendationsService.recordCategoryVisit('beauty');
+          Navigator.push(
+            context,
+            FirstVuePageRoute(builder: (_) => const BeautyDiscoveryScreen()),
+          );
+        },
+      ),
     ];
   }
 }
 
-class _ExploreCategory {
-  final String title;
-  final String subtitle;
-  final String imagePath;
-  final Color accent;
-  final IconData icon;
+class _ExploreTile {
+  final String handle;
+  final String? imageUrl;
+  final String? assetImage;
+  final String? avatarUrl;
+  final String? likeLabel;
+  final String? dateLabel;
+  final bool isVideo;
+  final bool showFollowOverlay;
   final VoidCallback onTap;
 
-  const _ExploreCategory({
-    required this.title,
-    required this.subtitle,
-    required this.imagePath,
-    required this.accent,
-    required this.icon,
+  const _ExploreTile({
+    required this.handle,
     required this.onTap,
+    this.imageUrl,
+    this.assetImage,
+    this.avatarUrl,
+    this.likeLabel,
+    this.dateLabel,
+    this.isVideo = false,
+    this.showFollowOverlay = false,
   });
 }
 
-class _ExploreCategoryTile extends StatefulWidget {
-  final _ExploreCategory category;
+class _ExploreCategory {
+  final String handle;
+  final String imagePath;
+  final VoidCallback onTap;
 
-  const _ExploreCategoryTile({required this.category});
-
-  @override
-  State<_ExploreCategoryTile> createState() => _ExploreCategoryTileState();
-}
-
-class _ExploreCategoryTileState extends State<_ExploreCategoryTile> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final category = widget.category;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: category.onTap,
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? .98 : 1,
-        duration: const Duration(milliseconds: 100),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Image.asset(
-                category.imagePath,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) =>
-                    ColoredBox(color: FirstVueColors.elevatedSurface),
-              ),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    stops: const [0.35, 0.72, 1.0],
-                    colors: [
-                      Colors.black.withValues(alpha: .08),
-                      Colors.black.withValues(alpha: .28),
-                      Colors.black.withValues(alpha: .88),
-                    ],
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(category.icon, color: category.accent, size: 26),
-                    const Spacer(),
-                    Text(
-                      category.title,
-                      maxLines: 2,
-                      style: const TextStyle(
-                        fontFamily: 'CormorantGaramond',
-                        color: FirstVueColors.ivory,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: .6,
-                        height: 1.05,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      category.subtitle,
-                      maxLines: 2,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: .72),
-                        fontSize: 10.5,
-                        height: 1.15,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  const _ExploreCategory({
+    required this.handle,
+    required this.imagePath,
+    required this.onTap,
+  });
 }
 
 class _VueFeedBanner extends StatelessWidget {
@@ -297,46 +301,24 @@ class _VueFeedBanner extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             color: FirstVueColors.teal,
           ),
-          child: Row(
+          child: const Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .18),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                alignment: Alignment.center,
-                child: const Text(
-                  'V',
+              Icon(Icons.open_in_full_rounded, color: Colors.white, size: 22),
+              SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  'Open Vue — full-screen social feed',
                   style: TextStyle(
-                    fontFamily: 'CormorantGaramond',
                     color: Colors.white,
-                    fontSize: 24,
                     fontWeight: FontWeight.w700,
+                    fontSize: 14,
                   ),
                 ),
               ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Open Vue — full-screen social feed',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 16,
-                color: Colors.white.withValues(alpha: .85),
+                Icons.chevron_right_rounded,
+                color: Colors.white,
+                size: 22,
               ),
             ],
           ),

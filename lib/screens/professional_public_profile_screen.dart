@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/firstvue_theme.dart';
 import 'package:flutter/services.dart';
 
@@ -7,12 +8,13 @@ import '../services/professional_media_service.dart';
 import '../services/professional_profiles_service.dart';
 import '../services/professional_showcase_service.dart';
 import '../widgets/facebook_style_profile_header.dart';
+import '../widgets/social_chrome.dart';
 import '../widgets/entity_profile_feed_section.dart';
-import '../widgets/firstvue_inline_search_bar.dart';
 import '../widgets/portfolio_albums_section.dart';
 import '../widgets/signed_media_viewer.dart';
 import '../widgets/shoutout_card.dart';
 import '../services/shoutout_service.dart';
+import 'member_public_profile_screen.dart';
 
 class ProfessionalPublicProfileScreen extends StatefulWidget {
   final ProfessionalProfile profile;
@@ -32,7 +34,6 @@ class ProfessionalPublicProfileScreen extends StatefulWidget {
 class _ProfessionalPublicProfileScreenState
     extends State<ProfessionalPublicProfileScreen> {
   ProfessionalImageSet _profileImages = const ProfessionalImageSet();
-  bool _loadingImages = true;
 
   @override
   void initState() {
@@ -44,10 +45,7 @@ class _ProfessionalPublicProfileScreenState
     final images =
         await ProfessionalMediaService.fetchProfileImages(widget.profile.id);
     if (!mounted) return;
-    setState(() {
-      _profileImages = images;
-      _loadingImages = false;
-    });
+    setState(() => _profileImages = images);
   }
 
   @override
@@ -69,15 +67,65 @@ class _ProfessionalPublicProfileScreenState
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(
-            child: FacebookStyleProfileHeader(
-              title: profile.displayName,
-              subtitle: 'FIRSTVUE VERIFIED ${profile.type.label.toUpperCase()}',
-              avatarIcon: widget.icon,
+            child: SocialProfileHeader(
+              name: profile.displayName,
+              handle:
+                  '${socialHandleFromName(profile.displayName)} • ${profile.type.label}${location.isNotEmpty ? ' • $location' : ''}',
+              bio: profile.bio.isEmpty ? null : profile.bio,
               avatarImageUrl: _profileImages.avatar?.signedUrl,
               coverImageUrl: _profileImages.cover?.signedUrl,
-              showImageLoading: _loadingImages,
-              actionButtons: const [
-                Icon(Icons.verified, color: Color(0xFFD8B56A), size: 28),
+              avatarIcon: widget.icon,
+              verified: profile.status == 'approved',
+              stats: [
+                ProfileStatItem(
+                  label: 'services',
+                  value: '${profile.services.length}',
+                ),
+                const ProfileStatItem(label: 'followers', value: '—'),
+                ProfileStatItem(
+                  label: 'clients',
+                  value: profile.acceptsNewClients ? 'Open' : 'Waitlist',
+                ),
+              ],
+              actions: [
+                SocialFollowButton(
+                  onPressed: () {
+                    openMemberProfile(
+                      context,
+                      profileId: profile.profileId,
+                      displayName: profile.displayName,
+                    );
+                  },
+                ),
+                SocialFollowButton(
+                  label: 'Message',
+                  filled: false,
+                  onPressed: () {
+                    openMemberProfile(
+                      context,
+                      profileId: profile.profileId,
+                      displayName: profile.displayName,
+                    );
+                  },
+                ),
+                SocialFollowButton(
+                  label: 'Book',
+                  onPressed: () async {
+                    final url = profile.bookingUrl.trim();
+                    if (url.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('No booking link yet. Message to book.'),
+                        ),
+                      );
+                      return;
+                    }
+                    final uri = Uri.tryParse(url);
+                    if (uri != null) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                ),
               ],
             ),
           ),
@@ -104,11 +152,6 @@ class _ProfessionalPublicProfileScreenState
                     ),
                     const SizedBox(height: 18),
                   ],
-                  const FirstVueInlineSearchBar(
-                    padding: EdgeInsets.zero,
-                    hintText: 'Search professionals, events, #tags…',
-                  ),
-                  const SizedBox(height: 28),
                   const _ProfileHeading('ABOUT'),
                   const SizedBox(height: 10),
                   Text(

@@ -24,11 +24,10 @@ import 'widgets/firstvue_onboarding.dart';
 import 'widgets/firstvue_refresh_scaffold.dart';
 import 'widgets/firstvue_settings_drawer.dart';
 import 'widgets/floating_messages_bubble.dart';
-import 'widgets/home_community_feed_block.dart';
-import 'widgets/home_discovery_section.dart';
-import 'widgets/firstvue_inline_search_bar.dart';
-import 'widgets/home_city_chip.dart';
 import 'widgets/firstvue_animated_header_title.dart';
+import 'widgets/home_city_chip.dart';
+import 'widgets/home_discovery_section.dart';
+import 'widgets/social_chrome.dart';
 import 'services/profile_media_service.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -93,7 +92,7 @@ class FirstVueHome extends StatefulWidget {
 }
 
 class _FirstVueHomeState extends State<FirstVueHome> {
-  int selectedIndex = 2;
+  int selectedIndex = 0;
   int _profileRefreshToken = 0;
   int _homeRefreshToken = 0;
   int _notificationBadge = 0;
@@ -253,7 +252,6 @@ class _FirstVueHomeState extends State<FirstVueHome> {
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
               children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _HomeProfileAvatar(
                     key: _homeAvatarKey,
@@ -282,16 +280,10 @@ class _FirstVueHomeState extends State<FirstVueHome> {
                       ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                    icon: const Icon(
-                      Icons.settings_outlined,
-                      color: FirstVueColors.gold,
-                      size: 24,
-                    ),
-                    tooltip: 'Settings',
+                  HomeCityChip(
+                    key: _cityChipKey,
+                    compact: true,
+                    onLocationChanged: _refreshHomeTab,
                   ),
                   IconButton(
                     onPressed: () async {
@@ -335,27 +327,13 @@ class _FirstVueHomeState extends State<FirstVueHome> {
 
               const SizedBox(height: 14),
 
-              const FirstVueInlineSearchBar(
-                padding: EdgeInsets.zero,
-              ),
+              const SocialSearchBar(),
 
-              const SizedBox(height: 14),
-
-              HomeCityChip(
-                key: _cityChipKey,
-                onLocationChanged: _refreshHomeTab,
-              ),
-
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
               HomeDiscoverySection(
                 refreshToken: _homeRefreshToken,
-                onViewAllVue: () => setState(() => selectedIndex = 2),
               ),
-
-              const SizedBox(height: 12),
-
-              HomeCommunityFeedBlock(refreshToken: _homeRefreshToken),
 
               const SizedBox(height: 12),
             ],
@@ -446,13 +424,7 @@ class _HomeProfileAvatarState extends State<_HomeProfileAvatar> {
         height: 44,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          border: Border.all(color: FirstVueColors.coral, width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: FirstVueColors.coral.withValues(alpha: .22),
-              blurRadius: 8,
-            ),
-          ],
+          border: Border.all(color: FirstVueColors.gold, width: 1.5),
         ),
         child: ClipOval(
           child: _loading

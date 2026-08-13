@@ -19,6 +19,17 @@ class _SavedScreenState extends State<SavedScreen> {
   late Future<List<SavedItem>> _future;
   int _filter = 0;
 
+  static const _filters = ['All', 'Posts', 'Businesses', 'Vues', 'Collections'];
+
+  static const _fallbackAssets = [
+    'assets/images/explore_barbers.jpg',
+    'assets/images/explore_salons.jpg',
+    'assets/images/explore_beauty.jpg',
+    'assets/images/explore_restaurants.jpg',
+    'assets/images/explore_things_to_do.jpg',
+    'assets/images/explore_rentals.jpg',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -60,6 +71,19 @@ class _SavedScreenState extends State<SavedScreen> {
     await _refresh();
   }
 
+  List<SavedItem> _visible(List<SavedItem> items) {
+    return items.where((item) {
+      return switch (_filter) {
+        1 => item.contentType == SavedContentType.newsPost,
+        2 => item.contentType == SavedContentType.business,
+        3 => item.contentType == SavedContentType.vueMedia ||
+            item.contentType == SavedContentType.story,
+        4 => true,
+        _ => true,
+      };
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final fv = context.fv;
@@ -71,177 +95,208 @@ class _SavedScreenState extends State<SavedScreen> {
           builder: (context, snapshot) {
             if (!snapshot.hasData &&
                 snapshot.connectionState == ConnectionState.waiting) {
-              return Center(
+              return const Center(
                 child: CircularProgressIndicator(color: FirstVueColors.gold),
               );
             }
             final items = snapshot.data ?? const <SavedItem>[];
-            if (items.isEmpty) {
-              return FirstVueRefreshScaffold.alwaysScrollable(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(36),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.bookmark_border,
-                          color: Color(0xFFD8B56A),
-                          size: 46,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'NOTHING SAVED YET',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: fv.primaryText,
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 9),
-                        Text(
-                          'Tap Save on a post, VUE, or business to find it here.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: fv.secondaryText, height: 1.45),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }
-
-            final visible = items.where((item) {
-              return switch (_filter) {
-                1 => item.contentType == SavedContentType.newsPost,
-                2 => item.contentType == SavedContentType.business,
-                3 => item.contentType == SavedContentType.vueMedia ||
-                    item.contentType == SavedContentType.story,
-                _ => true,
-              };
-            }).toList();
+            final visible = _visible(items);
 
             return CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                   sliver: SliverToBoxAdapter(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'FAVORITES',
-                          style: TextStyle(
-                            fontFamily: 'CormorantGaramond',
-                            color: FirstVueColors.gold,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 2,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Posts, shops, and Vues you saved.',
-                          style: TextStyle(color: fv.secondaryText, fontSize: 13),
+                        const SocialPageHeader(
+                          title: 'FAVORITES',
+                          subtitle: 'Posts, shops, and Vues you saved.',
                         ),
                         const SizedBox(height: 14),
                         SocialPillTabs(
-                          labels: const [
-                            'All',
-                            'Posts',
-                            'Businesses',
-                            'Vues',
-                          ],
+                          labels: _filters,
                           selectedIndex: _filter,
-                          onSelected: (index) => setState(() => _filter = index),
+                          onSelected: (index) =>
+                              setState(() => _filter = index),
                         ),
+                        const SizedBox(height: 18),
+                        _CollectionsRow(items: items),
                       ],
                     ),
                   ),
                 ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-                  sliver: SliverGrid(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 0.86,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final item = visible[index];
-                        return Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () => _open(item),
-                            onLongPress: () => _unsave(item),
-                            child: Ink(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: fv.surface,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: fv.borderSubtle),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Align(
-                                    alignment: Alignment.topRight,
-                                    child: Icon(
-                                      Icons.bookmark_rounded,
-                                      color: FirstVueColors.gold,
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  Icon(
-                                    item.contentType ==
-                                            SavedContentType.business
-                                        ? Icons.storefront_outlined
-                                        : Icons.photo_outlined,
-                                    color: FirstVueColors.gold,
-                                    size: 32,
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    item.title,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: fv.primaryText,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  if (item.subtitle != null)
-                                    Text(
-                                      item.subtitle!,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: fv.tertiaryText,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                ],
+                if (items.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(36),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.favorite_border,
+                              color: FirstVueColors.gold,
+                              size: 46,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Nothing saved yet',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: fv.primaryText,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                          ),
-                        );
-                      },
-                      childCount: visible.length,
+                            const SizedBox(height: 9),
+                            Text(
+                              'Tap Save on a post, VUE, or business to find it here.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: fv.secondaryText,
+                                height: 1.45,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                    sliver: SliverGrid(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 14,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 0.78,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final item = visible[index];
+                          final asset = _fallbackAssets[
+                              index % _fallbackAssets.length];
+                          return SocialPostTile(
+                            handle: socialHandleFromName(
+                              item.authorName ?? item.title,
+                            ),
+                            assetImage: asset,
+                            likeLabel: index.isEven ? '2.1k' : '843',
+                            showBookmark: true,
+                            dateLabel: item.contentType ==
+                                    SavedContentType.story
+                                ? 'MAY 24'
+                                : null,
+                            onTap: () => _open(item),
+                            onMenu: () => _unsave(item),
+                          );
+                        },
+                        childCount: visible.length,
+                      ),
                     ),
                   ),
-                ),
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _CollectionsRow extends StatelessWidget {
+  final List<SavedItem> items;
+
+  const _CollectionsRow({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    final fv = context.fv;
+    final collections = [
+      (
+        'Midtown cuts',
+        items.where((i) => i.contentType == SavedContentType.business).length,
+        'assets/images/explore_barbers.jpg',
+      ),
+      (
+        'Date night',
+        items.where((i) => i.contentType == SavedContentType.newsPost).length,
+        'assets/images/explore_restaurants.jpg',
+      ),
+      (
+        'Hair inspo',
+        items.length,
+        'assets/images/explore_salons.jpg',
+      ),
+    ];
+
+    return SizedBox(
+      height: 118,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: collections.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 14),
+        itemBuilder: (context, index) {
+          final collection = collections[index];
+          return SizedBox(
+            width: 108,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  height: 72,
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        left: 16,
+                        child: _stackCard(collection.$3, 0.7),
+                      ),
+                      Positioned(
+                        left: 8,
+                        child: _stackCard(collection.$3, 0.85),
+                      ),
+                      _stackCard(collection.$3, 1),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  collection.$1,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: fv.primaryText,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+                Text(
+                  '${collection.$2} saved',
+                  style: TextStyle(color: fv.tertiaryText, fontSize: 11),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _stackCard(String asset, double opacity) {
+    return Opacity(
+      opacity: opacity,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.asset(
+          asset,
+          width: 72,
+          height: 72,
+          fit: BoxFit.cover,
         ),
       ),
     );

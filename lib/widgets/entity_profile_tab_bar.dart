@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../theme/firstvue_theme.dart';
+import 'social_chrome.dart';
 
-/// Horizontal borderless tab strip used across entity public profiles.
+/// Horizontal gold-underline tab strip used across entity public profiles.
 class EntityProfileTabBar extends StatelessWidget {
   final List<String> labels;
   final int selectedIndex;
@@ -17,36 +17,10 @@ class EntityProfileTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fv = context.fv;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Row(
-        children: [
-          for (var i = 0; i < labels.length; i++)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: TextButton(
-                onPressed: () => onSelected(i),
-                style: TextButton.styleFrom(
-                  foregroundColor: selectedIndex == i
-                      ? FirstVueColors.gold
-                      : fv.secondaryText,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                ),
-                child: Text(
-                  labels[i],
-                  style: TextStyle(
-                    fontWeight:
-                        selectedIndex == i ? FontWeight.w700 : FontWeight.w500,
-                    letterSpacing: 0.6,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+    return SocialGoldUnderlineTabs(
+      labels: labels,
+      selectedIndex: selectedIndex,
+      onSelected: onSelected,
     );
   }
 }
