@@ -301,7 +301,11 @@ grant execute on function public.review_hub_role(uuid, uuid, boolean) to authent
 
 -- ---------------------------------------------------------------------------
 -- 6) Ranked Home feed: exclude VUE-only posts, return background + destination
+-- PostgreSQL cannot CREATE OR REPLACE a function when OUT/RETURNS TABLE
+-- columns change — drop the previous signature first.
 -- ---------------------------------------------------------------------------
+drop function if exists public.fetch_ranked_main_feed(integer, double precision);
+
 create or replace function public.fetch_ranked_main_feed(
   p_limit integer default 30,
   p_seed double precision default null
