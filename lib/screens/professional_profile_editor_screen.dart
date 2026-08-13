@@ -8,6 +8,7 @@ import '../widgets/media_picker_sheet.dart';
 import '../services/entity_details_service.dart';
 import '../services/professional_media_service.dart';
 import '../services/professional_profiles_service.dart';
+import '../theme/firstvue_theme.dart';
 import 'professional_showcase_editor_screen.dart';
 
 class ProfessionalProfileEditorScreen extends StatefulWidget {
@@ -340,7 +341,7 @@ class _ProfessionalProfileEditorScreenState
                     Text(
                       'Save your profile once, then add a profile photo and cover.',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: .45),
+                        color: Colors.black45,
                         fontSize: 12,
                       ),
                     ),
@@ -349,15 +350,14 @@ class _ProfessionalProfileEditorScreenState
                   const Text(
                     'YOUR PUBLIC IDENTITY',
                     style: TextStyle(
-                      color: Colors.white,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 1.2,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Individual profiles are separate from shops, salons, studios, and suites.',
-                    style: TextStyle(color: Colors.white54, height: 1.4),
+                    style: TextStyle(color: context.fv.secondaryText, height: 1.4),
                   ),
                   const SizedBox(height: 20),
                   TextFormField(
@@ -378,7 +378,7 @@ class _ProfessionalProfileEditorScreenState
                     decoration: const InputDecoration(
                       labelText: 'Professional type',
                     ),
-                    dropdownColor: const Color(0xFF151B22),
+                    dropdownColor: Theme.of(context).colorScheme.surface,
                     items: ProfessionalType.values
                         .map(
                           (type) => DropdownMenuItem(
@@ -420,7 +420,6 @@ class _ProfessionalProfileEditorScreenState
                   const Text(
                     'SERVICE AREA',
                     style: TextStyle(
-                      color: Colors.white,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 1.2,
                     ),
@@ -466,7 +465,6 @@ class _ProfessionalProfileEditorScreenState
                   const Text(
                     'AVAILABILITY',
                     style: TextStyle(
-                      color: Colors.white,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 1.2,
                     ),
@@ -479,7 +477,7 @@ class _ProfessionalProfileEditorScreenState
                     title: const Text('Accepting new clients'),
                     subtitle: const Text(
                       'This status appears on your approved public profile.',
-                      style: TextStyle(color: Colors.white54, fontSize: 12),
+                      style: TextStyle(fontSize: 12),
                     ),
                     onChanged: (value) {
                       setState(() => _acceptsNewClients = value);
@@ -521,7 +519,6 @@ class _ProfessionalProfileEditorScreenState
                         child: Text(
                           'PORTFOLIO PHOTOS & VIDEOS',
                           style: TextStyle(
-                            color: Colors.white,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1.2,
                           ),
@@ -545,7 +542,7 @@ class _ProfessionalProfileEditorScreenState
                   if (_existing == null)
                     const Text(
                       'Submit the profile once before adding portfolio photos.',
-                      style: TextStyle(color: Colors.white54, fontSize: 12),
+                      style: TextStyle(fontSize: 12),
                     )
                   else
                     FutureBuilder<List<ProfessionalMediaItem>>(
@@ -554,7 +551,7 @@ class _ProfessionalProfileEditorScreenState
                         if (snapshot.hasError) {
                           return const Text(
                             'Unable to load portfolio photos.',
-                            style: TextStyle(color: Colors.white54),
+                            style: TextStyle(),
                           );
                         }
                         if (!snapshot.hasData) {
@@ -565,10 +562,7 @@ class _ProfessionalProfileEditorScreenState
                         if (snapshot.data!.isEmpty) {
                           return const Text(
                             'Add photos or videos of your work. Star one for Trending.',
-                            style: TextStyle(
-                              color: Colors.white54,
-                              fontSize: 12,
-                            ),
+                            style: TextStyle(fontSize: 12),
                           );
                         }
                         return EditableMediaGrid(
@@ -627,7 +621,6 @@ class _ProfessionalProfileEditorScreenState
                     'New and edited profiles remain private until approved by a FIRSTVUE administrator.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: Colors.white38,
                       fontSize: 12,
                       height: 1.4,
                     ),

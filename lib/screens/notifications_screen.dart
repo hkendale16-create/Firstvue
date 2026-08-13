@@ -73,7 +73,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 children: [
                   const Text(
                     'Sign in to see updates and messages.',
-                    style: TextStyle(color: Colors.white54),
+                    style: TextStyle(color: Color(0xFF5A5668)),
                   ),
                   const SizedBox(height: 12),
                   FilledButton(
@@ -314,7 +314,7 @@ class _EmptyCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white12),
       ),
-      child: Text(text, style: const TextStyle(color: Colors.white54)),
+      child: Text(text, style: const TextStyle(color: Color(0xFF5A5668))),
     );
   }
 }
@@ -448,7 +448,7 @@ class _FollowRequestNotificationTileState
                 Text(
                   widget.item.title,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF16131F),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -456,7 +456,7 @@ class _FollowRequestNotificationTileState
                   const SizedBox(height: 4),
                   Text(
                     widget.item.body!,
-                    style: const TextStyle(color: Colors.white54, fontSize: 13),
+                    style: const TextStyle(color: Color(0xFF5A5668), fontSize: 13),
                   ),
                 ],
                 const SizedBox(height: 12),
@@ -541,7 +541,7 @@ class _NotificationTile extends StatelessWidget {
                       Text(
                         title,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: Color(0xFF16131F),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -551,7 +551,7 @@ class _NotificationTile extends StatelessWidget {
                           body!,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white54),
+                          style: const TextStyle(color: Color(0xFF5A5668)),
                         ),
                       ],
                     ],

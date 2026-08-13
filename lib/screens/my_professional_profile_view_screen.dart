@@ -4,6 +4,7 @@ import '../navigation/firstvue_page_route.dart';
 import '../services/professional_media_service.dart';
 import '../services/professional_profiles_service.dart';
 import '../services/portfolio_album_service.dart';
+import '../theme/firstvue_theme.dart';
 import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
@@ -127,7 +128,7 @@ class _MyProfessionalProfileViewScreenState
                 const Text(
                   'No professional profile yet',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF16131F),
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
                   ),
@@ -136,7 +137,7 @@ class _MyProfessionalProfileViewScreenState
                 const Text(
                   'Create your barber or stylist profile to get verified on FirstVue.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white54, height: 1.4),
+                  style: TextStyle(color: Color(0xFF5A5668), height: 1.4),
                 ),
                 const SizedBox(height: 20),
                 FilledButton(
@@ -178,19 +179,13 @@ class _MyProfessionalProfileViewScreenState
               coverImageUrl: coverUrl,
               onAvatarTap: _openEditor,
               onCoverTap: _openEditor,
-              coverGradient: const [
-                Color(0xFF2A241B),
-                Color(0xFF10151B),
-                Color(0xFF78B9BE),
-              ],
               actionButtons: [
                 OutlinedButton.icon(
                   onPressed: _openEditor,
                   icon: const Icon(Icons.edit_outlined, size: 18),
                   label: const Text('Edit profile'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white70,
-                    side: BorderSide(color: Colors.white.withValues(alpha: .2)),
+                    foregroundColor: FirstVueColors.gold,
                   ),
                 ),
                 if (profile.status == 'approved')
@@ -273,7 +268,7 @@ class _MyProfessionalProfileViewScreenState
                       child: Text(
                         'PORTFOLIO',
                         style: TextStyle(
-                          color: Colors.white54,
+                          color: Color(0xFF5A5668),
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.2,
                           fontSize: 12,
@@ -313,9 +308,9 @@ class _MyProfessionalProfileViewScreenState
                   ),
                   title: const Text(
                     'Social links & catalog',
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(color: Color(0xFF16131F)),
                   ),
-                  trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+                  trailing: const Icon(Icons.chevron_right, color: Color(0xFF8A8696)),
                   onTap: () {
                     Navigator.push(
                       context,

@@ -44,9 +44,9 @@ class FacebookStyleProfileHeader extends StatelessWidget {
     this.coverIsVideo = false,
     this.avatarIsVideo = false,
     this.coverGradient = const [
-      Color(0xFF1A2530),
-      Color(0xFF243540),
-      Color(0xFF78B9BE),
+      Color(0xFFE5C16F),
+      Color(0xFF3DD9C9),
+      Color(0xFFF7F5F2),
     ],
     this.actionButtons,
     this.stats,
@@ -110,20 +110,27 @@ class FacebookStyleProfileHeader extends StatelessWidget {
                 child: CircleAvatar(
                   radius: 50,
                   backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                  child: CircleAvatar(
-                    radius: 46,
-                    backgroundColor: const Color(0xFF241D22),
-                    child: hasAvatar
-                        ? ClipOval(
-                            child: SignedMediaThumbnail(
-                              url: avatarImageUrl!,
-                              isVideo: avatarIsVideo,
-                              width: 92,
-                              height: 92,
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        : Icon(avatarIcon, color: FirstVueColors.teal, size: 42),
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: FirstVueColors.gold,
+                    ),
+                    child: CircleAvatar(
+                      radius: 44,
+                      backgroundColor: context.fv.elevatedSurface,
+                      child: hasAvatar
+                          ? ClipOval(
+                              child: SignedMediaThumbnail(
+                                url: avatarImageUrl!,
+                                isVideo: avatarIsVideo,
+                                width: 88,
+                                height: 88,
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : Icon(avatarIcon, color: FirstVueColors.teal, size: 42),
+                    ),
                   ),
                 ),
               ),
@@ -138,15 +145,18 @@ class FacebookStyleProfileHeader extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: context.fv.primaryText,
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               if (subtitle != null && subtitle!.isNotEmpty) ...[
                 const SizedBox(height: 4),
-                Text(subtitle!, style: const TextStyle(color: Colors.white54)),
+                Text(
+                  subtitle!,
+                  style: TextStyle(color: context.fv.secondaryText),
+                ),
               ],
               if (statusLabel != null) ...[
                 const SizedBox(height: 10),
@@ -179,7 +189,7 @@ class FacebookStyleProfileHeader extends StatelessWidget {
                           width: 1,
                           height: 28,
                           margin: const EdgeInsets.symmetric(horizontal: 16),
-                          color: Colors.white.withValues(alpha: .12),
+                          color: context.fv.divider,
                         ),
                       _StatColumn(stat: stats![i]),
                     ],
@@ -222,8 +232,8 @@ class _StatColumn extends StatelessWidget {
       children: [
         Text(
           stat.value,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: context.fv.primaryText,
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
@@ -232,7 +242,7 @@ class _StatColumn extends StatelessWidget {
         Text(
           stat.label,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: .45),
+            color: context.fv.tertiaryText,
             fontSize: 12,
           ),
         ),
@@ -273,8 +283,8 @@ class ProfileViewSection extends StatelessWidget {
             padding: const EdgeInsets.only(left: 4, bottom: 8),
             child: Text(
               title.toUpperCase(),
-              style: const TextStyle(
-                color: Colors.white54,
+              style: TextStyle(
+                color: context.fv.secondaryText,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.2,
                 fontSize: 12,
@@ -286,7 +296,7 @@ class ProfileViewSection extends StatelessWidget {
             decoration: BoxDecoration(
               color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withValues(alpha: .07)),
+              border: Border.all(color: context.fv.borderSubtle),
             ),
             child: Column(
               children: [
@@ -296,7 +306,7 @@ class ProfileViewSection extends StatelessWidget {
                     Divider(
                       height: 1,
                       indent: 16,
-                      color: Colors.white.withValues(alpha: .08),
+                      color: context.fv.divider,
                     ),
                 ],
               ],
@@ -335,16 +345,16 @@ class ProfileViewRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: Colors.white54,
+                  style: TextStyle(
+                    color: context.fv.secondaryText,
                     fontSize: 12,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: context.fv.primaryText,
                     fontWeight: FontWeight.w600,
                     height: 1.35,
                   ),

@@ -19,14 +19,13 @@ class BusinessOwnerStartScreen extends StatelessWidget {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'BUSINESS TOOLS',
           style: TextStyle(
             fontFamily: 'CormorantGaramond',
-            color: Colors.white,
             fontSize: 22,
             fontWeight: FontWeight.w600,
             letterSpacing: 1.5,
@@ -41,16 +40,15 @@ class BusinessOwnerStartScreen extends StatelessWidget {
             const Text(
               'SHOWCASE YOUR BUSINESS',
               style: TextStyle(
-                color: Colors.white,
                 fontSize: 21,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.2,
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
+            Text(
               'Submit an unlisted business for verification. Nothing is public until FirstVue approves it.',
-              style: TextStyle(color: Colors.white54, height: 1.5),
+              style: TextStyle(color: context.fv.secondaryText, height: 1.5),
             ),
             const SizedBox(height: 28),
             _WorkflowOption(
@@ -150,8 +148,8 @@ class _WorkflowOption extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: context.fv.primaryText,
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                       ),
@@ -159,15 +157,15 @@ class _WorkflowOption extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(
                       description,
-                      style: const TextStyle(
-                        color: Colors.white54,
+                      style: TextStyle(
+                        color: context.fv.secondaryText,
                         height: 1.35,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Colors.white38),
+              const Icon(Icons.chevron_right, color: FirstVueColors.gold),
             ],
           ),
         ),
@@ -204,31 +202,28 @@ class _ClaimBusinessScreen extends StatelessWidget {
               padding: EdgeInsets.only(bottom: 8),
               child: Text(
                 'Choose the prototype listing that best matches your business.',
-                style: TextStyle(color: Colors.white54, height: 1.4),
+                style: TextStyle(height: 1.4),
               ),
             );
           }
 
           final business = _businesses[index - 1];
           return ListTile(
-            tileColor: const Color(0xFF10151B),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(17),
-              side: BorderSide(color: Colors.white.withValues(alpha: .07)),
+              side: BorderSide(color: Colors.black12),
             ),
             leading: const Icon(Icons.content_cut, color: Color(0xFFD8B56A)),
             title: Text(
               business.$1,
               style: const TextStyle(
-                color: Colors.white,
                 fontWeight: FontWeight.bold,
               ),
             ),
             subtitle: Text(
               business.$2,
-              style: const TextStyle(color: Colors.white54),
             ),
-            trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+            trailing: const Icon(Icons.chevron_right),
             onTap: () {
               Navigator.push(
                 context,
@@ -306,7 +301,6 @@ class _NewBusinessScreenState extends State<_NewBusinessScreen> {
           children: [
             TextField(
               controller: _businessController,
-              style: const TextStyle(color: Colors.white),
               decoration: _fieldDecoration('Business name'),
             ),
             const SizedBox(height: 14),
@@ -314,14 +308,12 @@ class _NewBusinessScreenState extends State<_NewBusinessScreen> {
               alignment: Alignment.centerLeft,
               child: Text(
                 'What type of business is this?',
-                style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+                style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               initialValue: _categoryGroup,
-              dropdownColor: const Color(0xFF151B22),
-              style: const TextStyle(color: Colors.white),
               decoration: _fieldDecoration('Business category'),
               items: businessCategoryGroups.keys
                   .map(
@@ -339,8 +331,6 @@ class _NewBusinessScreenState extends State<_NewBusinessScreen> {
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _category,
-              dropdownColor: const Color(0xFF151B22),
-              style: const TextStyle(color: Colors.white),
               decoration: _fieldDecoration('Specific business type'),
               items: businessCategoryGroups[_categoryGroup]!
                   .map(
@@ -372,22 +362,7 @@ class _NewBusinessScreenState extends State<_NewBusinessScreen> {
 }
 
 InputDecoration _fieldDecoration(String label) {
-  return InputDecoration(
-    labelText: label,
-    labelStyle: const TextStyle(color: Colors.white54),
-    filled: true,
-    fillColor: const Color(0xFF151B22),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(15),
-      borderSide: BorderSide(
-        color: const Color(0xFFD8B56A).withValues(alpha: .2),
-      ),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(15),
-      borderSide: const BorderSide(color: Color(0xFFD8B56A)),
-    ),
-  );
+  return InputDecoration(labelText: label);
 }
 
 class _VerificationFormScreen extends StatefulWidget {
@@ -485,7 +460,6 @@ class _VerificationFormScreenState extends State<_VerificationFormScreen> {
             Text(
               widget.businessName,
               style: const TextStyle(
-                color: Colors.white,
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
               ),
@@ -493,19 +467,17 @@ class _VerificationFormScreenState extends State<_VerificationFormScreen> {
             const SizedBox(height: 9),
             const Text(
               'Provide a contact person for this prototype verification submission.',
-              style: TextStyle(color: Colors.white54, height: 1.4),
+              style: TextStyle(height: 1.4),
             ),
             const SizedBox(height: 24),
             TextField(
               controller: _nameController,
-              style: const TextStyle(color: Colors.white),
               decoration: _fieldDecoration('Your full name'),
             ),
             const SizedBox(height: 14),
             TextField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
-              style: const TextStyle(color: Colors.white),
               decoration: _fieldDecoration('Email address'),
             ),
             const Spacer(),
@@ -560,7 +532,6 @@ class _PendingVerificationScreen extends StatelessWidget {
                   'PENDING VERIFICATION',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white,
                     fontSize: 21,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.3,
@@ -570,7 +541,7 @@ class _PendingVerificationScreen extends StatelessWidget {
                 Text(
                   '$businessName has a ${isClaim ? 'claim' : 'new business'} submission awaiting review. It has not been published or verified.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white54, height: 1.5),
+                  style: TextStyle(height: 1.5),
                 ),
                 const SizedBox(height: 26),
                 OutlinedButton(
@@ -599,7 +570,7 @@ class _WorkflowNotice extends StatelessWidget {
       ),
       child: const Text(
         'New business submissions are saved as pending. Claiming a mock prototype listing remains a local demonstration until external business matching is added.',
-        style: TextStyle(color: Colors.white54, height: 1.4, fontSize: 12),
+        style: TextStyle(height: 1.4, fontSize: 12),
       ),
     );
   }

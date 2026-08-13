@@ -7,7 +7,7 @@ import '../services/theme_preference_service.dart';
 class AppThemeController extends ChangeNotifier {
   AppThemeController();
 
-  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode _themeMode = ThemeMode.light;
   bool _loaded = false;
 
   ThemeMode get themeMode => _themeMode;

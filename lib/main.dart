@@ -26,7 +26,6 @@ import 'widgets/firstvue_settings_drawer.dart';
 import 'widgets/floating_messages_bubble.dart';
 import 'widgets/home_community_feed_block.dart';
 import 'widgets/home_discovery_section.dart';
-import 'widgets/home_discovery_swipe.dart';
 import 'widgets/firstvue_inline_search_bar.dart';
 import 'widgets/home_city_chip.dart';
 import 'widgets/firstvue_animated_header_title.dart';
@@ -354,15 +353,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
                 onViewAllVue: () => setState(() => selectedIndex = 2),
               ),
 
-              const SizedBox(height: 30),
-
-              HomeDiscoverySwipe(
-                refreshToken: _homeRefreshToken,
-                onOpenExplore: () => setState(() => selectedIndex = 1),
-                onOpenVue: () => setState(() => selectedIndex = 2),
-              ),
-
-              const SizedBox(height: 30),
+              const SizedBox(height: 12),
 
               HomeCommunityFeedBlock(refreshToken: _homeRefreshToken),
 

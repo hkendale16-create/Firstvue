@@ -44,7 +44,7 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
       prefixIcon: const Icon(Icons.search, color: FirstVueColors.teal),
       suffixIcon: suffixIcon,
       filled: true,
-      fillColor: fv.surface.withValues(alpha: .72),
+      fillColor: fv.inputFill,
       border: border,
       enabledBorder: border,
       focusedBorder: border,

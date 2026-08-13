@@ -101,12 +101,12 @@ class _CommunitiesScreenState extends State<CommunitiesScreen>
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.white,
+        foregroundColor: null,
         title: const Text('GROUPS & COMMUNITIES'),
         bottom: TabBar(
           controller: _tabs,
           labelColor: FirstVueColors.gold,
-          unselectedLabelColor: Colors.white54,
+          unselectedLabelColor: Color(0xFF5A5668),
           indicatorColor: FirstVueColors.teal,
           tabs: const [
             Tab(text: 'GROUPS'),
@@ -122,7 +122,7 @@ class _CommunitiesScreenState extends State<CommunitiesScreen>
                 return FloatingActionButton.extended(
                   onPressed: isGroups ? _createGroup : _createHub,
                   backgroundColor: FirstVueColors.coral,
-                  foregroundColor: Colors.white,
+                  foregroundColor: null,
                   icon: const Icon(Icons.add),
                   label: Text(isGroups ? 'Create Group' : 'Create Community'),
                 );
@@ -145,7 +145,7 @@ class _CommunitiesScreenState extends State<CommunitiesScreen>
                           children: [
                             const Text(
                               'No groups yet.',
-                              style: TextStyle(color: Colors.white54),
+                              style: TextStyle(color: Color(0xFF5A5668)),
                             ),
                             const SizedBox(height: 8),
                             Text(
@@ -153,7 +153,7 @@ class _CommunitiesScreenState extends State<CommunitiesScreen>
                                   ? 'Tap Create Group to connect with people nearby.'
                                   : 'Create from Settings → Groups & Communities.',
                               style: const TextStyle(
-                                color: Colors.white38,
+                                color: Color(0xFF8A8696),
                                 fontSize: 13,
                               ),
                             ),
@@ -193,7 +193,7 @@ class _CommunitiesScreenState extends State<CommunitiesScreen>
                           children: [
                             const Text(
                               'No Communities yet.',
-                              style: TextStyle(color: Colors.white54),
+                              style: TextStyle(color: Color(0xFF5A5668)),
                             ),
                             const SizedBox(height: 8),
                             Text(
@@ -201,7 +201,7 @@ class _CommunitiesScreenState extends State<CommunitiesScreen>
                                   ? 'Approved Community Leaders can create local hubs that contain many Groups.'
                                   : 'Create from Settings → Groups & Communities.',
                               style: const TextStyle(
-                                color: Colors.white38,
+                                color: Color(0xFF8A8696),
                                 fontSize: 13,
                               ),
                             ),
@@ -229,17 +229,17 @@ class _CommunitiesScreenState extends State<CommunitiesScreen>
                               title: Text(
                                 hub.name,
                                 style: const TextStyle(
-                                  color: Colors.white,
+                                  color: Color(0xFF16131F),
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
                               subtitle: Text(
                                 hub.locationLabel ?? 'Community hub',
-                                style: const TextStyle(color: Colors.white54),
+                                style: const TextStyle(color: Color(0xFF5A5668)),
                               ),
                               trailing: const Icon(
                                 Icons.chevron_right,
-                                color: Colors.white38,
+                                color: Color(0xFF8A8696),
                               ),
                               onTap: () {
                                 Navigator.push(
@@ -302,7 +302,7 @@ class _CommunityListTile extends StatelessWidget {
                     Text(
                       community.name,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: Color(0xFF16131F),
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
                       ),
@@ -314,7 +314,7 @@ class _CommunityListTile extends StatelessWidget {
                         community.locationLabel ??
                             '${community.memberCount} member${community.memberCount == 1 ? '' : 's'}',
                       ].join(' · '),
-                      style: const TextStyle(color: Colors.white54, fontSize: 12),
+                      style: const TextStyle(color: Color(0xFF5A5668), fontSize: 12),
                     ),
                     if (community.description?.trim().isNotEmpty == true) ...[
                       const SizedBox(height: 4),
@@ -343,7 +343,7 @@ class _CommunityListTile extends StatelessWidget {
                     style: TextStyle(color: FirstVueColors.teal, fontSize: 11),
                   ),
                 ),
-              const Icon(Icons.chevron_right, color: Colors.white38),
+              const Icon(Icons.chevron_right, color: Color(0xFF8A8696)),
             ],
           ),
         ),

@@ -5,6 +5,7 @@ import '../services/recommendations_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/home_discovery_section.dart';
+import '../widgets/social_chrome.dart';
 import 'barber_results_screen.dart';
 import 'beauty_discovery_screen.dart';
 import 'discovery_feed_screen.dart';
@@ -28,7 +29,7 @@ class ExploreScreen extends StatelessWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           children: [
-            const Text(
+            Text(
               'EXPLORE',
               style: TextStyle(
                 fontFamily: 'CormorantGaramond',
@@ -40,31 +41,39 @@ class ExploreScreen extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Discover local pros, read real ratings, and book with confidence.',
+              'Discover local pros, follow their work, book with confidence.',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: .58),
+                color: context.fv.secondaryText,
                 height: 1.4,
                 fontSize: 13,
               ),
             ),
-            const SizedBox(height: 18),
-            _VueFeedBanner(onTap: onOpenVueFeed),
+            const SizedBox(height: 16),
+            const PeopleToFollowRow(),
             const SizedBox(height: 22),
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: MediaQuery.sizeOf(context).width >= 420 ? 2 : 2,
-                mainAxisSpacing: 12,
+                mainAxisSpacing: 14,
                 crossAxisSpacing: 12,
-                childAspectRatio: 0.72,
+                childAspectRatio: 0.78,
               ),
               itemCount: categories.length,
               itemBuilder: (context, index) {
                 final category = categories[index];
-                return _ExploreCategoryTile(category: category);
+                return SocialMasonryTile(
+                  title: category.title,
+                  subtitle: category.subtitle,
+                  assetImage: category.imagePath,
+                  likeLabel: index.isEven ? '2.1k' : null,
+                  onTap: category.onTap,
+                );
               },
             ),
+            const SizedBox(height: 18),
+            _VueFeedBanner(onTap: onOpenVueFeed),
             const SizedBox(height: 28),
             const YouMightLikeSection(),
           ],
@@ -286,13 +295,7 @@ class _VueFeedBanner extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              colors: [
-                FirstVueColors.coral.withValues(alpha: .22),
-                FirstVueColors.teal.withValues(alpha: .18),
-              ],
-            ),
-            border: Border.all(color: Colors.white.withValues(alpha: .1)),
+            color: FirstVueColors.teal,
           ),
           child: Row(
             children: [
@@ -300,40 +303,31 @@ class _VueFeedBanner extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: FirstVueColors.background.withValues(alpha: .65),
+                  color: Colors.white.withValues(alpha: .18),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: FirstVueColors.coral),
                 ),
                 alignment: Alignment.center,
                 child: const Text(
                   'V',
                   style: TextStyle(
                     fontFamily: 'CormorantGaramond',
-                    color: FirstVueColors.gold,
+                    color: Colors.white,
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
               const SizedBox(width: 14),
-              Expanded(
+              const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Vue discovery feed',
+                    Text(
+                      'Open Vue — full-screen social feed',
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Scroll rated pros, sparks & community posts',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: .62),
-                        fontSize: 12,
                       ),
                     ),
                   ],
@@ -342,7 +336,7 @@ class _VueFeedBanner extends StatelessWidget {
               Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: 16,
-                color: Colors.white.withValues(alpha: .5),
+                color: Colors.white.withValues(alpha: .85),
               ),
             ],
           ),

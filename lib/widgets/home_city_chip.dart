@@ -68,7 +68,6 @@ class HomeCityChipState extends State<HomeCityChip> {
                     const Text(
                       'BROWSE LOCATION',
                       style: TextStyle(
-                        color: Colors.white,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 1.2,
                       ),
@@ -77,7 +76,9 @@ class HomeCityChipState extends State<HomeCityChip> {
                     Text(
                       'Choose everywhere or pick a US state and city.',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: .55),
+                        color: Theme.of(context)
+                            .extension<FirstVuePalette>()
+                            ?.secondaryText,
                         fontSize: 13,
                       ),
                     ),
@@ -90,13 +91,10 @@ class HomeCityChipState extends State<HomeCityChip> {
                             : Icons.public_outlined,
                         color: FirstVueColors.teal,
                       ),
-                      title: const Text(
-                        'Everywhere',
-                        style: TextStyle(color: Colors.white),
-                      ),
+                      title: const Text('Everywhere'),
                       subtitle: const Text(
                         'Show content from all areas',
-                        style: TextStyle(color: Colors.white54, fontSize: 12),
+                        style: TextStyle(fontSize: 12),
                       ),
                       trailing: Switch(
                         value: browseEverywhere,
@@ -116,7 +114,6 @@ class HomeCityChipState extends State<HomeCityChip> {
                         dropdownColor: FirstVueColors.surface,
                         decoration: InputDecoration(
                           labelText: 'State',
-                          labelStyle: const TextStyle(color: Colors.white54),
                           filled: true,
                           fillColor: FirstVueColors.elevatedSurface,
                           border: OutlineInputBorder(
@@ -132,18 +129,12 @@ class HomeCityChipState extends State<HomeCityChip> {
                             borderSide: BorderSide.none,
                           ),
                         ),
-                        hint: const Text(
-                          'Select a state',
-                          style: TextStyle(color: Colors.white38),
-                        ),
+                        hint: const Text('Select a state'),
                         items: UsLocations.states
                             .map(
                               (state) => DropdownMenuItem(
                                 value: state,
-                                child: Text(
-                                  state,
-                                  style: const TextStyle(color: Colors.white),
-                                ),
+                                child: Text(state),
                               ),
                             )
                             .toList(),
@@ -244,7 +235,7 @@ class HomeCityChipState extends State<HomeCityChip> {
                       _label ?? 'Set location',
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: FirstVueColors.ivory,
+                        color: Color(0xFF16131F),
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                       ),
@@ -253,7 +244,7 @@ class HomeCityChipState extends State<HomeCityChip> {
                 const SizedBox(width: 2),
                 Icon(
                   Icons.keyboard_arrow_down_rounded,
-                  color: Colors.white.withValues(alpha: .5),
+                  color: FirstVueColors.gold,
                   size: 20,
                 ),
               ],

@@ -26,7 +26,8 @@ void main() {
     await tester.tap(homeNav);
     await tester.pumpAndSettle();
 
-    expect(find.text('TRENDING NEAR YOU'), findsOneWidget);
+    expect(find.text('SEE FIRST. BOOK FIRST.'), findsOneWidget);
+    expect(find.text('People to follow'), findsOneWidget);
 
     final exploreNav = find.text('EXPLORE');
     await tester.ensureVisible(exploreNav);

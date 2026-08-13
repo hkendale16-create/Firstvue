@@ -63,7 +63,7 @@ class _ProfessionalPublicProfileScreenState
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.white,
+        foregroundColor: null,
         title: Text(profile.displayName, style: const TextStyle(fontSize: 16)),
       ),
       body: CustomScrollView(
@@ -76,11 +76,6 @@ class _ProfessionalPublicProfileScreenState
               avatarImageUrl: _profileImages.avatar?.signedUrl,
               coverImageUrl: _profileImages.cover?.signedUrl,
               showImageLoading: _loadingImages,
-              coverGradient: const [
-                Color(0xFF2A241B),
-                Color(0xFF10151B),
-                Color(0xFF080B0F),
-              ],
               actionButtons: const [
                 Icon(Icons.verified, color: Color(0xFFD8B56A), size: 28),
               ],
@@ -103,7 +98,7 @@ class _ProfessionalPublicProfileScreenState
                         const SizedBox(width: 7),
                         Text(
                           location,
-                          style: const TextStyle(color: Colors.white54),
+                          style: const TextStyle(color: Color(0xFF5A5668)),
                         ),
                       ],
                     ),
@@ -120,7 +115,7 @@ class _ProfessionalPublicProfileScreenState
                     profile.bio.isEmpty
                         ? 'This professional has not added a biography yet.'
                         : profile.bio,
-                    style: const TextStyle(color: Colors.white60, height: 1.55),
+                    style: const TextStyle(color: Color(0xFF5A5668), height: 1.55),
                   ),
                   const SizedBox(height: 28),
                   const _ProfileHeading('SERVICES'),
@@ -128,7 +123,7 @@ class _ProfessionalPublicProfileScreenState
                   if (profile.services.isEmpty)
                     const Text(
                       'No services listed yet.',
-                      style: TextStyle(color: Colors.white54),
+                      style: TextStyle(color: Color(0xFF5A5668)),
                     )
                   else
                     Wrap(
@@ -152,7 +147,7 @@ class _ProfessionalPublicProfileScreenState
                               ),
                               child: Text(
                                 service,
-                                style: const TextStyle(color: Colors.white70),
+                                style: const TextStyle(color: Color(0xFF5A5668)),
                               ),
                             ),
                           )
@@ -194,7 +189,7 @@ class _ProfessionalPublicProfileScreenState
                                   ? 'Accepting new clients'
                                   : 'Not accepting new clients',
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: Color(0xFF16131F),
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -205,7 +200,7 @@ class _ProfessionalPublicProfileScreenState
                           Text(
                             profile.availabilityNote,
                             style: const TextStyle(
-                              color: Colors.white60,
+                              color: Color(0xFF5A5668),
                               height: 1.4,
                             ),
                           ),
@@ -248,7 +243,7 @@ class _ProfessionalPublicProfileScreenState
                       if (snapshot.hasError) {
                         return const Text(
                           'Sign in to view this professional portfolio.',
-                          style: TextStyle(color: Colors.white54),
+                          style: TextStyle(color: Color(0xFF5A5668)),
                         );
                       }
                       if (!snapshot.hasData) {
@@ -257,7 +252,7 @@ class _ProfessionalPublicProfileScreenState
                       if (snapshot.data!.isEmpty) {
                         return const Text(
                           'No portfolio photos have been added yet.',
-                          style: TextStyle(color: Colors.white54),
+                          style: TextStyle(color: Color(0xFF5A5668)),
                         );
                       }
                       return SizedBox(
@@ -306,7 +301,7 @@ class _ProfessionalPublicProfileScreenState
                       if (snapshot.hasError) {
                         return const Text(
                           'Showcase details are not available yet.',
-                          style: TextStyle(color: Colors.white54),
+                          style: TextStyle(color: Color(0xFF5A5668)),
                         );
                       }
                       if (!snapshot.hasData) {
@@ -318,7 +313,7 @@ class _ProfessionalPublicProfileScreenState
                           showcase.catalog.isEmpty) {
                         return const Text(
                           'No social links or catalog items have been added yet.',
-                          style: TextStyle(color: Colors.white54),
+                          style: TextStyle(color: Color(0xFF5A5668)),
                         );
                       }
                       return _ShowcaseSection(showcase: showcase);
@@ -346,7 +341,7 @@ class _ProfessionalPublicProfileScreenState
                     ),
                     child: const Text(
                       'FIRSTVUE does not guarantee availability. Confirm services, pricing, and appointment terms directly with the professional.',
-                      style: TextStyle(color: Colors.white54, height: 1.45),
+                      style: TextStyle(color: Color(0xFF5A5668), height: 1.45),
                     ),
                   ),
                 ],
@@ -477,7 +472,7 @@ class _ShowcaseCard extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 9),
-        Text(body, style: const TextStyle(color: Colors.white60, height: 1.4)),
+        Text(body, style: const TextStyle(color: Color(0xFF5A5668), height: 1.4)),
         TextButton.icon(
           onPressed: onPressed,
           icon: const Icon(Icons.content_copy, size: 16),
@@ -531,7 +526,7 @@ class _CatalogCard extends StatelessWidget {
                   const SizedBox(height: 5),
                   Text(
                     item.description,
-                    style: const TextStyle(color: Colors.white60),
+                    style: const TextStyle(color: Color(0xFF5A5668)),
                   ),
                 ],
                 if (item.priceLabel.isNotEmpty) ...[
@@ -572,7 +567,7 @@ class _ProfileHeading extends StatelessWidget {
     return Text(
       label,
       style: const TextStyle(
-        color: Colors.white,
+        color: Color(0xFF16131F),
         fontWeight: FontWeight.w700,
         letterSpacing: 1.4,
       ),

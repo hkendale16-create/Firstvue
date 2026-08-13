@@ -6,10 +6,12 @@ import '../services/community_news_service.dart';
 import '../services/discovery_feed_service.dart';
 import '../services/firstvue_feedback_sounds.dart';
 import '../services/saved_items_service.dart';
+import '../theme/firstvue_theme.dart';
 import '../widgets/feed_comments_sheet.dart';
 import '../widgets/vue_video_player.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/firstvue_share_sheet.dart';
+import '../widgets/social_chrome.dart';
 import '../models/share_payload.dart';
 import 'ai_search_screen.dart';
 import 'business_profile_screen.dart';
@@ -194,8 +196,9 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return ColoredBox(
-      color: const Color(0xFF080B0F),
+      color: fv.background,
       child: SafeArea(
         bottom: false,
         child: Column(
@@ -208,41 +211,27 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                     'VUE',
                     style: TextStyle(
                       fontFamily: 'CormorantGaramond',
-                      color: Color(0xFFD8B56A),
+                      color: FirstVueColors.gold,
                       fontSize: 27,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 2,
                     ),
                   ),
                   const Spacer(),
-                  _ModeButton(
-                    label: 'For You',
-                    selected: _mode == _FeedMode.forYou,
-                    onTap: () {
-                      if (_mode == _FeedMode.forYou) return;
-                      setState(() => _mode = _FeedMode.forYou);
-                      _feedFuture = _loadFeed();
-                    },
-                  ),
-                  _ModeButton(
-                    label: 'Nearby',
-                    selected: _mode == _FeedMode.nearby,
-                    onTap: () {
-                      if (_mode == _FeedMode.nearby) return;
-                      setState(() => _mode = _FeedMode.nearby);
-                      _feedFuture = _loadFeed();
-                    },
-                  ),
-                  _ModeButton(
-                    label: 'Trending',
-                    selected: _mode == _FeedMode.trending,
-                    onTap: () {
-                      if (_mode == _FeedMode.trending) return;
-                      setState(() => _mode = _FeedMode.trending);
-                      _feedFuture = _loadFeed();
-                    },
-                  ),
                 ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: SocialPillTabs(
+                labels: const ['For You', 'Nearby', 'Trending'],
+                selectedIndex: _mode.index,
+                onSelected: (index) {
+                  final next = _FeedMode.values[index];
+                  if (next == _mode) return;
+                  setState(() => _mode = next);
+                  _feedFuture = _loadFeed();
+                },
               ),
             ),
             Padding(
@@ -250,27 +239,18 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
               child: TextField(
                 controller: _searchController,
                 onSubmitted: (_) => _search(),
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: fv.primaryText),
                 decoration: InputDecoration(
-                  hintText: 'Ask FirstVue: barber under \$50, open today…',
-                  hintStyle: const TextStyle(
-                    color: Colors.white38,
-                    fontSize: 13,
-                  ),
+                  hintText: 'Search people, shops, styles',
+                  hintStyle: TextStyle(color: fv.tertiaryText, fontSize: 13),
                   prefixIcon: const Icon(
-                    Icons.auto_awesome,
-                    color: Color(0xFFD8B56A),
+                    Icons.search,
+                    color: FirstVueColors.gold,
                     size: 20,
                   ),
                   suffixIcon: IconButton(
                     onPressed: _search,
-                    icon: const Icon(Icons.arrow_forward, color: Colors.white),
-                  ),
-                  filled: true,
-                  fillColor: const Color(0xFF151B22),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide.none,
+                    icon: Icon(Icons.arrow_forward, color: fv.icon),
                   ),
                 ),
               ),
@@ -282,30 +262,33 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(
                       child: CircularProgressIndicator(
-                        color: Color(0xFFD8B56A),
+                        color: FirstVueColors.gold,
                       ),
                     );
                   }
                   final items = _feedItems.isEmpty ? _items : _feedItems;
                   return FirstVueRefreshScaffold(
                     onRefresh: _refreshFeed,
-                    notificationPredicate: (notification) {
-                      if (_currentPage != 0) return false;
-                      return defaultScrollNotificationPredicate(notification);
-                    },
-                    child: PageView.builder(
-                      controller: _pageController,
-                      scrollDirection: Axis.vertical,
+                    child: GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 14,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 0.72,
+                      ),
                       itemCount: items.length,
                       itemBuilder: (_, index) {
                         final item = items[index];
-                        final itemKey = item.connected?.mediaId ??
-                            '${item.name}-${item.image}';
-                        return _InteractiveFeedCard(
-                          key: ValueKey(itemKey),
-                          item: item,
-                          isActive: index == _currentPage,
-                          onViewProfile: () => _openProfile(item),
+                        return SocialMasonryTile(
+                          title: item.name,
+                          subtitle: '@${item.name.toLowerCase().replaceAll(' ', '')}',
+                          imageUrl: item.connected != null ? item.image : null,
+                          assetImage: item.connected == null ? item.image : null,
+                          likeLabel: item.reviews > 0 ? '${item.reviews}' : null,
+                          showPlay: item.mediaType == 'video',
+                          onTap: () => _openProfile(item),
                         );
                       },
                     ),
@@ -318,32 +301,6 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
       ),
     );
   }
-}
-
-class _ModeButton extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _ModeButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-  @override
-  Widget build(BuildContext context) => TextButton(
-    onPressed: onTap,
-    style: TextButton.styleFrom(
-      padding: const EdgeInsets.symmetric(horizontal: 7),
-    ),
-    child: Text(
-      label,
-      style: TextStyle(
-        color: selected ? Colors.white : Colors.white38,
-        fontSize: 12,
-        fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-      ),
-    ),
-  );
 }
 
 // Kept as the lightweight static renderer for prototype comparison.
@@ -512,12 +469,12 @@ class _Action extends StatelessWidget {
   );
 }
 
+// ignore: unused_element
 class _InteractiveFeedCard extends StatefulWidget {
   final _FeedItem item;
   final bool isActive;
   final VoidCallback onViewProfile;
   const _InteractiveFeedCard({
-    super.key,
     required this.item,
     required this.isActive,
     required this.onViewProfile,
@@ -527,6 +484,7 @@ class _InteractiveFeedCard extends StatefulWidget {
   State<_InteractiveFeedCard> createState() => _InteractiveFeedCardState();
 }
 
+// ignore: unused_element
 class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
   bool _liked = false;
   bool _saved = false;

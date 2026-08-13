@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Local-only theme preference. Defaults to [ThemeMode.system].
+/// Local-only theme preference. Defaults to [ThemeMode.light] (white social).
 /// Does not require Supabase — loads before auth/network.
 class ThemePreferenceService {
   ThemePreferenceService._();
@@ -31,13 +31,13 @@ class ThemePreferenceService {
 
   static ThemeMode fromStorage(String? raw) {
     switch (raw) {
-      case 'light':
-        return ThemeMode.light;
       case 'dark':
         return ThemeMode.dark;
       case 'system':
-      default:
         return ThemeMode.system;
+      case 'light':
+      default:
+        return ThemeMode.light;
     }
   }
 
