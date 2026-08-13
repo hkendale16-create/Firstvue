@@ -79,14 +79,16 @@ void main() {
       expect(hub.locationLabel, 'Atlanta, GA');
     });
 
-    test('fromRow falls back leaderUserId to created_by when missing', () {
+    test('fromRow does not invent leaderUserId from created_by', () {
       final hub = CommunityHub.fromRow({
         'id': 'h2',
         'name': 'Legacy Hub',
         'created_by_profile_id': 'creator-1',
         'created_at': '2026-08-01T00:00:00.000Z',
       });
-      expect(hub.leaderUserId, 'creator-1');
+      // Leadership is a separate approval; missing leader_user_id stays null.
+      expect(hub.leaderUserId, isNull);
+      expect(hub.createdByProfileId, 'creator-1');
       expect(hub.status, 'active');
     });
   });
