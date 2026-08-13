@@ -4,6 +4,7 @@ import '../navigation/firstvue_page_route.dart';
 import '../services/trending_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/social_chrome.dart';
+import '../widgets/entity_follow_button.dart';
 import 'firstvue_business_profile_screen.dart';
 
 class PeopleToFollowScreen extends StatefulWidget {
@@ -79,18 +80,10 @@ class _PeopleToFollowScreenState extends State<PeopleToFollowScreen> {
                   peopleFollowRoleLabel(item.services),
                   style: TextStyle(color: fv.tertiaryText),
                 ),
-                trailing: SocialFollowButton(
+                trailing: EntityFollowButton(
+                  kind: FollowTargetKind.business,
+                  targetId: item.id,
                   compact: true,
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      FirstVuePageRoute(
-                        builder: (_) => FirstVueBusinessProfileScreen(
-                          businessId: item.id,
-                        ),
-                      ),
-                    );
-                  },
                 ),
                 onTap: () {
                   Navigator.push(

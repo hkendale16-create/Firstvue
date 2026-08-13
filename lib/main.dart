@@ -7,9 +7,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config/app_config.dart';
 import 'config/supabase_config.dart';
 import 'screens/discovery_feed_screen.dart';
+import 'screens/feeds_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/notifications_screen.dart';
-import 'screens/saved_screen.dart';
 import 'screens/explore_screen.dart';
 import 'screens/firstvue_business_profile_screen.dart';
 import 'screens/member_public_profile_screen.dart';
@@ -238,11 +238,11 @@ class _FirstVueHomeState extends State<FirstVueHome> {
       body: Stack(
         children: [
           switch (selectedIndex) {
-        1 => ExploreScreen(
+        1 => FeedsScreen(refreshToken: _homeRefreshToken),
+        2 => const DiscoveryFeedScreen(),
+        3 => ExploreScreen(
               onOpenVueFeed: () => setState(() => selectedIndex = 2),
             ),
-        2 => const DiscoveryFeedScreen(),
-        3 => const SavedScreen(),
         4 => ProfileScreen(refreshToken: _profileRefreshToken),
         _ => SafeArea(
           child: FirstVueRefreshScaffold(

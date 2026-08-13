@@ -15,6 +15,7 @@ import 'social_rich_text.dart';
 import 'feed_autoplay_video.dart';
 import 'spark_reaction_button.dart';
 import 'signed_media_viewer.dart';
+import 'entity_follow_button.dart';
 
 enum CommunityNewsPostCardStyle { compact, timeline }
 
@@ -26,6 +27,7 @@ class CommunityNewsPostCard extends StatefulWidget {
   final VoidCallback? onSave;
   final VoidCallback? onComment;
   final VoidCallback? onRepost;
+  final VoidCallback? onShare;
   final VoidCallback? onDelete;
   final bool repostedByMe;
   final bool compact;
@@ -40,6 +42,7 @@ class CommunityNewsPostCard extends StatefulWidget {
     this.onSave,
     this.onComment,
     this.onRepost,
+    this.onShare,
     this.onDelete,
     this.repostedByMe = false,
     this.compact = false,
@@ -315,7 +318,8 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
     if (widget.onSpark == null &&
         widget.onComment == null &&
         widget.onSave == null &&
-        widget.onRepost == null) {
+        widget.onRepost == null &&
+        widget.onShare == null) {
       return const SizedBox.shrink();
     }
 
@@ -332,50 +336,68 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
             Expanded(
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: SparkReactionButton(
-                  sparked: post.sparkedByMe,
-                  count: post.sparkCount,
-                  onPressed: () {
-                    FirstVueFeedbackSounds.playSpark(fromUserTap: true);
-                    widget.onSpark!();
-                  },
+                child: StopPropagation(
+                  child: SparkReactionButton(
+                    sparked: post.sparkedByMe,
+                    count: post.sparkCount,
+                    onPressed: () {
+                      FirstVueFeedbackSounds.playSpark(fromUserTap: true);
+                      widget.onSpark!();
+                    },
+                  ),
                 ),
               ),
             ),
           if (widget.onComment != null)
             Expanded(
-              child: _ActionButton(
-                icon: Icons.chat_bubble_outline_rounded,
-                label: 'Comment',
-                onTap: widget.onComment!,
+              child: StopPropagation(
+                child: _ActionButton(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  label: 'Comment',
+                  onTap: widget.onComment!,
+                ),
               ),
             ),
           if (widget.onRepost != null)
             Expanded(
-              child: _ActionButton(
-                icon: widget.repostedByMe
-                    ? Icons.repeat_rounded
-                    : Icons.repeat_outlined,
-                label: widget.repostedByMe
-                    ? 'Reposted'
-                    : (post.repostCount > 0
-                        ? 'Repost · ${post.repostCount}'
-                        : 'Repost'),
-                active: widget.repostedByMe,
-                activeColor: FirstVueColors.teal,
-                onTap: widget.onRepost!,
+              child: StopPropagation(
+                child: _ActionButton(
+                  icon: widget.repostedByMe
+                      ? Icons.repeat_rounded
+                      : Icons.repeat_outlined,
+                  label: widget.repostedByMe
+                      ? 'Reposted'
+                      : (post.repostCount > 0
+                          ? 'Repost · ${post.repostCount}'
+                          : 'Repost'),
+                  active: widget.repostedByMe,
+                  activeColor: FirstVueColors.teal,
+                  onTap: widget.onRepost!,
+                ),
+              ),
+            ),
+          if (widget.onShare != null)
+            Expanded(
+              child: StopPropagation(
+                child: _ActionButton(
+                  icon: Icons.ios_share_outlined,
+                  label: 'Share',
+                  onTap: widget.onShare!,
+                ),
               ),
             ),
           if (widget.onSave != null)
             Expanded(
-              child: _ActionButton(
-                icon: post.savedByMe
-                    ? Icons.bookmark_rounded
-                    : Icons.bookmark_border_rounded,
-                label: post.savedByMe ? 'Saved' : 'Save',
-                active: post.savedByMe,
-                activeColor: FirstVueColors.gold,
-                onTap: widget.onSave!,
+              child: StopPropagation(
+                child: _ActionButton(
+                  icon: post.savedByMe
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_border_rounded,
+                  label: post.savedByMe ? 'Saved' : 'Save',
+                  active: post.savedByMe,
+                  activeColor: FirstVueColors.gold,
+                  onTap: widget.onSave!,
+                ),
               ),
             ),
         ],

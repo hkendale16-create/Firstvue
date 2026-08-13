@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/app_config.dart';
+import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../screens/auth_screen.dart';
 import '../screens/create_post_screen.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../screens/story_composer_screen.dart';
 import '../services/community_news_service.dart';
+import '../services/feed_interaction_service.dart';
 import '../services/profile_media_service.dart';
 import '../services/repost_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../utils/app_environment.dart';
+import '../widgets/firstvue_share_sheet.dart';
 import 'community_news_post_card.dart';
 import 'community_news_post_detail_sheet.dart';
 import 'feed_comments_sheet.dart';
@@ -24,10 +28,14 @@ class HomeCommunityFeedBlock extends StatefulWidget {
     super.key,
     this.refreshToken = 0,
     this.maxPosts = 20,
+    this.borderlessComposer = false,
+    this.showTitle = true,
   });
 
   final int refreshToken;
   final int maxPosts;
+  final bool borderlessComposer;
+  final bool showTitle;
 
   @override
   State<HomeCommunityFeedBlock> createState() => _HomeCommunityFeedBlockState();
@@ -346,11 +354,13 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-          decoration: BoxDecoration(
-            color: fv.elevatedSurface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: fv.borderSubtle),
-          ),
+          decoration: widget.borderlessComposer
+              ? const BoxDecoration(color: Colors.transparent)
+              : BoxDecoration(
+                  color: fv.elevatedSurface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: fv.borderSubtle),
+                ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -416,40 +426,41 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
           ),
         ),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            Container(
-              width: 3,
-              height: 16,
-              decoration: BoxDecoration(
-                color: FirstVueColors.teal,
-                borderRadius: BorderRadius.circular(2),
+        if (widget.showTitle)
+          Row(
+            children: [
+              Container(
+                width: 3,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: FirstVueColors.teal,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            const Text(
-              'MAIN NEWSFEED',
-              style: TextStyle(
-                color: FirstVueColors.ivory,
-                fontWeight: FontWeight.w800,
-                fontSize: 13,
-                letterSpacing: 1.2,
+              const SizedBox(width: 8),
+              Text(
+                'MAIN NEWSFEED',
+                style: TextStyle(
+                  color: fv.primaryText,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  letterSpacing: 1.2,
+                ),
               ),
-            ),
-            const Spacer(),
-            IconButton(
-              onPressed: _loading ? null : _loadFeed,
-              icon: const Icon(
-                Icons.refresh,
-                color: FirstVueColors.mutedIcon,
-                size: 20,
+              const Spacer(),
+              IconButton(
+                onPressed: _loading ? null : _loadFeed,
+                icon: Icon(
+                  Icons.refresh,
+                  color: fv.mutedIcon,
+                  size: 20,
+                ),
+                tooltip: 'Refresh feed',
+                visualDensity: VisualDensity.compact,
               ),
-              tooltip: 'Refresh feed',
-              visualDensity: VisualDensity.compact,
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
+            ],
+          ),
+        if (widget.showTitle) const SizedBox(height: 8),
         if (_loading && _posts.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 28),
@@ -499,6 +510,22 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
                       businessName: _posts[index].authorName,
                     ),
                     onRepost: () => _repostPost(index),
+                    onShare: () {
+                      final post = _posts[index];
+                      FirstVueShareSheet.show(
+                        context,
+                        payload: SharePayload(
+                          title: post.authorName,
+                          subtitle: post.body,
+                          link: '${AppConfig.webBaseUrl}/?post=${post.id}',
+                        ),
+                      );
+                      FeedInteractionService.record(
+                        postId: post.id,
+                        interactionType: 'share',
+                        sourceTab: 'main',
+                      );
+                    },
                     repostedByMe: _repostedPostIds.contains(_posts[index].id),
                   ),
                 ),

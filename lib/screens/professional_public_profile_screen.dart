@@ -9,6 +9,7 @@ import '../services/professional_profiles_service.dart';
 import '../services/professional_showcase_service.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/social_chrome.dart';
+import '../widgets/entity_follow_button.dart';
 import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/portfolio_albums_section.dart';
 import '../widgets/signed_media_viewer.dart';
@@ -88,14 +89,10 @@ class _ProfessionalPublicProfileScreenState
                 ),
               ],
               actions: [
-                SocialFollowButton(
-                  onPressed: () {
-                    openMemberProfile(
-                      context,
-                      profileId: profile.profileId,
-                      displayName: profile.displayName,
-                    );
-                  },
+                EntityFollowButton(
+                  kind: FollowTargetKind.profile,
+                  targetId: profile.profileId,
+                  compact: false,
                 ),
                 SocialFollowButton(
                   label: 'Message',

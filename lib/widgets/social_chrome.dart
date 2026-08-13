@@ -7,6 +7,7 @@ import '../services/things_to_do_service.dart';
 import '../services/trending_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'event_profile_sheet.dart';
+import 'entity_follow_button.dart';
 import 'facebook_style_profile_header.dart';
 import 'firstvue_inline_search_bar.dart';
 
@@ -385,7 +386,17 @@ class _PeopleFollowCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final fv = context.fv;
     final role = peopleFollowRoleLabel(item.services);
-    return Container(
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          FirstVuePageRoute(
+            builder: (_) =>
+                FirstVueBusinessProfileScreen(businessId: item.id),
+          ),
+        );
+      },
+      child: Container(
       width: 132,
       padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
       decoration: BoxDecoration(
@@ -423,19 +434,13 @@ class _PeopleFollowCard extends StatelessWidget {
             style: TextStyle(color: fv.tertiaryText, fontSize: 11),
           ),
           const Spacer(),
-          SocialFollowButton(
+          EntityFollowButton(
+            kind: FollowTargetKind.business,
+            targetId: item.id,
             compact: true,
-            onPressed: () {
-              Navigator.push(
-                context,
-                FirstVuePageRoute(
-                  builder: (_) =>
-                      FirstVueBusinessProfileScreen(businessId: item.id),
-                ),
-              );
-            },
           ),
         ],
+      ),
       ),
     );
   }
@@ -571,27 +576,29 @@ class SocialPostTile extends StatelessWidget {
                         ],
                       ),
                     ),
-                  if (showFollowOverlay)
+                  if (showFollowOverlay && onFollow != null)
                     Positioned(
                       top: 8,
                       right: 8,
-                      child: GestureDetector(
-                        onTap: onFollow ?? onTap,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: .45),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Text(
-                            'Follow',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
+                      child: StopPropagation(
+                        child: GestureDetector(
+                          onTap: onFollow,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: .45),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Text(
+                              'Follow',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ),
@@ -664,11 +671,13 @@ class SocialPostTile extends StatelessWidget {
                   ),
                 ),
               ),
-              if (showOutlineFollow)
-                SocialFollowButton(
-                  compact: true,
-                  filled: false,
-                  onPressed: onFollow ?? onTap,
+              if (showOutlineFollow && onFollow != null)
+                StopPropagation(
+                  child: SocialFollowButton(
+                    compact: true,
+                    filled: false,
+                    onPressed: onFollow,
+                  ),
                 )
               else if (showMenu)
                 GestureDetector(
@@ -840,6 +849,7 @@ class SocialFeedCard extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onFollow;
   final VoidCallback? onMore;
+  final String? followBusinessId;
 
   const SocialFeedCard({
     super.key,
@@ -856,6 +866,7 @@ class SocialFeedCard extends StatelessWidget {
     this.onTap,
     this.onFollow,
     this.onMore,
+    this.followBusinessId,
   });
 
   @override
@@ -929,9 +940,20 @@ class SocialFeedCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  SocialFollowButton(
-                    compact: true,
-                    onPressed: onFollow ?? onTap,
+                  StopPropagation(
+                    child: followBusinessId != null &&
+                            followBusinessId!.trim().isNotEmpty
+                        ? EntityFollowButton(
+                            kind: FollowTargetKind.business,
+                            targetId: followBusinessId!,
+                            compact: true,
+                          )
+                        : (onFollow != null
+                            ? SocialFollowButton(
+                                compact: true,
+                                onPressed: onFollow,
+                              )
+                            : const SizedBox.shrink()),
                   ),
                   IconButton(
                     onPressed: onMore ?? onTap,
@@ -1184,6 +1206,12 @@ class _SocialEventCardState extends State<SocialEventCard> {
                           compact: true,
                           fillColor: FirstVueColors.teal,
                           onPressed: _busy ? null : _toggleGoing,
+                        ),
+                        const SizedBox(width: 6),
+                        EntityFollowButton(
+                          kind: FollowTargetKind.event,
+                          targetId: event.id,
+                          compact: true,
                         ),
                       ],
                     ),

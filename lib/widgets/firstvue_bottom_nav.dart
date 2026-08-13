@@ -12,7 +12,7 @@ class FirstVueBottomNav extends StatelessWidget {
     required this.onSelected,
   });
 
-  static const _vueIndex = 2;
+  static const vueIndex = 2;
 
   @override
   Widget build(BuildContext context) {
@@ -45,18 +45,18 @@ class FirstVueBottomNav extends StatelessWidget {
                   onTap: () => onSelected(0),
                 ),
                 _NavItem(
-                  label: 'EXPLORE',
-                  icon: Icons.search,
-                  selectedIcon: Icons.search,
+                  label: 'FEEDS',
+                  icon: Icons.dynamic_feed_outlined,
+                  selectedIcon: Icons.dynamic_feed_rounded,
                   selected: selectedIndex == 1,
                   selectedColor: FirstVueColors.teal,
                   onTap: () => onSelected(1),
                 ),
                 const Expanded(child: SizedBox(width: 72)),
                 _NavItem(
-                  label: 'FAVORITES',
-                  icon: Icons.favorite_border_rounded,
-                  selectedIcon: Icons.favorite_rounded,
+                  label: 'EXPLORE',
+                  icon: Icons.search,
+                  selectedIcon: Icons.search,
                   selected: selectedIndex == 3,
                   selectedColor: FirstVueColors.gold,
                   onTap: () => onSelected(3),
@@ -75,8 +75,8 @@ class FirstVueBottomNav extends StatelessWidget {
           Positioned(
             bottom: 18 + bottomInset,
             child: _VueCenterTab(
-              selected: selectedIndex == _vueIndex,
-              onTap: () => onSelected(_vueIndex),
+              selected: selectedIndex == vueIndex,
+              onTap: () => onSelected(vueIndex),
             ),
           ),
         ],
