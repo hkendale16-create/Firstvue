@@ -1,22 +1,25 @@
 import 'package:flutter/material.dart';
-import '../navigation/firstvue_page_route.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/app_config.dart';
+import '../models/share_payload.dart';
+import '../navigation/firstvue_page_route.dart';
+import '../screens/auth_screen.dart';
 import '../screens/firstvue_business_profile_screen.dart';
 import '../screens/people_to_follow_screen.dart';
 import '../services/recommendations_service.dart';
+import '../services/saved_items_service.dart';
 import '../services/things_to_do_service.dart';
 import '../services/trending_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'firstvue_share_sheet.dart';
 import 'home_communities_section.dart';
 import 'social_chrome.dart';
 
 class HomeDiscoverySection extends StatefulWidget {
   final int refreshToken;
 
-  const HomeDiscoverySection({
-    super.key,
-    this.refreshToken = 0,
-  });
+  const HomeDiscoverySection({super.key, this.refreshToken = 0});
 
   @override
   State<HomeDiscoverySection> createState() => _HomeDiscoverySectionState();
@@ -77,10 +80,12 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
     return switch (label) {
       'Trending' => TrendingBusinessesService.fetchTrendingNearYou(limit: 16),
       'New' => TrendingBusinessesService.fetchNewNearYou(limit: 16),
-      'Recommended' =>
-        TrendingBusinessesService.fetchRecommendedNearYou(limit: 16),
-      'Coming Soon' =>
-        TrendingBusinessesService.fetchComingSoonNearYou(limit: 16),
+      'Recommended' => TrendingBusinessesService.fetchRecommendedNearYou(
+        limit: 16,
+      ),
+      'Coming Soon' => TrendingBusinessesService.fetchComingSoonNearYou(
+        limit: 16,
+      ),
       _ => TrendingBusinessesService.fetchTrendingNearYou(limit: 16),
     };
   }
@@ -151,7 +156,8 @@ class _MixedSocialFeed extends StatelessWidget {
       future: loadBusinesses(),
       builder: (context, snapshot) {
         final businesses = snapshot.data ?? const <TrendingBusiness>[];
-        final waiting = snapshot.connectionState == ConnectionState.waiting &&
+        final waiting =
+            snapshot.connectionState == ConnectionState.waiting &&
             businesses.isEmpty;
 
         return Column(
@@ -165,7 +171,7 @@ class _MixedSocialFeed extends StatelessWidget {
                 ),
               )
             else if (businesses.isNotEmpty)
-              _businessCard(context, businesses.first),
+              _InteractiveBusinessCard(business: businesses.first),
             const SizedBox(height: 18),
             PeopleToFollowRow(onSeeAll: onSeeAllPeople),
             const SizedBox(height: 18),
@@ -173,7 +179,7 @@ class _MixedSocialFeed extends StatelessWidget {
             if (businesses.length > 1) ...[
               const SizedBox(height: 18),
               for (final business in businesses.skip(1)) ...[
-                _businessCard(context, business),
+                _InteractiveBusinessCard(business: business),
                 const SizedBox(height: 12),
               ],
             ],
@@ -182,8 +188,163 @@ class _MixedSocialFeed extends StatelessWidget {
       },
     );
   }
+}
 
-  Widget _businessCard(BuildContext context, TrendingBusiness business) {
+class _InteractiveBusinessCard extends StatefulWidget {
+  final TrendingBusiness business;
+
+  const _InteractiveBusinessCard({required this.business});
+
+  @override
+  State<_InteractiveBusinessCard> createState() =>
+      _InteractiveBusinessCardState();
+}
+
+class _InteractiveBusinessCardState extends State<_InteractiveBusinessCard> {
+  bool _liked = false;
+  bool _saved = false;
+  bool _busy = false;
+  int _likeCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _likeCount = widget.business.reviewCount > 0
+        ? widget.business.reviewCount
+        : 128;
+    _loadSaved();
+  }
+
+  Future<void> _loadSaved() async {
+    final ids = await SavedItemsService.fetchSavedIds(
+      contentType: SavedContentType.business,
+      contentIds: [widget.business.id],
+    );
+    if (!mounted) return;
+    setState(() {
+      _saved = ids.contains(widget.business.id);
+      _liked = _saved;
+    });
+  }
+
+  Future<bool> _ensureSignedIn() async {
+    if (Supabase.instance.client.auth.currentUser != null) return true;
+    await Navigator.push(
+      context,
+      FirstVuePageRoute(builder: (_) => const AuthScreen()),
+    );
+    if (!mounted) return false;
+    return Supabase.instance.client.auth.currentUser != null;
+  }
+
+  void _openProfile() {
+    Navigator.push(
+      context,
+      FirstVuePageRoute(
+        builder: (_) =>
+            FirstVueBusinessProfileScreen(businessId: widget.business.id),
+      ),
+    );
+  }
+
+  Future<void> _toggleLike() async {
+    if (_busy) return;
+    if (Supabase.instance.client.auth.currentUser == null) {
+      if (!await _ensureSignedIn()) return;
+      if (!mounted) return;
+    }
+    setState(() => _busy = true);
+    final previousLiked = _liked;
+    final previousCount = _likeCount;
+    setState(() {
+      _liked = !_liked;
+      _likeCount = _liked ? _likeCount + 1 : (_likeCount - 1).clamp(0, 999999);
+    });
+    try {
+      final saved = await SavedItemsService.toggleSave(
+        contentType: SavedContentType.business,
+        contentId: widget.business.id,
+        currentlySaved: previousLiked,
+      );
+      if (!mounted) return;
+      setState(() {
+        _liked = saved;
+        _saved = saved;
+        _busy = false;
+      });
+    } on AuthException {
+      if (!mounted) return;
+      setState(() {
+        _liked = previousLiked;
+        _likeCount = previousCount;
+        _busy = false;
+      });
+      if (await _ensureSignedIn() && mounted) {
+        await _toggleLike();
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _liked = previousLiked;
+        _likeCount = previousCount;
+        _busy = false;
+      });
+    }
+  }
+
+  Future<void> _toggleSave() async {
+    if (_busy) return;
+    if (Supabase.instance.client.auth.currentUser == null) {
+      if (!await _ensureSignedIn()) return;
+      if (!mounted) return;
+    }
+    setState(() => _busy = true);
+    final previous = _saved;
+    setState(() => _saved = !_saved);
+    try {
+      final saved = await SavedItemsService.toggleSave(
+        contentType: SavedContentType.business,
+        contentId: widget.business.id,
+        currentlySaved: previous,
+      );
+      if (!mounted) return;
+      setState(() {
+        _saved = saved;
+        _liked = saved;
+        _busy = false;
+      });
+    } on AuthException {
+      if (!mounted) return;
+      setState(() {
+        _saved = previous;
+        _busy = false;
+      });
+      if (await _ensureSignedIn() && mounted) {
+        await _toggleSave();
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _saved = previous;
+        _busy = false;
+      });
+    }
+  }
+
+  Future<void> _share() async {
+    await FirstVueShareSheet.show(
+      context,
+      payload: SharePayload(
+        title: widget.business.name,
+        link: AppConfig.businessShareUrl(widget.business.id),
+        subtitle: 'Discover this business on FirstVue',
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final business = widget.business;
     final caption = business.services.isEmpty
         ? 'Verified on FirstVue. Book your appointment and start your weekend right.'
         : '${business.services.take(3).join(' • ')}. Book your appointment and start your weekend right.';
@@ -195,17 +356,17 @@ class _MixedSocialFeed extends StatelessWidget {
       assetImage: 'assets/images/explore_barbershops.jpg',
       meta: '2h',
       verified: business.verified,
-      likeCount: business.reviewCount > 0 ? business.reviewCount : 128,
+      likeCount: _likeCount,
       commentCount: 12,
       shareCount: 8,
-      onTap: () => Navigator.push(
-        context,
-        FirstVuePageRoute(
-          builder: (_) => FirstVueBusinessProfileScreen(
-            businessId: business.id,
-          ),
-        ),
-      ),
+      liked: _liked,
+      saved: _saved,
+      onProfileTap: _openProfile,
+      onTap: _openProfile,
+      onLike: _toggleLike,
+      onComment: _openProfile,
+      onShare: _share,
+      onSave: _toggleSave,
       followBusinessId: business.id,
     );
   }
@@ -335,9 +496,7 @@ class _YouMightLikeSectionState extends State<YouMightLikeSection> {
                         decoration: BoxDecoration(
                           color: context.fv.surface,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: context.fv.borderSubtle,
-                          ),
+                          border: Border.all(color: context.fv.borderSubtle),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,

@@ -8,6 +8,7 @@ import '../navigation/firstvue_page_route.dart';
 import '../services/community_hub_service.dart';
 import '../services/community_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../widgets/create_entity_form_chrome.dart';
 import '../widgets/location_autocomplete_field.dart';
 import '../widgets/media_picker_sheet.dart';
 import 'auth_screen.dart';
@@ -90,6 +91,13 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
         context,
         FirstVuePageRoute(builder: (_) => const AuthScreen()),
       );
+      if (!mounted) return;
+      if (Supabase.instance.client.auth.currentUser == null) return;
+    }
+
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = 'Group name is required.');
       return;
     }
 
@@ -126,71 +134,56 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: fv.background,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: null,
+        backgroundColor: fv.background,
+        foregroundColor: fv.primaryText,
         title: const Text('Create Group'),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
           if (_error != null) ...[
-            Text(_error!, style: const TextStyle(color: FirstVueColors.coral)),
+            Text(_error!, style: TextStyle(color: fv.error)),
             const SizedBox(height: 12),
           ],
-          Center(
-            child: Column(
-              children: [
-                GestureDetector(
-                  onTap: _saving ? null : _pickImage,
-                  child: CircleAvatar(
-                    radius: 46,
-                    backgroundColor: FirstVueColors.elevatedSurface,
-                    backgroundImage: _imageBytes != null
-                        ? MemoryImage(_imageBytes!)
-                        : null,
-                    child: _imageBytes == null
-                        ? const Icon(
-                            Icons.add_a_photo_outlined,
-                            color: FirstVueColors.teal,
-                            size: 28,
-                          )
-                        : null,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _imageFile == null
-                      ? 'Add group profile photo'
-                      : 'Tap to replace photo',
-                  style: const TextStyle(color: Color(0xFF5A5668), fontSize: 12),
-                ),
-                if (_imageFile != null)
-                  TextButton(
-                    onPressed: _saving ? null : _removeImage,
-                    child: const Text('Remove photo'),
-                  ),
-              ],
-            ),
+          CreateEntityFormChrome.imagePicker(
+            context: context,
+            onTap: _saving ? null : _pickImage,
+            onRemove: _saving ? null : _removeImage,
+            image: _imageBytes == null ? null : MemoryImage(_imageBytes!),
+            emptyLabel: 'Add group profile photo',
+            filledLabel: 'Tap to replace photo',
           ),
-          const SizedBox(height: 20),
-          _field(_nameController, 'Group name'),
-          const SizedBox(height: 16),
-          _field(
-            _descriptionController,
-            'Group bio / about',
-            lines: 4,
+          const SizedBox(height: 24),
+          CreateEntityFormChrome.sectionHeader(context, 'Basics'),
+          CreateEntityFormChrome.textField(
+            context,
+            controller: _nameController,
+            label: 'Group name',
+            capitalization: TextCapitalization.words,
+            enabled: !_saving,
           ),
-          const SizedBox(height: 16),
-          _field(_categoryController, 'Category (optional)'),
-          const SizedBox(height: 16),
-          const Text(
-            'Privacy',
-            style: TextStyle(color: Color(0xFF5A5668), fontWeight: FontWeight.w600),
+          const SizedBox(height: 12),
+          CreateEntityFormChrome.textField(
+            context,
+            controller: _descriptionController,
+            label: 'Group bio / about',
+            maxLines: 4,
+            enabled: !_saving,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
+          CreateEntityFormChrome.textField(
+            context,
+            controller: _categoryController,
+            label: 'Category (optional)',
+            capitalization: TextCapitalization.words,
+            enabled: !_saving,
+          ),
+          const SizedBox(height: 24),
+          CreateEntityFormChrome.sectionHeader(context, 'Privacy'),
           SegmentedButton<String>(
             segments: const [
               ButtonSegment(value: 'public', label: Text('Public')),
@@ -206,49 +199,63 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
             _privacy == 'public'
                 ? 'Anyone can discover and join this group.'
                 : 'Membership requires Group Leader approval.',
-            style: const TextStyle(color: Color(0xFF5A5668), fontSize: 12),
+            style: TextStyle(color: fv.secondaryText, fontSize: 12),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
+          CreateEntityFormChrome.sectionHeader(context, 'Location'),
           LocationAutocompleteField(
             controller: _cityController,
             label: 'City',
             type: LocationFieldType.city,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           LocationAutocompleteField(
             controller: _stateController,
             label: 'State',
             type: LocationFieldType.state,
           ),
-          const SizedBox(height: 16),
-          _field(_postalController, 'ZIP / postal code (optional)'),
-          const SizedBox(height: 16),
-          _field(_rulesController, 'Group rules (optional)', lines: 3),
+          const SizedBox(height: 12),
+          CreateEntityFormChrome.textField(
+            context,
+            controller: _postalController,
+            label: 'ZIP / postal code (optional)',
+            enabled: !_saving,
+          ),
+          const SizedBox(height: 24),
+          CreateEntityFormChrome.sectionHeader(context, 'Rules'),
+          CreateEntityFormChrome.textField(
+            context,
+            controller: _rulesController,
+            label: 'Group rules (optional)',
+            maxLines: 3,
+            enabled: !_saving,
+          ),
           if (_hubs.isNotEmpty) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
+            CreateEntityFormChrome.sectionHeader(context, 'Community'),
             DropdownButtonFormField<String?>(
               initialValue: _hubId,
-              dropdownColor: FirstVueColors.surface,
-              style: const TextStyle(color: Color(0xFF16131F)),
-              decoration: InputDecoration(
-                labelText: 'Associate with Community (optional)',
-                labelStyle: const TextStyle(color: Color(0xFF5A5668)),
-                filled: true,
-                fillColor: FirstVueColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
+              dropdownColor: fv.surface,
+              style: TextStyle(color: fv.primaryText),
+              decoration: CreateEntityFormChrome.decoration(
+                context,
+                label: 'Associate with Community (optional)',
               ),
               items: [
-                const DropdownMenuItem<String?>(
+                DropdownMenuItem<String?>(
                   value: null,
-                  child: Text('No community yet'),
+                  child: Text(
+                    'No community yet',
+                    style: TextStyle(color: fv.primaryText),
+                  ),
                 ),
                 ..._hubs.map(
                   (hub) => DropdownMenuItem<String?>(
                     value: hub.id,
-                    child: Text(hub.name),
+                    child: Text(
+                      hub.name,
+                      style: TextStyle(color: fv.primaryText),
+                    ),
                   ),
                 ),
               ],
@@ -258,44 +265,12 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
             ),
           ],
           const SizedBox(height: 28),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: FilledButton(
-              onPressed: _saving ? null : _create,
-              style: FilledButton.styleFrom(
-                backgroundColor: FirstVueColors.coral,
-                foregroundColor: null,
-              ),
-              child: Text(_saving ? 'Creating…' : 'Create Group'),
-            ),
+          CreateEntityFormChrome.primaryButton(
+            label: 'Create Group',
+            loading: _saving,
+            onPressed: _create,
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _field(
-    TextEditingController controller,
-    String label, {
-    int lines = 1,
-  }) {
-    return TextField(
-      controller: controller,
-      style: const TextStyle(color: Color(0xFF16131F)),
-      maxLines: lines,
-      textCapitalization: lines > 1
-          ? TextCapitalization.sentences
-          : TextCapitalization.words,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: Color(0xFF5A5668)),
-        filled: true,
-        fillColor: FirstVueColors.surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
       ),
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
+import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../screens/followers_following_screen.dart';
 import '../services/web_seo_service.dart';
@@ -13,6 +14,7 @@ import '../theme/firstvue_theme.dart';
 import '../widgets/community_news_post_card.dart';
 import '../widgets/community_news_post_detail_sheet.dart';
 import '../widgets/facebook_style_profile_header.dart';
+import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/social_chrome.dart';
 import '../services/messaging_service.dart';
 import 'conversation_screen.dart';
@@ -182,10 +184,7 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
       await Navigator.push(
         context,
         FirstVuePageRoute(
-          builder: (_) => ConversationScreen(
-            threadId: threadId,
-            title: _title,
-          ),
+          builder: (_) => ConversationScreen(threadId: threadId, title: _title),
         ),
       );
     } catch (_) {
@@ -235,9 +234,7 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            updated.savedByMe
-                ? 'Saved to Favorites'
-                : 'Removed from Favorites',
+            updated.savedByMe ? 'Saved to Favorites' : 'Removed from Favorites',
           ),
           duration: const Duration(seconds: 2),
         ),
@@ -342,13 +339,14 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
   }
 
   Widget _buildPostsTab() {
+    final fv = context.fv;
     if (_posts.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 36),
         child: Text(
           'No community posts yet.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white.withValues(alpha: .45)),
+          style: TextStyle(color: fv.secondaryText),
         ),
       );
     }
@@ -368,11 +366,39 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
               ),
               onSpark: () => _sparkPost(index),
               onSave: () => _savePost(index),
+              onShare: () => FirstVueShareSheet.show(
+                context,
+                payload: SharePayload(
+                  title: _posts[index].authorName,
+                  link: AppConfig.newsPostShareUrl(_posts[index].id),
+                  subtitle: _posts[index].body,
+                ),
+              ),
               onComment: () => FeedCommentsSheet.show(
                 context,
                 mediaId: _posts[index].commentsMediaId,
                 businessName: _posts[index].authorName,
               ),
+            ),
+          if (_posts.length >= 20)
+            TextButton(
+              onPressed: () async {
+                final more = await CommunityNewsService.fetchPostsByAuthor(
+                  widget.profileId,
+                  limit: 20,
+                  beforeCreatedAt: _posts.last.createdAt,
+                  beforeId: _posts.last.id,
+                );
+                if (!mounted || more.isEmpty) return;
+                final existing = _posts.map((p) => p.id).toSet();
+                setState(() {
+                  _posts = [
+                    ..._posts,
+                    ...more.where((p) => existing.add(p.id)),
+                  ];
+                });
+              },
+              child: const Text('Load more posts'),
             ),
         ],
       ),
@@ -460,15 +486,15 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
                   onTap: _loading
                       ? null
                       : () => Navigator.push(
-                            context,
-                            FirstVuePageRoute(
-                              builder: (_) => FollowersFollowingScreen(
-                                profileId: widget.profileId,
-                                displayName: _title,
-                                mode: FollowListMode.followers,
-                              ),
+                          context,
+                          FirstVuePageRoute(
+                            builder: (_) => FollowersFollowingScreen(
+                              profileId: widget.profileId,
+                              displayName: _title,
+                              mode: FollowListMode.followers,
                             ),
                           ),
+                        ),
                 ),
                 ProfileStatItem(
                   label: 'following',
@@ -476,15 +502,15 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
                   onTap: _loading
                       ? null
                       : () => Navigator.push(
-                            context,
-                            FirstVuePageRoute(
-                              builder: (_) => FollowersFollowingScreen(
-                                profileId: widget.profileId,
-                                displayName: _title,
-                                mode: FollowListMode.following,
-                              ),
+                          context,
+                          FirstVuePageRoute(
+                            builder: (_) => FollowersFollowingScreen(
+                              profileId: widget.profileId,
+                              displayName: _title,
+                              mode: FollowListMode.following,
                             ),
                           ),
+                        ),
                 ),
               ],
               actions: _isSelf
@@ -493,8 +519,9 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
                       SocialFollowButton(
                         label: _followLabel(),
                         filled: _followStatus != FollowStatus.following,
-                        onPressed:
-                            _loading || _followBusy ? null : _toggleFollow,
+                        onPressed: _loading || _followBusy
+                            ? null
+                            : _toggleFollow,
                       ),
                       SocialFollowButton(
                         label: 'Message',
@@ -526,15 +553,15 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
                     0 => _buildPostsTab(),
                     1 => _buildPhotosTab(),
                     2 => ProfileAffiliationsSection(
-                        profileId: widget.profileId,
-                        showGroups: true,
-                        showCommunities: false,
-                      ),
+                      profileId: widget.profileId,
+                      showGroups: true,
+                      showCommunities: false,
+                    ),
                     _ => ProfileAffiliationsSection(
-                        profileId: widget.profileId,
-                        showGroups: false,
-                        showCommunities: true,
-                      ),
+                      profileId: widget.profileId,
+                      showGroups: false,
+                      showCommunities: true,
+                    ),
                   },
                 ),
               ),

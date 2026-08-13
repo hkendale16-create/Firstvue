@@ -28,9 +28,7 @@ class _PeopleToFollowScreenState extends State<PeopleToFollowScreen> {
     final fv = context.fv;
     return Scaffold(
       backgroundColor: fv.background,
-      appBar: AppBar(
-        title: const Text('People to follow'),
-      ),
+      appBar: AppBar(title: const Text('Consider Following')),
       body: FutureBuilder<List<TrendingBusiness>>(
         future: _future,
         builder: (context, snapshot) {

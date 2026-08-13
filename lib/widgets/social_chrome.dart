@@ -8,6 +8,7 @@ import '../services/trending_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'event_profile_sheet.dart';
 import 'entity_follow_button.dart';
+import 'explore_grid_video.dart';
 import 'facebook_style_profile_header.dart';
 import 'firstvue_inline_search_bar.dart';
 
@@ -46,8 +47,10 @@ class SocialPillTabs extends StatelessWidget {
               onTap: () => onSelected(i),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: i == selectedIndex
                       ? FirstVueColors.gold
@@ -62,9 +65,7 @@ class SocialPillTabs extends StatelessWidget {
                 child: Text(
                   labels[i],
                   style: TextStyle(
-                    color: i == selectedIndex
-                        ? _goldOnWhite
-                        : fv.secondaryText,
+                    color: i == selectedIndex ? _goldOnWhite : fv.secondaryText,
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
                   ),
@@ -137,11 +138,15 @@ class SocialFollowButton extends StatelessWidget {
 class SocialSearchBar extends StatelessWidget {
   final String hintText;
   final bool autofocus;
+  final VoidCallback? onFilterTap;
+  final bool filterActive;
 
   const SocialSearchBar({
     super.key,
     this.hintText = _searchHint,
     this.autofocus = false,
+    this.onFilterTap,
+    this.filterActive = false,
   });
 
   @override
@@ -151,6 +156,8 @@ class SocialSearchBar extends StatelessWidget {
       autofocus: autofocus,
       padding: EdgeInsets.zero,
       showOpenButton: false,
+      onFilterTap: onFilterTap,
+      filterActive: filterActive,
     );
   }
 }
@@ -171,8 +178,9 @@ class SocialPageHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final align = centered ? TextAlign.center : TextAlign.start;
     return Column(
-      crossAxisAlignment:
-          centered ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      crossAxisAlignment: centered
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
         Text(
           title,
@@ -307,11 +315,16 @@ class SocialGoldUnderlineTabs extends StatelessWidget {
   }
 }
 
-/// Horizontal “People to follow” cards driven by nearby trending businesses.
+/// Horizontal “Consider Following” cards driven by nearby trending businesses.
 class PeopleToFollowRow extends StatefulWidget {
-  const PeopleToFollowRow({super.key, this.onSeeAll});
+  const PeopleToFollowRow({
+    super.key,
+    this.onSeeAll,
+    this.title = 'Consider Following',
+  });
 
   final VoidCallback? onSeeAll;
+  final String title;
 
   @override
   State<PeopleToFollowRow> createState() => _PeopleToFollowRowState();
@@ -333,7 +346,7 @@ class _PeopleToFollowRowState extends State<PeopleToFollowRow> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SocialSectionHeader(
-          title: 'People to follow',
+          title: widget.title,
           actionLabel: widget.onSeeAll != null ? 'See all' : null,
           onAction: widget.onSeeAll,
         ),
@@ -391,56 +404,56 @@ class _PeopleFollowCard extends StatelessWidget {
         Navigator.push(
           context,
           FirstVuePageRoute(
-            builder: (_) =>
-                FirstVueBusinessProfileScreen(businessId: item.id),
+            builder: (_) => FirstVueBusinessProfileScreen(businessId: item.id),
           ),
         );
       },
       child: Container(
-      width: 132,
-      padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
-      decoration: BoxDecoration(
-        color: fv.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: fv.borderSubtle),
-      ),
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: fv.elevatedSurface,
-            backgroundImage:
-                item.imageUrl != null ? NetworkImage(item.imageUrl!) : null,
-            child: item.imageUrl == null
-                ? const Icon(Icons.person_rounded, color: FirstVueColors.gold)
-                : null,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            item.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: fv.primaryText,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
+        width: 132,
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+        decoration: BoxDecoration(
+          color: fv.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: fv.borderSubtle),
+        ),
+        child: Column(
+          children: [
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: fv.elevatedSurface,
+              backgroundImage: item.imageUrl != null
+                  ? NetworkImage(item.imageUrl!)
+                  : null,
+              child: item.imageUrl == null
+                  ? const Icon(Icons.person_rounded, color: FirstVueColors.gold)
+                  : null,
             ),
-          ),
-          Text(
-            role,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: fv.tertiaryText, fontSize: 11),
-          ),
-          const Spacer(),
-          EntityFollowButton(
-            kind: FollowTargetKind.business,
-            targetId: item.id,
-            compact: true,
-          ),
-        ],
-      ),
+            const SizedBox(height: 8),
+            Text(
+              item.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: fv.primaryText,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+            Text(
+              role,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: fv.tertiaryText, fontSize: 11),
+            ),
+            const Spacer(),
+            EntityFollowButton(
+              kind: FollowTargetKind.business,
+              targetId: item.id,
+              compact: true,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -474,6 +487,7 @@ class SocialPostTile extends StatelessWidget {
   final String? avatarUrl;
   final String? imageUrl;
   final String? assetImage;
+  final String? videoUrl;
   final String? likeLabel;
   final String? dateLabel;
   final String? durationLabel;
@@ -493,6 +507,7 @@ class SocialPostTile extends StatelessWidget {
     this.avatarUrl,
     this.imageUrl,
     this.assetImage,
+    this.videoUrl,
     this.likeLabel,
     this.dateLabel,
     this.durationLabel,
@@ -509,6 +524,7 @@ class SocialPostTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fv = context.fv;
+    final hasVideo = videoUrl != null && videoUrl!.trim().isNotEmpty;
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -520,13 +536,16 @@ class SocialPostTile extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  _tileImage(),
+                  if (hasVideo)
+                    ExploreGridVideo(
+                      url: videoUrl!,
+                      thumbnailUrl: imageUrl,
+                      onTap: onTap,
+                    )
+                  else
+                    _tileImage(),
                   if (live)
-                    const Positioned(
-                      top: 8,
-                      left: 8,
-                      child: _LiveBadge(),
-                    ),
+                    const Positioned(top: 8, left: 8, child: _LiveBadge()),
                   if (dateLabel != null)
                     Positioned(
                       top: 8,
@@ -614,7 +633,7 @@ class SocialPostTile extends StatelessWidget {
                         size: 20,
                       ),
                     ),
-                  if (showPlay)
+                  if (showPlay && !hasVideo)
                     Center(
                       child: Icon(
                         Icons.play_circle_fill_rounded,
@@ -648,8 +667,9 @@ class SocialPostTile extends StatelessWidget {
               CircleAvatar(
                 radius: 11,
                 backgroundColor: fv.elevatedSurface,
-                backgroundImage:
-                    avatarUrl != null ? NetworkImage(avatarUrl!) : null,
+                backgroundImage: avatarUrl != null
+                    ? NetworkImage(avatarUrl!)
+                    : null,
                 child: avatarUrl == null
                     ? const Icon(
                         Icons.person_rounded,
@@ -682,11 +702,7 @@ class SocialPostTile extends StatelessWidget {
               else if (showMenu)
                 GestureDetector(
                   onTap: onMenu ?? onTap,
-                  child: Icon(
-                    Icons.more_horiz,
-                    size: 18,
-                    color: fv.mutedIcon,
-                  ),
+                  child: Icon(Icons.more_horiz, size: 18, color: fv.mutedIcon),
                 ),
             ],
           ),
@@ -700,8 +716,9 @@ class SocialPostTile extends StatelessWidget {
       return Image.network(
         imageUrl!,
         fit: BoxFit.cover,
-        errorBuilder: (_, _, _) =>
-            assetImage != null ? Image.asset(assetImage!, fit: BoxFit.cover) : _fallback(),
+        errorBuilder: (_, _, _) => assetImage != null
+            ? Image.asset(assetImage!, fit: BoxFit.cover)
+            : _fallback(),
       );
     }
     if (assetImage != null) {
@@ -846,9 +863,16 @@ class SocialFeedCard extends StatelessWidget {
   final int likeCount;
   final int commentCount;
   final int shareCount;
+  final bool liked;
+  final bool saved;
   final VoidCallback? onTap;
+  final VoidCallback? onProfileTap;
   final VoidCallback? onFollow;
   final VoidCallback? onMore;
+  final VoidCallback? onLike;
+  final VoidCallback? onComment;
+  final VoidCallback? onShare;
+  final VoidCallback? onSave;
   final String? followBusinessId;
 
   const SocialFeedCard({
@@ -863,9 +887,16 @@ class SocialFeedCard extends StatelessWidget {
     this.likeCount = 0,
     this.commentCount = 0,
     this.shareCount = 0,
+    this.liked = false,
+    this.saved = false,
     this.onTap,
+    this.onProfileTap,
     this.onFollow,
     this.onMore,
+    this.onLike,
+    this.onComment,
+    this.onShare,
+    this.onSave,
     this.followBusinessId,
   });
 
@@ -873,19 +904,21 @@ class SocialFeedCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final fv = context.fv;
     final handleLine = meta == null ? handle : '$handle · $meta';
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final openProfile = onProfileTap ?? onTap;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  CircleAvatar(
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: openProfile,
+                  borderRadius: BorderRadius.circular(24),
+                  child: CircleAvatar(
                     radius: 18,
                     backgroundColor: fv.elevatedSurface,
                     backgroundImage: imageUrl != null
@@ -899,131 +932,222 @@ class SocialFeedCard extends StatelessWidget {
                           )
                         : null,
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: fv.primaryText,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: openProfile,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: fv.primaryText,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
                                 ),
                               ),
-                            ),
-                            if (verified) ...[
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.verified,
-                                color: Color(0xFF1D9BF0),
-                                size: 16,
-                              ),
+                              if (verified) ...[
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.verified,
+                                  color: Color(0xFF1D9BF0),
+                                  size: 16,
+                                ),
+                              ],
                             ],
-                          ],
-                        ),
-                        Text(
-                          handleLine,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: fv.tertiaryText,
-                            fontSize: 12,
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  StopPropagation(
-                    child: followBusinessId != null &&
-                            followBusinessId!.trim().isNotEmpty
-                        ? EntityFollowButton(
-                            kind: FollowTargetKind.business,
-                            targetId: followBusinessId!,
-                            compact: true,
-                          )
-                        : (onFollow != null
-                            ? SocialFollowButton(
-                                compact: true,
-                                onPressed: onFollow,
-                              )
-                            : const SizedBox.shrink()),
-                  ),
-                  IconButton(
-                    onPressed: onMore ?? onTap,
-                    visualDensity: VisualDensity.compact,
-                    icon: Icon(Icons.more_horiz, color: fv.mutedIcon),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                body,
-                style: TextStyle(color: fv.primaryText, height: 1.35),
-              ),
-              if (imageUrl != null || assetImage != null) ...[
-                const SizedBox(height: 10),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: AspectRatio(
-                    aspectRatio: 16 / 10,
-                    child: imageUrl != null
-                        ? Image.network(
-                            imageUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => Image.asset(
-                              assetImage ?? 'assets/images/explore_salons.jpg',
-                              fit: BoxFit.cover,
+                          Text(
+                            handleLine,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: fv.tertiaryText,
+                              fontSize: 12,
                             ),
-                          )
-                        : Image.asset(assetImage!, fit: BoxFit.cover),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ],
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Icon(Icons.favorite_border, size: 18, color: fv.mutedIcon),
-                  if (likeCount > 0) ...[
-                    const SizedBox(width: 4),
-                    Text(
-                      '$likeCount',
-                      style: TextStyle(color: fv.secondaryText, fontSize: 12),
-                    ),
-                  ],
-                  const SizedBox(width: 14),
-                  Icon(Icons.mode_comment_outlined, size: 18, color: fv.mutedIcon),
-                  if (commentCount > 0) ...[
-                    const SizedBox(width: 4),
-                    Text(
-                      '$commentCount',
-                      style: TextStyle(color: fv.secondaryText, fontSize: 12),
-                    ),
-                  ],
-                  const SizedBox(width: 14),
-                  Icon(Icons.ios_share_outlined, size: 18, color: fv.mutedIcon),
-                  if (shareCount > 0) ...[
-                    const SizedBox(width: 4),
-                    Text(
-                      '$shareCount',
-                      style: TextStyle(color: fv.secondaryText, fontSize: 12),
-                    ),
-                  ],
-                  const Spacer(),
-                  const Icon(
-                    Icons.bookmark_border_rounded,
-                    size: 18,
-                    color: FirstVueColors.gold,
-                  ),
-                ],
+              ),
+              StopPropagation(
+                child:
+                    followBusinessId != null &&
+                        followBusinessId!.trim().isNotEmpty
+                    ? EntityFollowButton(
+                        kind: FollowTargetKind.business,
+                        targetId: followBusinessId!,
+                        compact: true,
+                      )
+                    : (onFollow != null
+                          ? SocialFollowButton(
+                              compact: true,
+                              onPressed: onFollow,
+                            )
+                          : const SizedBox.shrink()),
+              ),
+              StopPropagation(
+                child: IconButton(
+                  onPressed: onMore,
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(Icons.more_horiz, color: fv.mutedIcon),
+                ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    body,
+                    style: TextStyle(color: fv.primaryText, height: 1.35),
+                  ),
+                  if (imageUrl != null || assetImage != null) ...[
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: AspectRatio(
+                        aspectRatio: 16 / 10,
+                        child: imageUrl != null
+                            ? Image.network(
+                                imageUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => Image.asset(
+                                  assetImage ??
+                                      'assets/images/explore_salons.jpg',
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : Image.asset(assetImage!, fit: BoxFit.cover),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _FeedActionHitTarget(
+                onTap: onLike,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      liked ? Icons.favorite : Icons.favorite_border,
+                      size: 20,
+                      color: liked ? FirstVueColors.coral : fv.mutedIcon,
+                    ),
+                    if (likeCount > 0) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        '$likeCount',
+                        style: TextStyle(color: fv.secondaryText, fontSize: 12),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _FeedActionHitTarget(
+                onTap: onComment,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.mode_comment_outlined,
+                      size: 20,
+                      color: fv.mutedIcon,
+                    ),
+                    if (commentCount > 0) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        '$commentCount',
+                        style: TextStyle(color: fv.secondaryText, fontSize: 12),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _FeedActionHitTarget(
+                onTap: onShare,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.ios_share_outlined,
+                      size: 20,
+                      color: fv.mutedIcon,
+                    ),
+                    if (shareCount > 0) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        '$shareCount',
+                        style: TextStyle(color: fv.secondaryText, fontSize: 12),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const Spacer(),
+              _FeedActionHitTarget(
+                onTap: onSave,
+                child: Icon(
+                  saved
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_border_rounded,
+                  size: 20,
+                  color: saved ? FirstVueColors.gold : FirstVueColors.gold,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeedActionHitTarget extends StatelessWidget {
+  final VoidCallback? onTap;
+  final Widget child;
+
+  const _FeedActionHitTarget({required this.child, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return StopPropagation(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+            child: child,
           ),
         ),
       ),
@@ -1147,7 +1271,11 @@ class _SocialEventCardState extends State<SocialEventCard> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(Icons.place_outlined, size: 13, color: fv.mutedIcon),
+                        Icon(
+                          Icons.place_outlined,
+                          size: 13,
+                          color: fv.mutedIcon,
+                        ),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
@@ -1308,8 +1436,9 @@ class SocialProfileHeader extends StatelessWidget {
         child: CircleAvatar(
           radius: 44,
           backgroundColor: fv.elevatedSurface,
-          backgroundImage:
-              hasAvatar && !avatarIsVideo ? NetworkImage(avatarImageUrl!) : null,
+          backgroundImage: hasAvatar && !avatarIsVideo
+              ? NetworkImage(avatarImageUrl!)
+              : null,
           child: hasAvatar
               ? null
               : Icon(avatarIcon, color: FirstVueColors.gold, size: 42),
@@ -1359,8 +1488,9 @@ class SocialProfileHeader extends StatelessWidget {
                   Flexible(
                     child: Text(
                       name,
-                      textAlign:
-                          centerAvatar ? TextAlign.center : TextAlign.start,
+                      textAlign: centerAvatar
+                          ? TextAlign.center
+                          : TextAlign.start,
                       style: TextStyle(
                         fontFamily: 'CormorantGaramond',
                         color: fv.primaryText,
@@ -1429,12 +1559,14 @@ class SocialProfileHeader extends StatelessWidget {
               if (bio != null && bio!.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Align(
-                  alignment:
-                      centerAvatar ? Alignment.center : Alignment.centerLeft,
+                  alignment: centerAvatar
+                      ? Alignment.center
+                      : Alignment.centerLeft,
                   child: Text(
                     bio!,
-                    textAlign:
-                        centerAvatar ? TextAlign.center : TextAlign.start,
+                    textAlign: centerAvatar
+                        ? TextAlign.center
+                        : TextAlign.start,
                     style: TextStyle(color: fv.secondaryText, fontSize: 13),
                   ),
                 ),

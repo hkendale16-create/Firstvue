@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
-import '../theme/firstvue_theme.dart';
-import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/share_payload.dart';
+import '../navigation/firstvue_page_route.dart';
+import '../config/app_config.dart';
 import '../screens/auth_screen.dart';
 import '../services/community_news_service.dart';
+import '../theme/firstvue_theme.dart';
 import 'community_news_post_card.dart';
 import 'community_news_post_detail_sheet.dart';
 import 'feed_comments_sheet.dart';
-import 'social_chrome.dart';
+import 'firstvue_share_sheet.dart';
 
 class ProfileMyPostsSection extends StatefulWidget {
   final int refreshToken;
@@ -25,164 +27,253 @@ class ProfileMyPostsSection extends StatefulWidget {
 }
 
 class _ProfileMyPostsSectionState extends State<ProfileMyPostsSection> {
-  late Future<List<CommunityNewsPost>> _postsFuture;
-  List<CommunityNewsPost> _posts = const [];
+  static const _pageSize = 12;
+
+  final List<CommunityNewsPost> _posts = [];
+  final Set<String> _seenIds = {};
+  bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  String? _error;
+  final Set<String> _busyIds = {};
 
   @override
   void initState() {
     super.initState();
-    _postsFuture = _loadPosts();
+    _reload();
   }
 
   @override
   void didUpdateWidget(covariant ProfileMyPostsSection oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.refreshToken != widget.refreshToken) {
-      _postsFuture = _loadPosts();
+      _reload();
     }
   }
 
-  Future<List<CommunityNewsPost>> _loadPosts() async {
-    final posts = await CommunityNewsService.fetchMyPosts();
-    if (mounted) setState(() => _posts = posts);
-    return posts;
+  Future<void> _reload() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+      _hasMore = true;
+    });
+    try {
+      final posts = await CommunityNewsService.fetchMyPosts(limit: _pageSize);
+      if (!mounted) return;
+      setState(() {
+        _posts
+          ..clear()
+          ..addAll(posts);
+        _seenIds
+          ..clear()
+          ..addAll(posts.map((p) => p.id));
+        _loading = false;
+        _hasMore = posts.length >= _pageSize;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Unable to load your posts.';
+      });
+    }
   }
 
-  Future<void> _refresh() async {
-    setState(() => _postsFuture = _loadPosts());
-    await _postsFuture;
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore || _posts.isEmpty) return;
+    setState(() => _loadingMore = true);
+    try {
+      final more = await CommunityNewsService.fetchMyPosts(
+        limit: _pageSize,
+        beforeCreatedAt: _posts.last.createdAt,
+        beforeId: _posts.last.id,
+      );
+      final fresh = more.where((p) => _seenIds.add(p.id)).toList();
+      if (!mounted) return;
+      setState(() {
+        _posts.addAll(fresh);
+        _hasMore = more.length >= _pageSize;
+        _loadingMore = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingMore = false;
+        _error = 'Could not load more posts.';
+      });
+    }
+  }
+
+  Future<bool> _ensureSignedIn() async {
+    if (Supabase.instance.client.auth.currentUser != null) return true;
+    await Navigator.push(
+      context,
+      FirstVuePageRoute(builder: (_) => const AuthScreen()),
+    );
+    return Supabase.instance.client.auth.currentUser != null;
+  }
+
+  Future<void> _withBusy(String id, Future<void> Function() action) async {
+    if (_busyIds.contains(id)) return;
+    _busyIds.add(id);
+    try {
+      await action();
+    } finally {
+      _busyIds.remove(id);
+    }
   }
 
   Future<void> _savePost(int index) async {
     if (index < 0 || index >= _posts.length) return;
-    final post = _posts[index];
-    final previous = post;
-    final optimistic = post.copyWith(savedByMe: !post.savedByMe);
-
-    setState(() {
-      _posts = [
-        for (var i = 0; i < _posts.length; i++)
-          if (i == index) optimistic else _posts[i],
-      ];
-    });
-
-    try {
-      final updated = await CommunityNewsService.toggleSave(post);
-      if (!mounted) return;
-      setState(() {
-        _posts = [
-          for (var i = 0; i < _posts.length; i++)
-            if (i == index) updated else _posts[i],
-        ];
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            updated.savedByMe
-                ? 'Saved to Favorites'
-                : 'Removed from Favorites',
+    await _withBusy(_posts[index].id, () async {
+      if (Supabase.instance.client.auth.currentUser == null) {
+        if (!await _ensureSignedIn()) return;
+        if (!mounted || index >= _posts.length) return;
+      }
+      final post = _posts[index];
+      final previous = post;
+      final optimistic = post.copyWith(savedByMe: !post.savedByMe);
+      setState(() => _posts[index] = optimistic);
+      try {
+        final updated = await CommunityNewsService.toggleSave(post);
+        if (!mounted) return;
+        setState(() => _posts[index] = updated);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              updated.savedByMe
+                  ? 'Saved to Favorites'
+                  : 'Removed from Favorites',
+            ),
+            duration: const Duration(seconds: 2),
           ),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } on AuthException {
-      if (!mounted) return;
-      setState(() {
-        _posts = [
-          for (var i = 0; i < _posts.length; i++)
-            if (i == index) previous else _posts[i],
-        ];
-      });
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _posts = [
-          for (var i = 0; i < _posts.length; i++)
-            if (i == index) previous else _posts[i],
-        ];
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to save this post right now.')),
-      );
-    }
+        );
+      } on AuthException {
+        if (!mounted) return;
+        setState(() => _posts[index] = previous);
+        if (await _ensureSignedIn() && mounted) {
+          await _savePost(index);
+        }
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _posts[index] = previous);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to save this post right now.')),
+        );
+      }
+    });
   }
 
   Future<void> _sparkPost(int index) async {
     if (index < 0 || index >= _posts.length) return;
-    final post = _posts[index];
-    final previous = post;
-    final optimistic = post.copyWith(
-      sparkedByMe: !post.sparkedByMe,
-      sparkCount: post.sparkCount + (post.sparkedByMe ? -1 : 1),
-    );
-
-    setState(() {
-      _posts = [
-        for (var i = 0; i < _posts.length; i++)
-          if (i == index) optimistic else _posts[i],
-      ];
+    await _withBusy(_posts[index].id, () async {
+      if (Supabase.instance.client.auth.currentUser == null) {
+        if (!await _ensureSignedIn()) return;
+        if (!mounted || index >= _posts.length) return;
+      }
+      final post = _posts[index];
+      final previous = post;
+      final optimistic = post.copyWith(
+        sparkedByMe: !post.sparkedByMe,
+        sparkCount: post.sparkCount + (post.sparkedByMe ? -1 : 1),
+      );
+      setState(() => _posts[index] = optimistic);
+      try {
+        final updated = await CommunityNewsService.toggleSpark(post);
+        if (!mounted) return;
+        setState(() => _posts[index] = updated);
+      } on AuthException {
+        if (!mounted) return;
+        setState(() => _posts[index] = previous);
+        if (await _ensureSignedIn() && mounted) {
+          await _sparkPost(index);
+        }
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _posts[index] = previous);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to spark this post right now.')),
+        );
+      }
     });
+  }
 
-    try {
-      final updated = await CommunityNewsService.toggleSpark(post);
-      if (!mounted) return;
-      setState(() {
-        _posts = [
-          for (var i = 0; i < _posts.length; i++)
-            if (i == index) updated else _posts[i],
-        ];
-      });
-    } on AuthException {
-      if (!mounted) return;
-      setState(() {
-        _posts = [
-          for (var i = 0; i < _posts.length; i++)
-            if (i == index) previous else _posts[i],
-        ];
-      });
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _posts = [
-          for (var i = 0; i < _posts.length; i++)
-            if (i == index) previous else _posts[i],
-        ];
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to spark this post right now.')),
-      );
-    }
+  Future<void> _sharePost(CommunityNewsPost post) async {
+    await FirstVueShareSheet.show(
+      context,
+      payload: SharePayload(
+        title: post.authorName,
+        link: AppConfig.newsPostShareUrl(post.id),
+        subtitle: post.body,
+      ),
+    );
   }
 
   Future<void> _deletePost(int index) async {
     if (index < 0 || index >= _posts.length) return;
     final deleted = await confirmDeleteNewsPost(context, _posts[index]);
     if (!deleted || !mounted) return;
+    final removed = _posts[index];
     setState(() {
-      _posts = [
-        for (var i = 0; i < _posts.length; i++)
-          if (i != index) _posts[i],
-      ];
+      _posts.removeAt(index);
+      _seenIds.remove(removed.id);
     });
   }
 
-  Future<void> _showPostMenu(int index) async {
-    await _deletePost(index);
+  Widget _buildPostList({required bool compact}) {
+    return Column(
+      children: [
+        for (var index = 0; index < _posts.length; index++)
+          Padding(
+            padding: EdgeInsets.only(bottom: compact ? 8 : 10),
+            child: CommunityNewsPostCard(
+              post: _posts[index],
+              compact: true,
+              onTap: () => CommunityNewsPostDetailSheet.show(
+                context,
+                postId: _posts[index].id,
+                initialPost: _posts[index],
+              ),
+              onSpark: () => _sparkPost(index),
+              onSave: () => _savePost(index),
+              onShare: () => _sharePost(_posts[index]),
+              onComment: () => FeedCommentsSheet.show(
+                context,
+                mediaId: _posts[index].commentsMediaId,
+                businessName: _posts[index].authorName,
+              ),
+              onDelete: _posts[index].isMine ? () => _deletePost(index) : null,
+            ),
+          ),
+        if (_hasMore)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            child: TextButton(
+              onPressed: _loadingMore ? null : _loadMore,
+              child: _loadingMore
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Load more posts'),
+            ),
+          ),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     final embedded = widget.embedded;
     return Padding(
-      padding: EdgeInsets.fromLTRB(embedded ? 16 : 20, 0, embedded ? 16 : 20, embedded ? 0 : 18),
+      padding: EdgeInsets.fromLTRB(
+        embedded ? 16 : 20,
+        0,
+        embedded ? 16 : 20,
+        embedded ? 0 : 18,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -191,11 +282,11 @@ class _ProfileMyPostsSectionState extends State<ProfileMyPostsSection> {
               padding: const EdgeInsets.only(left: 4, bottom: 8),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'MY POSTS',
                       style: TextStyle(
-                        color: Colors.white54,
+                        color: fv.secondaryText,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 1.2,
                         fontSize: 12,
@@ -203,161 +294,67 @@ class _ProfileMyPostsSectionState extends State<ProfileMyPostsSection> {
                     ),
                   ),
                   IconButton(
-                    onPressed: _refresh,
-                    icon: const Icon(Icons.refresh, size: 18, color: Colors.white38),
+                    onPressed: _reload,
+                    icon: Icon(Icons.refresh, size: 18, color: fv.mutedIcon),
                     tooltip: 'Refresh posts',
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
                   ),
                 ],
               ),
             ),
-          FutureBuilder<List<CommunityNewsPost>>(
-            future: _postsFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting &&
-                  _posts.isEmpty) {
-                return _PostsContainer(
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 28),
-                    child: Center(
-                      child: SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Color(0xFFD8B56A),
-                        ),
-                      ),
-                    ),
+          if (_loading && _posts.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 28),
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: FirstVueColors.gold,
                   ),
-                );
-              }
-
-              if (snapshot.hasError) {
-                return _PostsContainer(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 22,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          color: Colors.white.withValues(alpha: .35),
-                          size: 28,
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Unable to load your posts.',
-                                style: TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: _refresh,
-                                child: const Text('Try again'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-              final posts = snapshot.data ?? _posts;
-              if (posts.isEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 8),
-                  child: Text(
-                    'No posts yet. Share updates from the home feed and they will show up here.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: context.fv.secondaryText,
-                      height: 1.45,
-                      fontSize: 13,
-                    ),
-                  ),
-                );
-              }
-
-              if (embedded) {
-                return SocialPhotoGrid(
-                  items: [
-                    for (final post in posts)
-                      SocialPhotoGridItem(
-                        imageUrl: post.media.isNotEmpty
-                            ? post.media.first.signedUrl
-                            : null,
-                        isVideo: post.media.isNotEmpty && post.media.first.isVideo,
-                        onTap: () => CommunityNewsPostDetailSheet.show(
-                          context,
-                          postId: post.id,
-                          initialPost: post,
-                        ),
-                      ),
-                  ],
-                );
-              }
-
-              return Column(
+                ),
+              ),
+            )
+          else if (_error != null && _posts.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 22),
+              child: Column(
                 children: [
-                  for (var index = 0; index < posts.length; index++)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: CommunityNewsPostCard(
-                        post: posts[index],
-                        compact: true,
-                        onTap: () => CommunityNewsPostDetailSheet.show(
-                          context,
-                          postId: posts[index].id,
-                          initialPost: posts[index],
-                        ),
-                        onSpark: () => _sparkPost(index),
-                        onSave: () => _savePost(index),
-                        onComment: () => FeedCommentsSheet.show(
-                          context,
-                          mediaId: posts[index].commentsMediaId,
-                          businessName: posts[index].authorName,
-                        ),
-                        onDelete: posts[index].isMine
-                            ? () => _showPostMenu(index)
-                            : null,
-                      ),
-                    ),
+                  Text(
+                    _error!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: fv.secondaryText, fontSize: 13),
+                  ),
+                  TextButton(
+                    onPressed: _reload,
+                    child: const Text('Try again'),
+                  ),
                 ],
-              );
-            },
-          ),
+              ),
+            )
+          else if (_posts.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 8),
+              child: Text(
+                'No posts yet. Share updates from the home feed and they will show up here.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: fv.secondaryText,
+                  height: 1.45,
+                  fontSize: 13,
+                ),
+              ),
+            )
+          else
+            _buildPostList(compact: embedded),
         ],
       ),
-    );
-  }
-}
-
-class _PostsContainer extends StatelessWidget {
-  final Widget child;
-
-  const _PostsContainer({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: .07)),
-      ),
-      child: child,
     );
   }
 }

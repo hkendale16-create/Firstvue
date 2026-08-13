@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../services/community_creation_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../widgets/create_entity_form_chrome.dart';
 import '../widgets/location_autocomplete_field.dart';
 import 'auth_screen.dart';
 
@@ -70,20 +71,21 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
     });
 
     if (existing == null || existing.isPending != true) {
+      final fv = context.fv;
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
-          backgroundColor: FirstVueColors.surface,
-          title: const Text(
+          backgroundColor: fv.surface,
+          title: Text(
             'Community creation requires approval',
-            style: TextStyle(color: Color(0xFF16131F)),
+            style: TextStyle(color: fv.primaryText),
           ),
-          content: const Text(
+          content: Text(
             'Unlike Groups, Communities must be reviewed by FirstVue '
             'administrators before they become active. Submit a request with '
             'your proposed name, description, category, location, and reason. '
             'You will be the Community Leader if approved.',
-            style: TextStyle(color: Color(0xFF5A5668), height: 1.4),
+            style: TextStyle(color: fv.secondaryText, height: 1.4),
           ),
           actions: [
             TextButton(
@@ -103,7 +105,9 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
       return;
     }
     if (_reason.text.trim().isEmpty) {
-      setState(() => _error = 'Please explain why this Community should exist.');
+      setState(
+        () => _error = 'Please explain why this Community should exist.',
+      );
       return;
     }
 
@@ -150,16 +154,17 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: fv.background,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: null,
+        backgroundColor: fv.background,
+        foregroundColor: fv.primaryText,
         title: const Text('Create Community'),
       ),
       body: _checking
           ? const Center(
-              child: CircularProgressIndicator(color: FirstVueColors.teal),
+              child: CircularProgressIndicator(color: FirstVueColors.gold),
             )
           : ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
@@ -168,7 +173,7 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: FirstVueColors.surface,
+                      color: fv.surface,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Column(
@@ -185,8 +190,8 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
                         Text(
                           '“${_existing!.proposedName}” is awaiting FirstVue admin approval. '
                           'The Community will not be active until approved.',
-                          style: const TextStyle(
-                            color: Color(0xFF5A5668),
+                          style: TextStyle(
+                            color: fv.secondaryText,
                             height: 1.4,
                           ),
                         ),
@@ -199,70 +204,80 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: FirstVueColors.surface,
+                      color: fv.surface,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
                       'Your Community “${_existing!.proposedName}” was approved.',
-                      style: const TextStyle(color: Color(0xFF5A5668)),
+                      style: TextStyle(color: fv.secondaryText),
                     ),
                   ),
                   const SizedBox(height: 20),
                 ],
                 Text(
                   'Community creation requires approval',
-                  style: TextStyle(
-                    color: FirstVueColors.ivory.withValues(alpha: .7),
-                    height: 1.35,
-                  ),
+                  style: TextStyle(color: fv.secondaryText, height: 1.35),
                 ),
                 const SizedBox(height: 18),
-                _field(_name, 'Community name *'),
-                const SizedBox(height: 12),
-                _field(_description, 'Description / bio', maxLines: 4),
-                const SizedBox(height: 12),
-                _field(_category, 'Category'),
-                const SizedBox(height: 12),
-                InputDecorator(
-                  decoration: InputDecoration(
-                    labelText: 'Visibility',
-                    labelStyle: const TextStyle(color: Color(0xFF5A5668)),
-                    filled: true,
-                    fillColor: FirstVueColors.surface,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _visibility,
-                      dropdownColor: FirstVueColors.surface,
-                      isExpanded: true,
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'public',
-                          child: Text(
-                            'Public — discoverable in search',
-                            style: TextStyle(color: Color(0xFF16131F)),
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'private',
-                          child: Text(
-                            'Private — members and leaders only',
-                            style: TextStyle(color: Color(0xFF16131F)),
-                          ),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setState(() => _visibility = value);
-                      },
-                    ),
-                  ),
+                CreateEntityFormChrome.sectionHeader(context, 'Basics'),
+                CreateEntityFormChrome.textField(
+                  context,
+                  controller: _name,
+                  label: 'Community name *',
+                  capitalization: TextCapitalization.words,
+                  enabled: !_submitting && _existing?.isPending != true,
                 ),
                 const SizedBox(height: 12),
+                CreateEntityFormChrome.textField(
+                  context,
+                  controller: _description,
+                  label: 'Description / bio',
+                  maxLines: 4,
+                  enabled: !_submitting && _existing?.isPending != true,
+                ),
+                const SizedBox(height: 12),
+                CreateEntityFormChrome.textField(
+                  context,
+                  controller: _category,
+                  label: 'Category',
+                  capitalization: TextCapitalization.words,
+                  enabled: !_submitting && _existing?.isPending != true,
+                ),
+                const SizedBox(height: 24),
+                CreateEntityFormChrome.sectionHeader(context, 'Visibility'),
+                DropdownButtonFormField<String>(
+                  initialValue: _visibility,
+                  dropdownColor: fv.surface,
+                  style: TextStyle(color: fv.primaryText),
+                  decoration: CreateEntityFormChrome.decoration(
+                    context,
+                    label: 'Visibility',
+                  ),
+                  items: [
+                    DropdownMenuItem(
+                      value: 'public',
+                      child: Text(
+                        'Public — discoverable in search',
+                        style: TextStyle(color: fv.primaryText),
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'private',
+                      child: Text(
+                        'Private — members and leaders only',
+                        style: TextStyle(color: fv.primaryText),
+                      ),
+                    ),
+                  ],
+                  onChanged: _submitting || _existing?.isPending == true
+                      ? null
+                      : (value) {
+                          if (value == null) return;
+                          setState(() => _visibility = value);
+                        },
+                ),
+                const SizedBox(height: 24),
+                CreateEntityFormChrome.sectionHeader(context, 'Location'),
                 LocationAutocompleteField(
                   controller: _city,
                   label: 'City',
@@ -275,12 +290,20 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
                   type: LocationFieldType.state,
                 ),
                 const SizedBox(height: 12),
-                _field(_postal, 'Postal code'),
-                const SizedBox(height: 12),
-                _field(
-                  _reason,
-                  'Reason for creating this Community *',
+                CreateEntityFormChrome.textField(
+                  context,
+                  controller: _postal,
+                  label: 'Postal code',
+                  enabled: !_submitting && _existing?.isPending != true,
+                ),
+                const SizedBox(height: 24),
+                CreateEntityFormChrome.sectionHeader(context, 'Request'),
+                CreateEntityFormChrome.textField(
+                  context,
+                  controller: _reason,
+                  label: 'Reason for creating this Community *',
                   maxLines: 4,
+                  enabled: !_submitting && _existing?.isPending != true,
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -292,53 +315,18 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),
-                  Text(
-                    _error!,
-                    style: const TextStyle(color: FirstVueColors.coral),
-                  ),
+                  Text(_error!, style: TextStyle(color: fv.error)),
                 ],
                 const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: _submitting || _existing?.isPending == true
-                      ? null
-                      : _submit,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: FirstVueColors.coral,
-                    foregroundColor: null,
-                    minimumSize: const Size.fromHeight(48),
-                  ),
-                  child: Text(
-                    _submitting
-                        ? 'Submitting…'
-                        : _existing?.isPending == true
-                            ? 'Request pending'
-                            : 'Submit for approval',
-                  ),
+                CreateEntityFormChrome.primaryButton(
+                  label: _existing?.isPending == true
+                      ? 'Request pending'
+                      : 'Submit for approval',
+                  loading: _submitting,
+                  onPressed: _existing?.isPending == true ? null : _submit,
                 ),
               ],
             ),
-    );
-  }
-
-  Widget _field(
-    TextEditingController controller,
-    String label, {
-    int maxLines = 1,
-  }) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      style: const TextStyle(color: Color(0xFF16131F)),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: Color(0xFF5A5668)),
-        filled: true,
-        fillColor: FirstVueColors.surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
-      ),
     );
   }
 }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../navigation/firstvue_page_route.dart';
-import '../screens/member_public_profile_screen.dart';
 import '../screens/search_screen.dart';
+import '../screens/member_public_profile_screen.dart';
 import '../services/search_autocomplete_service.dart';
 import '../theme/firstvue_theme.dart';
 
@@ -11,6 +11,8 @@ class FirstVueInlineSearchBar extends StatefulWidget {
   final bool autofocus;
   final EdgeInsetsGeometry padding;
   final bool showOpenButton;
+  final VoidCallback? onFilterTap;
+  final bool filterActive;
 
   const FirstVueInlineSearchBar({
     super.key,
@@ -18,6 +20,8 @@ class FirstVueInlineSearchBar extends StatefulWidget {
     this.autofocus = false,
     this.padding = const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     this.showOpenButton = true,
+    this.onFilterTap,
+    this.filterActive = false,
   });
 
   @override
@@ -117,6 +121,46 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
     );
   }
 
+  Widget? _suffix(FirstVuePalette fv) {
+    final children = <Widget>[];
+    if (_searching) {
+      children.add(
+        const Padding(
+          padding: EdgeInsets.all(12),
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    if (widget.onFilterTap != null) {
+      children.add(
+        IconButton(
+          onPressed: widget.onFilterTap,
+          tooltip: 'Filters',
+          icon: Icon(
+            Icons.tune_rounded,
+            size: 20,
+            color: widget.filterActive ? FirstVueColors.gold : fv.mutedIcon,
+          ),
+        ),
+      );
+    } else if (widget.showOpenButton) {
+      children.add(
+        IconButton(
+          onPressed: () => _openFullSearch(),
+          icon: const Icon(Icons.open_in_new, size: 18),
+          tooltip: 'Open search',
+        ),
+      );
+    }
+    if (children.isEmpty) return null;
+    if (children.length == 1) return children.first;
+    return Row(mainAxisSize: MainAxisSize.min, children: children);
+  }
+
   @override
   Widget build(BuildContext context) {
     final fv = context.fv;
@@ -135,22 +179,7 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
               decoration: _borderlessDecoration(
                 fv: fv,
                 hintText: widget.hintText,
-                suffixIcon: _searching
-                    ? const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    : widget.showOpenButton
-                        ? IconButton(
-                            onPressed: () => _openFullSearch(),
-                            icon: const Icon(Icons.open_in_new, size: 18),
-                            tooltip: 'Open search',
-                          )
-                        : null,
+                suffixIcon: _suffix(fv),
               ),
             ),
           ),
