@@ -45,4 +45,17 @@ class FirstVueFeedbackSounds {
       // Soft fail — refresh should never break on audio.
     }
   }
+
+  static Future<void> playIncomingMessage() async {
+    if (!await InteractionPreferencesService.interactionSoundsEnabled()) {
+      return;
+    }
+    try {
+      await _player.stop();
+      await _player.setVolume(0.28);
+      await _player.play(AssetSource('sounds/refresh.wav'));
+    } catch (_) {
+      SystemSound.play(SystemSoundType.click);
+    }
+  }
 }

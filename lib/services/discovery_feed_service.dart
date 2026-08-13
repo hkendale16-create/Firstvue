@@ -22,6 +22,7 @@ class DiscoveryFeedItem {
   final double rating;
   final List<String> services;
   final VueFeedSource source;
+  final String? newsPostId;
 
   const DiscoveryFeedItem({
     required this.mediaId,
@@ -38,6 +39,7 @@ class DiscoveryFeedItem {
     required this.rating,
     required this.services,
     this.source = VueFeedSource.business,
+    this.newsPostId,
   });
 
   bool get isVideo => mediaType == 'video';
@@ -57,11 +59,16 @@ class DiscoveryFeedService {
     final me = _client.auth.currentUser?.id;
     final businessItems = await _fetchBusinessMedia(limit: limit);
     final memberItems = await _fetchMemberProfileMedia(limit: limit);
+    final vueNews = await _fetchVueNewsPosts(limit: limit);
 
     final mine = me == null
         ? const <DiscoveryFeedItem>[]
-        : memberItems.where((item) => item.ownerId == me).toList();
+        : [
+            ...vueNews.where((item) => item.ownerId == me),
+            ...memberItems.where((item) => item.ownerId == me),
+          ];
     var others = [
+      ...vueNews.where((item) => item.ownerId != me),
       ...memberItems.where((item) => item.ownerId != me),
       ...businessItems,
     ];
@@ -255,6 +262,106 @@ class DiscoveryFeedService {
           source: VueFeedSource.member,
         );
       }));
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<List<DiscoveryFeedItem>> _fetchVueNewsPosts({
+    required int limit,
+  }) async {
+    try {
+      List<dynamic> rows;
+      try {
+        rows = await _client
+            .from('community_news_posts')
+            .select(
+              'id, body, author_id, created_at, publish_destination, '
+              'community_news_post_media(id, storage_path, storage_provider, media_type, storage_bucket)',
+            )
+            .eq('status', 'approved')
+            .inFilter('publish_destination', ['vue', 'feed_and_vue'])
+            .order('created_at', ascending: false)
+            .limit(limit);
+      } catch (_) {
+        rows = await _client
+            .from('community_news_posts')
+            .select(
+              'id, body, author_id, created_at, '
+              'community_news_post_media(id, storage_path, storage_provider, media_type)',
+            )
+            .eq('status', 'approved')
+            .order('created_at', ascending: false)
+            .limit(limit);
+      }
+      if (rows.isEmpty) return const [];
+
+      final authorIds = rows
+          .map((row) => row['author_id'] as String?)
+          .whereType<String>()
+          .toSet()
+          .toList();
+      final names = <String, String>{};
+      if (authorIds.isNotEmpty) {
+        final nameRows = await _client
+            .from('profiles')
+            .select('id, display_name')
+            .inFilter('id', authorIds);
+        for (final row in nameRows) {
+          names[row['id'] as String] =
+              (row['display_name'] as String?) ?? 'FirstVue member';
+        }
+      }
+
+      final items = <DiscoveryFeedItem>[];
+      for (final row in rows) {
+        final mediaRows = row['community_news_post_media'];
+        if (mediaRows is! List || mediaRows.isEmpty) continue;
+        Map<String, dynamic>? video;
+        Map<String, dynamic>? first;
+        for (final media in mediaRows) {
+          if (media is! Map) continue;
+          final map = Map<String, dynamic>.from(media);
+          first ??= map;
+          if ((map['media_type'] as String?) == 'video') {
+            video = map;
+            break;
+          }
+        }
+        final chosen = video ?? first;
+        if (chosen == null) continue;
+        final path = chosen['storage_path'] as String?;
+        if (path == null) continue;
+        final bucket = MediaBucket.fromId(chosen['storage_bucket'] as String?);
+        final url = await MediaStorageService.createReadUrl(
+          bucket: bucket,
+          path: path,
+          provider: MediaStorageProvider.parse(
+            chosen['storage_provider'] as String?,
+          ),
+        );
+        final authorId = row['author_id'] as String;
+        items.add(
+          DiscoveryFeedItem(
+            mediaId: (chosen['id'] as String?) ?? row['id'] as String,
+            businessId: '',
+            businessName: names[authorId] ?? 'FirstVue member',
+            businessType: 'VUE',
+            ownerId: authorId,
+            ownerName: names[authorId] ?? 'FirstVue member',
+            caption: (row['body'] as String?) ?? '',
+            mediaType: (chosen['media_type'] as String?) ?? 'image',
+            mediaUrl: url,
+            verified: false,
+            sponsored: false,
+            rating: 0,
+            services: const [],
+            source: VueFeedSource.member,
+            newsPostId: row['id'] as String,
+          ),
+        );
+      }
+      return items;
     } catch (_) {
       return const [];
     }

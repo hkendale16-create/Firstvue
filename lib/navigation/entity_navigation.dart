@@ -38,7 +38,7 @@ class EntityNavigation {
         await _openProfessional(context, id);
         return;
       case ShoutoutTargetType.event:
-        await _openEvent(context, id);
+        await openEvent(context, id);
         return;
       case ShoutoutTargetType.group:
         await Navigator.push(
@@ -87,7 +87,7 @@ class EntityNavigation {
     } catch (_) {}
   }
 
-  static Future<void> _openEvent(BuildContext context, String id) async {
+  static Future<void> openEvent(BuildContext context, String id) async {
     try {
       final events = await ThingsToDoService.fetchApprovedEvents();
       if (!context.mounted) return;

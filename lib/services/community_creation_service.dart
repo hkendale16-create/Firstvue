@@ -19,6 +19,7 @@ class CommunityCreationRequest {
   final String? denialReason;
   final String? createdCommunityId;
   final DateTime createdAt;
+  final String proposedVisibility;
 
   const CommunityCreationRequest({
     required this.id,
@@ -38,6 +39,7 @@ class CommunityCreationRequest {
     this.denialReason,
     this.createdCommunityId,
     required this.createdAt,
+    this.proposedVisibility = 'public',
   });
 
   bool get isPending => status == 'pending';
@@ -73,6 +75,7 @@ class CommunityCreationRequest {
           : createdRaw is DateTime
               ? createdRaw
               : DateTime.now(),
+      proposedVisibility: (row['proposed_visibility'] as String?) ?? 'public',
     );
   }
 }
@@ -86,7 +89,7 @@ class CommunityCreationService {
       'id, requesting_user_id, proposed_name, description, category, city, '
       'state, postal_code, location_label, proposed_leader_user_id, reason, '
       'status, reviewed_by, reviewed_at, denial_reason, created_community_id, '
-      'created_at';
+      'created_at, proposed_visibility';
 
   static Future<CommunityCreationRequest> submitRequest({
     required String name,
@@ -96,6 +99,7 @@ class CommunityCreationService {
     String? state,
     String? postalCode,
     String? locationLabel,
+    String? visibility,
     String? reason,
   }) async {
     final me = _client.auth.currentUser;
@@ -113,25 +117,42 @@ class CommunityCreationService {
       return existing!;
     }
 
-    final row = await _client
-        .from('community_creation_requests')
-        .insert({
-          'requesting_user_id': me.id,
-          'proposed_leader_user_id': me.id,
-          'proposed_name': trimmed,
-          'description': description?.trim(),
-          'category': category?.trim(),
-          'city': city?.trim(),
-          'state': state?.trim(),
-          'postal_code': postalCode?.trim(),
-          'location_label': locationLabel?.trim(),
-          'reason': reason?.trim(),
-          'status': 'pending',
-        })
-        .select(_columns)
-        .single();
+    final payload = <String, dynamic>{
+      'requesting_user_id': me.id,
+      'proposed_leader_user_id': me.id,
+      'proposed_name': trimmed,
+      'description': description?.trim(),
+      'category': category?.trim(),
+      'city': city?.trim(),
+      'state': state?.trim(),
+      'postal_code': postalCode?.trim(),
+      'location_label': locationLabel?.trim(),
+      'reason': reason?.trim(),
+      'proposed_visibility': visibility == 'private' ? 'private' : 'public',
+      'status': 'pending',
+    };
 
-    return CommunityCreationRequest.fromRow(row);
+    try {
+      final row = await _client
+          .from('community_creation_requests')
+          .insert(payload)
+          .select(_columns)
+          .single();
+      return CommunityCreationRequest.fromRow(row);
+    } catch (_) {
+      payload.remove('proposed_visibility');
+      final row = await _client
+          .from('community_creation_requests')
+          .insert(payload)
+          .select(
+            'id, requesting_user_id, proposed_name, description, category, city, '
+            'state, postal_code, location_label, proposed_leader_user_id, reason, '
+            'status, reviewed_by, reviewed_at, denial_reason, created_community_id, '
+            'created_at',
+          )
+          .single();
+      return CommunityCreationRequest.fromRow(row);
+    }
   }
 
   static Future<CommunityCreationRequest?> fetchMyLatestRequest() async {

@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/post_identity.dart';
+import '../models/publish_destination.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../services/community_news_service.dart';
 import '../services/post_identity_service.dart';
@@ -55,6 +56,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   PostIdentityOption? _selectedIdentity;
   String _visibility = 'public';
   String _backgroundColor = 'none';
+  PublishDestination _destination = PublishDestination.feed;
   bool _publishing = false;
   String? _error;
 
@@ -141,6 +143,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           files: _attachedMedia,
           backgroundColor: bg,
           visibility: _visibility,
+          publishDestination: _destination,
         );
       } on CommunityNewsMediaUploadException catch (error) {
         post = error.post;
@@ -249,6 +252,90 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 },
               ),
             ),
+          ),
+          const SizedBox(height: 12),
+          InputDecorator(
+            decoration: InputDecoration(
+              labelText: 'Publish to',
+              labelStyle: TextStyle(color: fv.secondaryText, fontSize: 12),
+              filled: true,
+              fillColor: fv.elevatedSurface,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<PublishDestination>(
+                value: _destination,
+                isExpanded: true,
+                dropdownColor: fv.elevatedSurface,
+                style: TextStyle(color: fv.primaryText, fontSize: 13),
+                items: [
+                  DropdownMenuItem(
+                    value: PublishDestination.feed,
+                    child: Text(
+                      'Home Newsfeed',
+                      style: TextStyle(color: fv.primaryText),
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: PublishDestination.vue,
+                    child: Text(
+                      'VUE only',
+                      style: TextStyle(color: fv.primaryText),
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: PublishDestination.feedAndVue,
+                    child: Text(
+                      'Home + VUE',
+                      style: TextStyle(color: fv.primaryText),
+                    ),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => _destination = value);
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'TEMPLATES',
+            style: TextStyle(
+              color: FirstVueColors.gold,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.1,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final template in const [
+                'Now available',
+                'Looking for recommendations',
+                'Today’s special',
+                'Hiring',
+                'Event reminder',
+              ])
+                ActionChip(
+                  label: Text(template),
+                  onPressed: () {
+                    final current = _body.text.trim();
+                    _body.text = current.isEmpty
+                        ? template
+                        : '$current\n$template';
+                    setState(() {});
+                  },
+                ),
+            ],
           ),
           const SizedBox(height: 12),
           Text(

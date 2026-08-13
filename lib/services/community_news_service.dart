@@ -9,6 +9,7 @@ import 'community_service.dart';
 import 'follow_service.dart';
 import 'post_metadata_service.dart';
 import 'saved_items_service.dart';
+import '../models/publish_destination.dart';
 
 class ProfileEngagementStats {
   final int postCount;
@@ -38,6 +39,7 @@ class CommunityNewsPost {
   final int repostCount;
   final String visibility;
   final String? backgroundColor;
+  final PublishDestination publishDestination;
   final List<CommunityNewsMediaItem> media;
 
   const CommunityNewsPost({
@@ -58,6 +60,7 @@ class CommunityNewsPost {
     this.repostCount = 0,
     this.visibility = 'public',
     this.backgroundColor,
+    this.publishDestination = PublishDestination.feed,
     this.media = const [],
   });
 
@@ -96,6 +99,7 @@ class CommunityNewsPost {
     int? repostCount,
     String? visibility,
     String? backgroundColor,
+    PublishDestination? publishDestination,
     List<CommunityNewsMediaItem>? media,
   }) {
     return CommunityNewsPost(
@@ -116,6 +120,7 @@ class CommunityNewsPost {
       repostCount: repostCount ?? this.repostCount,
       visibility: visibility ?? this.visibility,
       backgroundColor: backgroundColor ?? this.backgroundColor,
+      publishDestination: publishDestination ?? this.publishDestination,
       media: media ?? this.media,
     );
   }
@@ -127,7 +132,7 @@ class CommunityNewsService {
   static final _client = Supabase.instance.client;
 
   static const _postColumnsWithBackground =
-      'id, body, created_at, author_id, business_id, community_id, visibility, professional_profile_id, event_id, author_profile_type, author_profile_id, background_color';
+      'id, body, created_at, author_id, business_id, community_id, visibility, professional_profile_id, event_id, author_profile_type, author_profile_id, background_color, publish_destination';
 
   static const _postColumns =
       'id, body, created_at, author_id, business_id, community_id, visibility, professional_profile_id, event_id, author_profile_type, author_profile_id';
@@ -199,7 +204,8 @@ class CommunityNewsService {
       return await attempt(insertPayload, _postColumnsWithBackground);
     } catch (_) {
       final withoutBg = Map<String, dynamic>.from(insertPayload)
-        ..remove('background_color');
+        ..remove('background_color')
+        ..remove('publish_destination');
       try {
         return await attempt(withoutBg, _postColumns);
       } catch (_) {
@@ -273,7 +279,6 @@ class CommunityNewsService {
     double? seed,
   }) async {
     final me = _client.auth.currentUser?.id;
-    if (me == null) return const [];
 
     try {
       final result = await _client.rpc(
@@ -283,11 +288,18 @@ class CommunityNewsService {
           'p_seed': seed,
         },
       );
-      if (result is! List || result.isEmpty) return const [];
-      return await _mapPostRows(result, currentUserId: me);
+      if (result is! List || result.isEmpty) {
+        return me == null ? await fetchPosts(limit: limit) : const [];
+      }
+      final mapped = await _mapPostRows(result, currentUserId: me);
+      return mapped
+          .where((post) => post.publishDestination.appearsOnHome)
+          .toList(growable: false);
     } catch (_) {
-      // Fall back to chronological main feed if ranking RPC is unavailable.
-      return await fetchPosts(limit: limit);
+      final posts = await fetchPosts(limit: limit);
+      return posts
+          .where((post) => post.publishDestination.appearsOnHome)
+          .toList(growable: false);
     }
   }
 
@@ -491,6 +503,11 @@ class CommunityNewsService {
             backgroundColor = rawBg.trim();
           }
         } catch (_) {}
+        PublishDestination publishDestination = PublishDestination.feed;
+        try {
+          publishDestination =
+              PublishDestination.parse(row['publish_destination'] as String?);
+        } catch (_) {}
 
         posts.add(
           CommunityNewsPost(
@@ -512,6 +529,7 @@ class CommunityNewsService {
             savedByMe: mySaves.contains(id),
             visibility: visibility,
             backgroundColor: backgroundColor,
+            publishDestination: publishDestination,
             media: media,
           ),
         );
@@ -824,6 +842,7 @@ class CommunityNewsService {
     List<XFile> files = const [],
     String? backgroundColor,
     String? visibility,
+    PublishDestination publishDestination = PublishDestination.feed,
   }) async {
     final me = _client.auth.currentUser;
     if (me == null) throw const AuthException('Sign in to post.');
@@ -877,6 +896,7 @@ class CommunityNewsService {
     if (bg != null && bg.isNotEmpty && bg != 'none') {
       insertPayload['background_color'] = bg;
     }
+    insertPayload['publish_destination'] = publishDestination.value;
 
     final row = await _insertPostReturning(insertPayload);
 
@@ -948,6 +968,9 @@ class CommunityNewsService {
       savedByMe: false,
       visibility: (row['visibility'] as String?) ?? resolvedVisibility,
       backgroundColor: insertedBackground,
+      publishDestination: PublishDestination.parse(
+        row['publish_destination'] as String? ?? publishDestination.value,
+      ),
       media: media,
     );
 

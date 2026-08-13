@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 
 import '../config/app_config.dart';
+import '../services/community_news_service.dart';
 import '../services/discovery_feed_service.dart';
+import '../services/firstvue_feedback_sounds.dart';
+import '../services/saved_items_service.dart';
 import '../widgets/feed_comments_sheet.dart';
 import '../widgets/vue_video_player.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
@@ -80,7 +83,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
     if (!_pageController.hasClients) return;
     final page = _pageController.page?.round() ?? 0;
     if (page != _currentPage) {
-      _currentPage = page;
+      setState(() => _currentPage = page);
     }
   }
 
@@ -301,6 +304,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                         return _InteractiveFeedCard(
                           key: ValueKey(itemKey),
                           item: item,
+                          isActive: index == _currentPage,
                           onViewProfile: () => _openProfile(item),
                         );
                       },
@@ -510,10 +514,12 @@ class _Action extends StatelessWidget {
 
 class _InteractiveFeedCard extends StatefulWidget {
   final _FeedItem item;
+  final bool isActive;
   final VoidCallback onViewProfile;
   const _InteractiveFeedCard({
     super.key,
     required this.item,
+    required this.isActive,
     required this.onViewProfile,
   });
 
@@ -524,11 +530,82 @@ class _InteractiveFeedCard extends StatefulWidget {
 class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
   bool _liked = false;
   bool _saved = false;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _hydrateSaved();
+  }
+
+  Future<void> _hydrateSaved() async {
+    final connected = widget.item.connected;
+    if (connected == null) return;
+    final contentType = connected.newsPostId != null
+        ? SavedContentType.newsPost
+        : connected.isMember
+            ? SavedContentType.vueMedia
+            : SavedContentType.business;
+    final contentId = connected.newsPostId ??
+        (connected.isMember ? connected.mediaId : connected.businessId);
+    final saved = await SavedItemsService.isSaved(
+      contentType: contentType,
+      contentId: contentId,
+    );
+    if (!mounted) return;
+    setState(() => _saved = saved);
+  }
 
   void _record(String type) {
     final connected = widget.item.connected;
     if (connected != null) {
       DiscoveryFeedService.recordEngagement(connected, type);
+    }
+  }
+
+  Future<void> _toggleSpark() async {
+    if (_busy) return;
+    final previous = _liked;
+    setState(() => _liked = !_liked);
+    if (_liked) {
+      await FirstVueFeedbackSounds.playSpark(fromUserTap: true);
+      _record('like');
+    }
+    final connected = widget.item.connected;
+    final newsPostId = connected?.newsPostId;
+    if (newsPostId == null) return;
+    _busy = true;
+    try {
+      final post = await CommunityNewsService.fetchPostById(newsPostId);
+      if (post != null) await CommunityNewsService.toggleSpark(post);
+    } catch (_) {
+      if (mounted) setState(() => _liked = previous);
+    } finally {
+      _busy = false;
+    }
+  }
+
+  Future<void> _toggleSave() async {
+    final connected = widget.item.connected;
+    final previous = _saved;
+    setState(() => _saved = !_saved);
+    if (_saved) _record('save');
+    if (connected == null) return;
+    final contentType = connected.newsPostId != null
+        ? SavedContentType.newsPost
+        : connected.isMember
+            ? SavedContentType.vueMedia
+            : SavedContentType.business;
+    final contentId = connected.newsPostId ??
+        (connected.isMember ? connected.mediaId : connected.businessId);
+    try {
+      await SavedItemsService.toggleSave(
+        contentType: contentType,
+        contentId: contentId,
+        currentlySaved: previous,
+      );
+    } catch (_) {
+      if (mounted) setState(() => _saved = previous);
     }
   }
 
@@ -566,10 +643,12 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
       return;
     }
     if (connected.isMember) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Comments on member Vue posts are coming soon.'),
-        ),
+      FeedCommentsSheet.show(
+        context,
+        mediaId: connected.newsPostId != null
+            ? 'news-post:${connected.newsPostId}'
+            : connected.mediaId,
+        businessName: connected.ownerName,
       );
       return;
     }
@@ -587,16 +666,20 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
     final isMember = connected?.isMember ?? false;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(8),
         child: Stack(
           fit: StackFit.expand,
           children: [
-            _VueFeedMediaBackground(
-              assetPath: item.connected == null ? item.image : null,
-              networkUrl: item.connected == null ? null : item.image,
-              isVideo: connected?.isVideo ?? false,
+            GestureDetector(
+              onDoubleTap: _toggleSpark,
+              child: _VueFeedMediaBackground(
+                assetPath: item.connected == null ? item.image : null,
+                networkUrl: item.connected == null ? null : item.image,
+                isVideo: connected?.isVideo ?? false,
+                active: widget.isActive,
+              ),
             ),
             const IgnorePointer(
               child: DecoratedBox(
@@ -625,22 +708,16 @@ class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
                         : Icons.auto_awesome_outlined,
                     label: 'Spark',
                     active: _liked,
-                    onTap: () {
-                      setState(() => _liked = !_liked);
-                      if (_liked) _record('like');
-                    },
+                    onTap: _toggleSpark,
                   ),
                   const SizedBox(height: 15),
                   _VueAction(
                     icon: _saved
-                        ? Icons.inventory_2_rounded
-                        : Icons.inventory_2_outlined,
-                    label: 'Collection',
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_border_rounded,
+                    label: _saved ? 'Saved' : 'Save',
                     active: _saved,
-                    onTap: () {
-                      setState(() => _saved = !_saved);
-                      if (_saved) _record('save');
-                    },
+                    onTap: _toggleSave,
                   ),
                   const SizedBox(height: 15),
                   _VueAction(
@@ -763,11 +840,13 @@ class _VueFeedMediaBackground extends StatelessWidget {
   final String? assetPath;
   final String? networkUrl;
   final bool isVideo;
+  final bool active;
 
   const _VueFeedMediaBackground({
     this.assetPath,
     this.networkUrl,
     this.isVideo = false,
+    this.active = true,
   });
 
   @override
@@ -792,6 +871,7 @@ class _VueFeedMediaBackground extends StatelessWidget {
         fit: BoxFit.cover,
         autoPlay: true,
         startMuted: true,
+        active: active,
       );
     }
 

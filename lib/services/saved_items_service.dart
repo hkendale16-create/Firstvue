@@ -2,10 +2,21 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 enum SavedContentType {
   newsPost('news_post'),
-  business('business');
+  business('business'),
+  vueMedia('vue_media'),
+  story('story');
 
   final String value;
   const SavedContentType(this.value);
+
+  static SavedContentType parse(String? raw) {
+    return switch (raw) {
+      'business' => SavedContentType.business,
+      'vue_media' => SavedContentType.vueMedia,
+      'story' => SavedContentType.story,
+      _ => SavedContentType.newsPost,
+    };
+  }
 }
 
 class SavedItem {
@@ -158,7 +169,7 @@ class SavedItemsService {
     }
   }
 
-  static Future<List<SavedItem>> fetchRecentSaved({int limit = 8}) async {
+  static Future<List<SavedItem>> fetchRecentSaved({int limit = 50}) async {
     final user = _client.auth.currentUser;
     if (user == null) return const [];
 
@@ -173,20 +184,26 @@ class SavedItemsService {
       if (rows.isEmpty) return const [];
 
       final newsPostIds = <String>[];
+      final businessIds = <String>[];
       for (final row in rows) {
-        if (row['content_type'] == SavedContentType.newsPost.value) {
-          newsPostIds.add(row['content_id'] as String);
+        final type = row['content_type'] as String?;
+        final id = row['content_id'] as String;
+        if (type == SavedContentType.newsPost.value) {
+          newsPostIds.add(id);
+        } else if (type == SavedContentType.business.value) {
+          businessIds.add(id);
         }
       }
 
       final postDetails = await _fetchNewsPostDetails(newsPostIds);
+      final businessNames = await _fetchBusinessNames(businessIds);
 
       return rows.map((row) {
-        final contentTypeValue = row['content_type'] as String;
+        final contentType = SavedContentType.parse(row['content_type'] as String?);
         final contentId = row['content_id'] as String;
         final savedAt = DateTime.parse(row['created_at'] as String);
 
-        if (contentTypeValue == SavedContentType.newsPost.value) {
+        if (contentType == SavedContentType.newsPost) {
           final post = postDetails[contentId];
           if (post == null) {
             return SavedItem(
@@ -209,12 +226,32 @@ class SavedItemsService {
           );
         }
 
+        if (contentType == SavedContentType.business) {
+          return SavedItem(
+            contentId: contentId,
+            contentType: SavedContentType.business,
+            savedAt: savedAt,
+            title: businessNames[contentId] ?? 'Saved business',
+            subtitle: 'Open this business profile',
+          );
+        }
+
+        if (contentType == SavedContentType.vueMedia) {
+          return SavedItem(
+            contentId: contentId,
+            contentType: SavedContentType.vueMedia,
+            savedAt: savedAt,
+            title: 'Saved VUE',
+            subtitle: 'Open in VUE',
+          );
+        }
+
         return SavedItem(
           contentId: contentId,
-          contentType: SavedContentType.business,
+          contentType: contentType,
           savedAt: savedAt,
-          title: 'Saved business',
-          subtitle: contentId,
+          title: 'Saved Story',
+          subtitle: 'Stories expire after 24 hours.',
         );
       }).toList();
     } catch (_) {

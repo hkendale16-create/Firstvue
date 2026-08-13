@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'firstvue_feedback_sounds.dart';
 import 'notification_service.dart';
 
 class ActivityNotification {
@@ -103,10 +104,14 @@ class ActivityNotificationsService {
             final record = payload.newRecord;
             final title = record['title'] as String? ?? 'FirstVue';
             final body = record['body'] as String?;
+            final type = record['type'] as String? ?? '';
             NotificationService.showLocal(
               title: title,
               body: body ?? 'You have a new update.',
             );
+            if (type.contains('message')) {
+              FirstVueFeedbackSounds.playIncomingMessage();
+            }
           },
         )
         .subscribe();

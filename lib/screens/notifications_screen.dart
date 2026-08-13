@@ -184,7 +184,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'follow':
       case 'follow_request':
       case 'follow_accepted':
-        final profileId = payload['profile_id'] as String?;
+        final profileId = payload['profile_id'] as String? ??
+            payload['actor_id'] as String?;
         if (profileId != null) {
           Navigator.push(
             context,
@@ -196,6 +197,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'mention':
       case 'news_spark':
       case 'news_comment':
+      case 'spark':
+      case 'comment':
         final postId = payload['post_id'] as String?;
         if (postId != null) {
           Navigator.push(
@@ -206,12 +209,38 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           );
         }
       case 'rental_inquiry':
-        final requesterId = payload['requester_id'] as String?;
+      case 'direct_message':
+      case 'message':
+        final requesterId = payload['requester_id'] as String? ??
+            payload['sender_id'] as String? ??
+            payload['profile_id'] as String?;
         if (requesterId != null) {
-          _openMessageThread(context, requesterId, title: 'Rental inquiry');
+          _openMessageThread(context, requesterId, title: item.title);
+        } else {
+          Navigator.push(
+            context,
+            FirstVuePageRoute(builder: (_) => const MessagesInboxScreen()),
+          );
+        }
+      case 'story':
+        final profileId = payload['profile_id'] as String? ??
+            payload['owner_id'] as String?;
+        if (profileId != null) {
+          Navigator.push(
+            context,
+            FirstVuePageRoute(
+              builder: (_) => MemberPublicProfileScreen(profileId: profileId),
+            ),
+          );
         }
       default:
-        break;
+        final postId = payload['post_id'] as String?;
+        if (postId != null) {
+          Navigator.push(
+            context,
+            FirstVuePageRoute(builder: (_) => PostDetailScreen(postId: postId)),
+          );
+        }
     }
   }
 

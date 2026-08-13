@@ -1,29 +1,29 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../navigation/firstvue_page_route.dart';
 import '../screens/auth_screen.dart';
+import '../screens/create_post_screen.dart';
 import '../screens/member_public_profile_screen.dart';
+import '../screens/story_composer_screen.dart';
 import '../services/community_news_service.dart';
-import '../services/interaction_preferences_service.dart';
 import '../services/profile_media_service.dart';
 import '../services/repost_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../utils/app_environment.dart';
 import 'community_news_post_card.dart';
 import 'community_news_post_detail_sheet.dart';
 import 'feed_comments_sheet.dart';
 import 'feed_impression_tracker.dart';
-import 'local_media_thumbnail.dart';
-import 'media_picker_sheet.dart';
 import 'profile_avatar_thumbnail.dart';
+import 'stories_tray.dart';
 
 /// Facebook-style composer + news feed for the Home Communities container.
 class HomeCommunityFeedBlock extends StatefulWidget {
   const HomeCommunityFeedBlock({
     super.key,
     this.refreshToken = 0,
-    this.maxPosts = 12,
+    this.maxPosts = 20,
   });
 
   final int refreshToken;
@@ -34,21 +34,23 @@ class HomeCommunityFeedBlock extends StatefulWidget {
 }
 
 class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
-  final _composer = TextEditingController();
-
   List<CommunityNewsPost> _posts = const [];
   Set<String> _repostedPostIds = const {};
-  List<XFile> _attachedMedia = const [];
   bool _loading = true;
-  bool _posting = false;
+  bool _loadingMore = false;
   String? _error;
   String? _avatarUrl;
   String _displayName = 'you';
+  int _feedLimit = 20;
+  RealtimeChannel? _newsChannel;
+  int _storiesRefresh = 0;
 
   @override
   void initState() {
     super.initState();
+    _feedLimit = widget.maxPosts;
     _bootstrap();
+    _subscribeToNewsFeed();
   }
 
   @override
@@ -61,8 +63,39 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
 
   @override
   void dispose() {
-    _composer.dispose();
+    _newsChannel?.unsubscribe();
     super.dispose();
+  }
+
+  void _subscribeToNewsFeed() {
+    if (isWidgetTestBinding) return;
+    _newsChannel?.unsubscribe();
+    _newsChannel = Supabase.instance.client
+        .channel('home-community-feed')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'community_news_posts',
+          callback: (payload) async {
+            final record = payload.newRecord;
+            if (record.isEmpty) return;
+            if (record['status'] != 'approved') return;
+            final postId = record['id'] as String?;
+            if (postId == null) return;
+            if (_posts.any((post) => post.id == postId)) return;
+            final post = await CommunityNewsService.fetchPostById(postId);
+            if (post == null || !mounted) return;
+            if (!post.publishDestination.appearsOnHome) return;
+            setState(() {
+              _posts = [
+                post,
+                for (final existing in _posts)
+                  if (existing.id != post.id) existing,
+              ];
+            });
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _bootstrap() async {
@@ -93,16 +126,18 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
     }
   }
 
-  Future<void> _loadFeed() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _loadFeed({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       // Ranked main Newsfeed: recency + unseen + relevance + controlled variety.
       // Seed changes on each refresh so top results are not identical every time.
       final posts = await CommunityNewsService.fetchRankedMainFeed(
-        limit: widget.maxPosts,
+        limit: _feedLimit,
         seed: DateTime.now().millisecondsSinceEpoch.toDouble(),
       );
       final postIds = posts.map((p) => p.id).toList();
@@ -138,70 +173,49 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
     );
   }
 
-  Future<void> _publish() async {
+  Future<void> _openCreatePost() async {
     await _ensureSignedIn();
-    if (Supabase.instance.client.auth.currentUser == null) return;
-
-    final text = _composer.text.trim();
-    if ((text.isEmpty && _attachedMedia.isEmpty) || _posting) return;
-
-    setState(() => _posting = true);
-    try {
-      CommunityNewsPost created;
-      try {
-        created = await CommunityNewsService.createPost(
-          text,
-          files: _attachedMedia,
-        );
-      } on CommunityNewsMediaUploadException catch (error) {
-        created = error.post;
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Post saved but media upload failed: ${error.cause}',
-              ),
-            ),
-          );
-        }
-      }
-      if (!mounted) return;
-      _composer.clear();
-      setState(() {
-        _attachedMedia = const [];
-        _posts = [
-          created,
-          for (final post in _posts)
-            if (post.id != created.id) post,
-        ].take(widget.maxPosts).toList(growable: false);
-        _posting = false;
-      });
-      FocusScope.of(context).unfocus();
-    } catch (error) {
-      CommunityNewsService.logFeedError(
-        error,
-        context: 'HomeCommunityFeedBlock.publish',
-      );
-      if (!mounted) return;
-      setState(() => _posting = false);
+    if (Supabase.instance.client.auth.currentUser == null || !mounted) return;
+    final created = await Navigator.push<CommunityNewsPost>(
+      context,
+      FirstVuePageRoute(builder: (_) => const CreatePostScreen()),
+    );
+    if (created == null || !mounted) return;
+    if (!created.publishDestination.appearsOnHome) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            error is AuthException
-                ? 'Sign in to post.'
-                : 'Unable to post right now.',
-          ),
-        ),
+        const SnackBar(content: Text('Posted to VUE.')),
       );
+      return;
+    }
+    setState(() {
+      _posts = [
+        created,
+        for (final post in _posts)
+          if (post.id != created.id) post,
+      ];
+    });
+  }
+
+  Future<void> _openStoryComposer() async {
+    await _ensureSignedIn();
+    if (Supabase.instance.client.auth.currentUser == null || !mounted) return;
+    final created = await Navigator.push(
+      context,
+      FirstVuePageRoute(builder: (_) => const StoryComposerScreen()),
+    );
+    if (created != null && mounted) {
+      setState(() => _storiesRefresh++);
     }
   }
 
-  Future<void> _showMediaPicker() async {
-    await _ensureSignedIn();
-    if (Supabase.instance.client.auth.currentUser == null || !mounted) return;
-    final files = await showMediaPickerSheet(context);
-    if (files == null || files.isEmpty || !mounted) return;
-    setState(() => _attachedMedia = [..._attachedMedia, ...files]);
+  Future<void> _loadMore() async {
+    if (_loadingMore || _loading) return;
+    setState(() {
+      _loadingMore = true;
+      _feedLimit += 20;
+    });
+    await _loadFeed(silent: true);
+    if (mounted) setState(() => _loadingMore = false);
   }
 
   Future<void> _sparkPost(int index) async {
@@ -219,9 +233,6 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
           if (i == index) optimistic else _posts[i],
       ];
     });
-    if (willSpark) {
-      await InteractionPreferencesService.playSparkFeedback(fromUserTap: true);
-    }
     try {
       final updated = await CommunityNewsService.toggleSpark(post);
       if (!mounted) return;
@@ -326,28 +337,24 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
 
   @override
   Widget build(BuildContext context) {
-    final canPost =
-        (_composer.text.trim().isNotEmpty || _attachedMedia.isNotEmpty) &&
-            !_posting;
+    final fv = context.fv;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Facebook-style composer
+        StoriesTray(refreshToken: widget.refreshToken + _storiesRefresh),
+        const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
           decoration: BoxDecoration(
-            color: FirstVueColors.elevatedSurface,
+            color: fv.elevatedSurface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: FirstVueColors.ivory.withValues(alpha: 0.08),
-            ),
+            border: Border.all(color: fv.borderSubtle),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   ProfileAvatarThumbnail(
                     imageUrl: _avatarUrl,
@@ -356,98 +363,32 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: FirstVueColors.surface,
+                    child: Material(
+                      color: fv.surface,
+                      borderRadius: BorderRadius.circular(22),
+                      child: InkWell(
+                        onTap: _openCreatePost,
                         borderRadius: BorderRadius.circular(22),
-                        border: Border.all(
-                          color: FirstVueColors.ivory.withValues(alpha: 0.1),
-                        ),
-                      ),
-                      child: TextField(
-                        controller: _composer,
-                        minLines: 1,
-                        maxLines: 4,
-                        style: const TextStyle(
-                          color: FirstVueColors.ivory,
-                          fontSize: 14,
-                          height: 1.35,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: "What's on your mind, $_displayName?",
-                          hintStyle: TextStyle(
-                            color: FirstVueColors.ivory.withValues(alpha: 0.38),
-                            fontSize: 14,
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
                             vertical: 12,
                           ),
+                          child: Text(
+                            "What's on your mind, $_displayName?",
+                            style: TextStyle(
+                              color: fv.tertiaryText,
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
-                        onChanged: (_) => setState(() {}),
                       ),
                     ),
                   ),
                 ],
               ),
-              if (_attachedMedia.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 72,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _attachedMedia.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final file = _attachedMedia[index];
-                      return Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          LocalMediaThumbnail(
-                            file: file,
-                            size: 72,
-                            onTap: () => LocalMediaThumbnail.previewLocalFile(
-                              context,
-                              file,
-                            ),
-                          ),
-                          Positioned(
-                            top: -6,
-                            right: -6,
-                            child: IconButton.filledTonal(
-                              visualDensity: VisualDensity.compact,
-                              style: IconButton.styleFrom(
-                                backgroundColor: FirstVueColors.surface,
-                                foregroundColor: Colors.white70,
-                                minimumSize: const Size(24, 24),
-                                padding: EdgeInsets.zero,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _attachedMedia = [
-                                    for (var i = 0;
-                                        i < _attachedMedia.length;
-                                        i++)
-                                      if (i != index) _attachedMedia[i],
-                                  ];
-                                });
-                              },
-                              icon: const Icon(Icons.close, size: 14),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-              ],
               const SizedBox(height: 10),
-              Divider(
-                height: 1,
-                color: FirstVueColors.ivory.withValues(alpha: 0.1),
-              ),
+              Divider(height: 1, color: fv.divider),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -455,48 +396,19 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
                     icon: Icons.photo_library_outlined,
                     label: 'Photo',
                     color: FirstVueColors.teal,
-                    onTap: _posting ? null : _showMediaPicker,
+                    onTap: _openCreatePost,
                   ),
                   _ComposerAction(
                     icon: Icons.videocam_outlined,
                     label: 'Video',
                     color: FirstVueColors.coral,
-                    onTap: _posting ? null : _showMediaPicker,
+                    onTap: _openCreatePost,
                   ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: canPost ? _publish : null,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: FirstVueColors.coral,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor:
-                          FirstVueColors.coral.withValues(alpha: 0.35),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 10,
-                      ),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                    child: _posting
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text(
-                            'Post',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13,
-                            ),
-                          ),
+                  _ComposerAction(
+                    icon: Icons.auto_awesome_motion_outlined,
+                    label: 'Story',
+                    color: FirstVueColors.gold,
+                    onTap: _openStoryComposer,
                   ),
                 ],
               ),
@@ -589,6 +501,13 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
                     onRepost: () => _repostPost(index),
                     repostedByMe: _repostedPostIds.contains(_posts[index].id),
                   ),
+                ),
+              ],
+              if (_posts.length >= 8) ...[
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _loadingMore ? null : _loadMore,
+                  child: Text(_loadingMore ? 'Loading…' : 'See more posts'),
                 ),
               ],
             ],

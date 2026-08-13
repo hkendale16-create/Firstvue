@@ -36,6 +36,11 @@ class NotificationService {
         ),
       );
       await androidPlugin?.requestNotificationsPermission();
+      await _plugin
+          .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin
+          >()
+          ?.requestPermissions(alert: true, badge: true, sound: true);
     }
 
     _initialized = true;
