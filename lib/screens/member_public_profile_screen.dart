@@ -13,6 +13,9 @@ import '../theme/firstvue_theme.dart';
 import '../widgets/community_news_post_card.dart';
 import '../widgets/community_news_post_detail_sheet.dart';
 import '../widgets/facebook_style_profile_header.dart';
+import '../widgets/social_chrome.dart';
+import '../services/messaging_service.dart';
+import 'conversation_screen.dart';
 import '../widgets/feed_comments_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/profile_affiliations_section.dart';
@@ -161,6 +164,36 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
       FollowStatus.pending => 'Requested',
       FollowStatus.notFollowing => 'Follow',
     };
+  }
+
+  Future<void> _openMessage() async {
+    if (Supabase.instance.client.auth.currentUser == null) {
+      await Navigator.push(
+        context,
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
+      );
+      return;
+    }
+    try {
+      final threadId = await MessagingService.openThreadWithUser(
+        otherUserId: widget.profileId,
+      );
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        FirstVuePageRoute(
+          builder: (_) => ConversationScreen(
+            threadId: threadId,
+            title: _title,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to start a message right now.')),
+      );
+    }
   }
 
   String get _title {
@@ -398,7 +431,6 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.white,
         title: Text(_title, style: const TextStyle(fontSize: 16)),
       ),
       body: FirstVueRefreshScaffold(
@@ -407,23 +439,23 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.zero,
           children: [
-            FacebookStyleProfileHeader(
-              title: _title,
-              subtitle: _subtitle ?? 'FirstVue member',
+            SocialProfileHeader(
+              name: _title,
+              handle: _subtitle,
               coverImageUrl: _profileImages.cover?.signedUrl,
               avatarImageUrl: _profileImages.avatar?.signedUrl,
               coverIsVideo: _profileImages.cover?.isVideo ?? false,
               avatarIsVideo: _profileImages.avatar?.isVideo ?? false,
+              centerAvatar: true,
               onCoverTap: _profileImages.cover != null ? _viewCover : null,
               onAvatarTap: _profileImages.avatar != null ? _viewAvatar : null,
-              showImageLoading: _loading,
               stats: [
                 ProfileStatItem(
-                  label: 'Posts',
+                  label: 'posts',
                   value: _loading ? '—' : '${_stats.postCount}',
                 ),
                 ProfileStatItem(
-                  label: 'Followers',
+                  label: 'followers',
                   value: _loading ? '—' : '$_followerCount',
                   onTap: _loading
                       ? null
@@ -439,7 +471,7 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
                           ),
                 ),
                 ProfileStatItem(
-                  label: 'Following',
+                  label: 'following',
                   value: _loading ? '—' : '$_followingCount',
                   onTap: _loading
                       ? null
@@ -454,58 +486,28 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
                             ),
                           ),
                 ),
-                ProfileStatItem(
-                  label: 'Sparks',
-                  value: _loading ? '—' : '${_stats.sparksReceived}',
-                ),
               ],
-            ),
-            if (!_isSelf) ...[
-              const SizedBox(height: 14),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _loading || _followBusy ? null : _toggleFollow,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _followStatus == FollowStatus.following
-                          ? context.fv.elevatedSurface
-                          : FirstVueColors.gold,
-                      foregroundColor: _followStatus == FollowStatus.following
-                          ? context.fv.primaryText
-                          : const Color(0xFF17130B),
-                    ),
-                    child: _followBusy
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(_followLabel()),
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (var i = 0; i < _tabLabels.length; i++)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: _MemberProfileTabButton(
-                          label: _tabLabels[i],
-                          selected: _selectedTab == i,
-                          onTap: () => setState(() => _selectedTab = i),
-                        ),
+              actions: _isSelf
+                  ? const []
+                  : [
+                      SocialFollowButton(
+                        label: _followLabel(),
+                        filled: _followStatus != FollowStatus.following,
+                        onPressed:
+                            _loading || _followBusy ? null : _toggleFollow,
                       ),
-                  ],
-                ),
-              ),
+                      SocialFollowButton(
+                        label: 'Message',
+                        filled: false,
+                        onPressed: _openMessage,
+                      ),
+                    ],
+            ),
+            const SizedBox(height: 8),
+            SocialGoldUnderlineTabs(
+              labels: _tabLabels,
+              selectedIndex: _selectedTab,
+              onSelected: (index) => setState(() => _selectedTab = index),
             ),
             const SizedBox(height: 8),
             if (_loading)
@@ -538,54 +540,6 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
               ),
             const SizedBox(height: 28),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MemberProfileTabButton extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _MemberProfileTabButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Column(
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: selected ? FirstVueColors.gold : context.fv.secondaryText,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  letterSpacing: 1,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Container(
-                height: 2,
-                width: 32,
-                decoration: BoxDecoration(
-                  color: selected ? FirstVueColors.gold : Colors.transparent,
-                  borderRadius: BorderRadius.circular(1),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

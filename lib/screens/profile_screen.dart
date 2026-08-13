@@ -18,11 +18,11 @@ import '../services/profile_privacy_service.dart';
 import '../services/username_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/facebook_style_profile_header.dart';
+import '../widgets/social_chrome.dart';
 import '../widgets/media_picker_sheet.dart';
 import '../widgets/signed_media_viewer.dart' show openSignedMedia;
 import '../widgets/portfolio_albums_section.dart';
 import '../widgets/profile_affiliations_section.dart';
-import '../widgets/profile_completion_banner.dart';
 import '../widgets/profile_media_section.dart';
 import '../widgets/profile_my_posts_section.dart';
 import '../widgets/profile_saved_section.dart';
@@ -31,9 +31,7 @@ import '../config/app_config.dart';
 import '../services/portfolio_album_service.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/follow_requests_section.dart';
-import '../widgets/live_stream_eligibility_card.dart';
 import '../widgets/firstvue_settings_drawer.dart';
-import '../widgets/firstvue_inline_search_bar.dart';
 import '../models/share_payload.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -47,7 +45,6 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   ProfileImageSet _profileImages = const ProfileImageSet();
-  bool _imagesLoading = false;
   bool _imageUpdating = false;
   ProfileEngagementStats _stats = const ProfileEngagementStats(
     postCount: 0,
@@ -67,12 +64,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _hasApprovedProfessional = false;
 
   static const _tabLabels = [
-    'POSTS',
-    'PHOTOS',
-    'PORTFOLIO',
-    'GROUPS',
-    'COMMUNITIES',
-    'ABOUT',
+    'Posts',
+    'Photos',
+    'Portfolio',
+    'Groups',
+    'Communities',
+    'About',
   ];
 
   @override
@@ -206,13 +203,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) setState(() => _profileImages = const ProfileImageSet());
       return;
     }
-    setState(() => _imagesLoading = true);
     final images = await ProfileMediaService.fetchProfileImages();
     if (!mounted) return;
-    setState(() {
-      _profileImages = images;
-      _imagesLoading = false;
-    });
+    setState(() => _profileImages = images);
   }
 
   Future<void> _showAvatarOptions() async {
@@ -534,6 +527,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _ => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (_approvedBusinesses.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.storefront_outlined, color: FirstVueColors.gold),
+                title: Text(
+                  _approvedBusinesses.length == 1
+                      ? 'My Business'
+                      : 'My Businesses',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _openMyBusiness,
+              ),
+            if (_hasApprovedProfessional)
+              ListTile(
+                leading: const Icon(Icons.work_outline, color: FirstVueColors.gold),
+                title: const Text('My Professional'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _openMyProfessional,
+              ),
             ProfileSavedSection(refreshToken: widget.refreshToken),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -589,17 +600,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: EdgeInsets.zero,
           children: [
           if (user != null)
-            const FirstVueInlineSearchBar(
-              padding: EdgeInsets.fromLTRB(12, 4, 12, 0),
-            ),
-          if (user != null)
             FollowRequestsSection(
               onChanged: () {
                 _loadStats();
                 setState(() => _pullRefreshToken++);
               },
             ),
-          if (user != null) const LiveStreamEligibilityCard(),
           if (user != null &&
               !_nameLoading &&
               (handle == null || handle.isEmpty))
@@ -638,130 +644,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ),
-          Stack(
-            children: [
-              FacebookStyleProfileHeader(
-                title: displayName,
-                subtitle: subtitle,
-                coverImageUrl: _profileImages.cover?.signedUrl,
-                avatarImageUrl: _profileImages.avatar?.signedUrl,
-                coverIsVideo: _profileImages.cover?.isVideo ?? false,
-                avatarIsVideo: _profileImages.avatar?.isVideo ?? false,
-                onCoverTap: _imageUpdating ? null : _showCoverOptions,
-                onAvatarTap: _imageUpdating ? null : _showAvatarOptions,
-                showImageLoading: _imagesLoading || _imageUpdating,
-                stats: user == null
-                    ? null
-                    : [
-                        ProfileStatItem(
-                          label: 'Posts',
-                          value: _statsLoading ? '—' : '${_stats.postCount}',
-                        ),
-                        ProfileStatItem(
-                          label: 'Followers',
-                          value: _statsLoading ? '—' : '$_followerCount',
-                          onTap: () => _openFollowList(
-                            FollowListMode.followers,
-                            displayName,
-                          ),
-                        ),
-                        ProfileStatItem(
-                          label: 'Following',
-                          value: _statsLoading ? '—' : '$_followingCount',
-                          onTap: () => _openFollowList(
-                            FollowListMode.following,
-                            displayName,
-                          ),
-                        ),
-                        ProfileStatItem(
-                          label: 'Sparks',
-                          value: _statsLoading ? '—' : '${_stats.sparksReceived}',
-                        ),
-                      ],
-                actionButtons: user == null
-                    ? [
-                        FilledButton(
-                          onPressed: () => _handleAccountTap(user),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: FirstVueColors.gold,
-                            foregroundColor: Colors.black,
-                          ),
-                          child: const Text('Sign in or create account'),
-                        ),
-                      ]
-                    : [
-                        FilledButton(
-                          onPressed: _openEditProfile,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: FirstVueColors.gold,
-                            foregroundColor: const Color(0xFF17130B),
-                          ),
-                          child: const Text('Edit profile'),
-                        ),
-                        OutlinedButton(
-                          onPressed: _shareProfile,
-                          child: const Text('Share profile'),
-                        ),
-                        if (_approvedBusinesses.isNotEmpty)
-                          OutlinedButton.icon(
-                            onPressed: _openMyBusiness,
-                            icon: const Icon(Icons.storefront_outlined, size: 18),
-                            label: Text(
-                              _approvedBusinesses.length == 1
-                                  ? 'My Business'
-                                  : 'My Businesses',
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: FirstVueColors.gold,
-                            ),
-                          ),
-                        if (_hasApprovedProfessional)
-                          OutlinedButton.icon(
-                            onPressed: _openMyProfessional,
-                            icon: const Icon(Icons.work_outline, size: 18),
-                            label: const Text('My Professional'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: FirstVueColors.gold,
-                            ),
-                          ),
-                      ],
+          SocialProfileHeader(
+            name: displayName,
+            handle: subtitle,
+            bio: 'Discovering local talent',
+            coverImageUrl: _profileImages.cover?.signedUrl,
+            avatarImageUrl: _profileImages.avatar?.signedUrl,
+            coverIsVideo: _profileImages.cover?.isVideo ?? false,
+            avatarIsVideo: _profileImages.avatar?.isVideo ?? false,
+            verified: user != null,
+            centerAvatar: true,
+            onCoverTap: _imageUpdating ? null : _showCoverOptions,
+            onAvatarTap: _imageUpdating ? null : _showAvatarOptions,
+            stats: user == null
+                ? const []
+                : [
+                    ProfileStatItem(
+                      label: 'posts',
+                      value: _statsLoading ? '—' : '${_stats.postCount}',
+                    ),
+                    ProfileStatItem(
+                      label: 'followers',
+                      value: _statsLoading ? '—' : '$_followerCount',
+                      onTap: () => _openFollowList(
+                        FollowListMode.followers,
+                        displayName,
+                      ),
+                    ),
+                    ProfileStatItem(
+                      label: 'following',
+                      value: _statsLoading ? '—' : '$_followingCount',
+                      onTap: () => _openFollowList(
+                        FollowListMode.following,
+                        displayName,
+                      ),
+                    ),
+                  ],
+            actions: user == null
+                ? [
+                    FilledButton(
+                      onPressed: () => _handleAccountTap(user),
+                      child: const Text('Sign in or create account'),
+                    ),
+                  ]
+                : [
+                    FilledButton(
+                      onPressed: _openEditProfile,
+                      child: const Text('Edit profile'),
+                    ),
+                    OutlinedButton(
+                      onPressed: _shareProfile,
+                      child: const Text('Share profile'),
+                    ),
+                  ],
+            trailing: IconButton(
+              onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+              icon: const Icon(
+                Icons.settings_outlined,
+                color: FirstVueColors.gold,
               ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: IconButton(
-                  onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
-                  icon: Icon(
-                    Icons.settings_outlined,
-                    color: FirstVueColors.gold,
-                  ),
-                  tooltip: 'Settings',
-                ),
-              ),
-            ],
+              tooltip: 'Settings',
+            ),
           ),
           if (user != null) ...[
-            const SizedBox(height: 12),
-            UserProfileCompletionBanner(userId: user.id),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (var i = 0; i < _tabLabels.length; i++)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: _ProfileTabButton(
-                          label: _tabLabels[i],
-                          selected: _selectedTab == i,
-                          onTap: () => setState(() => _selectedTab = i),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+            const SizedBox(height: 16),
+            SocialGoldUnderlineTabs(
+              labels: _tabLabels,
+              selectedIndex: _selectedTab,
+              onSelected: (index) => setState(() => _selectedTab = index),
             ),
             const SizedBox(height: 8),
             AnimatedSwitcher(
@@ -796,51 +746,3 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-class _ProfileTabButton extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ProfileTabButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Column(
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: selected ? FirstVueColors.gold : context.fv.secondaryText,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  letterSpacing: 1,
-                ),
-              ),
-              const SizedBox(height: 6),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                height: 3,
-                width: selected ? 36 : 0,
-                decoration: BoxDecoration(
-                  color: FirstVueColors.gold,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

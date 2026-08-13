@@ -1,20 +1,12 @@
 import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 
-import '../config/app_config.dart';
-import '../services/community_news_service.dart';
 import '../services/discovery_feed_service.dart';
-import '../services/firstvue_feedback_sounds.dart';
-import '../services/saved_items_service.dart';
 import '../theme/firstvue_theme.dart';
-import '../widgets/feed_comments_sheet.dart';
-import '../widgets/vue_video_player.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
-import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/social_chrome.dart';
-import '../models/share_payload.dart';
-import 'ai_search_screen.dart';
 import 'business_profile_screen.dart';
+import 'create_post_screen.dart';
 import 'firstvue_business_profile_screen.dart';
 import 'member_public_profile_screen.dart';
 
@@ -28,11 +20,8 @@ class DiscoveryFeedScreen extends StatefulWidget {
 }
 
 class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
-  final _searchController = TextEditingController();
-  final _pageController = PageController();
   late Future<List<DiscoveryFeedItem>> _feedFuture;
   List<_FeedItem> _feedItems = const [];
-  int _currentPage = 0;
   _FeedMode _mode = _FeedMode.forYou;
 
   static const _items = [
@@ -78,15 +67,6 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   void initState() {
     super.initState();
     _feedFuture = _loadFeed();
-    _pageController.addListener(_onPageChanged);
-  }
-
-  void _onPageChanged() {
-    if (!_pageController.hasClients) return;
-    final page = _pageController.page?.round() ?? 0;
-    if (page != _currentPage) {
-      setState(() => _currentPage = page);
-    }
   }
 
   Future<List<DiscoveryFeedItem>> _loadFeed() async {
@@ -105,31 +85,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   }
 
   Future<void> _refreshFeed() async {
-    final savedPage = _currentPage;
     await _loadFeed();
-    if (!mounted || !_pageController.hasClients) return;
-    final maxPage = (_feedItems.length - 1).clamp(0, _feedItems.length);
-    final target = savedPage.clamp(0, maxPage);
-    if (_pageController.page?.round() != target) {
-      _pageController.jumpToPage(target);
-    }
-  }
-
-  @override
-  void dispose() {
-    _pageController.removeListener(_onPageChanged);
-    _pageController.dispose();
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _search() {
-    final query = _searchController.text.trim();
-    if (query.isEmpty) return;
-    Navigator.push(
-      context,
-      FirstVuePageRoute(builder: (_) => AiSearchScreen(initialPrompt: query)),
-    );
   }
 
   void _openProfile(_FeedItem item) {
@@ -201,697 +157,121 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
       color: fv.background,
       child: SafeArea(
         bottom: false,
-        child: Column(
+        child: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-              child: Row(
-                children: [
-                  const Text(
-                    'VUE',
-                    style: TextStyle(
-                      fontFamily: 'CormorantGaramond',
-                      color: FirstVueColors.gold,
-                      fontSize: 27,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                  const Spacer(),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-              child: SocialPillTabs(
-                labels: const ['For You', 'Nearby', 'Trending'],
-                selectedIndex: _mode.index,
-                onSelected: (index) {
-                  final next = _FeedMode.values[index];
-                  if (next == _mode) return;
-                  setState(() => _mode = next);
-                  _feedFuture = _loadFeed();
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-              child: TextField(
-                controller: _searchController,
-                onSubmitted: (_) => _search(),
-                style: TextStyle(color: fv.primaryText),
-                decoration: InputDecoration(
-                  hintText: 'Search people, shops, styles',
-                  hintStyle: TextStyle(color: fv.tertiaryText, fontSize: 13),
-                  prefixIcon: const Icon(
-                    Icons.search,
-                    color: FirstVueColors.gold,
-                    size: 20,
-                  ),
-                  suffixIcon: IconButton(
-                    onPressed: _search,
-                    icon: Icon(Icons.arrow_forward, color: fv.icon),
+            Column(
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: SocialPageHeader(
+                    title: 'VUE',
+                    subtitle: 'Watch, follow, and book local talent.',
                   ),
                 ),
-              ),
-            ),
-            Expanded(
-              child: FutureBuilder<List<DiscoveryFeedItem>>(
-                future: _feedFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: FirstVueColors.gold,
-                      ),
-                    );
-                  }
-                  final items = _feedItems.isEmpty ? _items : _feedItems;
-                  return FirstVueRefreshScaffold(
-                    onRefresh: _refreshFeed,
-                    child: GridView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 14,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 0.72,
-                      ),
-                      itemCount: items.length,
-                      itemBuilder: (_, index) {
-                        final item = items[index];
-                        return SocialMasonryTile(
-                          title: item.name,
-                          subtitle: '@${item.name.toLowerCase().replaceAll(' ', '')}',
-                          imageUrl: item.connected != null ? item.image : null,
-                          assetImage: item.connected == null ? item.image : null,
-                          likeLabel: item.reviews > 0 ? '${item.reviews}' : null,
-                          showPlay: item.mediaType == 'video',
-                          onTap: () => _openProfile(item),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                  child: SocialPillTabs(
+                    labels: const ['For You', 'Nearby', 'Trending'],
+                    selectedIndex: _mode.index,
+                    onSelected: (index) {
+                      final next = _FeedMode.values[index];
+                      if (next == _mode) return;
+                      setState(() => _mode = next);
+                      _feedFuture = _loadFeed();
+                    },
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 10),
+                  child: SocialSearchBar(),
+                ),
+                Expanded(
+                  child: FutureBuilder<List<DiscoveryFeedItem>>(
+                    future: _feedFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: FirstVueColors.gold,
+                          ),
                         );
-                      },
+                      }
+                      final items = _feedItems.isEmpty ? _items : _feedItems;
+                      return FirstVueRefreshScaffold(
+                        onRefresh: _refreshFeed,
+                        child: GridView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 14,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 0.72,
+                          ),
+                          itemCount: items.length,
+                          itemBuilder: (_, index) {
+                            final item = items[index];
+                            return SocialPostTile(
+                              handle: socialHandleFromName(item.name),
+                              avatarUrl: item.connected?.mediaUrl,
+                              imageUrl:
+                                  item.connected != null ? item.image : null,
+                              assetImage:
+                                  item.connected == null ? item.image : null,
+                              likeLabel: item.reviews > 0
+                                  ? '${item.reviews}'
+                                  : index.isEven
+                                      ? '2.1k'
+                                      : '843',
+                              showPlay: true,
+                              durationLabel: item.mediaType == 'video' ||
+                                      item.connected == null
+                                  ? '0:12'
+                                  : null,
+                              live: item.sponsored,
+                              showOutlineFollow: true,
+                              showMenu: false,
+                              onFollow: () => _openProfile(item),
+                              onTap: () => _openProfile(item),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+            Positioned(
+              left: 48,
+              right: 48,
+              bottom: 16,
+              child: FilledButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    FirstVuePageRoute(
+                      builder: (_) => const CreatePostScreen(),
                     ),
                   );
                 },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Kept as the lightweight static renderer for prototype comparison.
-// ignore: unused_element
-class _FeedCard extends StatelessWidget {
-  final _FeedItem item;
-  final VoidCallback onOpen;
-  const _FeedCard({required this.item, required this.onOpen});
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-    child: GestureDetector(
-      onTap: onOpen,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            item.connected == null
-                ? Image.asset(
-                    item.image,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) =>
-                        const ColoredBox(color: Color(0xFF202833)),
-                  )
-                : Image.network(
-                    item.image,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) =>
-                        const ColoredBox(color: Color(0xFF202833)),
-                  ),
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Color(0x22000000),
-                    Color(0xEE080B0F),
-                  ],
-                  stops: [0, .45, 1],
+                style: FilledButton.styleFrom(
+                  backgroundColor: FirstVueColors.gold,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: const StadiumBorder(),
+                ),
+                child: const Text(
+                  '+ Create a Vue',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                 ),
               ),
             ),
-            const Center(
-              child: Icon(
-                Icons.play_circle_fill_rounded,
-                color: Color(0xCCFFFFFF),
-                size: 66,
-              ),
-            ),
-            Positioned(
-              right: 14,
-              bottom: 112,
-              child: Column(
-                children: [
-                  _Action(icon: Icons.favorite_border, label: 'Like'),
-                  const SizedBox(height: 18),
-                  _Action(icon: Icons.bookmark_border, label: 'Save'),
-                  const SizedBox(height: 18),
-                  _Action(icon: Icons.ios_share, label: 'Share'),
-                ],
-              ),
-            ),
-            Positioned(
-              left: 16,
-              right: 64,
-              bottom: 18,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (item.sponsored)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text(
-                        'SPONSORED',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 9,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          item.name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 21,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      if (item.verified)
-                        const Padding(
-                          padding: EdgeInsets.only(left: 6),
-                          child: Icon(
-                            Icons.verified,
-                            color: Color(0xFFD8B56A),
-                            size: 18,
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    item.caption,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                  ),
-                  const SizedBox(height: 7),
-                  Text(
-                    '★ ${item.rating} (${item.reviews})  •  ${item.distance}  •  ${item.specialty}',
-                    maxLines: 2,
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                  const SizedBox(height: 10),
-                  FilledButton.icon(
-                    onPressed: onOpen,
-                    icon: const Icon(Icons.storefront, size: 17),
-                    label: const Text('VIEW BUSINESS'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFD8B56A),
-                      foregroundColor: Colors.black,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-class _Action extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _Action({required this.icon, required this.label});
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Container(
-        width: 44,
-        height: 44,
-        decoration: const BoxDecoration(
-          color: Colors.black45,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: Colors.white),
-      ),
-      const SizedBox(height: 3),
-      Text(label, style: const TextStyle(color: Colors.white, fontSize: 10)),
-    ],
-  );
-}
-
-// ignore: unused_element
-class _InteractiveFeedCard extends StatefulWidget {
-  final _FeedItem item;
-  final bool isActive;
-  final VoidCallback onViewProfile;
-  const _InteractiveFeedCard({
-    required this.item,
-    required this.isActive,
-    required this.onViewProfile,
-  });
-
-  @override
-  State<_InteractiveFeedCard> createState() => _InteractiveFeedCardState();
-}
-
-// ignore: unused_element
-class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
-  bool _liked = false;
-  bool _saved = false;
-  bool _busy = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _hydrateSaved();
-  }
-
-  Future<void> _hydrateSaved() async {
-    final connected = widget.item.connected;
-    if (connected == null) return;
-    final contentType = connected.newsPostId != null
-        ? SavedContentType.newsPost
-        : connected.isMember
-            ? SavedContentType.vueMedia
-            : SavedContentType.business;
-    final contentId = connected.newsPostId ??
-        (connected.isMember ? connected.mediaId : connected.businessId);
-    final saved = await SavedItemsService.isSaved(
-      contentType: contentType,
-      contentId: contentId,
-    );
-    if (!mounted) return;
-    setState(() => _saved = saved);
-  }
-
-  void _record(String type) {
-    final connected = widget.item.connected;
-    if (connected != null) {
-      DiscoveryFeedService.recordEngagement(connected, type);
-    }
-  }
-
-  Future<void> _toggleSpark() async {
-    if (_busy) return;
-    final previous = _liked;
-    setState(() => _liked = !_liked);
-    if (_liked) {
-      await FirstVueFeedbackSounds.playSpark(fromUserTap: true);
-      _record('like');
-    }
-    final connected = widget.item.connected;
-    final newsPostId = connected?.newsPostId;
-    if (newsPostId == null) return;
-    _busy = true;
-    try {
-      final post = await CommunityNewsService.fetchPostById(newsPostId);
-      if (post != null) await CommunityNewsService.toggleSpark(post);
-    } catch (_) {
-      if (mounted) setState(() => _liked = previous);
-    } finally {
-      _busy = false;
-    }
-  }
-
-  Future<void> _toggleSave() async {
-    final connected = widget.item.connected;
-    final previous = _saved;
-    setState(() => _saved = !_saved);
-    if (_saved) _record('save');
-    if (connected == null) return;
-    final contentType = connected.newsPostId != null
-        ? SavedContentType.newsPost
-        : connected.isMember
-            ? SavedContentType.vueMedia
-            : SavedContentType.business;
-    final contentId = connected.newsPostId ??
-        (connected.isMember ? connected.mediaId : connected.businessId);
-    try {
-      await SavedItemsService.toggleSave(
-        contentType: contentType,
-        contentId: contentId,
-        currentlySaved: previous,
-      );
-    } catch (_) {
-      if (mounted) setState(() => _saved = previous);
-    }
-  }
-
-  void _openRouteShare() {
-    final connected = widget.item.connected;
-    final item = widget.item;
-    final link = connected == null
-        ? AppConfig.webBaseUrl
-        : connected.isMember
-            ? AppConfig.memberShareUrl(connected.ownerId)
-            : AppConfig.businessShareUrl(connected.businessId);
-
-    FirstVueShareSheet.show(
-      context,
-      payload: SharePayload(
-        title: item.name,
-        subtitle: item.caption,
-        link: link,
-        detailLine: connected?.isMember == true
-            ? 'FirstVue member profile'
-            : '★ ${item.rating} (${item.reviews} reviews) • ${item.distance} • ${item.specialty}',
-      ),
-      onAction: (_) => _record('share'),
-    );
-  }
-
-  void _openComments() {
-    final connected = widget.item.connected;
-    if (connected == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Comments are available on verified Vue posts.'),
-        ),
-      );
-      return;
-    }
-    if (connected.isMember) {
-      FeedCommentsSheet.show(
-        context,
-        mediaId: connected.newsPostId != null
-            ? 'news-post:${connected.newsPostId}'
-            : connected.mediaId,
-        businessName: connected.ownerName,
-      );
-      return;
-    }
-    FeedCommentsSheet.show(
-      context,
-      mediaId: connected.mediaId,
-      businessName: connected.businessName,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final item = widget.item;
-    final connected = item.connected;
-    final isMember = connected?.isMember ?? false;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            GestureDetector(
-              onDoubleTap: _toggleSpark,
-              child: _VueFeedMediaBackground(
-                assetPath: item.connected == null ? item.image : null,
-                networkUrl: item.connected == null ? null : item.image,
-                isVideo: connected?.isVideo ?? false,
-                active: widget.isActive,
-              ),
-            ),
-            const IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Color(0x22000000),
-                      Color(0xF2080B0F),
-                    ],
-                    stops: [0, .45, 1],
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              right: 13,
-              bottom: 116,
-              child: Column(
-                children: [
-                  _VueAction(
-                    icon: _liked
-                        ? Icons.auto_awesome_rounded
-                        : Icons.auto_awesome_outlined,
-                    label: 'Spark',
-                    active: _liked,
-                    onTap: _toggleSpark,
-                  ),
-                  const SizedBox(height: 15),
-                  _VueAction(
-                    icon: _saved
-                        ? Icons.bookmark_rounded
-                        : Icons.bookmark_border_rounded,
-                    label: _saved ? 'Saved' : 'Save',
-                    active: _saved,
-                    onTap: _toggleSave,
-                  ),
-                  const SizedBox(height: 15),
-                  _VueAction(
-                    icon: Icons.chat_bubble_outline_rounded,
-                    label: 'Comment',
-                    onTap: _openComments,
-                  ),
-                  const SizedBox(height: 15),
-                  _VueAction(
-                    icon: Icons.route_outlined,
-                    label: 'Route',
-                    onTap: _openRouteShare,
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              left: 16,
-              right: 64,
-              bottom: 18,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (item.sponsored)
-                    const Text(
-                      'SPONSORED',
-                      style: TextStyle(
-                        color: Color(0xFFD8B56A),
-                        fontSize: 9,
-                        letterSpacing: 1.3,
-                      ),
-                    ),
-                  Row(
-                    children: [
-                      if (connected != null)
-                        GestureDetector(
-                          onTap: widget.onViewProfile,
-                          child: CircleAvatar(
-                            radius: 18,
-                            backgroundColor: Colors.black45,
-                            child: Icon(
-                              isMember ? Icons.person : Icons.storefront,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                      if (connected != null) const SizedBox(width: 10),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: connected != null ? widget.onViewProfile : null,
-                          behavior: HitTestBehavior.opaque,
-                          child: Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  item.name,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 21,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              if (item.verified)
-                                const Padding(
-                                  padding: EdgeInsets.only(left: 6),
-                                  child: Icon(
-                                    Icons.workspace_premium_rounded,
-                                    color: Color(0xFFD8B56A),
-                                    size: 19,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.caption,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    isMember
-                        ? '${item.specialty} • FirstVue member'
-                        : '★ ${item.rating} (${item.reviews}) • ${item.distance} • ${item.specialty}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white70, fontSize: 11),
-                  ),
-                  const SizedBox(height: 9),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: widget.onViewProfile,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFFD8B56A),
-                        foregroundColor: Colors.black,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      child: Text(isMember ? 'VIEW PROFILE' : 'VIEW BUSINESS'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
       ),
     );
   }
-}
-
-class _VueFeedMediaBackground extends StatelessWidget {
-  final String? assetPath;
-  final String? networkUrl;
-  final bool isVideo;
-  final bool active;
-
-  const _VueFeedMediaBackground({
-    this.assetPath,
-    this.networkUrl,
-    this.isVideo = false,
-    this.active = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (assetPath != null) {
-      return Image.asset(
-        assetPath!,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) =>
-            const ColoredBox(color: Color(0xFF202833)),
-      );
-    }
-
-    final url = networkUrl;
-    if (url == null || url.isEmpty) {
-      return const ColoredBox(color: Color(0xFF202833));
-    }
-
-    if (isVideo) {
-      return VueVideoPlayer(
-        url: url,
-        fit: BoxFit.cover,
-        autoPlay: true,
-        startMuted: true,
-        active: active,
-      );
-    }
-
-    return Image.network(
-      url,
-      fit: BoxFit.cover,
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        return const ColoredBox(
-          color: Color(0xFF202833),
-          child: Center(
-            child: CircularProgressIndicator(color: Color(0xFFD8B56A)),
-          ),
-        );
-      },
-      errorBuilder: (_, _, _) => const ColoredBox(color: Color(0xFF202833)),
-    );
-  }
-}
-
-class _VueAction extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool active;
-  const _VueAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.active = false,
-  });
-
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          customBorder: const StarBorder.polygon(sides: 6, pointRounding: .35),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            width: 46,
-            height: 46,
-            decoration: ShapeDecoration(
-              color: active
-                  ? const Color(0xFFD8B56A)
-                  : Colors.black.withValues(alpha: .62),
-              shape: const StarBorder.polygon(sides: 6, pointRounding: .35),
-            ),
-            child: Icon(
-              icon,
-              color: active ? Colors.black : Colors.white,
-              size: 22,
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(height: 3),
-      Text(label, style: const TextStyle(color: Colors.white, fontSize: 10)),
-    ],
-  );
 }
 
 class _FeedItem {

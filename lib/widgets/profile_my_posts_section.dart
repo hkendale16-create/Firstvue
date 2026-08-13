@@ -8,6 +8,7 @@ import '../services/community_news_service.dart';
 import 'community_news_post_card.dart';
 import 'community_news_post_detail_sheet.dart';
 import 'feed_comments_sheet.dart';
+import 'social_chrome.dart';
 
 class ProfileMyPostsSection extends StatefulWidget {
   final int refreshToken;
@@ -275,53 +276,47 @@ class _ProfileMyPostsSectionState extends State<ProfileMyPostsSection> {
 
               final posts = snapshot.data ?? _posts;
               if (posts.isEmpty) {
-                return embedded
-                    ? _emptyState(
-                        icon: Icons.campaign_outlined,
-                        message:
-                            'No posts yet. Share updates from the home feed and they will show up here.',
-                      )
-                    : _PostsContainer(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 22,
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.campaign_outlined,
-                                color: Colors.white.withValues(alpha: .35),
-                                size: 28,
-                              ),
-                              const SizedBox(width: 14),
-                              const Expanded(
-                                child: Text(
-                                  'No posts yet. Share updates from the home news feed and they will appear here.',
-                                  style: TextStyle(
-                                    color: Colors.white54,
-                                    height: 1.4,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 8),
+                  child: Text(
+                    'No posts yet. Share updates from the home feed and they will show up here.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: context.fv.secondaryText,
+                      height: 1.45,
+                      fontSize: 13,
+                    ),
+                  ),
+                );
+              }
+
+              if (embedded) {
+                return SocialPhotoGrid(
+                  items: [
+                    for (final post in posts)
+                      SocialPhotoGridItem(
+                        imageUrl: post.media.isNotEmpty
+                            ? post.media.first.signedUrl
+                            : null,
+                        isVideo: post.media.isNotEmpty && post.media.first.isVideo,
+                        onTap: () => CommunityNewsPostDetailSheet.show(
+                          context,
+                          postId: post.id,
+                          initialPost: post,
                         ),
-                      );
+                      ),
+                  ],
+                );
               }
 
               return Column(
                 children: [
                   for (var index = 0; index < posts.length; index++)
                     Padding(
-                      padding: EdgeInsets.only(bottom: embedded ? 0 : 10),
+                      padding: const EdgeInsets.only(bottom: 10),
                       child: CommunityNewsPostCard(
                         post: posts[index],
-                        compact: !embedded,
-                        style: embedded
-                            ? CommunityNewsPostCardStyle.timeline
-                            : CommunityNewsPostCardStyle.compact,
+                        compact: true,
                         onTap: () => CommunityNewsPostDetailSheet.show(
                           context,
                           postId: posts[index].id,
@@ -365,21 +360,4 @@ class _PostsContainer extends StatelessWidget {
       child: child,
     );
   }
-}
-
-Widget _emptyState({required IconData icon, required String message}) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 8),
-    child: Column(
-      children: [
-        Icon(icon, color: Colors.white.withValues(alpha: .25), size: 40),
-        const SizedBox(height: 12),
-        Text(
-          message,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.white54, height: 1.45, fontSize: 13),
-        ),
-      ],
-    ),
-  );
 }

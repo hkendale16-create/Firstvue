@@ -7,8 +7,13 @@ import 'location_autocomplete_field.dart';
 
 class HomeCityChip extends StatefulWidget {
   final VoidCallback? onLocationChanged;
+  final bool compact;
 
-  const HomeCityChip({super.key, this.onLocationChanged});
+  const HomeCityChip({
+    super.key,
+    this.onLocationChanged,
+    this.compact = false,
+  });
 
   @override
   State<HomeCityChip> createState() => HomeCityChipState();
@@ -197,6 +202,50 @@ class HomeCityChipState extends State<HomeCityChip> {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
+    final content = Row(
+      mainAxisSize: widget.compact ? MainAxisSize.min : MainAxisSize.max,
+      mainAxisAlignment:
+          widget.compact ? MainAxisAlignment.start : MainAxisAlignment.center,
+      children: [
+        Icon(
+          _label == 'Everywhere'
+              ? Icons.public
+              : Icons.location_on_outlined,
+          color: FirstVueColors.teal.withValues(alpha: .92),
+          size: widget.compact ? 14 : 18,
+        ),
+        const SizedBox(width: 4),
+        if (_loading)
+          SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: FirstVueColors.teal.withValues(alpha: .8),
+            ),
+          )
+        else
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: widget.compact ? 78 : 220),
+            child: Text(
+              _label ?? 'Set location',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: fv.primaryText,
+                fontWeight: FontWeight.w600,
+                fontSize: widget.compact ? 12 : 14,
+              ),
+            ),
+          ),
+        Icon(
+          Icons.keyboard_arrow_down_rounded,
+          color: FirstVueColors.gold,
+          size: widget.compact ? 16 : 20,
+        ),
+      ],
+    );
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -204,53 +253,20 @@ class HomeCityChipState extends State<HomeCityChip> {
         borderRadius: BorderRadius.circular(20),
         splashColor: FirstVueColors.teal.withValues(alpha: .12),
         highlightColor: FirstVueColors.teal.withValues(alpha: .06),
-        child: AnimatedScale(
-          scale: 1,
-          duration: const Duration(milliseconds: 120),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  _label == 'Everywhere'
-                      ? Icons.public
-                      : Icons.location_on_outlined,
-                  color: FirstVueColors.teal.withValues(alpha: .92),
-                  size: 18,
+        child: widget.compact
+            ? Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: fv.elevatedSurface,
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                const SizedBox(width: 6),
-                if (_loading)
-                  SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: FirstVueColors.teal.withValues(alpha: .8),
-                    ),
-                  )
-                else
-                  Flexible(
-                    child: Text(
-                      _label ?? 'Set location',
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF16131F),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 2),
-                Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: FirstVueColors.gold,
-                  size: 20,
-                ),
-              ],
-            ),
-          ),
-        ),
+                child: content,
+              )
+            : Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                child: content,
+              ),
       ),
     );
   }
