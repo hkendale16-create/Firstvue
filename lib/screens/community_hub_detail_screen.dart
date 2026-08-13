@@ -281,7 +281,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
         backgroundColor: const Color(0xFF10151B),
         title: const Text(
           'Add Community Editor',
-          style: TextStyle(color: const Color(0xFF16131F)),
+          style: TextStyle(color: Color(0xFF16131F)),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -512,7 +512,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                                 Text(
                                   hub.name,
                                   style: const TextStyle(
-                                    color: const Color(0xFF16131F),
+                                    color: Color(0xFF16131F),
                                     fontSize: 22,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -582,7 +582,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                                     Text(
                                       _leader!.displayName,
                                       style: const TextStyle(
-                                        color: const Color(0xFF16131F),
+                                        color: Color(0xFF16131F),
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -860,7 +860,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                                   title: Text(
                                     name,
                                     style: const TextStyle(
-                                      color: const Color(0xFF16131F),
+                                      color: Color(0xFF16131F),
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),

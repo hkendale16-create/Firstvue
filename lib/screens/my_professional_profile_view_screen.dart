@@ -4,6 +4,7 @@ import '../navigation/firstvue_page_route.dart';
 import '../services/professional_media_service.dart';
 import '../services/professional_profiles_service.dart';
 import '../services/portfolio_album_service.dart';
+import '../theme/firstvue_theme.dart';
 import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
@@ -127,7 +128,7 @@ class _MyProfessionalProfileViewScreenState
                 const Text(
                   'No professional profile yet',
                   style: TextStyle(
-                    color: const Color(0xFF16131F),
+                    color: Color(0xFF16131F),
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
                   ),
@@ -307,7 +308,7 @@ class _MyProfessionalProfileViewScreenState
                   ),
                   title: const Text(
                     'Social links & catalog',
-                    style: TextStyle(color: const Color(0xFF16131F)),
+                    style: TextStyle(color: Color(0xFF16131F)),
                   ),
                   trailing: const Icon(Icons.chevron_right, color: Color(0xFF8A8696)),
                   onTap: () {

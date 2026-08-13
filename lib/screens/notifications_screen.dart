@@ -448,7 +448,7 @@ class _FollowRequestNotificationTileState
                 Text(
                   widget.item.title,
                   style: const TextStyle(
-                    color: const Color(0xFF16131F),
+                    color: Color(0xFF16131F),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -541,7 +541,7 @@ class _NotificationTile extends StatelessWidget {
                       Text(
                         title,
                         style: const TextStyle(
-                          color: const Color(0xFF16131F),
+                          color: Color(0xFF16131F),
                           fontWeight: FontWeight.w600,
                         ),
                       ),

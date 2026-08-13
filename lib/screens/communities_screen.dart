@@ -229,7 +229,7 @@ class _CommunitiesScreenState extends State<CommunitiesScreen>
                               title: Text(
                                 hub.name,
                                 style: const TextStyle(
-                                  color: const Color(0xFF16131F),
+                                  color: Color(0xFF16131F),
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
@@ -302,7 +302,7 @@ class _CommunityListTile extends StatelessWidget {
                     Text(
                       community.name,
                       style: const TextStyle(
-                        color: const Color(0xFF16131F),
+                        color: Color(0xFF16131F),
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
                       ),

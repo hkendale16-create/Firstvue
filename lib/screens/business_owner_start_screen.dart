@@ -308,7 +308,7 @@ class _NewBusinessScreenState extends State<_NewBusinessScreen> {
               alignment: Alignment.centerLeft,
               child: Text(
                 'What type of business is this?',
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(height: 10),

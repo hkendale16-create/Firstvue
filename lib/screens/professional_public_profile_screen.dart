@@ -189,7 +189,7 @@ class _ProfessionalPublicProfileScreenState
                                   ? 'Accepting new clients'
                                   : 'Not accepting new clients',
                               style: const TextStyle(
-                                color: const Color(0xFF16131F),
+                                color: Color(0xFF16131F),
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -567,7 +567,7 @@ class _ProfileHeading extends StatelessWidget {
     return Text(
       label,
       style: const TextStyle(
-        color: const Color(0xFF16131F),
+        color: Color(0xFF16131F),
         fontWeight: FontWeight.w700,
         letterSpacing: 1.4,
       ),

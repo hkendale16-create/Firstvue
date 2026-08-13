@@ -303,32 +303,6 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   }
 }
 
-class _ModeButton extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _ModeButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-  @override
-  Widget build(BuildContext context) => TextButton(
-    onPressed: onTap,
-    style: TextButton.styleFrom(
-      padding: const EdgeInsets.symmetric(horizontal: 7),
-    ),
-    child: Text(
-      label,
-      style: TextStyle(
-        color: selected ? Colors.white : Colors.white38,
-        fontSize: 12,
-        fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-      ),
-    ),
-  );
-}
-
 // Kept as the lightweight static renderer for prototype comparison.
 // ignore: unused_element
 class _FeedCard extends StatelessWidget {
@@ -495,12 +469,12 @@ class _Action extends StatelessWidget {
   );
 }
 
+// ignore: unused_element
 class _InteractiveFeedCard extends StatefulWidget {
   final _FeedItem item;
   final bool isActive;
   final VoidCallback onViewProfile;
   const _InteractiveFeedCard({
-    super.key,
     required this.item,
     required this.isActive,
     required this.onViewProfile,
@@ -510,6 +484,7 @@ class _InteractiveFeedCard extends StatefulWidget {
   State<_InteractiveFeedCard> createState() => _InteractiveFeedCardState();
 }
 
+// ignore: unused_element
 class _InteractiveFeedCardState extends State<_InteractiveFeedCard> {
   bool _liked = false;
   bool _saved = false;

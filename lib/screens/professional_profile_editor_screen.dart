@@ -8,6 +8,7 @@ import '../widgets/media_picker_sheet.dart';
 import '../services/entity_details_service.dart';
 import '../services/professional_media_service.dart';
 import '../services/professional_profiles_service.dart';
+import '../theme/firstvue_theme.dart';
 import 'professional_showcase_editor_screen.dart';
 
 class ProfessionalProfileEditorScreen extends StatefulWidget {
@@ -562,7 +563,6 @@ class _ProfessionalProfileEditorScreenState
                           return const Text(
                             'Add photos or videos of your work. Star one for Trending.',
                             style: TextStyle(fontSize: 12),
-                          );
                           );
                         }
                         return EditableMediaGrid(

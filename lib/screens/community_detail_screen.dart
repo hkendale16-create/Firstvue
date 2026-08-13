@@ -246,7 +246,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                   Text(
                                     community.name,
                                     style: const TextStyle(
-                                      color: const Color(0xFF16131F),
+                                      color: Color(0xFF16131F),
                                       fontSize: 22,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -339,7 +339,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                       Text(
                                         _leader!.displayName,
                                         style: const TextStyle(
-                                          color: const Color(0xFF16131F),
+                                          color: Color(0xFF16131F),
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -565,7 +565,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                       title: Text(
                                         member.displayName,
                                         style: const TextStyle(
-                                          color: const Color(0xFF16131F),
+                                          color: Color(0xFF16131F),
                                         ),
                                       ),
                                       subtitle: member.username != null

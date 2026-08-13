@@ -76,7 +76,7 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
           backgroundColor: FirstVueColors.surface,
           title: const Text(
             'Community creation requires approval',
-            style: TextStyle(color: const Color(0xFF16131F)),
+            style: TextStyle(color: Color(0xFF16131F)),
           ),
           content: const Text(
             'Unlike Groups, Communities must be reviewed by FirstVue '
@@ -244,14 +244,14 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
                           value: 'public',
                           child: Text(
                             'Public — discoverable in search',
-                            style: TextStyle(color: const Color(0xFF16131F)),
+                            style: TextStyle(color: Color(0xFF16131F)),
                           ),
                         ),
                         DropdownMenuItem(
                           value: 'private',
                           child: Text(
                             'Private — members and leaders only',
-                            style: TextStyle(color: const Color(0xFF16131F)),
+                            style: TextStyle(color: Color(0xFF16131F)),
                           ),
                         ),
                       ],
