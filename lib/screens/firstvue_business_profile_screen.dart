@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/approved_businesses_service.dart';
+import '../services/business_follow_service.dart';
 import '../services/business_media_service.dart';
 import '../services/business_menu_service.dart';
 import '../services/business_reviews_service.dart';
@@ -18,6 +19,7 @@ import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/entity_profile_tab_bar.dart';
 import '../widgets/social_chrome.dart';
+import '../widgets/entity_follow_button.dart';
 import '../widgets/shoutout_card.dart';
 import '../services/shoutout_service.dart';
 import '../widgets/portfolio_albums_section.dart';
@@ -160,16 +162,24 @@ class _BusinessProfileContent extends StatefulWidget {
 class _BusinessProfileContentState extends State<_BusinessProfileContent> {
   BusinessImageSet _profileImages = const BusinessImageSet();
   int _selectedTab = 0;
-  bool _following = false;
+  int _followerCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadImages();
+    _loadFollowerCount();
     final tabs = EntityProfileTabs.forBusinessType(widget.details.businessType);
     // Prefer MENU first for dining; ABOUT for general businesses.
     _selectedTab = 0;
     assert(tabs.isNotEmpty);
+  }
+
+  Future<void> _loadFollowerCount() async {
+    final count =
+        await BusinessFollowService.followerCount(widget.details.id);
+    if (!mounted) return;
+    setState(() => _followerCount = count);
   }
 
   Future<void> _openOwnerMessage() async {
@@ -253,7 +263,10 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
                 label: 'posts',
                 value: details.services.isEmpty ? '—' : '${details.services.length}',
               ),
-              const ProfileStatItem(label: 'followers', value: '—'),
+              ProfileStatItem(
+                label: 'followers',
+                value: '$_followerCount',
+              ),
               ProfileStatItem(
                 label: 'rating',
                 value: '4.9',
@@ -261,10 +274,11 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
             ],
             actions: [
               if (isApproved && !isOwnerPreview) ...[
-                SocialFollowButton(
-                  label: _following ? 'Following' : 'Follow',
-                  filled: !_following,
-                  onPressed: () => setState(() => _following = !_following),
+                EntityFollowButton(
+                  kind: FollowTargetKind.business,
+                  targetId: details.id,
+                  compact: false,
+                  onChanged: (_) => _loadFollowerCount(),
                 ),
                 SocialFollowButton(
                   label: 'Message',

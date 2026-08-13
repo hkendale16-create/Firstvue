@@ -146,7 +146,7 @@ class _AffiliationBlock extends StatelessWidget {
           if (items.isEmpty)
             Text(
               emptyLabel,
-              style: TextStyle(color: Colors.white.withValues(alpha: .45)),
+              style: TextStyle(color: context.fv.secondaryText),
             )
           else
             ...items.map(
@@ -170,8 +170,8 @@ class _AffiliationBlock extends StatelessWidget {
                           children: [
                             Text(
                               item.name,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: context.fv.primaryText,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -179,7 +179,7 @@ class _AffiliationBlock extends StatelessWidget {
                             Text(
                               item.role,
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: .5),
+                                color: context.fv.tertiaryText,
                                 fontSize: 12,
                               ),
                             ),
@@ -188,7 +188,7 @@ class _AffiliationBlock extends StatelessWidget {
                       ),
                       Icon(
                         Icons.chevron_right,
-                        color: Colors.white.withValues(alpha: .35),
+                        color: context.fv.mutedIcon,
                       ),
                     ],
                   ),

@@ -168,10 +168,37 @@ class _EventProfileSheetState extends State<EventProfileSheet> {
                             children: [
                               FilterChip(
                                 label: Text(
-                                  _social.following ? 'Following' : 'Follow event',
+                                  _social.following
+                                      ? 'Following'
+                                      : 'Follow event',
                                 ),
                                 selected: _social.following,
-                                onSelected: (_) {},
+                                onSelected: (selected) async {
+                                  try {
+                                    final next =
+                                        await EventSocialService.toggleFollow(
+                                      widget.event.id,
+                                      following: selected,
+                                    );
+                                    if (!mounted) return;
+                                    setState(() {
+                                      _social = EventSocialState(
+                                        following: next,
+                                        attendance: _social.attendance,
+                                      );
+                                    });
+                                  } catch (_) {
+                                    if (!mounted) return;
+                                    ScaffoldMessenger.maybeOf(this.context)
+                                        ?.showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Could not update event follow.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
                               ),
                             ],
                           ),

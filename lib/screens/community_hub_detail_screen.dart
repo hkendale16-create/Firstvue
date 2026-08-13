@@ -17,6 +17,7 @@ import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/group_circle_avatar.dart';
 import 'community_detail_screen.dart';
 import 'create_community_screen.dart';
+import 'community_hub_settings_screen.dart';
 import 'member_public_profile_screen.dart';
 
 class CommunityHubDetailScreen extends StatefulWidget {
@@ -131,6 +132,177 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
       ),
     );
     if (created != null && mounted) await _load();
+  }
+
+  Future<void> _addExistingGroup() async {
+    if (!_isAuthorized) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Only Community leaders or editors can add groups.'),
+        ),
+      );
+      return;
+    }
+
+    final yours = await CommunityService.fetchYourCommunities(limit: 60);
+    final linkedIds = {
+      for (final m in _memberships)
+        if (m.status != 'removed') m.groupId,
+      for (final g in _groups) g.id,
+    };
+    final eligible = yours.where((g) => !linkedIds.contains(g.id)).toList();
+
+    if (!mounted) return;
+    if (eligible.isEmpty) {
+      final create = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          final fv = context.fv;
+          return AlertDialog(
+            backgroundColor: fv.surface,
+            title: Text('No eligible groups', style: TextStyle(color: fv.primaryText)),
+            content: Text(
+              'You have no groups available to add. Create a group first, then add it here.',
+              style: TextStyle(color: fv.secondaryText),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Create group'),
+              ),
+            ],
+          );
+        },
+      );
+      if (create == true && mounted) await _createGroup();
+      return;
+    }
+
+    final selected = await showModalBottomSheet<Community>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        final fv = context.fv;
+        return SafeArea(
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 10),
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: fv.divider,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  child: Text(
+                    'Add existing group',
+                    style: TextStyle(
+                      color: fv.primaryText,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'Select a group you lead or joined. Duplicate links are blocked.',
+                    style: TextStyle(color: fv.secondaryText, fontSize: 13),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+                    itemCount: eligible.length,
+                    separatorBuilder: (_, _) => Divider(color: fv.divider),
+                    itemBuilder: (context, index) {
+                      final group = eligible[index];
+                      return ListTile(
+                        leading: GroupCircleAvatar(
+                          imageUrl: group.imageUrl,
+                          size: 44,
+                        ),
+                        title: Text(
+                          group.name,
+                          style: TextStyle(
+                            color: fv.primaryText,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          group.category?.trim().isNotEmpty == true
+                              ? group.category!
+                              : (group.isMember ? 'Joined' : 'Yours'),
+                          style: TextStyle(color: fv.tertiaryText),
+                        ),
+                        onTap: () => Navigator.pop(context, group),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (selected == null || !mounted) return;
+
+    try {
+      final membership = await CommunityHubService.addGroupToCommunity(
+        hubId: widget.hubId,
+        groupId: selected.id,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Group added (${membership.status.replaceAll('_', ' ')}).',
+          ),
+        ),
+      );
+      await _load();
+    } catch (_) {
+      // Fall back to request flow when direct add is not permitted.
+      try {
+        final pending = await CommunityHubService.requestGroupJoin(
+          hubId: widget.hubId,
+          groupId: selected.id,
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Request submitted (${pending.status}). Awaiting approval.',
+            ),
+          ),
+        );
+        await _load();
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not add group. Try again.')),
+        );
+      }
+    }
   }
 
   void _share() {
@@ -466,19 +638,40 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
         foregroundColor: null,
         title: Text(hub?.name ?? 'Community'),
         actions: [
+          if (_isAuthorized)
+            IconButton(
+              tooltip: 'Community settings',
+              onPressed: () async {
+                final hub = _hub;
+                if (hub == null) return;
+                await Navigator.push(
+                  context,
+                  FirstVuePageRoute(
+                    builder: (_) => CommunityHubSettingsScreen(
+                      hubId: widget.hubId,
+                      initialHub: hub,
+                    ),
+                  ),
+                );
+                if (mounted) await _load();
+              },
+              icon: const Icon(Icons.settings_outlined),
+            ),
           IconButton(
             onPressed: hub == null ? null : _share,
             icon: const Icon(Icons.share_outlined),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _createGroup,
-        backgroundColor: FirstVueColors.coral,
-        foregroundColor: null,
-        icon: const Icon(Icons.add),
-        label: const Text('Add Group'),
-      ),
+      floatingActionButton: _isAuthorized
+          ? FloatingActionButton.extended(
+              onPressed: _addExistingGroup,
+              backgroundColor: FirstVueColors.coral,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.group_add_outlined),
+              label: const Text('Add Group'),
+            )
+          : null,
       body: _loading && hub == null
           ? const Center(
               child: CircularProgressIndicator(color: FirstVueColors.teal),

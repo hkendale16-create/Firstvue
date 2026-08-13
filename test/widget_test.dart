@@ -29,6 +29,14 @@ void main() {
     expect(find.text('SEE FIRST. BOOK FIRST.'), findsOneWidget);
     expect(find.text('People to follow'), findsOneWidget);
 
+    final feedsNav = find.text('FEEDS');
+    await tester.ensureVisible(feedsNav);
+    await tester.tap(feedsNav);
+    await tester.pumpAndSettle();
+
+    expect(find.text('FEEDS'), findsWidgets);
+    expect(find.textContaining('Main'), findsWidgets);
+
     final exploreNav = find.text('EXPLORE');
     await tester.ensureVisible(exploreNav);
     await tester.tap(exploreNav);

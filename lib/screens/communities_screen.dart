@@ -14,8 +14,13 @@ import 'create_community_screen.dart';
 class CommunitiesScreen extends StatefulWidget {
   /// When true (e.g. from Settings), show create FABs.
   final bool allowCreate;
+  final int initialTabIndex;
 
-  const CommunitiesScreen({super.key, this.allowCreate = false});
+  const CommunitiesScreen({
+    super.key,
+    this.allowCreate = false,
+    this.initialTabIndex = 0,
+  });
 
   @override
   State<CommunitiesScreen> createState() => _CommunitiesScreenState();
@@ -31,7 +36,8 @@ class _CommunitiesScreenState extends State<CommunitiesScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 2, vsync: this);
+    final initial = widget.initialTabIndex.clamp(0, 1);
+    _tabs = TabController(length: 2, vsync: this, initialIndex: initial);
     _load();
   }
 

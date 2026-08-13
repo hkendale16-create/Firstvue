@@ -7,7 +7,7 @@ import '../services/recommendations_service.dart';
 import '../services/things_to_do_service.dart';
 import '../services/trending_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
-import 'home_community_feed_block.dart';
+import 'home_communities_section.dart';
 import 'social_chrome.dart';
 
 class HomeDiscoverySection extends StatefulWidget {
@@ -120,7 +120,7 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
         if (label == 'Events')
           const _EventsFeedList()
         else if (label == 'Communities')
-          HomeCommunityFeedBlock(refreshToken: widget.refreshToken)
+          HomeCommunitiesSection(refreshToken: widget.refreshToken)
         else
           _MixedSocialFeed(
             key: ValueKey('$label-${widget.refreshToken}'),
@@ -206,6 +206,7 @@ class _MixedSocialFeed extends StatelessWidget {
           ),
         ),
       ),
+      followBusinessId: business.id,
     );
   }
 }

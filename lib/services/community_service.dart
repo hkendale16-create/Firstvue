@@ -704,6 +704,22 @@ class CommunityService {
     }
   }
 
+  static Future<bool> isFollowing(String communityId) async {
+    final me = _client.auth.currentUser;
+    if (me == null || communityId.trim().isEmpty) return false;
+    try {
+      final row = await _client
+          .from('community_follows')
+          .select('community_id')
+          .eq('community_id', communityId)
+          .eq('profile_id', me.id)
+          .maybeSingle();
+      return row != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<void> follow(String communityId) async {
     final me = _client.auth.currentUser;
     if (me == null) throw const AuthException('Sign in to follow a group.');

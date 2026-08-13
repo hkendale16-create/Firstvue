@@ -8,6 +8,7 @@ import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/location_autocomplete_field.dart';
 import '../widgets/username_handle_field.dart';
+import '../widgets/profile_affiliations_section.dart';
 import 'privacy_settings_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -305,6 +306,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       keyboard: TextInputType.phone,
                     ),
                   ],
+                  const SizedBox(height: 24),
+                  _SectionHeader(title: 'Groups & Communities'),
+                  Text(
+                    'Created and joined affiliations appear below. Manage membership from each page.',
+                    style: TextStyle(color: fv.tertiaryText, fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                  if (Supabase.instance.client.auth.currentUser != null)
+                    ProfileAffiliationsSection(
+                      profileId:
+                          Supabase.instance.client.auth.currentUser!.id,
+                    ),
                   const SizedBox(height: 24),
                   _SectionHeader(title: 'Privacy'),
                   ListTile(

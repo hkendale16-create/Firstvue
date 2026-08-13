@@ -303,6 +303,137 @@ class CommunityNewsService {
     }
   }
 
+  /// Chronological New feed (`created_at DESC`) with cursor pagination.
+  static Future<List<CommunityNewsPost>> fetchNewFeed({
+    int limit = 20,
+    DateTime? beforeCreatedAt,
+    String? beforeId,
+  }) async {
+    final me = _client.auth.currentUser?.id;
+    try {
+      final result = await _client.rpc(
+        'fetch_new_feed',
+        params: {
+          'p_limit': limit,
+          'p_before': beforeCreatedAt?.toUtc().toIso8601String(),
+          'p_before_id': beforeId,
+        },
+      );
+      if (result is List && result.isNotEmpty) {
+        return _dedupePosts(await _mapPostRows(result, currentUserId: me));
+      }
+    } catch (error) {
+      logFeedError(error, context: 'fetchNewFeed');
+    }
+
+    final rows = await _selectPosts(
+      (query) {
+        var q = query.order('created_at', ascending: false).limit(limit);
+        if (beforeCreatedAt != null) {
+          q = q.lt('created_at', beforeCreatedAt.toUtc().toIso8601String());
+        }
+        return q;
+      },
+    );
+    return _dedupePosts(await _mapPostRows(rows, currentUserId: me));
+  }
+
+  /// Trending feed ranked by recent engagement momentum (~48h window).
+  static Future<List<CommunityNewsPost>> fetchTrendingFeed({
+    int limit = 20,
+    int windowHours = 48,
+  }) async {
+    final me = _client.auth.currentUser?.id;
+    try {
+      final result = await _client.rpc(
+        'fetch_trending_feed',
+        params: {
+          'p_limit': limit,
+          'p_window_hours': windowHours,
+        },
+      );
+      if (result is List && result.isNotEmpty) {
+        return _dedupePosts(await _mapPostRows(result, currentUserId: me));
+      }
+    } catch (error) {
+      logFeedError(error, context: 'fetchTrendingFeed');
+    }
+    // Fallback: recent posts ordered by spark count heuristic client-side.
+    final posts = await fetchPosts(limit: limit * 2);
+    final sorted = [...posts]
+      ..sort((a, b) {
+        final scoreA = a.sparkCount * 1.0 + a.repostCount * 4.0;
+        final scoreB = b.sparkCount * 1.0 + b.repostCount * 4.0;
+        final cmp = scoreB.compareTo(scoreA);
+        if (cmp != 0) return cmp;
+        return b.createdAt.compareTo(a.createdAt);
+      });
+    return _dedupePosts(sorted.take(limit).toList());
+  }
+
+  /// Rule-based Recommended feed with cold-start fallback.
+  static Future<List<CommunityNewsPost>> fetchRecommendedFeed({
+    int limit = 20,
+    double? seed,
+  }) async {
+    final me = _client.auth.currentUser?.id;
+    try {
+      final result = await _client.rpc(
+        'fetch_recommended_feed',
+        params: {
+          'p_limit': limit,
+          'p_seed': seed ?? DateTime.now().millisecondsSinceEpoch.toDouble(),
+        },
+      );
+      if (result is List && result.isNotEmpty) {
+        return _dedupePosts(await _mapPostRows(result, currentUserId: me));
+      }
+    } catch (error) {
+      logFeedError(error, context: 'fetchRecommendedFeed');
+    }
+    return _dedupePosts(await fetchRankedMainFeed(limit: limit, seed: seed));
+  }
+
+  /// Aggregated Communities (hub) feed for all hubs the user can access.
+  static Future<List<CommunityNewsPost>> fetchAllCommunitiesFeed({
+    int limit = 20,
+  }) async {
+    final me = _client.auth.currentUser?.id;
+    if (me == null) return const [];
+    try {
+      final hubs = await _client
+          .from('community_hubs')
+          .select('id')
+          .eq('status', 'active')
+          .limit(40);
+      final hubIds = hubs
+          .map((r) => r['id'] as String?)
+          .whereType<String>()
+          .toList();
+      if (hubIds.isEmpty) return const [];
+
+      final all = <CommunityNewsPost>[];
+      for (final hubId in hubIds.take(12)) {
+        final page = await fetchHubCommunityFeed(hubId, limit: 8);
+        all.addAll(page);
+      }
+      all.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return _dedupePosts(all.take(limit).toList());
+    } catch (error) {
+      logFeedError(error, context: 'fetchAllCommunitiesFeed');
+      return const [];
+    }
+  }
+
+  static List<CommunityNewsPost> _dedupePosts(List<CommunityNewsPost> posts) {
+    final seen = <String>{};
+    final out = <CommunityNewsPost>[];
+    for (final post in posts) {
+      if (seen.add(post.id)) out.add(post);
+    }
+    return out;
+  }
+
   /// Umbrella Community feed: Group posts referenced by `community_feed_posts`.
   ///
   /// Mapped posts keep the source Group's name/image on

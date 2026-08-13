@@ -64,10 +64,14 @@ class EventSocialService {
     if (me == null) throw const AuthException('Sign in to follow events.');
 
     if (following) {
-      await _client.from('event_follows').insert({
-        'event_id': eventId,
-        'profile_id': me.id,
-      });
+      try {
+        await _client.from('event_follows').insert({
+          'event_id': eventId,
+          'profile_id': me.id,
+        });
+      } on PostgrestException catch (error) {
+        if (error.code != '23505') rethrow;
+      }
       return true;
     }
 

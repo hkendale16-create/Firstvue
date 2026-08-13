@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 
 import '../services/discovery_feed_service.dart';
+import '../services/business_follow_service.dart';
+import '../services/follow_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/social_chrome.dart';
+import 'auth_screen.dart';
 import 'business_profile_screen.dart';
 import 'create_post_screen.dart';
 import 'firstvue_business_profile_screen.dart';
 import 'member_public_profile_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 enum _FeedMode { forYou, nearby, trending }
 
@@ -129,6 +133,49 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
     );
   }
 
+  Future<void> _toggleFollow(_FeedItem item) async {
+    final connected = item.connected;
+    if (Supabase.instance.client.auth.currentUser == null) {
+      await Navigator.push(
+        context,
+        FirstVuePageRoute(builder: (_) => const AuthScreen()),
+      );
+      if (Supabase.instance.client.auth.currentUser == null) return;
+    }
+    try {
+      if (connected != null && connected.isMember) {
+        final status = await FollowService.followStatus(connected.ownerId);
+        if (status == FollowStatus.following || status == FollowStatus.pending) {
+          await FollowService.unfollow(connected.ownerId);
+        } else {
+          await FollowService.follow(connected.ownerId);
+        }
+      } else if (connected != null && connected.businessId.isNotEmpty) {
+        final following =
+            await BusinessFollowService.isFollowing(connected.businessId);
+        await BusinessFollowService.toggle(
+          connected.businessId,
+          currentlyFollowing: following,
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Open the profile to follow.')),
+        );
+        return;
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Follow updated')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not update follow.')),
+      );
+    }
+  }
+
   List<_FeedItem> _connectedItems(List<DiscoveryFeedItem> items) => items
       .map(
         (item) => _FeedItem(
@@ -231,7 +278,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                               live: item.sponsored,
                               showOutlineFollow: true,
                               showMenu: false,
-                              onFollow: () => _openProfile(item),
+                              onFollow: () => _toggleFollow(item),
                               onTap: () => _openProfile(item),
                             );
                           },
