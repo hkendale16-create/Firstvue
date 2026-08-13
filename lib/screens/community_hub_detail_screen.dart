@@ -43,6 +43,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
   List<CommunityGroupMembership> _memberships = const [];
   List<CommunityEditor> _editors = const [];
   List<Map<String, dynamic>> _linkRequests = const [];
+  List<Map<String, dynamic>> _pendingLeaders = const [];
   List<CommunityNewsPost> _feedPosts = const [];
   Map<String, String> _feedPostIdBySource = const {};
   bool _loading = true;
@@ -93,6 +94,9 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
     final requests = isLeader
         ? await CommunityHubService.fetchPendingLinkRequests(widget.hubId)
         : const <Map<String, dynamic>>[];
+    final pendingLeaders = isLeader
+        ? await CommunityHubService.fetchPendingHubRoles(widget.hubId)
+        : const <Map<String, dynamic>>[];
 
     final feedPosts =
         await CommunityNewsService.fetchHubCommunityFeed(widget.hubId);
@@ -110,6 +114,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
       _groups = groups;
       _memberships = memberships;
       _linkRequests = requests;
+      _pendingLeaders = pendingLeaders;
       _feedPosts = feedPosts;
       _feedPostIdBySource = feedPostIdBySource;
       _isLeader = isLeader;
@@ -723,6 +728,60 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                             ),
                           );
                         }),
+                      if (_pendingLeaders.isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        _sectionTitle('PENDING LEADERS'),
+                        ..._pendingLeaders.map((req) {
+                          final profile =
+                              req['profiles'] as Map<String, dynamic>?;
+                          final name =
+                              (profile?['display_name'] as String?) ??
+                              'Member';
+                          final profileId = req['profile_id'] as String;
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              name,
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            subtitle: Text(
+                              (req['role'] as String?) ?? 'leader',
+                              style: const TextStyle(color: Colors.white54),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                TextButton(
+                                  onPressed: () async {
+                                    await CommunityHubService.reviewHubRole(
+                                      hubId: widget.hubId,
+                                      profileId: profileId,
+                                      approve: true,
+                                    );
+                                    await _load();
+                                  },
+                                  child: const Text('Approve'),
+                                ),
+                                TextButton(
+                                  onPressed: () async {
+                                    await CommunityHubService.reviewHubRole(
+                                      hubId: widget.hubId,
+                                      profileId: profileId,
+                                      approve: false,
+                                    );
+                                    await _load();
+                                  },
+                                  child: const Text(
+                                    'Decline',
+                                    style:
+                                        TextStyle(color: FirstVueColors.coral),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
                       if (_linkRequests.isNotEmpty) ...[
                         const SizedBox(height: 24),
                         _sectionTitle('GROUP LINK REQUESTS'),

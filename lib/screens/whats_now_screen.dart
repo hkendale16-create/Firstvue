@@ -12,6 +12,7 @@ import '../utils/app_environment.dart';
 import '../widgets/feed_comments_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/community_news_post_detail_sheet.dart';
+import '../widgets/event_profile_sheet.dart';
 
 const _screenBackground = Color(0xFF080B0F);
 
@@ -500,7 +501,12 @@ class _EventFeedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => EventProfileSheet.show(context, event: event),
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -579,6 +585,8 @@ class _EventFeedCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    ),
       ),
     );
   }

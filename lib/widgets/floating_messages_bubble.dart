@@ -52,8 +52,7 @@ class FloatingMessagesBubbleState extends State<FloatingMessagesBubble> {
     if (me == null) return 0;
 
     try {
-      final threads = await MessagingService.fetchInbox();
-      return threads.length.clamp(0, 99);
+      return await MessagingService.unreadCount();
     } catch (_) {
       return 0;
     }

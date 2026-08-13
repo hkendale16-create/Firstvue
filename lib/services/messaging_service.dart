@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'profile_media_service.dart';
+
 class MessageRecipient {
   final String userId;
   final String displayName;
@@ -41,18 +43,30 @@ class MessageThreadSummary {
   final String id;
   final String otherUserId;
   final String otherDisplayName;
+  final String? otherAvatarUrl;
   final String? businessName;
   final String lastPreview;
   final DateTime lastMessageAt;
+  final int unreadCount;
+  final bool archived;
+  final bool saved;
+  final bool lastFromMe;
 
   const MessageThreadSummary({
     required this.id,
     required this.otherUserId,
     required this.otherDisplayName,
+    this.otherAvatarUrl,
     required this.businessName,
     required this.lastPreview,
     required this.lastMessageAt,
+    this.unreadCount = 0,
+    this.archived = false,
+    this.saved = false,
+    this.lastFromMe = false,
   });
+
+  bool get isUnread => unreadCount > 0;
 }
 
 class DirectMessage {
@@ -61,6 +75,9 @@ class DirectMessage {
   final String body;
   final DateTime createdAt;
   final bool isMine;
+  final String? mediaPath;
+  final String? replyToId;
+  final String? myReaction;
 
   const DirectMessage({
     required this.id,
@@ -68,6 +85,9 @@ class DirectMessage {
     required this.body,
     required this.createdAt,
     required this.isMine,
+    this.mediaPath,
+    this.replyToId,
+    this.myReaction,
   });
 }
 
@@ -180,7 +200,9 @@ class MessagingService {
     return profiles.map(MessageRecipient.fromProfileRow).toList();
   }
 
-  static Future<List<MessageThreadSummary>> fetchInbox() async {
+  static Future<List<MessageThreadSummary>> fetchInbox({
+    String filter = 'primary',
+  }) async {
     final me = currentUserId;
     if (me == null) return [];
 
@@ -192,6 +214,19 @@ class MessagingService {
         )
         .or('participant_a.eq.$me,participant_b.eq.$me')
         .order('last_message_at', ascending: false);
+
+    final threadIds = threads.map((t) => t['id'] as String).toList();
+    final reads = await _fetchReads(threadIds, me);
+    final otherIds = threads
+        .map(
+          (thread) => thread['participant_a'] == me
+              ? thread['participant_b'] as String
+              : thread['participant_a'] as String,
+        )
+        .toSet()
+        .toList();
+    final avatars =
+        await ProfileMediaService.fetchAvatarUrlsForProfiles(otherIds);
 
     final summaries = <MessageThreadSummary>[];
     for (final thread in threads) {
@@ -205,28 +240,175 @@ class MessagingService {
           .maybeSingle();
       final lastMessage = await _client
           .from('direct_messages')
-          .select('body, created_at')
+          .select('body, created_at, sender_id')
           .eq('thread_id', thread['id'])
           .order('created_at', ascending: false)
           .limit(1)
           .maybeSingle();
       final business = thread['businesses'] as Map<String, dynamic>?;
+      final read = reads[thread['id'] as String];
+      final lastAt = DateTime.parse(
+        (lastMessage?['created_at'] as String?) ??
+            thread['last_message_at'] as String,
+      );
+      final lastFromMe = lastMessage?['sender_id'] == me;
+      var unread = 0;
+      if (!lastFromMe) {
+        final lastRead = read?['last_read_at'] as DateTime?;
+        if (lastRead == null || lastAt.isAfter(lastRead)) {
+          unread = await _countUnread(thread['id'] as String, me, lastRead);
+        }
+      }
       summaries.add(
         MessageThreadSummary(
           id: thread['id'] as String,
           otherUserId: otherId,
           otherDisplayName:
               (profile?['display_name'] as String?) ?? 'FirstVue member',
+          otherAvatarUrl: avatars[otherId],
           businessName: business?['name'] as String?,
-          lastPreview: (lastMessage?['body'] as String?) ?? 'Start the conversation',
-          lastMessageAt: DateTime.parse(
-            (lastMessage?['created_at'] as String?) ??
-                thread['last_message_at'] as String,
-          ),
+          lastPreview:
+              (lastMessage?['body'] as String?) ?? 'Start the conversation',
+          lastMessageAt: lastAt,
+          unreadCount: unread,
+          archived: read?['archived'] == true,
+          saved: read?['saved'] == true,
+          lastFromMe: lastFromMe,
         ),
       );
     }
-    return summaries;
+
+    return switch (filter) {
+      'unread' => summaries.where((t) => t.isUnread && !t.archived).toList(),
+      'archived' => summaries.where((t) => t.archived).toList(),
+      'saved' => summaries.where((t) => t.saved).toList(),
+      _ => summaries.where((t) => !t.archived).toList(),
+    };
+  }
+
+  static Future<Map<String, Map<String, Object?>>> _fetchReads(
+    List<String> threadIds,
+    String me,
+  ) async {
+    if (threadIds.isEmpty) return {};
+    try {
+      final rows = await _client
+          .from('direct_thread_reads')
+          .select('thread_id, last_read_at, archived_at, saved_at')
+          .eq('user_id', me)
+          .inFilter('thread_id', threadIds);
+      return {
+        for (final row in rows)
+          row['thread_id'] as String: {
+            'last_read_at': row['last_read_at'] == null
+                ? null
+                : DateTime.tryParse(row['last_read_at'] as String),
+            'archived': row['archived_at'] != null,
+            'saved': row['saved_at'] != null,
+          },
+      };
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<int> _countUnread(
+    String threadId,
+    String me,
+    DateTime? lastRead,
+  ) async {
+    try {
+      var query = _client
+          .from('direct_messages')
+          .select('id')
+          .eq('thread_id', threadId)
+          .neq('sender_id', me);
+      if (lastRead != null) {
+        query = query.gt('created_at', lastRead.toUtc().toIso8601String());
+      }
+      final rows = await query;
+      return (rows as List).length;
+    } catch (_) {
+      return 1;
+    }
+  }
+
+  static Future<int> unreadCount() async {
+    try {
+      final result = await _client.rpc('unread_direct_message_count');
+      if (result is int) return result;
+      if (result is num) return result.toInt();
+      return 0;
+    } catch (_) {
+      final inbox = await fetchInbox();
+      return inbox.fold<int>(0, (sum, t) => sum + t.unreadCount);
+    }
+  }
+
+  static Future<void> markThreadRead(String threadId) async {
+    try {
+      await _client.rpc(
+        'mark_direct_thread_read',
+        params: {'p_thread_id': threadId},
+      );
+    } catch (_) {
+      final me = currentUserId;
+      if (me == null) return;
+      try {
+        await _client.from('direct_thread_reads').upsert({
+          'thread_id': threadId,
+          'user_id': me,
+          'last_read_at': DateTime.now().toUtc().toIso8601String(),
+        });
+      } catch (_) {}
+    }
+  }
+
+  static Future<void> setThreadArchived(String threadId, bool archived) async {
+    await _upsertThreadPref(
+      threadId,
+      'archived_at',
+      archived ? DateTime.now().toUtc().toIso8601String() : null,
+    );
+  }
+
+  static Future<void> setThreadSaved(String threadId, bool saved) async {
+    await _upsertThreadPref(
+      threadId,
+      'saved_at',
+      saved ? DateTime.now().toUtc().toIso8601String() : null,
+    );
+  }
+
+  static Future<void> _upsertThreadPref(
+    String threadId,
+    String column,
+    String? value,
+  ) async {
+    final me = currentUserId;
+    if (me == null) return;
+    try {
+      await _client.from('direct_thread_reads').upsert({
+        'thread_id': threadId,
+        'user_id': me,
+        column: value,
+      });
+    } catch (_) {}
+  }
+
+  static Future<void> reactToMessage({
+    required String messageId,
+    required String emoji,
+  }) async {
+    final me = currentUserId;
+    if (me == null) return;
+    try {
+      await _client.from('direct_message_reactions').upsert({
+        'message_id': messageId,
+        'user_id': me,
+        'emoji': emoji,
+      });
+    } catch (_) {}
   }
 
   static Future<List<DirectMessage>> fetchMessages(String threadId) async {

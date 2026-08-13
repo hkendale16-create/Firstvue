@@ -8,6 +8,7 @@ import '../services/shoutout_service.dart';
 import '../services/things_to_do_service.dart';
 import '../services/trending_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'event_profile_sheet.dart';
 import 'shoutout_card.dart';
 
 class HomeDiscoverySection extends StatefulWidget {
@@ -369,7 +370,9 @@ class _EventsSwipeList extends StatelessWidget {
           separatorBuilder: (_, _) => const SizedBox(width: 12),
           itemBuilder: (context, index) {
             final event = events[index];
-            return Container(
+            return GestureDetector(
+              onTap: () => EventProfileSheet.show(context, event: event),
+              child: Container(
               width: 220,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -402,6 +405,7 @@ class _EventsSwipeList extends StatelessWidget {
                   ],
                 ],
               ),
+            ),
             );
           },
         );

@@ -19,14 +19,14 @@ class _ProfileSavedSectionState extends State<ProfileSavedSection> {
   @override
   void initState() {
     super.initState();
-    _savedFuture = SavedItemsService.fetchRecentSaved();
+    _savedFuture = SavedItemsService.fetchRecentSaved(limit: 8);
   }
 
   @override
   void didUpdateWidget(covariant ProfileSavedSection oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.refreshToken != widget.refreshToken) {
-      _savedFuture = SavedItemsService.fetchRecentSaved();
+      _savedFuture = SavedItemsService.fetchRecentSaved(limit: 8);
     }
   }
 
@@ -260,6 +260,8 @@ class _SavedTile extends StatelessWidget {
     return switch (type) {
       SavedContentType.newsPost => Icons.article_outlined,
       SavedContentType.business => Icons.storefront_outlined,
+      SavedContentType.vueMedia => Icons.smart_display_outlined,
+      SavedContentType.story => Icons.auto_awesome_motion_outlined,
     };
   }
 }

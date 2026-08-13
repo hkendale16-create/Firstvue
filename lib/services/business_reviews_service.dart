@@ -5,12 +5,14 @@ class BusinessReview {
   final int rating;
   final String body;
   final DateTime createdAt;
+  final String? reviewerName;
 
   const BusinessReview({
     required this.id,
     required this.rating,
     required this.body,
     required this.createdAt,
+    this.reviewerName,
   });
 
   factory BusinessReview.fromMap(Map<String, dynamic> map) => BusinessReview(
@@ -18,6 +20,7 @@ class BusinessReview {
     rating: map['rating'] as int,
     body: map['body'] as String,
     createdAt: DateTime.parse(map['created_at'] as String).toLocal(),
+    reviewerName: map['reviewer_name'] as String?,
   );
 }
 
@@ -81,11 +84,41 @@ class BusinessReviewsService {
   ) async {
     final rows = await _client
         .from('business_reviews')
-        .select('id, rating, body, created_at')
+        .select('id, rating, body, created_at, reviewer_id')
         .eq('business_id', businessId)
         .eq('status', 'approved')
         .order('created_at', ascending: false);
-    return rows.map(BusinessReview.fromMap).toList();
+    if (rows.isEmpty) return const [];
+
+    final reviewerIds = rows
+        .map((row) => row['reviewer_id'] as String?)
+        .whereType<String>()
+        .toSet()
+        .toList();
+    final names = <String, String>{};
+    if (reviewerIds.isNotEmpty) {
+      try {
+        final profiles = await _client
+            .from('profiles')
+            .select('id, display_name')
+            .inFilter('id', reviewerIds);
+        for (final profile in profiles) {
+          names[profile['id'] as String] =
+              (profile['display_name'] as String?) ?? 'FirstVue member';
+        }
+      } catch (_) {}
+    }
+
+    return rows.map((row) {
+      final reviewerId = row['reviewer_id'] as String?;
+      return BusinessReview(
+        id: row['id'] as String,
+        rating: row['rating'] as int,
+        body: row['body'] as String,
+        createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
+        reviewerName: reviewerId == null ? null : names[reviewerId],
+      );
+    }).toList();
   }
 
   static Future<void> submitReview({

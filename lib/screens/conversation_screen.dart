@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../screens/member_public_profile_screen.dart';
+import '../services/firstvue_feedback_sounds.dart';
 import '../services/messaging_service.dart';
+import '../theme/firstvue_theme.dart';
+import '../utils/app_environment.dart';
 
 class ConversationScreen extends StatefulWidget {
   final String threadId;
   final String title;
   final String? subtitle;
   final String? initialMessage;
+  final String? otherUserId;
 
   const ConversationScreen({
     super.key,
@@ -14,6 +20,7 @@ class ConversationScreen extends StatefulWidget {
     required this.title,
     this.subtitle,
     this.initialMessage,
+    this.otherUserId,
   });
 
   @override
@@ -21,23 +28,58 @@ class ConversationScreen extends StatefulWidget {
 }
 
 class _ConversationScreenState extends State<ConversationScreen> {
+  static const _emojis = ['😀', '🔥', '❤️', '👏', '😂', '✨', '👍', '🎉'];
+
   final _controller = TextEditingController();
   late Future<List<DirectMessage>> _messagesFuture;
   bool _sending = false;
+  bool _showEmoji = false;
+  RealtimeChannel? _channel;
 
   @override
   void initState() {
     super.initState();
     _messagesFuture = MessagingService.fetchMessages(widget.threadId);
-    if (widget.initialMessage != null && widget.initialMessage!.trim().isNotEmpty) {
+    if (widget.initialMessage != null &&
+        widget.initialMessage!.trim().isNotEmpty) {
       _controller.text = widget.initialMessage!.trim();
     }
+    MessagingService.markThreadRead(widget.threadId);
+    _subscribe();
   }
 
   @override
   void dispose() {
+    _channel?.unsubscribe();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _subscribe() {
+    if (isWidgetTestBinding) return;
+    _channel?.unsubscribe();
+    _channel = Supabase.instance.client
+        .channel('dm-${widget.threadId}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'direct_messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'thread_id',
+            value: widget.threadId,
+          ),
+          callback: (payload) async {
+            final sender = payload.newRecord['sender_id'] as String?;
+            final me = MessagingService.currentUserId;
+            if (sender != null && sender != me) {
+              await FirstVueFeedbackSounds.playIncomingMessage();
+            }
+            await MessagingService.markThreadRead(widget.threadId);
+            if (mounted) _refresh();
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _refresh() async {
@@ -45,13 +87,13 @@ class _ConversationScreenState extends State<ConversationScreen> {
     await _messagesFuture;
   }
 
-  Future<void> _send() async {
-    final text = _controller.text.trim();
+  Future<void> _send({String? emoji}) async {
+    final text = (emoji ?? _controller.text).trim();
     if (text.isEmpty || _sending) return;
     setState(() => _sending = true);
     try {
       await MessagingService.sendMessage(threadId: widget.threadId, body: text);
-      _controller.clear();
+      if (emoji == null) _controller.clear();
       await _refresh();
     } catch (_) {
       if (mounted) {
@@ -66,21 +108,32 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: fv.background,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: fv.background,
         surfaceTintColor: Colors.transparent,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.title),
-            if (widget.subtitle != null)
-              Text(
-                widget.subtitle!,
-                style: const TextStyle(fontSize: 12, color: Colors.white54),
-              ),
-          ],
+        foregroundColor: fv.primaryText,
+        title: GestureDetector(
+          onTap: widget.otherUserId == null
+              ? null
+              : () => openMemberProfile(
+                    context,
+                    profileId: widget.otherUserId!,
+                    displayName: widget.title,
+                  ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.title),
+              if (widget.subtitle != null)
+                Text(
+                  widget.subtitle!,
+                  style: TextStyle(fontSize: 12, color: fv.secondaryText),
+                ),
+            ],
+          ),
         ),
       ),
       body: Column(
@@ -104,10 +157,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 }
                 final messages = snapshot.data!;
                 if (messages.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
                       'Send the first message.',
-                      style: TextStyle(color: Colors.white54),
+                      style: TextStyle(color: fv.secondaryText),
                     ),
                   );
                 }
@@ -120,25 +173,31 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       alignment: message.isMine
                           ? Alignment.centerRight
                           : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
+                      child: GestureDetector(
+                        onLongPress: () => MessagingService.reactToMessage(
+                          messageId: message.id,
+                          emoji: '❤️',
                         ),
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.sizeOf(context).width * .78,
-                        ),
-                        decoration: BoxDecoration(
-                          color: message.isMine
-                              ? const Color(0xFFD8B56A)
-                              : const Color(0xFF151B22),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          message.body,
-                          style: TextStyle(
-                            color: message.isMine ? Colors.black : Colors.white,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.sizeOf(context).width * .78,
+                          ),
+                          decoration: BoxDecoration(
+                            color: message.isMine
+                                ? const Color(0xFFD8B56A)
+                                : fv.elevatedSurface,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            message.body,
+                            style: TextStyle(
+                              color: message.isMine ? Colors.black : fv.primaryText,
+                            ),
                           ),
                         ),
                       ),
@@ -148,25 +207,43 @@ class _ConversationScreenState extends State<ConversationScreen> {
               },
             ),
           ),
+          if (_showEmoji)
+            SizedBox(
+              height: 48,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                itemCount: _emojis.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  return InkWell(
+                    onTap: () => _send(emoji: _emojis[index]),
+                    child: Text(_emojis[index], style: const TextStyle(fontSize: 24)),
+                  );
+                },
+              ),
+            ),
           SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              padding: const EdgeInsets.fromLTRB(8, 8, 12, 12),
               child: Row(
                 children: [
+                  IconButton(
+                    onPressed: () => setState(() => _showEmoji = !_showEmoji),
+                    icon: Icon(Icons.emoji_emotions_outlined, color: fv.icon),
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _controller,
                       minLines: 1,
                       maxLines: 4,
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(color: fv.primaryText),
                       decoration: InputDecoration(
-                        hintText: 'Write a message...',
-                        hintStyle: TextStyle(
-                          color: Colors.white.withValues(alpha: .38),
-                        ),
+                        hintText: 'Message…',
+                        hintStyle: TextStyle(color: fv.tertiaryText),
                         filled: true,
-                        fillColor: const Color(0xFF151B22),
+                        fillColor: fv.elevatedSurface,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(22),
                           borderSide: BorderSide.none,

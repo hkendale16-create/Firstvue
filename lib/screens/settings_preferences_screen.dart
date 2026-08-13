@@ -166,11 +166,11 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(
-                    'Interaction sounds',
+                    'App Sounds',
                     style: TextStyle(color: fv.primaryText),
                   ),
                   subtitle: Text(
-                    'Subtle sounds when you spark posts',
+                    'Spark, refresh, and incoming message sounds',
                     style: TextStyle(color: fv.secondaryText, fontSize: 12),
                   ),
                   value: _interactionSounds,

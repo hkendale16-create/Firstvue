@@ -25,6 +25,7 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
   final _state = TextEditingController();
   final _postal = TextEditingController();
   final _reason = TextEditingController();
+  String _visibility = 'public';
   bool _checking = true;
   bool _submitting = false;
   String? _error;
@@ -124,6 +125,7 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
           _state.text.trim(),
         ].where((p) => p.isNotEmpty).join(', '),
         reason: _reason.text.trim(),
+        visibility: _visibility,
       );
       if (!mounted) return;
       setState(() {
@@ -220,6 +222,46 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
                 _field(_description, 'Description / bio', maxLines: 4),
                 const SizedBox(height: 12),
                 _field(_category, 'Category'),
+                const SizedBox(height: 12),
+                InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: 'Visibility',
+                    labelStyle: const TextStyle(color: Colors.white54),
+                    filled: true,
+                    fillColor: FirstVueColors.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _visibility,
+                      dropdownColor: FirstVueColors.surface,
+                      isExpanded: true,
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'public',
+                          child: Text(
+                            'Public — discoverable in search',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'private',
+                          child: Text(
+                            'Private — members and leaders only',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() => _visibility = value);
+                      },
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 12),
                 LocationAutocompleteField(
                   controller: _city,

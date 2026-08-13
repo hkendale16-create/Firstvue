@@ -510,8 +510,8 @@ class _BusinessReviewsSectionState extends State<_BusinessReviewsSection> {
           ),
           if (snapshot.hasError)
             const _ProfileInfoCard(
-              icon: Icons.lock_outline,
-              text: 'Sign in to view and write customer reviews.',
+              icon: Icons.refresh,
+              text: 'Reviews could not be loaded. Pull to refresh.',
             )
           else if (!snapshot.hasData)
             const Center(
@@ -690,7 +690,10 @@ class _ReviewCard extends StatelessWidget {
             ),
             const Spacer(),
             Text(
-              '${review.createdAt.month}/${review.createdAt.day}/${review.createdAt.year}',
+              [
+                if (review.reviewerName != null) review.reviewerName!,
+                '${review.createdAt.month}/${review.createdAt.day}/${review.createdAt.year}',
+              ].join(' · '),
               style: const TextStyle(color: Colors.white38, fontSize: 11),
             ),
           ],

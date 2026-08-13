@@ -11,6 +11,7 @@ class VueVideoPlayer extends StatefulWidget {
   final BorderRadius? borderRadius;
   final bool autoPlay;
   final bool startMuted;
+  final bool active;
 
   const VueVideoPlayer({
     super.key,
@@ -20,6 +21,7 @@ class VueVideoPlayer extends StatefulWidget {
     this.borderRadius,
     this.autoPlay = true,
     this.startMuted = true,
+    this.active = true,
   });
 
   @override
@@ -46,7 +48,22 @@ class _VueVideoPlayerState extends State<VueVideoPlayer> {
     if (oldWidget.url != widget.url) {
       _disposeController();
       _initController();
+      return;
     }
+    if (oldWidget.active != widget.active) {
+      _syncActive();
+    }
+  }
+
+  Future<void> _syncActive() async {
+    final controller = _controller;
+    if (controller == null || !_ready) return;
+    if (widget.active && widget.autoPlay) {
+      await controller.play();
+    } else {
+      await controller.pause();
+    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _initController() async {
@@ -62,7 +79,7 @@ class _VueVideoPlayerState extends State<VueVideoPlayer> {
       }
 
       final duration = controller.value.duration;
-      if (widget.autoPlay) {
+      if (widget.autoPlay && widget.active) {
         await controller.play();
       }
 

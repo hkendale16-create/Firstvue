@@ -905,4 +905,50 @@ class CommunityHubService {
       },
     );
   }
+
+  static Future<List<Map<String, dynamic>>> fetchPendingHubRoles(
+    String hubId,
+  ) async {
+    try {
+      final rows = await _client
+          .from('community_hub_roles')
+          .select('profile_id, role, status, created_at, profiles(display_name)')
+          .eq('hub_id', hubId)
+          .eq('status', 'pending')
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(rows);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<void> reviewHubRole({
+    required String hubId,
+    required String profileId,
+    required bool approve,
+  }) async {
+    await _client.rpc(
+      'review_hub_role',
+      params: {
+        'p_hub_id': hubId,
+        'p_profile_id': profileId,
+        'p_approve': approve,
+      },
+    );
+  }
+
+  static Future<void> inviteHubLeader({
+    required String hubId,
+    required String profileId,
+    String role = 'leader',
+  }) async {
+    await _client.rpc(
+      'invite_hub_leader',
+      params: {
+        'p_hub_id': hubId,
+        'p_profile_id': profileId,
+        'p_role': role,
+      },
+    );
+  }
 }
