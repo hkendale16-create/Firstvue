@@ -6,6 +6,7 @@ import '../screens/post_detail_screen.dart';
 import '../services/saved_items_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/social_chrome.dart';
 
 class SavedScreen extends StatefulWidget {
   const SavedScreen({super.key});
@@ -16,6 +17,7 @@ class SavedScreen extends StatefulWidget {
 
 class _SavedScreenState extends State<SavedScreen> {
   late Future<List<SavedItem>> _future;
+  int _filter = 0;
 
   @override
   void initState() {
@@ -111,83 +113,133 @@ class _SavedScreenState extends State<SavedScreen> {
               );
             }
 
-            return ListView.separated(
+            final visible = items.where((item) {
+              return switch (_filter) {
+                1 => item.contentType == SavedContentType.newsPost,
+                2 => item.contentType == SavedContentType.business,
+                3 => item.contentType == SavedContentType.vueMedia ||
+                    item.contentType == SavedContentType.story,
+                _ => true,
+              };
+            }).toList();
+
+            return CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
-              itemCount: items.length + 1,
-              separatorBuilder: (_, _) => const SizedBox(height: 14),
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return Text(
-                    'FAVORITES',
-                    style: TextStyle(
-                      fontFamily: 'CormorantGaramond',
-                      color: fv.primaryText,
-                      fontSize: 25,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 2,
-                    ),
-                  );
-                }
-                final item = items[index - 1];
-                return Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(19),
-                    onTap: () => _open(item),
-                    onLongPress: () => _unsave(item),
-                    child: Ink(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: fv.surface,
-                        borderRadius: BorderRadius.circular(19),
-                        border: Border.all(
-                          color: FirstVueColors.gold.withValues(alpha: .16),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            item.contentType == SavedContentType.business
-                                ? Icons.storefront_outlined
-                                : Icons.bookmark_rounded,
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+                  sliver: SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'FAVORITES',
+                          style: TextStyle(
+                            fontFamily: 'CormorantGaramond',
                             color: FirstVueColors.gold,
-                            size: 28,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 2,
                           ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.title,
-                                  style: TextStyle(
-                                    color: fv.primaryText,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Posts, shops, and Vues you saved.',
+                          style: TextStyle(color: fv.secondaryText, fontSize: 13),
+                        ),
+                        const SizedBox(height: 14),
+                        SocialPillTabs(
+                          labels: const [
+                            'All',
+                            'Posts',
+                            'Businesses',
+                            'Vues',
+                          ],
+                          selectedIndex: _filter,
+                          onSelected: (index) => setState(() => _filter = index),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                  sliver: SliverGrid(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 0.86,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final item = visible[index];
+                        return Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () => _open(item),
+                            onLongPress: () => _unsave(item),
+                            child: Ink(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: fv.surface,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: fv.borderSubtle),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Align(
+                                    alignment: Alignment.topRight,
+                                    child: Icon(
+                                      Icons.bookmark_rounded,
+                                      color: FirstVueColors.gold,
+                                      size: 20,
+                                    ),
                                   ),
-                                ),
-                                if (item.subtitle != null) ...[
-                                  const SizedBox(height: 6),
+                                  const Spacer(),
+                                  Icon(
+                                    item.contentType ==
+                                            SavedContentType.business
+                                        ? Icons.storefront_outlined
+                                        : Icons.photo_outlined,
+                                    color: FirstVueColors.gold,
+                                    size: 32,
+                                  ),
+                                  const SizedBox(height: 10),
                                   Text(
-                                    item.subtitle!,
+                                    item.title,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      color: fv.secondaryText,
-                                      fontSize: 13,
+                                      color: fv.primaryText,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
                                     ),
                                   ),
+                                  if (item.subtitle != null)
+                                    Text(
+                                      item.subtitle!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: fv.tertiaryText,
+                                        fontSize: 12,
+                                      ),
+                                    ),
                                 ],
-                              ],
+                              ),
                             ),
                           ),
-                        ],
-                      ),
+                        );
+                      },
+                      childCount: visible.length,
                     ),
                   ),
-                );
-              },
+                ),
+              ],
             );
           },
         ),

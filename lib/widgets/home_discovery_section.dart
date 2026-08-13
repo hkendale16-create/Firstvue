@@ -10,6 +10,7 @@ import '../services/trending_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'event_profile_sheet.dart';
 import 'shoutout_card.dart';
+import 'social_chrome.dart';
 
 class HomeDiscoverySection extends StatefulWidget {
   final VoidCallback onViewAllVue;
@@ -100,103 +101,41 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'TRENDING NEAR YOU',
-                style: TextStyle(
-                  color: FirstVueColors.ivory,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.4,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: widget.onViewAllVue,
-              style: TextButton.styleFrom(
-                foregroundColor: FirstVueColors.coral,
-                padding: EdgeInsets.zero,
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: const Text(
-                'VIEW ALL  >',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: .8,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
+        const PeopleToFollowRow(),
+        const SizedBox(height: 22),
+        SocialPillTabs(
+          labels: _labels,
+          selectedIndex: _tabController.index,
+          onSelected: (index) {
+            _tabController.index = index;
+            setState(() {});
+          },
         ),
-        const SizedBox(height: 10),
-        TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          labelColor: FirstVueColors.gold,
-          unselectedLabelColor: Colors.white54,
-          indicatorColor: FirstVueColors.coral,
-          onTap: (_) => setState(() {}),
-          tabs: _labels.map((label) => Tab(text: label.toUpperCase())).toList(),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 248,
-          child: TabBarView(
-            controller: _tabController,
-            children: _labels.map((label) {
-              if (label == 'Events') {
-                return _EventsSwipeList(
-                  key: ValueKey('events-${widget.refreshToken}'),
-                );
-              }
-              return _BusinessSwipeList(
-                key: ValueKey('$label-${widget.refreshToken}'),
-                label: label,
-                loadBusinesses: () => _loadBusinessesForLabel(label),
-              );
-            }).toList(),
+        const SizedBox(height: 14),
+        if (_labels[_tabController.index] == 'Events')
+          const _EventsFeedList()
+        else
+          _BusinessFeedList(
+            key: ValueKey('${_labels[_tabController.index]}-${widget.refreshToken}'),
+            label: _labels[_tabController.index],
+            loadBusinesses: () =>
+                _loadBusinessesForLabel(_labels[_tabController.index]),
           ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'SHOUTOUTS',
-                style: TextStyle(
-                  color: FirstVueColors.ivory,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                ),
+        const SizedBox(height: 22),
+        SocialSectionHeader(
+          title: 'Shoutouts',
+          actionLabel: 'Create',
+          onAction: () async {
+            final created = await Navigator.push(
+              context,
+              FirstVuePageRoute(
+                builder: (_) => const CreateShoutoutScreen(),
               ),
-            ),
-            TextButton(
-              onPressed: () async {
-                final created = await Navigator.push(
-                  context,
-                  FirstVuePageRoute(
-                    builder: (_) => const CreateShoutoutScreen(),
-                  ),
-                );
-                if (created != null && mounted) {
-                  setState(() => _shoutoutsFuture = _loadShoutouts());
-                }
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: FirstVueColors.coral,
-                padding: EdgeInsets.zero,
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: const Text('Create', style: TextStyle(fontSize: 12)),
-            ),
-          ],
+            );
+            if (created != null && mounted) {
+              setState(() => _shoutoutsFuture = _loadShoutouts());
+            }
+          },
         ),
         const SizedBox(height: 8),
         Row(
@@ -211,14 +150,14 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
                   _shoutoutsFuture = _loadShoutouts();
                 });
               },
-              selectedColor: FirstVueColors.gold.withValues(alpha: .25),
+              selectedColor: FirstVueColors.gold,
               labelStyle: TextStyle(
                 color: _shoutoutSort == ShoutoutSort.popular
-                    ? FirstVueColors.gold
-                    : Colors.white54,
+                    ? const Color(0xFF17130B)
+                    : context.fv.secondaryText,
                 fontSize: 12,
               ),
-              backgroundColor: FirstVueColors.surface,
+              backgroundColor: context.fv.elevatedSurface,
               side: BorderSide.none,
             ),
             const SizedBox(width: 8),
@@ -232,14 +171,14 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
                   _shoutoutsFuture = _loadShoutouts();
                 });
               },
-              selectedColor: FirstVueColors.gold.withValues(alpha: .25),
+              selectedColor: FirstVueColors.gold,
               labelStyle: TextStyle(
                 color: _shoutoutSort == ShoutoutSort.newest
-                    ? FirstVueColors.gold
-                    : Colors.white54,
+                    ? const Color(0xFF17130B)
+                    : context.fv.secondaryText,
                 fontSize: 12,
               ),
-              backgroundColor: FirstVueColors.surface,
+              backgroundColor: context.fv.elevatedSurface,
               side: BorderSide.none,
             ),
           ],
@@ -256,21 +195,18 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
                   child: SizedBox(
                     width: 22,
                     height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: FirstVueColors.teal,
-                    ),
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                 ),
               );
             }
             final items = snapshot.data ?? const <Shoutout>[];
             if (items.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(
                   'Be the first to shout out a local favorite.',
-                  style: TextStyle(color: Colors.white54),
+                  style: TextStyle(color: context.fv.secondaryText),
                 ),
               );
             }
@@ -287,11 +223,11 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
   }
 }
 
-class _BusinessSwipeList extends StatelessWidget {
+class _BusinessFeedList extends StatelessWidget {
   final String label;
   final Future<List<TrendingBusiness>> Function() loadBusinesses;
 
-  const _BusinessSwipeList({
+  const _BusinessFeedList({
     super.key,
     required this.label,
     required this.loadBusinesses,
@@ -318,35 +254,40 @@ class _BusinessSwipeList extends StatelessWidget {
             message: 'No $label listings yet.',
           );
         }
-        return ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: businesses.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 12),
-          itemBuilder: (context, index) {
-            final business = businesses[index];
-            final accent =
-                index.isEven ? FirstVueColors.teal : FirstVueColors.coral;
-            return _TrendingPortraitCard(
-              business: business,
-              accent: accent,
-              onTap: () => Navigator.push(
-                context,
-                FirstVuePageRoute(
-                  builder: (_) => FirstVueBusinessProfileScreen(
-                    businessId: business.id,
+        return Column(
+          children: [
+            for (final business in businesses) ...[
+              SocialFeedCard(
+                name: business.name,
+                handle: '@${business.name.toLowerCase().replaceAll(' ', '')}',
+                body: business.services.isEmpty
+                    ? 'Verified on FirstVue'
+                    : business.services.take(3).join(' • '),
+                imageUrl: business.imageUrl,
+                assetImage: 'assets/images/explore_barbershops.jpg',
+                meta: business.rating > 0
+                    ? '${business.rating.toStringAsFixed(1)}★'
+                    : null,
+                onTap: () => Navigator.push(
+                  context,
+                  FirstVuePageRoute(
+                    builder: (_) => FirstVueBusinessProfileScreen(
+                      businessId: business.id,
+                    ),
                   ),
                 ),
               ),
-            );
-          },
+              const SizedBox(height: 12),
+            ],
+          ],
         );
       },
     );
   }
 }
 
-class _EventsSwipeList extends StatelessWidget {
-  const _EventsSwipeList({super.key});
+class _EventsFeedList extends StatelessWidget {
+  const _EventsFeedList();
 
   @override
   Widget build(BuildContext context) {
@@ -364,50 +305,19 @@ class _EventsSwipeList extends StatelessWidget {
             message: 'Local events will appear here.',
           );
         }
-        return ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: events.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 12),
-          itemBuilder: (context, index) {
-            final event = events[index];
-            return GestureDetector(
-              onTap: () => EventProfileSheet.show(context, event: event),
-              child: Container(
-              width: 220,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: FirstVueColors.surface,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: FirstVueColors.coral.withValues(alpha: .35),
-                ),
+        return Column(
+          children: [
+            for (final event in events) ...[
+              SocialFeedCard(
+                name: event.title,
+                handle: 'Event',
+                body: event.locationLabel ?? 'Local event',
+                assetImage: 'assets/images/explore_things_to_do.jpg',
+                onTap: () => EventProfileSheet.show(context, event: event),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.local_activity, color: FirstVueColors.coral),
-                  const SizedBox(height: 8),
-                  Text(
-                    event.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (event.locationLabel != null) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      event.locationLabel!,
-                      style: const TextStyle(color: Colors.white54, fontSize: 12),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            );
-          },
+              const SizedBox(height: 12),
+            ],
+          ],
         );
       },
     );
@@ -423,7 +333,7 @@ class _TrendingEmptyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Text(message, style: const TextStyle(color: Colors.white54)),
+      child: Text(message, style: TextStyle(color: context.fv.secondaryText)),
     );
   }
 }
@@ -588,11 +498,11 @@ class _YouMightLikeSectionState extends State<YouMightLikeSection> {
       builder: (context, snapshot) {
         final businesses = snapshot.data ?? const [];
         if (businesses.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
               'Personalized picks will appear here as you explore.',
-              style: TextStyle(color: Colors.white54),
+              style: TextStyle(color: context.fv.secondaryText),
             ),
           );
         }
@@ -601,10 +511,10 @@ class _YouMightLikeSectionState extends State<YouMightLikeSection> {
           children: [
             if (widget.showTitle) ...[
               const SizedBox(height: 24),
-              const Text(
+              Text(
                 'YOU MIGHT LIKE',
                 style: TextStyle(
-                  color: FirstVueColors.ivory,
+                  color: context.fv.primaryText,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.4,
@@ -649,8 +559,8 @@ class _YouMightLikeSectionState extends State<YouMightLikeSection> {
                               business.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: context.fv.primaryText,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -661,8 +571,8 @@ class _YouMightLikeSectionState extends State<YouMightLikeSection> {
                                   : 'Based on your recent searches',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white54,
+                              style: TextStyle(
+                                color: context.fv.secondaryText,
                                 fontSize: 12,
                               ),
                             ),

@@ -197,7 +197,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.white,
+        foregroundColor: null,
         title: Text(community?.name ?? 'Group'),
         actions: [
           if (canManage)
@@ -220,7 +220,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
               ? const Center(
                   child: Text(
                     'Group not found.',
-                    style: TextStyle(color: Colors.white54),
+                    style: TextStyle(color: Color(0xFF5A5668)),
                   ),
                 )
               : FirstVueRefreshScaffold(
@@ -246,7 +246,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                   Text(
                                     community.name,
                                     style: const TextStyle(
-                                      color: Colors.white,
+                                      color: const Color(0xFF16131F),
                                       fontSize: 22,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -255,7 +255,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                     Text(
                                       community.locationLabel!,
                                       style: const TextStyle(
-                                        color: Colors.white54,
+                                        color: Color(0xFF5A5668),
                                       ),
                                     ),
                                   const SizedBox(height: 6),
@@ -339,7 +339,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                       Text(
                                         _leader!.displayName,
                                         style: const TextStyle(
-                                          color: Colors.white,
+                                          color: const Color(0xFF16131F),
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -359,7 +359,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                 ),
                                 const Icon(
                                   Icons.chevron_right,
-                                  color: Colors.white38,
+                                  color: Color(0xFF8A8696),
                                 ),
                               ],
                             ),
@@ -378,7 +378,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                   backgroundColor: community.isMember
                                       ? FirstVueColors.surface
                                       : FirstVueColors.coral,
-                                  foregroundColor: Colors.white,
+                                  foregroundColor: null,
                                 ),
                                 child: Text(
                                   _actionLoading ? '…' : _joinLabel,
@@ -391,7 +391,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                 onPressed:
                                     _actionLoading ? null : _toggleFollow,
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.white,
+                                  foregroundColor: null,
                                   side: BorderSide(
                                     color: community.isFollowing
                                         ? FirstVueColors.teal
@@ -427,7 +427,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                           child: Text(
                             community.rules!.trim(),
                             style: const TextStyle(
-                              color: Colors.white70,
+                              color: Color(0xFF5A5668),
                               height: 1.4,
                             ),
                           ),
@@ -460,7 +460,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                             ),
                             title: Text(
                               member.displayName,
-                              style: const TextStyle(color: Colors.white),
+                              style: const TextStyle(color: Color(0xFF16131F)),
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -533,7 +533,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                         child: _members.isEmpty
                             ? const Text(
                                 'No members yet.',
-                                style: TextStyle(color: Colors.white54),
+                                style: TextStyle(color: Color(0xFF5A5668)),
                               )
                             : Column(
                                 children: [
@@ -565,14 +565,14 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                       title: Text(
                                         member.displayName,
                                         style: const TextStyle(
-                                          color: Colors.white,
+                                          color: const Color(0xFF16131F),
                                         ),
                                       ),
                                       subtitle: member.username != null
                                           ? Text(
                                               '@${member.username}',
                                               style: const TextStyle(
-                                                color: Colors.white54,
+                                                color: Color(0xFF5A5668),
                                               ),
                                             )
                                           : null,
@@ -605,7 +605,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
       ),
       child: Text(
         label,
-        style: const TextStyle(color: Colors.white70, fontSize: 11),
+        style: const TextStyle(color: Color(0xFF5A5668), fontSize: 11),
       ),
     );
   }

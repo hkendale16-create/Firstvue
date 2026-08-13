@@ -153,20 +153,18 @@ class _VueCenterTab extends StatelessWidget {
               height: 64,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: fv.background,
-                borderRadius: BorderRadius.circular(16),
+                color: selected ? FirstVueColors.gold : fv.background,
+                borderRadius: BorderRadius.circular(28),
                 border: Border.all(
-                  color: selected
-                      ? FirstVueColors.coral
-                      : FirstVueColors.coral.withValues(alpha: .55),
+                  color: FirstVueColors.gold,
                   width: selected ? 2 : 1.4,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: FirstVueColors.coral.withValues(
-                      alpha: selected ? .45 : .28,
+                    color: FirstVueColors.gold.withValues(
+                      alpha: selected ? .35 : .18,
                     ),
-                    blurRadius: selected ? 18 : 12,
+                    blurRadius: selected ? 16 : 10,
                     spreadRadius: selected ? 1 : 0,
                   ),
                 ],
@@ -175,16 +173,10 @@ class _VueCenterTab extends StatelessWidget {
                 'V',
                 style: TextStyle(
                   fontFamily: 'CormorantGaramond',
-                  color: FirstVueColors.gold,
+                  color: selected ? Colors.white : FirstVueColors.gold,
                   fontSize: 34,
                   fontWeight: FontWeight.w700,
                   height: 1,
-                  shadows: [
-                    Shadow(
-                      color: FirstVueColors.coral.withValues(alpha: .35),
-                      blurRadius: 8,
-                    ),
-                  ],
                 ),
               ),
             ),

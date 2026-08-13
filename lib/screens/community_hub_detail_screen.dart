@@ -281,7 +281,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
         backgroundColor: const Color(0xFF10151B),
         title: const Text(
           'Add Community Editor',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: const Color(0xFF16131F)),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -294,12 +294,12 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
             const SizedBox(height: 10),
             TextField(
               controller: controller,
-              style: const TextStyle(color: Colors.white),
+              style: const TextStyle(color: Color(0xFF16131F)),
               decoration: const InputDecoration(
                 hintText: 'Profile UUID or username',
-                hintStyle: TextStyle(color: Colors.white38),
+                hintStyle: TextStyle(color: Color(0xFF8A8696)),
                 enabledBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: Colors.white24),
+                  borderSide: BorderSide(color: Color(0x1A16131F)),
                 ),
                 focusedBorder: UnderlineInputBorder(
                   borderSide: BorderSide(color: FirstVueColors.teal),
@@ -419,7 +419,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
     }
     if (m.isApproved) return FirstVueColors.gold;
     if (m.isPending) return Colors.orangeAccent;
-    return Colors.white54;
+    return const Color(0xFF5A5668);
   }
 
   Widget _sectionTitle(String title) {
@@ -463,7 +463,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.white,
+        foregroundColor: null,
         title: Text(hub?.name ?? 'Community'),
         actions: [
           IconButton(
@@ -475,7 +475,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _createGroup,
         backgroundColor: FirstVueColors.coral,
-        foregroundColor: Colors.white,
+        foregroundColor: null,
         icon: const Icon(Icons.add),
         label: const Text('Add Group'),
       ),
@@ -487,7 +487,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
               ? const Center(
                   child: Text(
                     'Community not found.',
-                    style: TextStyle(color: Colors.white54),
+                    style: TextStyle(color: Color(0xFF5A5668)),
                   ),
                 )
               : FirstVueRefreshScaffold(
@@ -512,7 +512,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                                 Text(
                                   hub.name,
                                   style: const TextStyle(
-                                    color: Colors.white,
+                                    color: const Color(0xFF16131F),
                                     fontSize: 22,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -531,7 +531,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                                 if (hub.locationLabel != null)
                                   Text(
                                     hub.locationLabel!,
-                                    style: const TextStyle(color: Colors.white54),
+                                    style: const TextStyle(color: Color(0xFF5A5668)),
                                   ),
                                 const SizedBox(height: 4),
                                 Text(
@@ -582,7 +582,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                                     Text(
                                       _leader!.displayName,
                                       style: const TextStyle(
-                                        color: Colors.white,
+                                        color: const Color(0xFF16131F),
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -618,14 +618,14 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                       else
                         const Text(
                           'No description yet.',
-                          style: TextStyle(color: Colors.white54),
+                          style: TextStyle(color: Color(0xFF5A5668)),
                         ),
                       if (hub.rules?.trim().isNotEmpty == true) ...[
                         const SizedBox(height: 14),
                         const Text(
                           'Rules',
                           style: TextStyle(
-                            color: Colors.white70,
+                            color: Color(0xFF5A5668),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -633,7 +633,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                         Text(
                           hub.rules!.trim(),
                           style: const TextStyle(
-                            color: Colors.white70,
+                            color: Color(0xFF5A5668),
                             height: 1.4,
                           ),
                         ),
@@ -668,7 +668,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                       if (_editors.isEmpty)
                         const Text(
                           'No editors appointed yet.',
-                          style: TextStyle(color: Colors.white54),
+                          style: TextStyle(color: Color(0xFF5A5668)),
                         )
                       else
                         ..._editors.map((editor) {
@@ -699,13 +699,13 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                             ),
                             title: Text(
                               label,
-                              style: const TextStyle(color: Colors.white),
+                              style: const TextStyle(color: Color(0xFF16131F)),
                             ),
                             subtitle: editor.username != null
                                 ? Text(
                                     '@${editor.username}',
                                     style: const TextStyle(
-                                      color: Colors.white54,
+                                      color: Color(0xFF5A5668),
                                       fontSize: 12,
                                     ),
                                   )
@@ -742,11 +742,11 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                             contentPadding: EdgeInsets.zero,
                             title: Text(
                               name,
-                              style: const TextStyle(color: Colors.white),
+                              style: const TextStyle(color: Color(0xFF16131F)),
                             ),
                             subtitle: Text(
                               (req['role'] as String?) ?? 'leader',
-                              style: const TextStyle(color: Colors.white54),
+                              style: const TextStyle(color: Color(0xFF5A5668)),
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -796,7 +796,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                             ),
                             title: Text(
                               (group?['name'] as String?) ?? 'Group',
-                              style: const TextStyle(color: Colors.white),
+                              style: const TextStyle(color: Color(0xFF16131F)),
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -836,7 +836,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                       if (_displayMemberships.isEmpty)
                         const Text(
                           'No groups linked yet. Create one to get started.',
-                          style: TextStyle(color: Colors.white54),
+                          style: TextStyle(color: Color(0xFF5A5668)),
                         )
                       else
                         ..._displayMemberships.map((membership) {
@@ -860,7 +860,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                                   title: Text(
                                     name,
                                     style: const TextStyle(
-                                      color: Colors.white,
+                                      color: const Color(0xFF16131F),
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -1004,7 +1004,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                       const SizedBox(height: 8),
                       const Text(
                         'Groups publish into this feed.',
-                        style: TextStyle(color: Colors.white54, fontSize: 12),
+                        style: TextStyle(color: Color(0xFF5A5668), fontSize: 12),
                       ),
                       const SizedBox(height: 12),
                       if (_loading && _feedPosts.isEmpty)
@@ -1019,7 +1019,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                       else if (_feedPosts.isEmpty)
                         const Text(
                           'No community posts yet.',
-                          style: TextStyle(color: Colors.white54),
+                          style: TextStyle(color: Color(0xFF5A5668)),
                         )
                       else
                         Column(

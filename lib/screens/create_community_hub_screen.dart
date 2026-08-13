@@ -76,14 +76,14 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
           backgroundColor: FirstVueColors.surface,
           title: const Text(
             'Community creation requires approval',
-            style: TextStyle(color: Colors.white),
+            style: TextStyle(color: const Color(0xFF16131F)),
           ),
           content: const Text(
             'Unlike Groups, Communities must be reviewed by FirstVue '
             'administrators before they become active. Submit a request with '
             'your proposed name, description, category, location, and reason. '
             'You will be the Community Leader if approved.',
-            style: TextStyle(color: Colors.white70, height: 1.4),
+            style: TextStyle(color: Color(0xFF5A5668), height: 1.4),
           ),
           actions: [
             TextButton(
@@ -154,7 +154,7 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.white,
+        foregroundColor: null,
         title: const Text('Create Community'),
       ),
       body: _checking
@@ -186,7 +186,7 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
                           '“${_existing!.proposedName}” is awaiting FirstVue admin approval. '
                           'The Community will not be active until approved.',
                           style: const TextStyle(
-                            color: Colors.white70,
+                            color: Color(0xFF5A5668),
                             height: 1.4,
                           ),
                         ),
@@ -204,7 +204,7 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
                     ),
                     child: Text(
                       'Your Community “${_existing!.proposedName}” was approved.',
-                      style: const TextStyle(color: Colors.white70),
+                      style: const TextStyle(color: Color(0xFF5A5668)),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -226,7 +226,7 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
                 InputDecorator(
                   decoration: InputDecoration(
                     labelText: 'Visibility',
-                    labelStyle: const TextStyle(color: Colors.white54),
+                    labelStyle: const TextStyle(color: Color(0xFF5A5668)),
                     filled: true,
                     fillColor: FirstVueColors.surface,
                     border: OutlineInputBorder(
@@ -244,14 +244,14 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
                           value: 'public',
                           child: Text(
                             'Public — discoverable in search',
-                            style: TextStyle(color: Colors.white),
+                            style: TextStyle(color: const Color(0xFF16131F)),
                           ),
                         ),
                         DropdownMenuItem(
                           value: 'private',
                           child: Text(
                             'Private — members and leaders only',
-                            style: TextStyle(color: Colors.white),
+                            style: TextStyle(color: const Color(0xFF16131F)),
                           ),
                         ),
                       ],
@@ -304,7 +304,7 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
                       : _submit,
                   style: FilledButton.styleFrom(
                     backgroundColor: FirstVueColors.coral,
-                    foregroundColor: Colors.white,
+                    foregroundColor: null,
                     minimumSize: const Size.fromHeight(48),
                   ),
                   child: Text(
@@ -328,10 +328,10 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
     return TextField(
       controller: controller,
       maxLines: maxLines,
-      style: const TextStyle(color: Colors.white),
+      style: const TextStyle(color: Color(0xFF16131F)),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white54),
+        labelStyle: const TextStyle(color: Color(0xFF5A5668)),
         filled: true,
         fillColor: FirstVueColors.surface,
         border: OutlineInputBorder(

@@ -85,25 +85,25 @@ class FirstVuePalette extends ThemeExtension<FirstVuePalette> {
     borderSubtle: Color(0x2E3DD9C9),
   );
 
-  /// Native-looking light FirstVue — not a simple invert of dark.
+  /// White social FirstVue — canvas is pure white with gold/teal accents.
   static const light = FirstVuePalette(
-    background: Color(0xFFF7F5F2),
+    background: Color(0xFFFFFFFF),
     surface: Color(0xFFFFFFFF),
-    elevatedSurface: Color(0xFFEEEAE4),
+    elevatedSurface: Color(0xFFF4F4F6),
     primaryText: Color(0xFF16131F),
     secondaryText: Color(0xFF5A5668),
     tertiaryText: Color(0xFF8A8696),
     icon: Color(0xFF16131F),
     mutedIcon: Color(0xFF7A7686),
     divider: Color(0x1A16131F),
-    navBar: Color(0xFFF7F5F2),
+    navBar: Color(0xFFFFFFFF),
     success: Color(0xFF0D9B8C),
     error: Color(0xFFC04545),
     warning: Color(0xFFB8860B),
     mediaControl: Color(0xFFFFFFFF),
     mediaControlBg: Color(0x990E0B1A),
-    inputFill: Color(0xFFF0EDE8),
-    borderSubtle: Color(0x1A16131F),
+    inputFill: Color(0xFFF3F4F6),
+    borderSubtle: Color(0x1416131F),
   );
 
   @override
@@ -212,12 +212,12 @@ class FirstVueTheme {
         brightness: Brightness.light,
         palette: FirstVuePalette.light,
         scheme: const ColorScheme.light(
-          surface: Color(0xFFF7F5F2),
-          primary: Color(0xFFB8860B),
-          secondary: Color(0xFF0D9B8C),
+          surface: Color(0xFFFFFFFF),
+          primary: FirstVueColors.gold,
+          secondary: FirstVueColors.teal,
           tertiary: FirstVueColors.coral,
-          onPrimary: Color(0xFFFFFFFF),
-          onSecondary: Color(0xFFFFFFFF),
+          onPrimary: Color(0xFF17130B),
+          onSecondary: Color(0xFF071315),
           onSurface: Color(0xFF16131F),
           error: Color(0xFFC04545),
         ),
@@ -367,8 +367,8 @@ class FirstVueTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: FirstVueColors.coral,
-          foregroundColor: buttonForeground,
+          backgroundColor: FirstVueColors.gold,
+          foregroundColor: isDark ? buttonForeground : const Color(0xFF17130B),
           textStyle: const TextStyle(
             fontWeight: FontWeight.w700,
             letterSpacing: .6,
@@ -380,8 +380,8 @@ class FirstVueTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: FirstVueColors.teal,
-          foregroundColor: buttonForeground,
+          backgroundColor: FirstVueColors.gold,
+          foregroundColor: isDark ? buttonForeground : const Color(0xFF17130B),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),
@@ -389,10 +389,10 @@ class FirstVueTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: isDark ? FirstVueColors.teal : const Color(0xFF0D9B8C),
+          foregroundColor: isDark ? FirstVueColors.teal : FirstVueColors.gold,
           side: BorderSide(
-            color: (isDark ? FirstVueColors.teal : const Color(0xFF0D9B8C))
-                .withValues(alpha: .55),
+            color: (isDark ? FirstVueColors.teal : FirstVueColors.gold)
+                .withValues(alpha: .7),
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -400,7 +400,9 @@ class FirstVueTheme {
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: FirstVueColors.teal),
+        style: TextButton.styleFrom(
+          foregroundColor: isDark ? FirstVueColors.teal : FirstVueColors.gold,
+        ),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: palette.navBar,

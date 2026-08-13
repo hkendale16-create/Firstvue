@@ -67,20 +67,19 @@ class JoinFirstVueScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const Text(
-            'WHO ARE YOU ON FIRSTVUE?',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.1,
+            const Text(
+              'WHO ARE YOU ON FIRSTVUE?',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.1,
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Tap the option that matches you. Each path goes to the correct approval queue — business submissions never go to professional review.',
-            style: TextStyle(color: Colors.white54, height: 1.45),
-          ),
+            const SizedBox(height: 10),
+            Text(
+              'Tap the option that matches you. Each path goes to the correct approval queue — business submissions never go to professional review.',
+              style: TextStyle(color: context.fv.secondaryText, height: 1.45),
+            ),
           const SizedBox(height: 24),
           _RoleCard(
             icon: Icons.storefront_outlined,
@@ -161,8 +160,8 @@ class _RoleCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: context.fv.primaryText,
                         fontWeight: FontWeight.bold,
                         letterSpacing: .6,
                       ),
@@ -170,8 +169,8 @@ class _RoleCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(
                       description,
-                      style: const TextStyle(
-                        color: Colors.white54,
+                      style: TextStyle(
+                        color: context.fv.secondaryText,
                         height: 1.35,
                         fontSize: 12,
                       ),

@@ -40,9 +40,9 @@ class ShoutoutCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const Text(
+              Text(
                 ' gave a shoutout to ',
-                style: TextStyle(color: Colors.white54, fontSize: 13),
+                style: TextStyle(color: context.fv.secondaryText, fontSize: 13),
               ),
               GestureDetector(
                 onTap: () => EntityNavigation.openShoutoutTarget(
@@ -68,7 +68,7 @@ class ShoutoutCard extends StatelessWidget {
                     ? ''
                     : ' · ${shoutout.targetSubtitle}'),
             style: TextStyle(
-              color: Colors.white.withValues(alpha: .4),
+              color: context.fv.tertiaryText,
               fontSize: 11,
               letterSpacing: .4,
             ),
@@ -76,7 +76,7 @@ class ShoutoutCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             shoutout.message,
-            style: const TextStyle(color: Colors.white70, height: 1.35),
+            style: TextStyle(color: context.fv.primaryText, height: 1.35),
           ),
           const SizedBox(height: 6),
           Row(
@@ -84,7 +84,7 @@ class ShoutoutCard extends StatelessWidget {
               Text(
                 ShoutoutService.formatRelativeTime(shoutout.createdAt),
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: .35),
+                  color: context.fv.tertiaryText,
                   fontSize: 11,
                 ),
               ),
@@ -93,7 +93,7 @@ class ShoutoutCard extends StatelessWidget {
                 Text(
                   '${shoutout.sparkCount} spark${shoutout.sparkCount == 1 ? '' : 's'}',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: .35),
+                    color: context.fv.tertiaryText,
                     fontSize: 11,
                   ),
                 ),

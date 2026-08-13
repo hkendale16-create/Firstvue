@@ -18,6 +18,7 @@ import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/firstvue_inline_search_bar.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/entity_profile_tab_bar.dart';
+import '../widgets/social_chrome.dart';
 import '../widgets/shoutout_card.dart';
 import '../services/shoutout_service.dart';
 import '../widgets/portfolio_albums_section.dart';
@@ -113,7 +114,7 @@ class _FirstVueBusinessProfileScreenState
                 child: const Center(
                   child: Text(
                     'Unable to load this business profile.',
-                    style: TextStyle(color: Colors.white54),
+                    style: TextStyle(color: Color(0xFF5A5668)),
                   ),
                 ),
               ),
@@ -161,6 +162,7 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
   BusinessImageSet _profileImages = const BusinessImageSet();
   bool _loadingImages = true;
   int _selectedTab = 0;
+  bool _following = false;
 
   @override
   void initState() {
@@ -202,14 +204,26 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
             avatarImageUrl: _profileImages.avatar?.signedUrl,
             coverImageUrl: _profileImages.cover?.signedUrl,
             showImageLoading: _loadingImages,
-            coverGradient: const [
-              Color(0xFF2B241B),
-              Color(0xFF151B22),
-              Color(0xFF080B0F),
-            ],
             actionButtons: [
-              if (isApproved && !isOwnerPreview)
-                const Icon(Icons.verified, color: FirstVueColors.warmGold, size: 28),
+              if (isApproved && !isOwnerPreview) ...[
+                SocialFollowButton(
+                  label: _following ? 'Following' : 'Follow',
+                  filled: !_following,
+                  onPressed: () => setState(() => _following = !_following),
+                ),
+                SocialFollowButton(
+                  label: 'Message',
+                  filled: false,
+                  onPressed: () {
+                    final tabs = EntityProfileTabs.forBusinessType(
+                      details.businessType,
+                    );
+                    final about = tabs.indexOf('ABOUT');
+                    if (about >= 0) setState(() => _selectedTab = about);
+                  },
+                ),
+                const SocialFollowButton(label: 'Book'),
+              ],
             ],
           ),
         ),
@@ -491,13 +505,13 @@ class _BusinessReviewsSectionState extends State<_BusinessReviewsSection> {
                 ),
                 Text(
                   ' (${reviews.length})',
-                  style: const TextStyle(color: Colors.white54),
+                  style: const TextStyle(color: Color(0xFF5A5668)),
                 ),
               ] else
                 const Expanded(
                   child: Text(
                     'No approved reviews yet.',
-                    style: TextStyle(color: Colors.white54),
+                    style: TextStyle(color: Color(0xFF5A5668)),
                   ),
                 ),
               if (average != null) const Spacer(),
@@ -641,7 +655,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
           const SizedBox(height: 8),
           const Text(
             'Reviews appear publicly only after FirstVue approval.',
-            style: TextStyle(color: Colors.white54, fontSize: 12),
+            style: TextStyle(color: Color(0xFF5A5668), fontSize: 12),
           ),
           const SizedBox(height: 16),
           SizedBox(

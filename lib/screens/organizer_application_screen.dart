@@ -70,7 +70,7 @@ class _OrganizerApplicationScreenState extends State<OrganizerApplicationScreen>
         children: [
           const Text(
             'Apply to post events and things to do after FirstVue approves you.',
-            style: TextStyle(color: Colors.white54, height: 1.4),
+            style: TextStyle(color: Color(0xFF5A5668), height: 1.4),
           ),
           const SizedBox(height: 20),
           _field(_name, 'Your name'),
@@ -96,10 +96,10 @@ class _OrganizerApplicationScreenState extends State<OrganizerApplicationScreen>
     return TextField(
       controller: controller,
       maxLines: lines,
-      style: const TextStyle(color: Colors.white),
+      style: const TextStyle(color: Color(0xFF16131F)),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white54),
+        labelStyle: const TextStyle(color: Color(0xFF5A5668)),
         filled: true,
         fillColor: const Color(0xFF151B22),
         border: OutlineInputBorder(

@@ -132,21 +132,13 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
                       ? () => _openEdit()
                       : null,
                   onCoverTap: coverUrl != null ? () => _openEdit() : null,
-                  coverGradient: const [
-                    Color(0xFF2A241B),
-                    Color(0xFF1A2530),
-                    Color(0xFFD8B56A),
-                  ],
                   actionButtons: [
                     OutlinedButton.icon(
                       onPressed: _openEdit,
                       icon: const Icon(Icons.edit_outlined, size: 18),
                       label: const Text('Edit profile'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white70,
-                        side: BorderSide(
-                          color: Colors.white.withValues(alpha: .2),
-                        ),
+                        foregroundColor: FirstVueColors.gold,
                       ),
                     ),
                     OutlinedButton.icon(
@@ -165,10 +157,7 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
                       icon: const Icon(Icons.visibility_outlined, size: 18),
                       label: const Text('Preview as user'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white70,
-                        side: BorderSide(
-                          color: Colors.white.withValues(alpha: .2),
-                        ),
+                        foregroundColor: FirstVueColors.gold,
                       ),
                     ),
                     if (business.status == 'approved')
@@ -229,7 +218,7 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
                           child: Text(
                             'PHOTOS & VIDEOS',
                             style: TextStyle(
-                              color: Colors.white54,
+                              color: Color(0xFF5A5668),
                               fontWeight: FontWeight.bold,
                               letterSpacing: 1.2,
                               fontSize: 12,

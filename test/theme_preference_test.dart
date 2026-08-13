@@ -14,8 +14,8 @@ void main() {
       SharedPreferences.setMockInitialValues({});
     });
 
-    test('defaults to system when no preference stored', () async {
-      expect(await ThemePreferenceService.load(), ThemeMode.system);
+    test('defaults to light when no preference stored', () async {
+      expect(await ThemePreferenceService.load(), ThemeMode.light);
     });
 
     test('persists and reloads light / dark / system', () async {
@@ -29,9 +29,9 @@ void main() {
       expect(await ThemePreferenceService.load(), ThemeMode.system);
     });
 
-    test('fromStorage maps unknown values to system', () {
-      expect(ThemePreferenceService.fromStorage(null), ThemeMode.system);
-      expect(ThemePreferenceService.fromStorage('nope'), ThemeMode.system);
+    test('fromStorage maps unknown values to light', () {
+      expect(ThemePreferenceService.fromStorage(null), ThemeMode.light);
+      expect(ThemePreferenceService.fromStorage('nope'), ThemeMode.light);
       expect(ThemePreferenceService.fromStorage('light'), ThemeMode.light);
     });
   });
@@ -47,12 +47,12 @@ void main() {
       controller.addListener(() => notifications++);
 
       await controller.load();
-      expect(controller.themeMode, ThemeMode.system);
-
-      await controller.setThemeMode(ThemeMode.light);
       expect(controller.themeMode, ThemeMode.light);
+
+      await controller.setThemeMode(ThemeMode.dark);
+      expect(controller.themeMode, ThemeMode.dark);
       expect(notifications, greaterThanOrEqualTo(2));
-      expect(await ThemePreferenceService.load(), ThemeMode.light);
+      expect(await ThemePreferenceService.load(), ThemeMode.dark);
     });
   });
 

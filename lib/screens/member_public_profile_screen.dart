@@ -470,11 +470,11 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
                     onPressed: _loading || _followBusy ? null : _toggleFollow,
                     style: FilledButton.styleFrom(
                       backgroundColor: _followStatus == FollowStatus.following
-                          ? const Color(0xFF151B22)
+                          ? context.fv.elevatedSurface
                           : FirstVueColors.gold,
                       foregroundColor: _followStatus == FollowStatus.following
-                          ? Colors.white
-                          : Colors.black,
+                          ? context.fv.primaryText
+                          : const Color(0xFF17130B),
                     ),
                     child: _followBusy
                         ? const SizedBox(
@@ -569,7 +569,7 @@ class _MemberProfileTabButton extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? FirstVueColors.gold : Colors.white54,
+                  color: selected ? FirstVueColors.gold : context.fv.secondaryText,
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
                   letterSpacing: 1,

@@ -617,23 +617,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Icons.alternate_email,
                     color: FirstVueColors.gold,
                   ),
-                  title: const Text(
+                  title: Text(
                     'Choose your @handle',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: context.fv.primaryText,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   subtitle: Text(
                     'Your tag must be unique. Display names can be shared.',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: .55),
+                      color: context.fv.secondaryText,
                       fontSize: 13,
                     ),
                   ),
                   trailing: Icon(
                     Icons.chevron_right,
-                    color: Colors.white.withValues(alpha: .45),
+                    color: context.fv.mutedIcon,
                   ),
                 ),
               ),
@@ -690,23 +690,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ]
                     : [
-                        OutlinedButton.icon(
+                        FilledButton(
                           onPressed: _openEditProfile,
-                          icon: const Icon(Icons.edit_outlined, size: 18),
-                          label: const Text('Edit profile'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            side: BorderSide(color: Colors.white.withValues(alpha: .25)),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: FirstVueColors.gold,
+                            foregroundColor: const Color(0xFF17130B),
                           ),
+                          child: const Text('Edit profile'),
                         ),
-                        OutlinedButton.icon(
+                        OutlinedButton(
                           onPressed: _shareProfile,
-                          icon: const Icon(Icons.share_outlined, size: 18),
-                          label: const Text('Share profile'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            side: BorderSide(color: Colors.white.withValues(alpha: .25)),
-                          ),
+                          child: const Text('Share profile'),
                         ),
                         if (_approvedBusinesses.isNotEmpty)
                           OutlinedButton.icon(
@@ -718,10 +712,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   : 'My Businesses',
                             ),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              side: BorderSide(
-                                color: Colors.white.withValues(alpha: .25),
-                              ),
+                              foregroundColor: FirstVueColors.gold,
                             ),
                           ),
                         if (_hasApprovedProfessional)
@@ -730,10 +721,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             icon: const Icon(Icons.work_outline, size: 18),
                             label: const Text('My Professional'),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              side: BorderSide(
-                                color: Colors.white.withValues(alpha: .25),
-                              ),
+                              foregroundColor: FirstVueColors.gold,
                             ),
                           ),
                       ],
@@ -745,7 +733,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
                   icon: Icon(
                     Icons.settings_outlined,
-                    color: Colors.white.withValues(alpha: .85),
+                    color: FirstVueColors.gold,
                   ),
                   tooltip: 'Settings',
                 ),
@@ -833,7 +821,7 @@ class _ProfileTabButton extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? FirstVueColors.gold : Colors.white54,
+                  color: selected ? FirstVueColors.gold : context.fv.secondaryText,
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
                   letterSpacing: 1,

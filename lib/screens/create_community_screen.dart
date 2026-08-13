@@ -130,7 +130,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.white,
+        foregroundColor: null,
         title: const Text('Create Group'),
       ),
       body: ListView(
@@ -165,7 +165,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                   _imageFile == null
                       ? 'Add group profile photo'
                       : 'Tap to replace photo',
-                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  style: const TextStyle(color: Color(0xFF5A5668), fontSize: 12),
                 ),
                 if (_imageFile != null)
                   TextButton(
@@ -188,7 +188,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
           const SizedBox(height: 16),
           const Text(
             'Privacy',
-            style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+            style: TextStyle(color: Color(0xFF5A5668), fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           SegmentedButton<String>(
@@ -206,7 +206,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
             _privacy == 'public'
                 ? 'Anyone can discover and join this group.'
                 : 'Membership requires Group Leader approval.',
-            style: const TextStyle(color: Colors.white54, fontSize: 12),
+            style: const TextStyle(color: Color(0xFF5A5668), fontSize: 12),
           ),
           const SizedBox(height: 16),
           LocationAutocompleteField(
@@ -229,10 +229,10 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
             DropdownButtonFormField<String?>(
               initialValue: _hubId,
               dropdownColor: FirstVueColors.surface,
-              style: const TextStyle(color: Colors.white),
+              style: const TextStyle(color: Color(0xFF16131F)),
               decoration: InputDecoration(
                 labelText: 'Associate with Community (optional)',
-                labelStyle: const TextStyle(color: Colors.white54),
+                labelStyle: const TextStyle(color: Color(0xFF5A5668)),
                 filled: true,
                 fillColor: FirstVueColors.surface,
                 border: OutlineInputBorder(
@@ -265,7 +265,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
               onPressed: _saving ? null : _create,
               style: FilledButton.styleFrom(
                 backgroundColor: FirstVueColors.coral,
-                foregroundColor: Colors.white,
+                foregroundColor: null,
               ),
               child: Text(_saving ? 'Creating…' : 'Create Group'),
             ),
@@ -282,14 +282,14 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
   }) {
     return TextField(
       controller: controller,
-      style: const TextStyle(color: Colors.white),
+      style: const TextStyle(color: Color(0xFF16131F)),
       maxLines: lines,
       textCapitalization: lines > 1
           ? TextCapitalization.sentences
           : TextCapitalization.words,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white54),
+        labelStyle: const TextStyle(color: Color(0xFF5A5668)),
         filled: true,
         fillColor: FirstVueColors.surface,
         border: OutlineInputBorder(
