@@ -90,20 +90,53 @@ begin
 end $$;
 
 -- Wipe previous demo pack (auth delete cascades profiles + dependents).
+-- Match by fixed demo UUIDs / emails too — a partial prior run can leave
+-- auth.users without profiles, which would skip purge if we only look at profiles.
 do $$
 declare
-  demo_ids uuid[];
+  demo_ids uuid[] := array[
+    'a0000000-0000-4000-8000-000000000001'::uuid,
+    'a0000000-0000-4000-8000-000000000002'::uuid,
+    'a0000000-0000-4000-8000-000000000003'::uuid,
+    'a0000000-0000-4000-8000-000000000004'::uuid,
+    'a0000000-0000-4000-8000-000000000005'::uuid,
+    'a0000000-0000-4000-8000-000000000006'::uuid,
+    'a0000000-0000-4000-8000-000000000007'::uuid,
+    'a0000000-0000-4000-8000-000000000008'::uuid,
+    'a0000000-0000-4000-8000-000000000009'::uuid,
+    'a0000000-0000-4000-8000-000000000010'::uuid,
+    'a0000000-0000-4000-8000-000000000011'::uuid,
+    'a0000000-0000-4000-8000-000000000012'::uuid,
+    'a0000000-0000-4000-8000-000000000013'::uuid,
+    'a0000000-0000-4000-8000-000000000014'::uuid,
+    'a0000000-0000-4000-8000-000000000015'::uuid,
+    'a0000000-0000-4000-8000-000000000016'::uuid,
+    'a0000000-0000-4000-8000-000000000017'::uuid,
+    'a0000000-0000-4000-8000-000000000018'::uuid,
+    'a0000000-0000-4000-8000-000000000019'::uuid,
+    'a0000000-0000-4000-8000-000000000020'::uuid,
+    'a0000000-0000-4000-8000-000000000021'::uuid,
+    'a0000000-0000-4000-8000-000000000022'::uuid,
+    'a0000000-0000-4000-8000-000000000023'::uuid,
+    'a0000000-0000-4000-8000-000000000024'::uuid,
+    'a0000000-0000-4000-8000-000000000025'::uuid
+  ];
+  extra_ids uuid[];
 begin
-  select coalesce(array_agg(id), '{}') into demo_ids
+  select coalesce(array_agg(id), '{}') into extra_ids
   from public.profiles
   where is_demo = true or username like 'fvdemo_%';
 
-  if cardinality(demo_ids) > 0 then
-    delete from public.community_news_posts where is_demo = true or author_id = any(demo_ids);
-    delete from public.community_events where is_demo = true or organizer_id = any(demo_ids);
-    delete from public.businesses where is_demo = true or created_by = any(demo_ids);
-    delete from auth.users where id = any(demo_ids);
-  end if;
+  demo_ids := (select array_agg(distinct x) from unnest(demo_ids || extra_ids) as x);
+
+  delete from public.community_news_posts
+  where is_demo = true or author_id = any(demo_ids);
+  delete from public.community_events
+  where is_demo = true or organizer_id = any(demo_ids);
+  delete from public.businesses
+  where is_demo = true or created_by = any(demo_ids);
+  delete from auth.users
+  where id = any(demo_ids) or email like '%@firstvue.demo';
 end $$;
 
 create temporary table _fv_demo (
