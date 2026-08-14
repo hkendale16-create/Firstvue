@@ -43,7 +43,10 @@ void main() {
   });
 
   test('username login returns only refresh-session material', () {
-    expect(function, contains('"refresh_token"') | contains('refresh_token:'));
+    expect(
+      function,
+      anyOf(contains('"refresh_token"'), contains('refresh_token:')),
+    );
     expect(function, isNot(contains('email: data')));
     expect(function, isNot(contains('console.log')));
     expect(function, contains('Cache-Control'));
