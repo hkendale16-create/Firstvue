@@ -11,7 +11,7 @@ import '../services/business_media_service.dart';
 import '../services/business_submission_service.dart';
 import '../widgets/fv_ui.dart';
 import '../widgets/media_picker_sheet.dart';
-import 'auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import 'rentals_screen.dart';
 
 class BusinessOwnerStartScreen extends StatelessWidget {
@@ -603,10 +603,7 @@ class _VerificationFormScreenState extends State<_VerificationFormScreen> {
       return;
     }
     if (!widget.isClaim && Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       if (!mounted || Supabase.instance.client.auth.currentUser == null) return;
     }
 

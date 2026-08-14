@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme/firstvue_theme.dart';
 import '../navigation/firstvue_page_route.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import 'business_owner_start_screen.dart';
 import 'professional_profile_editor_screen.dart';
 import 'organizer_application_screen.dart';
@@ -14,16 +13,7 @@ class JoinFirstVueScreen extends StatelessWidget {
   const JoinFirstVueScreen({super.key});
 
   Future<void> _openRole(BuildContext context, FirstVueJoinRole role) async {
-    if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
-      if (!context.mounted ||
-          Supabase.instance.client.auth.currentUser == null) {
-        return;
-      }
-    }
+    if (!await ensureSignedIn(context)) return;
 
     if (!context.mounted) return;
     switch (role) {
@@ -42,9 +32,7 @@ class JoinFirstVueScreen extends StatelessWidget {
       case FirstVueJoinRole.organizer:
         Navigator.push(
           context,
-          FirstVuePageRoute(
-            builder: (_) => const OrganizerApplicationScreen(),
-          ),
+          FirstVuePageRoute(builder: (_) => const OrganizerApplicationScreen()),
         );
     }
   }

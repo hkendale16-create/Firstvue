@@ -9,7 +9,7 @@ import '../messaging/services/fv_messaging_service.dart';
 import '../services/messaging_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
-import '../screens/auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../screens/messages_inbox_screen.dart';
 import '../screens/post_detail_screen.dart';
@@ -79,10 +79,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   const SizedBox(height: 12),
                   FilledButton(
                     onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-                      );
+                      await ensureSignedIn(context);
                       if (mounted) _refresh();
                     },
                     child: const Text('SIGN IN'),

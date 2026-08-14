@@ -5,7 +5,7 @@ import '../config/app_config.dart';
 import '../config/feed_ranking_config.dart';
 import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
-import '../screens/auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import '../screens/communities_screen.dart';
 import '../screens/community_detail_screen.dart';
 import '../screens/community_hub_detail_screen.dart';
@@ -361,10 +361,7 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
 
   Future<void> _ensureSignedIn() async {
     if (Supabase.instance.client.auth.currentUser != null) return;
-    await Navigator.push(
-      context,
-      FirstVuePageRoute(builder: (_) => const AuthScreen()),
-    );
+    await ensureSignedIn(context);
   }
 
   Future<void> _withBusy(String postId, Future<void> Function() action) async {
@@ -1000,10 +997,7 @@ class _GroupsDirectoryAndFeedState extends State<_GroupsDirectoryAndFeed> {
 
   Future<void> _ensureComposer(BuildContext context) async {
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
     }
     if (Supabase.instance.client.auth.currentUser == null) return;
     if (!context.mounted) return;

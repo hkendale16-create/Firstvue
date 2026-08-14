@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../navigation/firstvue_page_route.dart';
 import '../services/story_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/local_media_thumbnail.dart';
 import '../widgets/media_picker_sheet.dart';
-import 'auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 
 class StoryComposerScreen extends StatefulWidget {
   const StoryComposerScreen({super.key});
@@ -39,10 +38,7 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
 
   Future<void> _publish() async {
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       if (Supabase.instance.client.auth.currentUser == null) return;
     }
     final file = _file;

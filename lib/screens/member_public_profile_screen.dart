@@ -22,7 +22,7 @@ import '../widgets/feed_comments_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/profile_affiliations_section.dart';
 import '../widgets/signed_media_viewer.dart';
-import 'auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 
 void openMemberProfile(
   BuildContext context, {
@@ -146,10 +146,7 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
       }
     } on AuthException {
       if (!mounted) return;
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -170,10 +167,7 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
 
   Future<void> _openMessage() async {
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       return;
     }
     try {
@@ -242,10 +236,7 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
             if (i == index) previous else _posts[i],
         ];
       });
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -293,10 +284,7 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
             if (i == index) previous else _posts[i],
         ];
       });
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
     } catch (_) {
       if (!mounted) return;
       setState(() {

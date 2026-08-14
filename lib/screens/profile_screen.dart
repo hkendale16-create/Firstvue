@@ -1,10 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'auth_screen.dart';
+import '../auth/auth_session_controller.dart';
+import '../navigation/firstvue_page_route.dart';
+
 import 'edit_profile_screen.dart';
 import 'followers_following_screen.dart';
 import 'my_business_profile_view_screen.dart';
@@ -451,23 +452,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _handleAccountTap(User? user) async {
-    if (user == null) {
-      final needsHandle = await Navigator.push<bool>(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
-      if (mounted) {
-        setState(() {});
-        await _loadStats();
-        await _loadDisplayName();
-        await _loadManagedProfiles();
-        if (needsHandle == true) {
-          await _openEditProfile();
-        }
-      }
-    } else {
-      await Supabase.instance.client.auth.signOut();
-    }
+    if (user == null) return;
+    await authSessionController.signOut();
 
     if (mounted) {
       setState(() {});
@@ -486,7 +472,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to reset this profile right now.')),
+        const SnackBar(
+          content: Text('Unable to reset this profile right now.'),
+        ),
       );
     }
   }
@@ -756,12 +744,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ],
                 actions: user == null
-                    ? [
-                        FilledButton(
-                          onPressed: () => _handleAccountTap(user),
-                          child: const Text('Sign in or create account'),
-                        ),
-                      ]
+                    ? const []
                     : [
                         FilledButton(
                           onPressed: _openEditProfile,
@@ -776,31 +759,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: const Text('Start over'),
                         ),
                       ],
-                trailing: IconButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      FirstVuePageRoute(
-                        builder: (_) => SettingsShellScreen(
-                          onSignOut: () {
-                            if (mounted) {
-                              setState(() {});
-                              _loadStats();
-                            }
-                          },
-                          onSignIn: () {
-                            if (mounted) setState(() {});
-                          },
+                trailing: user == null
+                    ? null
+                    : IconButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            FirstVuePageRoute(
+                              builder: (_) => SettingsShellScreen(
+                                onSignOut: () {
+                                  if (mounted) {
+                                    setState(() {});
+                                    _loadStats();
+                                  }
+                                },
+                                onSignIn: () {
+                                  if (mounted) setState(() {});
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(
+                          Icons.settings_outlined,
+                          color: FirstVueColors.gold,
                         ),
+                        tooltip: 'Settings',
                       ),
-                    );
-                  },
-                  icon: const Icon(
-                    Icons.settings_outlined,
-                    color: FirstVueColors.gold,
-                  ),
-                  tooltip: 'Settings',
-                ),
               ),
               if (user != null) ...[
                 const SizedBox(height: 16),
@@ -815,21 +800,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: KeyedSubtree(
                     key: ValueKey(_selectedTab),
                     child: _buildTabContent(user.id),
-                  ),
-                ),
-              ],
-              if (user == null) ...[
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: FilledButton(
-                    onPressed: () => _handleAccountTap(user),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: FirstVueColors.gold,
-                      foregroundColor: Colors.black,
-                      minimumSize: const Size.fromHeight(48),
-                    ),
-                    child: const Text('Sign in or create account'),
                   ),
                 ),
               ],

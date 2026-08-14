@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import '../theme/firstvue_theme.dart';
-import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/feed_comments_service.dart';
-import '../screens/auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import '../utils/app_environment.dart';
 import 'social_rich_text.dart';
 
@@ -141,10 +140,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
   Future<void> _post() async {
     if (Supabase.instance.client.auth.currentUser == null) {
       if (!mounted) return;
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       return;
     }
     final text = _controller.text.trim();

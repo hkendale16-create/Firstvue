@@ -4,7 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/post_identity.dart';
 import '../models/publish_destination.dart';
-import '../navigation/firstvue_page_route.dart';
 import '../services/community_news_service.dart';
 import '../services/post_identity_service.dart';
 import '../services/post_identity_store.dart';
@@ -13,7 +12,7 @@ import '../widgets/local_media_thumbnail.dart';
 import '../widgets/mention_autocomplete_field.dart';
 import '../widgets/post_identity_selector.dart';
 import '../widgets/profile_composer_media_actions.dart';
-import 'auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 
 /// Full-screen news post composer with mentions, media, identity, and background.
 class CreatePostScreen extends StatefulWidget {
@@ -127,10 +126,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   Future<void> _publish() async {
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       return;
     }
 

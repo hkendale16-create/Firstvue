@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../navigation/firstvue_page_route.dart';
-import '../screens/auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../screens/post_detail_screen.dart';
 import '../config/app_config.dart';
@@ -100,10 +100,7 @@ class _CommunityNewsPostDetailSheetState
     } on AuthException {
       if (!mounted) return;
       setState(() => _post = previous);
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
     } catch (_) {
       if (!mounted) return;
       setState(() => _post = previous);
@@ -135,10 +132,7 @@ class _CommunityNewsPostDetailSheetState
     } on AuthException {
       if (!mounted) return;
       setState(() => _post = previous);
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
     } catch (_) {
       if (!mounted) return;
       setState(() => _post = previous);

@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'auth/auth_gate.dart';
+import 'auth/auth_session_controller.dart';
 import 'config/app_config.dart';
 import 'config/supabase_config.dart';
 import 'screens/discovery_feed_screen.dart';
@@ -24,6 +26,7 @@ import 'theme/firstvue_theme.dart';
 import 'widgets/firstvue_bottom_nav.dart';
 import 'widgets/firstvue_onboarding.dart';
 import 'widgets/firstvue_refresh_scaffold.dart';
+import 'widgets/firstvue_settings_drawer.dart';
 import 'widgets/floating_messages_bubble.dart';
 import 'widgets/firstvue_animated_header_title.dart';
 import 'widgets/home_city_chip.dart';
@@ -41,15 +44,24 @@ Future<void> main() async {
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.publishableKey,
   );
+  authSessionController.onSessionCleared = () {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _rootNavigatorKey.currentState?.popUntil((route) => route.isFirst);
+    });
+  };
   runApp(const FirstVueApp());
   unawaited(NotificationService.initialize());
 }
 
 class FirstVueApp extends StatelessWidget {
-  const FirstVueApp({super.key});
+  const FirstVueApp({super.key, this.authController});
+
+  /// Injected in tests so the splash wait and live Supabase listener are skipped.
+  final AuthSessionController? authController;
 
   @override
   Widget build(BuildContext context) {
+    final auth = authController ?? authSessionController;
     return ListenableBuilder(
       listenable: appThemeController,
       builder: (context, _) {
@@ -78,7 +90,9 @@ class FirstVueApp extends StatelessWidget {
               child: child ?? const SizedBox.shrink(),
             );
           },
-          home: const FirstVueHome(),
+          home: AuthGate(controller: auth),
+          onGenerateRoute: (settings) =>
+              generateAuthAwareRoute(settings, controller: auth),
         );
       },
     );
@@ -188,6 +202,25 @@ class _FirstVueHomeState extends State<FirstVueHome> {
   void _goHome() => setState(() => selectedIndex = 0);
 
   Future<void> _openInitialDeepLink() async {
+    final pending = authSessionController.takePendingDeepLink();
+    if (pending != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleDeepLink(pending);
+      });
+      return;
+    }
+
+    final pendingRoute = authSessionController.takePendingRoute();
+    if (pendingRoute == SettingsShellScreen.routeName ||
+        pendingRoute == '/settings') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _rootNavigatorKey.currentState?.push(
+          FirstVuePageRoute(builder: (_) => const SettingsShellScreen()),
+        );
+      });
+      return;
+    }
+
     final webBusiness = AppConfig.initialBusinessIdFromUri();
     final webProfile = AppConfig.initialProfileIdFromUri();
     final webPost = AppConfig.initialPostIdFromUri();

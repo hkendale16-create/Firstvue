@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../navigation/firstvue_page_route.dart';
 import '../services/community_creation_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/create_entity_form_chrome.dart';
 import '../widgets/location_autocomplete_field.dart';
-import 'auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 
 /// Request form to create a Community. Communities are not active until an
 /// admin approves the request (enforced by Supabase RLS + review RPC).
@@ -52,10 +51,7 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
 
   Future<void> _bootstrap() async {
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       if (!mounted) return;
       if (Supabase.instance.client.auth.currentUser == null) {
         Navigator.pop(context);

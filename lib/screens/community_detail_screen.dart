@@ -10,7 +10,7 @@ import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/group_circle_avatar.dart';
-import 'auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import 'edit_community_screen.dart';
 import 'member_public_profile_screen.dart';
 
@@ -78,10 +78,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
   }
 
   Future<void> _requireAuth() async {
-    await Navigator.push(
-      context,
-      FirstVuePageRoute(builder: (_) => const AuthScreen()),
-    );
+    await ensureSignedIn(context);
   }
 
   Future<void> _toggleJoin() async {

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../navigation/firstvue_page_route.dart';
 import '../services/search_autocomplete_service.dart';
 import '../services/shoutout_service.dart';
 import '../theme/firstvue_theme.dart';
-import 'auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 
 class CreateShoutoutScreen extends StatefulWidget {
   final SearchAutocompleteResult? initialTarget;
@@ -82,10 +81,7 @@ class _CreateShoutoutScreenState extends State<CreateShoutoutScreen> {
 
   Future<void> _publish() async {
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       return;
     }
 

@@ -4,14 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../navigation/firstvue_page_route.dart';
 import '../services/community_hub_service.dart';
 import '../services/community_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/create_entity_form_chrome.dart';
 import '../widgets/location_autocomplete_field.dart';
 import '../widgets/media_picker_sheet.dart';
-import 'auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 
 class CreateCommunityScreen extends StatefulWidget {
   final String? initialHubId;
@@ -87,10 +86,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
 
   Future<void> _create() async {
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       if (!mounted) return;
       if (Supabase.instance.client.auth.currentUser == null) return;
     }

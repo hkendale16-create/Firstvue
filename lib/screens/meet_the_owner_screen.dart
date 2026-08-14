@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import '../theme/firstvue_theme.dart';
-import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/feed_comments_service.dart';
 import '../messaging/screens/messaging_shell_screen.dart';
 import '../messaging/services/fv_messaging_service.dart';
 import '../services/messaging_service.dart';
-import 'auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 
 class MeetTheOwnerScreen extends StatefulWidget {
   final String businessId;
@@ -56,10 +55,7 @@ class _MeetTheOwnerScreenState extends State<MeetTheOwnerScreen> {
 
   Future<void> _messageOwner() async {
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       return;
     }
     final ownerId = await MessagingService.fetchBusinessOwnerId(widget.businessId);
@@ -82,10 +78,7 @@ class _MeetTheOwnerScreenState extends State<MeetTheOwnerScreen> {
 
   Future<void> _postComment() async {
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       return;
     }
     final text = _replyController.text.trim();

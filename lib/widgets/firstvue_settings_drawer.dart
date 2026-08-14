@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../auth/auth_session_controller.dart';
 import '../navigation/firstvue_page_route.dart';
-import '../screens/admin_approvals_hub_screen.dart';
 import '../screens/admin_business_reviews_screen.dart';
 import '../screens/admin_business_submissions_screen.dart';
 import '../screens/admin_professional_profiles_screen.dart';
 import '../screens/admin_rentals_screen.dart';
-import '../screens/auth_screen.dart';
+import '../screens/admin_approvals_hub_screen.dart';
 import '../screens/business_growth_screen.dart';
 import '../screens/join_firstvue_screen.dart';
 import '../screens/legal_policy_screen.dart';
@@ -30,6 +30,8 @@ typedef FirstVueSettingsOpen = void Function(Widget screen);
 class SettingsShellScreen extends StatefulWidget {
   final VoidCallback? onSignOut;
   final VoidCallback? onSignIn;
+
+  static const routeName = '/settings';
 
   const SettingsShellScreen({super.key, this.onSignOut, this.onSignIn});
 
@@ -68,15 +70,10 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
       widget.onSignIn?.call();
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
-    } else {
-      await Supabase.instance.client.auth.signOut();
-      widget.onSignOut?.call();
-      if (mounted) Navigator.pop(context);
+      return;
     }
+    await authSessionController.signOut();
+    widget.onSignOut?.call();
   }
 
   Future<void> _startOver() async {
@@ -88,7 +85,9 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to reset this profile right now.')),
+        const SnackBar(
+          content: Text('Unable to reset this profile right now.'),
+        ),
       );
     }
   }

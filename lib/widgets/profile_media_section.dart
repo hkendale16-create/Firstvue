@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import '../theme/firstvue_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../navigation/firstvue_page_route.dart';
 
-import '../screens/auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import '../services/profile_media_service.dart';
 import 'editable_media_grid.dart';
 import 'media_picker_sheet.dart';
@@ -71,10 +70,7 @@ class _ProfileMediaSectionState extends State<ProfileMediaSection> {
       }
     } on AuthException {
       if (mounted) {
-        await Navigator.push(
-          context,
-          FirstVuePageRoute(builder: (_) => const AuthScreen()),
-        );
+        await ensureSignedIn(context);
       }
     } catch (_) {
       if (mounted) {
