@@ -590,14 +590,19 @@ class FvMessagingService {
     }
     if (conversationId.startsWith('legacy:')) {
       final legacyId = conversationId.substring(7);
-      await MessagingService.sendMessage(threadId: legacyId, body: trimmed);
-      return FvChatMessage(
-        id: _uuid.v4(),
-        conversationId: conversationId,
-        senderId: me,
-        isMine: true,
-        plaintext: trimmed,
-        createdAt: DateTime.now(),
+      await ensureReady();
+      if (!schemaReady) {
+        throw StateError('Encrypted messaging is required.');
+      }
+      final otherId = await MessagingService.otherParticipantId(legacyId);
+      if (otherId == null) {
+        throw StateError('Legacy thread is missing the other participant.');
+      }
+      final encryptedId = await openDirect(otherUserId: otherId);
+      return sendText(
+        conversationId: encryptedId,
+        body: trimmed,
+        asIdentity: asIdentity,
       );
     }
     await ensureReady();

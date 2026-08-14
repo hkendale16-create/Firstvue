@@ -232,6 +232,13 @@ class FollowService {
   static Future<int> fetchFollowerCount(String profileId) async {
     if (profileId.trim().isEmpty) return 0;
     try {
+      final count = await _client.rpc(
+        'count_profile_followers',
+        params: {'p_profile_id': profileId},
+      );
+      if (count is num) return count.toInt();
+    } catch (_) {}
+    try {
       final rows = await _client
           .from('profile_follows')
           .select('follower_id')
@@ -244,6 +251,13 @@ class FollowService {
 
   static Future<int> fetchFollowingCount(String profileId) async {
     if (profileId.trim().isEmpty) return 0;
+    try {
+      final count = await _client.rpc(
+        'count_profile_following',
+        params: {'p_profile_id': profileId},
+      );
+      if (count is num) return count.toInt();
+    } catch (_) {}
     try {
       final rows = await _client
           .from('profile_follows')

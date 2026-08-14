@@ -107,4 +107,22 @@ void main() {
     );
     expect(hubsSelect.group(0)!.contains('has_hub_role'), isTrue);
   });
+
+  test('20260917 does not disable RLS and covers remaining high findings', () {
+    final repair = File(
+      'supabase/migrations/20260917_repair_remaining_security.sql',
+    ).readAsStringSync();
+    expect(repair.toLowerCase().contains('disable row level security'), isFalse);
+    expect(repair.contains('grant_business_role'), isTrue);
+    expect(repair.contains('community_organizer_applications'), isTrue);
+    expect(repair.contains('feed_interactions'), isTrue);
+    expect(
+      repair.contains(
+        'drop policy if exists "Participants send messages in their threads"',
+      ),
+      isTrue,
+    );
+    expect(repair.contains('alter publication supabase_realtime add table'), isTrue);
+    expect(repair.contains('Users read follows they participate in'), isTrue);
+  });
 }

@@ -139,6 +139,22 @@ class MessagingService {
     return inserted['id'] as String;
   }
 
+  static Future<String?> otherParticipantId(String threadId) async {
+    final me = currentUserId;
+    if (me == null) return null;
+    final row = await _client
+        .from('direct_message_threads')
+        .select('participant_a, participant_b')
+        .eq('id', threadId)
+        .maybeSingle();
+    if (row == null) return null;
+    final a = row['participant_a'] as String?;
+    final b = row['participant_b'] as String?;
+    if (a == me) return b;
+    if (b == me) return a;
+    return null;
+  }
+
   static Future<List<MessageRecipient>> searchRecipients(String query) async {
     final me = currentUserId;
     if (me == null) return [];
@@ -440,15 +456,9 @@ class MessagingService {
     final trimmed = body.trim();
     if (trimmed.isEmpty) return;
 
-    await _client.from('direct_messages').insert({
-      'thread_id': threadId,
-      'sender_id': me,
-      'body': trimmed,
-    });
-    await _client
-        .from('direct_message_threads')
-        .update({'last_message_at': DateTime.now().toUtc().toIso8601String()})
-        .eq('id', threadId);
+    throw StateError(
+      'Plaintext direct messages are disabled. Use encrypted messaging.',
+    );
   }
 
   static (String, String) _orderedPair(String a, String b) {

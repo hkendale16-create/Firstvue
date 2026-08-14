@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../screens/member_public_profile_screen.dart';
 import '../services/firstvue_feedback_sounds.dart';
+import '../messaging/services/fv_messaging_service.dart';
 import '../services/messaging_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../utils/app_environment.dart';
@@ -92,7 +93,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
     if (text.isEmpty || _sending) return;
     setState(() => _sending = true);
     try {
-      await MessagingService.sendMessage(threadId: widget.threadId, body: text);
+      final otherId =
+          widget.otherUserId ??
+          await MessagingService.otherParticipantId(widget.threadId);
+      if (otherId == null) {
+        throw StateError('Missing recipient');
+      }
+      final conversationId = await FvMessagingService.openDirect(
+        otherUserId: otherId,
+      );
+      await FvMessagingService.sendText(
+        conversationId: conversationId,
+        body: text,
+      );
       if (emoji == null) _controller.clear();
       await _refresh();
     } catch (_) {
