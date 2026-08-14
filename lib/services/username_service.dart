@@ -80,15 +80,11 @@ class UsernameService {
     final normalized = normalize(username);
     if (normalized == null) return false;
 
-    try {
-      final result = await _client.rpc(
-        'is_username_available',
-        params: {'candidate': normalized},
-      );
-      return result == true;
-    } catch (_) {
-      return false;
-    }
+    final result = await _client.rpc(
+      'is_username_available',
+      params: {'candidate': normalized},
+    );
+    return result == true;
   }
 
   static Future<UsernameAvailability> checkAvailability(String raw) async {
@@ -141,12 +137,9 @@ class UsernameService {
       if (error.code == 'PGRST202' ||
           message.contains('set_profile_username') ||
           message.contains('could not find the function')) {
-        await _client.from('profiles').upsert({
-          'id': user.id,
-          'username': normalized,
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        });
-        return normalized;
+        throw StateError(
+          'Secure username updates are not available. Apply the auth migration.',
+        );
       }
       if (message.contains('already taken') || error.code == '23505') {
         throw ArgumentError('That @handle is already taken. Choose another one.');
