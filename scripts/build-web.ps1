@@ -22,7 +22,7 @@ if (-not $SkipTest) {
   & $Flutter test
 }
 
-$defineArgs = @()
+$defineArgs = @("--dart-define=FIRSTVUE_OAUTH_GOOGLE=true")
 if ($WebUrl -ne "") {
   $defineArgs += "--dart-define=FIRSTVUE_WEB_URL=$WebUrl"
 }
