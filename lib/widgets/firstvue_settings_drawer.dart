@@ -21,8 +21,8 @@ import '../screens/entity_settings_screen.dart';
 import '../screens/privacy_settings_screen.dart';
 import '../screens/settings_preferences_screen.dart';
 import '../services/admin_auth_service.dart';
-import '../services/profile_media_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'start_over_flow.dart';
 
 typedef FirstVueSettingsOpen = void Function(Widget screen);
 
@@ -80,32 +80,11 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
   }
 
   Future<void> _startOver() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Start over?'),
-        content: const Text(
-          'This clears the photos and videos on this account, then signs you out. '
-          'You can create a new profile. The app itself is not deleted.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Start over'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
     try {
-      await ProfileMediaService.clearMyMedia();
-      await Supabase.instance.client.auth.signOut();
+      final didReset = await confirmAndStartOver(context);
+      if (!didReset || !mounted) return;
       widget.onSignOut?.call();
-      if (mounted) Navigator.pop(context);
+      Navigator.pop(context);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -131,8 +110,20 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
             children: [
+              if (user != null)
+                _SettingsGroup(
+                  title: 'Prototype',
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.restart_alt,
+                      title: 'Start over',
+                      subtitle: 'Clear photos on this account and sign out',
+                      onTap: _startOver,
+                    ),
+                  ],
+                ),
               _SettingsGroup(
                 title: 'Your profile',
                 children: [
@@ -284,19 +275,6 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                   ),
                 ],
               ),
-              if (user != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: OutlinedButton.icon(
-                    onPressed: _startOver,
-                    icon: const Icon(Icons.restart_alt, size: 18),
-                    label: const Text('Start over'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: fv.secondaryText,
-                      side: BorderSide(color: fv.borderSubtle),
-                    ),
-                  ),
-                ),
               if (user != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
