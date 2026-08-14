@@ -8,7 +8,7 @@ import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import 'firstvue_business_profile_screen.dart';
-import 'my_businesses_screen.dart';
+import 'edit_business_profile_screen.dart';
 
 class MyBusinessProfileViewScreen extends StatefulWidget {
   final OwnedBusiness business;
