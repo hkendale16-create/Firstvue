@@ -37,7 +37,9 @@ bool shouldRedirectSignedInToHome(String? routeName) {
   return path == '/signin' ||
       path == '/signup' ||
       path == '/register' ||
-      path == '/forgot-password';
+      path == '/forgot-password' ||
+      path == '/auth/confirm' ||
+      path == '/auth/callback';
 }
 
 const kAllowedPostAuthRoutes = {

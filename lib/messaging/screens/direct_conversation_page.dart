@@ -81,11 +81,13 @@ class _DirectConversationPageState extends State<DirectConversationPage> {
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool quiet = false}) async {
+    if (!quiet || _messages.isEmpty) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final rows = await FvMessagingService.fetchMessages(
         widget.conversation.id,
@@ -95,12 +97,15 @@ class _DirectConversationPageState extends State<DirectConversationPage> {
       setState(() {
         _messages = rows;
         _loading = false;
+        _error = null;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Unable to load this conversation.';
+        if (_messages.isEmpty) {
+          _error = 'Unable to load this conversation.';
+        }
       });
     }
   }
@@ -118,7 +123,7 @@ class _DirectConversationPageState extends State<DirectConversationPage> {
           schema: 'public',
           table: table,
           callback: (_) {
-            if (mounted) _load();
+            if (mounted) _load(quiet: true);
           },
         )
         .subscribe();
@@ -150,7 +155,7 @@ class _DirectConversationPageState extends State<DirectConversationPage> {
         );
       }
       _controller.clear();
-      await _load();
+      await _load(quiet: true);
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(

@@ -7,6 +7,7 @@ import 'navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth/auth_gate.dart';
+import 'auth/auth_link_handler.dart';
 import 'auth/auth_session_controller.dart';
 import 'config/app_config.dart';
 import 'config/supabase_config.dart';
@@ -45,7 +46,13 @@ Future<void> main() async {
   await Supabase.initialize(
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.publishableKey,
+    authOptions: const FlutterAuthClientOptions(
+      // We complete /auth/confirm ourselves so the one-time code is not
+      // re-processed on every Safari remount.
+      detectSessionInUri: false,
+    ),
   );
+  await AuthLinkHandler.completeIfNeeded();
   authSessionController.onSessionCleared = () {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _rootNavigatorKey.currentState?.popUntil((route) => route.isFirst);
@@ -122,6 +129,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
   final _homeAvatarKey = GlobalKey<_HomeProfileAvatarState>();
   Widget? _vueTab;
   Widget? _exploreTab;
+  bool _feedsMounted = false;
 
   @override
   void initState() {
@@ -136,6 +144,9 @@ class _FirstVueHomeState extends State<FirstVueHome> {
         onOpenVueFeed: () =>
             setState(() => selectedIndex = FirstVueBottomNav.vueIndex),
       );
+    }
+    if (selectedIndex == FirstVueBottomNav.feedsIndex) {
+      _feedsMounted = true;
     }
     _openInitialDeepLink();
     _listenForDeepLinks();
@@ -325,8 +336,11 @@ class _FirstVueHomeState extends State<FirstVueHome> {
               offstage: selectedIndex != FirstVueBottomNav.exploreIndex,
               child: _exploreTab!,
             ),
-          if (selectedIndex == FirstVueBottomNav.feedsIndex)
-            FeedsScreen(refreshToken: _homeRefreshToken),
+          if (_feedsMounted)
+            Offstage(
+              offstage: selectedIndex != FirstVueBottomNav.feedsIndex,
+              child: FeedsScreen(refreshToken: _homeRefreshToken),
+            ),
           if (selectedIndex == FirstVueBottomNav.profileIndex)
             ProfileScreen(refreshToken: _profileRefreshToken),
           if (selectedIndex == FirstVueBottomNav.homeIndex)
@@ -429,6 +443,9 @@ class _FirstVueHomeState extends State<FirstVueHome> {
                   () => selectedIndex = FirstVueBottomNav.vueIndex,
                 ),
               );
+            }
+            if (index == FirstVueBottomNav.feedsIndex) {
+              _feedsMounted = true;
             }
             if (index == FirstVueBottomNav.profileIndex) {
               _profileRefreshToken++;

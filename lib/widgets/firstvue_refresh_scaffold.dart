@@ -47,7 +47,9 @@ class FirstVueRefreshScaffold extends StatelessWidget {
     return RefreshIndicator(
       color: FirstVueColors.teal,
       backgroundColor: context.fv.surface,
-      displacement: 40,
+      displacement: 56,
+      edgeOffset: 8,
+      triggerMode: RefreshIndicatorTriggerMode.onEdge,
       onRefresh: () async {
         await onRefresh();
         if (playRefreshSound) {

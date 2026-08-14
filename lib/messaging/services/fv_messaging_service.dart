@@ -45,15 +45,25 @@ class FvMessagingService {
     final me = currentUserId;
     final device = _device;
     if (me == null || device == null) return;
-    final existing = await _client
+    // Match by public key so a cleared browser does not reuse another
+    // device row whose envelopes cannot be unwrapped with this keypair.
+    final rows = await _client
         .from('fv_msg_devices')
-        .select('id')
+        .select('id, public_key')
         .eq('profile_id', me)
-        .isFilter('revoked_at', null)
-        .limit(1)
-        .maybeSingle();
-    if (existing != null) {
-      _registeredDeviceRowId = existing['id'] as String;
+        .isFilter('revoked_at', null);
+    for (final row in List<Map<String, dynamic>>.from(rows as List)) {
+      final pub = _asBytes(row['public_key']);
+      if (pub == null || pub.length != device.publicKey.length) continue;
+      var same = true;
+      for (var i = 0; i < pub.length; i++) {
+        if (pub[i] != device.publicKey[i]) {
+          same = false;
+          break;
+        }
+      }
+      if (!same) continue;
+      _registeredDeviceRowId = row['id'] as String;
       await _client
           .from('fv_msg_devices')
           .update({'last_seen_at': DateTime.now().toUtc().toIso8601String()})
@@ -266,6 +276,8 @@ class FvMessagingService {
                 conversationTypeLabel: 'Attendee chat',
                 eventId: event.id,
                 identityContext: event.businessName,
+                isEventHost: event.organizerId != null &&
+                    event.organizerId == currentUserId,
               ),
       );
     }
@@ -284,7 +296,7 @@ class FvMessagingService {
       var memberQuery = _client
           .from('fv_msg_members')
           .select(
-            'conversation_id, muted_until, last_read_at, identity_kind, identity_id, '
+            'conversation_id, muted_until, last_read_at, identity_kind, identity_id, role, '
             'fv_msg_conversations!inner(id, kind, title, last_message_at, request_state, '
             'inbox_status, entity_id, event_id, entity_kind, archived_at)',
           )
@@ -322,6 +334,9 @@ class FvMessagingService {
             conversationTypeLabel: kind == FvConversationKind.event
                 ? 'Event conversation'
                 : null,
+            isEventHost:
+                kind == FvConversationKind.event &&
+                (row['role'] as String?) == 'host',
           ),
         );
       }
@@ -418,13 +433,38 @@ class FvMessagingService {
     return conversationId;
   }
 
+  static String _secretCacheKey(String conversationId, int epoch) =>
+      '$conversationId#$epoch';
+
+  /// Creates the first epoch only when no envelopes exist yet.
+  /// Never overwrites an in-memory secret for an already-keyed conversation —
+  /// that previously caused "Unable to decrypt" after refresh.
   static Future<void> _establishEpoch(
     String conversationId,
-    List<String> profileIds,
-  ) async {
+    List<String> profileIds, {
+    int epoch = 1,
+  }) async {
     final device = _device;
     if (device == null) return;
+
+    final existingForUs = await _loadSecret(conversationId, epoch: epoch);
+    if (existingForUs != null) return;
+
+    final anyEnvelope = await _client
+        .from('fv_msg_key_envelopes')
+        .select('device_id')
+        .eq('conversation_id', conversationId)
+        .eq('epoch', epoch)
+        .limit(1)
+        .maybeSingle();
+    if (anyEnvelope != null) {
+      // Keys already exist; wrapping for this device requires a peer that
+      // holds the secret. Do not invent a conflicting conversation secret.
+      return;
+    }
+
     final secret = await MessagingCrypto.newConversationSecret();
+    _conversationSecrets[_secretCacheKey(conversationId, epoch)] = secret;
     _conversationSecrets[conversationId] = secret;
     final devices = await _client
         .from('fv_msg_devices')
@@ -439,29 +479,46 @@ class FvMessagingService {
         sender: device,
         recipientPublicKey: pub,
       );
-      await _client.from('fv_msg_key_envelopes').insert({
-        'conversation_id': conversationId,
-        'epoch': 1,
-        'device_id': row['id'],
-        'wrapped_key': wrapped.ciphertext,
-        'wrap_nonce': wrapped.nonce,
-        'sender_public_key': wrapped.senderPublicKey,
-      });
+      try {
+        await _client.from('fv_msg_key_envelopes').insert({
+          'conversation_id': conversationId,
+          'epoch': epoch,
+          'device_id': row['id'],
+          'wrapped_key': wrapped.ciphertext,
+          'wrap_nonce': wrapped.nonce,
+          'sender_public_key': wrapped.senderPublicKey,
+        });
+      } catch (_) {
+        // Concurrent establish — ignore duplicate primary key.
+      }
     }
   }
 
-  static Future<Uint8List?> _loadSecret(String conversationId) async {
-    if (_conversationSecrets.containsKey(conversationId)) {
+  static Future<Uint8List?> _loadSecret(
+    String conversationId, {
+    int? epoch,
+  }) async {
+    final cacheKey = epoch == null
+        ? conversationId
+        : _secretCacheKey(conversationId, epoch);
+    if (_conversationSecrets.containsKey(cacheKey)) {
+      return _conversationSecrets[cacheKey];
+    }
+    if (epoch == null && _conversationSecrets.containsKey(conversationId)) {
       return _conversationSecrets[conversationId];
     }
     final device = _device;
     if (device == null || _registeredDeviceRowId == null) return null;
     try {
-      final row = await _client
+      var query = _client
           .from('fv_msg_key_envelopes')
-          .select('wrapped_key, wrap_nonce, sender_public_key')
+          .select('wrapped_key, wrap_nonce, sender_public_key, epoch')
           .eq('conversation_id', conversationId)
-          .eq('device_id', _registeredDeviceRowId!)
+          .eq('device_id', _registeredDeviceRowId!);
+      if (epoch != null) {
+        query = query.eq('epoch', epoch);
+      }
+      final row = await query
           .order('epoch', ascending: false)
           .limit(1)
           .maybeSingle();
@@ -471,15 +528,69 @@ class FvMessagingService {
         nonce: _asBytes(row['wrap_nonce']) ?? Uint8List(0),
         senderPublicKey: _asBytes(row['sender_public_key']) ?? device.publicKey,
       );
-      // Envelopes are wrapped by various senders; try current device as recipient.
       final secret = await MessagingCrypto.unwrapSecret(
         wrapped: wrapped,
         recipient: device,
       );
+      final resolvedEpoch = (row['epoch'] as num?)?.toInt() ?? epoch ?? 1;
+      _conversationSecrets[_secretCacheKey(conversationId, resolvedEpoch)] =
+          secret;
       _conversationSecrets[conversationId] = secret;
       return secret;
     } catch (_) {
-      return _conversationSecrets[conversationId];
+      return _conversationSecrets[cacheKey] ??
+          _conversationSecrets[conversationId];
+    }
+  }
+
+  /// Resolves a decryptable conversation secret, establishing epoch 1 only
+  /// when the conversation has no envelopes yet.
+  static Future<Uint8List> _requireSecret(String conversationId) async {
+    await ensureReady();
+    var secret = await _loadSecret(conversationId);
+    if (secret != null) return secret;
+
+    final memberIds = await _memberProfileIds(conversationId);
+    if (!memberIds.contains(currentUserId)) {
+      throw StateError('You are not a member of this conversation.');
+    }
+    await _establishEpoch(conversationId, memberIds);
+    secret = await _loadSecret(conversationId);
+    if (secret != null) return secret;
+    throw StateError(
+      'Encryption keys are not available on this device yet. '
+      'Ask the other person to open the chat once, or try again from the '
+      'device where the conversation started.',
+    );
+  }
+
+  static Future<List<String>> _memberProfileIds(String conversationId) async {
+    try {
+      final rows = await _client
+          .from('fv_msg_members')
+          .select('profile_id')
+          .eq('conversation_id', conversationId)
+          .isFilter('left_at', null);
+      return [
+        for (final row in List<Map<String, dynamic>>.from(rows as List))
+          row['profile_id'] as String,
+      ];
+    } catch (_) {
+      final me = currentUserId;
+      return me == null ? const [] : [me];
+    }
+  }
+
+  static Future<int> _currentEpoch(String conversationId) async {
+    try {
+      final row = await _client
+          .from('fv_msg_conversations')
+          .select('current_epoch')
+          .eq('id', conversationId)
+          .maybeSingle();
+      return (row?['current_epoch'] as num?)?.toInt() ?? 1;
+    } catch (_) {
+      return 1;
     }
   }
 
@@ -504,12 +615,11 @@ class FvMessagingService {
     }
     if (!schemaReady) return [];
     final me = currentUserId;
-    final secret = await _loadSecret(conversationId);
     final rows = await _client
         .from('fv_msg_messages')
         .select(
           'id, sender_id, ciphertext, nonce, content_type, created_at, '
-          'edited_at, deleted_for_everyone_at',
+          'edited_at, deleted_for_everyone_at, epoch',
         )
         .eq('conversation_id', conversationId)
         .order('created_at', ascending: false)
@@ -529,9 +639,11 @@ class FvMessagingService {
     for (final row in reversed) {
       if (hidden.contains(row['id'])) continue;
       String? text;
+      final epoch = (row['epoch'] as num?)?.toInt() ?? 1;
+      final secret = await _loadSecret(conversationId, epoch: epoch);
       if (secret != null && row['deleted_for_everyone_at'] == null) {
         try {
-          final combined = _asBytes(row['ciphertext']);
+          final combined = _decodeMessagePayload(row);
           if (combined != null && combined.length > 28) {
             text = await MessagingCrypto.decryptMessage(
               conversationSecret: secret,
@@ -549,7 +661,10 @@ class FvMessagingService {
           conversationId: conversationId,
           senderId: row['sender_id'] as String,
           isMine: row['sender_id'] == me,
-          plaintext: text ?? (secret == null ? null : 'Unable to decrypt'),
+          plaintext: text ??
+              (secret == null
+                  ? null
+                  : 'Unable to decrypt'),
           contentType: row['content_type'] as String? ?? 'text',
           createdAt:
               DateTime.tryParse(row['created_at'] as String? ?? '') ??
@@ -609,9 +724,8 @@ class FvMessagingService {
     if (!schemaReady) {
       throw StateError('Messaging schema is not available.');
     }
-    var secret = await _loadSecret(conversationId);
-    secret ??= await MessagingCrypto.newConversationSecret();
-    _conversationSecrets[conversationId] = secret;
+    final secret = await _requireSecret(conversationId);
+    final epoch = await _currentEpoch(conversationId);
     final id = _uuid.v4();
     final encrypted = await MessagingCrypto.encryptMessage(
       conversationSecret: secret,
@@ -628,6 +742,7 @@ class FvMessagingService {
       'sender_id': me,
       'sender_identity_kind': asIdentity?.kind.name ?? 'personal',
       'sender_identity_id': asIdentity?.entityId,
+      'epoch': epoch,
       'seq': seq,
       'ciphertext': encrypted.concatenated,
       'nonce': encrypted.nonce,
@@ -800,9 +915,7 @@ class FvMessagingService {
     required String conversationId,
     required String body,
   }) async {
-    final secret =
-        await _loadSecret(conversationId) ??
-        await MessagingCrypto.newConversationSecret();
+    final secret = await _requireSecret(conversationId);
     final id = _uuid.v4();
     final encrypted = await MessagingCrypto.encryptMessage(
       conversationSecret: secret,
@@ -1012,9 +1125,8 @@ class FvMessagingService {
     if (allowed == false) {
       throw StateError('Attachment limit reached. Try again later.');
     }
-    var secret = await _loadSecret(conversationId);
-    secret ??= await MessagingCrypto.newConversationSecret();
-    _conversationSecrets[conversationId] = secret;
+    final secret = await _requireSecret(conversationId);
+    final epoch = await _currentEpoch(conversationId);
     final encrypted = await MessagingCrypto.encryptBytes(
       conversationSecret: secret,
       bytes: bytes,
@@ -1050,6 +1162,7 @@ class FvMessagingService {
       'sender_id': me,
       'sender_identity_kind': asIdentity?.kind.name ?? 'personal',
       'sender_identity_id': asIdentity?.entityId,
+      'epoch': epoch,
       'seq': seq,
       'ciphertext': placeholder.concatenated,
       'nonce': placeholder.nonce,
@@ -1209,9 +1322,7 @@ class FvMessagingService {
     String? area,
     DateTime? meetAt,
   }) async {
-    final secret =
-        await _loadSecret(conversationId) ??
-        await MessagingCrypto.newConversationSecret();
+    final secret = await _requireSecret(conversationId);
     final id = _uuid.v4();
     final titleEnc = await MessagingCrypto.encryptMessage(
       conversationSecret: secret,
@@ -1261,11 +1372,19 @@ class FvMessagingService {
   }
 
   static Future<String> joinEventChat(String eventId) async {
+    await ensureReady();
     final id = await _client.rpc(
       'fv_msg_join_event_chat',
       params: {'p_event_id': eventId},
     );
-    return id as String;
+    final conversationId = id as String;
+    // If this device already holds the conversation secret (host rejoining),
+    // wrap history for the current profile's devices.
+    final me = currentUserId;
+    if (me != null) {
+      await wrapHistoryForProfiles(conversationId, [me]);
+    }
+    return conversationId;
   }
 
   static Future<void> archiveEventChat({
@@ -1358,6 +1477,7 @@ class FvMessagingService {
         .update({'current_epoch': nextEpoch})
         .eq('id', conversationId);
     _conversationSecrets.remove(conversationId);
+    _conversationSecrets[_secretCacheKey(conversationId, nextEpoch)] = secret;
     _conversationSecrets[conversationId] = secret;
   }
 
@@ -1669,12 +1789,45 @@ class FvMessagingService {
     };
   }
 
+  static Uint8List? _decodeMessagePayload(Map<String, dynamic> row) {
+    final combined = _asBytes(row['ciphertext']);
+    if (combined != null && combined.length > 28) return combined;
+    // Legacy / alternate layout: ciphertext column held body only, nonce separate.
+    final body = _asBytes(row['ciphertext']);
+    final nonce = _asBytes(row['nonce']);
+    if (body == null || nonce == null || nonce.length != 12) return null;
+    if (body.length <= 16) return null;
+    // Assume body is mac || ciphertext when nonce is stored separately and
+    // ciphertext was not the concatenated wire format.
+    if (combined != null && combined.length <= 28) {
+      return Uint8List.fromList([...nonce, ...body]);
+    }
+    return null;
+  }
+
   static Uint8List? _asBytes(dynamic value) {
+    if (value == null) return null;
     if (value is Uint8List) return value;
     if (value is List<int>) return Uint8List.fromList(value);
     if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return null;
+      // PostgREST often returns bytea as \xhex.
+      if (trimmed.startsWith(r'\x') || trimmed.startsWith(r'\X')) {
+        final hex = trimmed.substring(2);
+        if (hex.length.isOdd) return null;
+        try {
+          final out = Uint8List(hex.length ~/ 2);
+          for (var i = 0; i < out.length; i++) {
+            out[i] = int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16);
+          }
+          return out;
+        } catch (_) {
+          return null;
+        }
+      }
       try {
-        return Uint8List.fromList(base64Decode(value));
+        return Uint8List.fromList(base64Decode(trimmed));
       } catch (_) {
         return null;
       }

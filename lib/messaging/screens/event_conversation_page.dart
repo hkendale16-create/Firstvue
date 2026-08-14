@@ -72,9 +72,13 @@ class _EventConversationPageState extends State<EventConversationPage> {
       await _loadMeta();
     } catch (error) {
       if (!mounted) return;
+      final raw = '$error';
+      final message = raw.contains('Only the host can enable event chat')
+          ? 'Only the event host can enable chat. You can join once they turn it on.'
+          : raw;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('$error')));
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -101,19 +105,22 @@ class _EventConversationPageState extends State<EventConversationPage> {
     final header = _eventHeader(fv, conv);
 
     if (_conversationId == null) {
+      final isHost = conv.isEventHost;
       final empty = Column(
         children: [
           header,
           Expanded(
             child: FvMessagingStateView(
               icon: Icons.forum_outlined,
-              message:
-                  'This event has no conversation until the host enables chat. Attendees can join after it is enabled.',
-              actionLabel: 'Enable event chat',
-              onAction: _enable,
+              message: isHost
+                  ? 'Chat is off for this event. Enable it so attendees can join the conversation.'
+                  : 'This event has no conversation until the host enables chat. You can join after it is enabled.',
+              actionLabel: isHost ? 'Enable event chat' : 'Join if enabled',
+              onAction: isHost ? _enable : _join,
             ),
           ),
-          TextButton(onPressed: _join, child: const Text('Join if enabled')),
+          if (isHost)
+            TextButton(onPressed: _join, child: const Text('Open if already enabled')),
         ],
       );
       if (widget.embedded) return empty;

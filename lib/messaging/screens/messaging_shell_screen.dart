@@ -124,11 +124,11 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
     );
   }
 
-  Future<void> _reloadList() async {
+  Future<void> _reloadList({bool quiet = false}) async {
     final identity = _identity;
     if (identity == null) return;
     setState(() {
-      _loading = true;
+      if (!quiet || _rows.isEmpty) _loading = true;
       _error = null;
     });
     try {
@@ -483,7 +483,9 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
         _requestCount > 0 && (_filter == 'all' || _filter == 'requests');
     return RefreshIndicator(
       color: FirstVueColors.gold,
-      onRefresh: _reloadList,
+      displacement: 56,
+      triggerMode: RefreshIndicatorTriggerMode.onEdge,
+      onRefresh: () => _reloadList(quiet: true),
       child: ListView(
         controller: controller,
         children: [
@@ -492,7 +494,7 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
               count: _requestCount,
               onTap: () {
                 setState(() => _filter = 'requests');
-                _reloadList();
+                _reloadList(quiet: true);
               },
             ),
           for (final row in _rows)
@@ -515,7 +517,9 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
         : _rows.where((r) => r.id != featured.first.id).toList();
     return RefreshIndicator(
       color: FirstVueColors.gold,
-      onRefresh: _reloadList,
+      displacement: 56,
+      triggerMode: RefreshIndicatorTriggerMode.onEdge,
+      onRefresh: () => _reloadList(quiet: true),
       child: ListView(
         controller: controller,
         children: [
