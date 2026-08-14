@@ -485,39 +485,42 @@ class _AuthScreenState extends State<AuthScreen> {
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 560),
                           child: AutofillGroup(
-                            child: ListView(
+                            child: SingleChildScrollView(
                               keyboardDismissBehavior:
                                   ScrollViewKeyboardDismissBehavior.onDrag,
                               padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-                              children: [
-                                if (_mode != AuthSheetMode.forgotPassword &&
-                                    _mode != AuthSheetMode.recovery)
-                                  _SegmentedAuthToggle(
-                                    mode: _mode,
-                                    enabled: !_submitting,
-                                    onChanged: _setMode,
-                                  )
-                                else
-                                  Text(
-                                    _mode == AuthSheetMode.recovery
-                                        ? 'Choose a new password'
-                                        : 'Reset password',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w700,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (_mode != AuthSheetMode.forgotPassword &&
+                                      _mode != AuthSheetMode.recovery)
+                                    _SegmentedAuthToggle(
+                                      mode: _mode,
+                                      enabled: !_submitting,
+                                      onChanged: _setMode,
+                                    )
+                                  else
+                                    Text(
+                                      _mode == AuthSheetMode.recovery
+                                          ? 'Choose a new password'
+                                          : 'Reset password',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
+                                  const SizedBox(height: 20),
+                                  AnimatedSize(
+                                    duration: Duration(
+                                      milliseconds: reduceMotion ? 0 : 220,
+                                    ),
+                                    curve: Curves.easeOutCubic,
+                                    alignment: Alignment.topCenter,
+                                    child: _formBody(),
                                   ),
-                                const SizedBox(height: 20),
-                                AnimatedSize(
-                                  duration: Duration(
-                                    milliseconds: reduceMotion ? 0 : 220,
-                                  ),
-                                  curve: Curves.easeOutCubic,
-                                  alignment: Alignment.topCenter,
-                                  child: _formBody(),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
