@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -94,6 +96,9 @@ class ExploreFeedService {
     };
   }
 
+  static const _peoplePostsBudget = Duration(seconds: 8);
+  static const _peopleAvatarBudget = Duration(seconds: 6);
+
   static Future<List<CommunityNewsPost>> _postsForSection({
     required ExploreSection section,
     DateTime? beforeCreatedAt,
@@ -112,6 +117,11 @@ class ExploreFeedService {
         'ExploreFeedService identity query failed for ${section.name}: '
         '$error\n$stack',
       );
+      // RLS recursion cannot be fixed by dropping identity filters — bail so
+      // Explore People can still render profile recommendations.
+      if (CommunityNewsService.isRlsRecursionError(error)) {
+        return const [];
+      }
       try {
         // Plain feed + client-side section filter — works when null filters 400.
         return await CommunityNewsService.fetchPosts(
@@ -135,8 +145,36 @@ class ExploreFeedService {
     required int limit,
   }) async {
     final items = <ExploreItem>[];
+
+    // First page: recommendations must not wait on community_news_posts (which
+    // can hang/timeout under authenticated 42P17 RLS recursion).
     if (beforeCreatedAt == null) {
-      items.addAll(await _peopleRecommendations(limit: 8));
+      final results = await Future.wait<Object>([
+        _peopleRecommendations(limit: 8),
+        _postsForSection(
+          section: ExploreSection.people,
+          beforeCreatedAt: beforeCreatedAt,
+          beforeId: beforeId,
+          limit: limit * 3,
+        ).timeout(
+          _peoplePostsBudget,
+          onTimeout: () {
+            debugPrint('Explore people posts timed out; showing recommendations');
+            return const <CommunityNewsPost>[];
+          },
+        ),
+      ]);
+      items.addAll(results[0] as List<ExploreItem>);
+      final posts = results[1] as List<CommunityNewsPost>;
+      for (final post in posts) {
+        if (!ExploreCategoryFilter.matches(post, ExploreSection.people)) {
+          continue;
+        }
+        items.add(
+          ExploreItem.postItem(section: ExploreSection.people, post: post),
+        );
+      }
+      return _page(items, limit: limit);
     }
 
     final posts = await _postsForSection(
@@ -144,6 +182,9 @@ class ExploreFeedService {
       beforeCreatedAt: beforeCreatedAt,
       beforeId: beforeId,
       limit: limit * 3,
+    ).timeout(
+      _peoplePostsBudget,
+      onTimeout: () => const <CommunityNewsPost>[],
     );
     for (final post in posts) {
       if (!ExploreCategoryFilter.matches(post, ExploreSection.people)) {
@@ -168,9 +209,17 @@ class ExploreFeedService {
       final ids = byId.keys.take(limit).toList();
       if (ids.isEmpty) return const [];
 
+      // Prefer real avatars, but never block People cards on storage signing.
       Map<String, String> avatars = const {};
       try {
-        avatars = await ProfileMediaService.fetchAvatarUrlsForProfiles(ids);
+        avatars = await ProfileMediaService.fetchAvatarUrlsForProfiles(ids)
+            .timeout(
+          _peopleAvatarBudget,
+          onTimeout: () {
+            debugPrint('Explore people avatars timed out; cards without photos');
+            return const <String, String>{};
+          },
+        );
       } catch (error, stack) {
         debugPrint('Explore people avatars failed: $error\n$stack');
       }

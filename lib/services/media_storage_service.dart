@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -34,6 +36,10 @@ class MediaStorageService {
 
   static bool get useAwsMedia => MediaConfig.useAwsMedia;
 
+  /// Auth storage signing can hang or 503 (DatabaseInvalidObjectDefinition)
+  /// while anon still succeeds. Fail fast so Explore/feeds can soft-fallback.
+  static const _signTimeout = Duration(seconds: 4);
+
   static bool _isPublicSocialBucket(MediaBucket bucket) {
     return bucket == MediaBucket.profile ||
         bucket == MediaBucket.business ||
@@ -68,7 +74,8 @@ class MediaStorageService {
     try {
       return await _client.storage
           .from(bucket.id)
-          .createSignedUrl(trimmed, 3600);
+          .createSignedUrl(trimmed, 3600)
+          .timeout(_signTimeout);
     } catch (error, stack) {
       assert(() {
         debugPrint(
@@ -85,7 +92,8 @@ class MediaStorageService {
       try {
         return await _publicSignClient.storage
             .from(bucket.id)
-            .createSignedUrl(trimmed, 3600);
+            .createSignedUrl(trimmed, 3600)
+            .timeout(_signTimeout);
       } catch (error, stack) {
         assert(() {
           debugPrint(
