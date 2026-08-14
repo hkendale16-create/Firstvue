@@ -195,4 +195,30 @@ void main() {
       expect(find.byType(FirstVueHome), findsNothing, reason: name);
     }
   });
+
+  testWidgets('signed-out users cannot reach home, feeds, or settings chrome', (
+    tester,
+  ) async {
+    final auth = AuthSessionController.test();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AuthGate(
+          controller: auth,
+          signedInHome: const Scaffold(
+            body: Text('PROTECTED_HOME'),
+            bottomNavigationBar: Text('HOME_NAV'),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(AuthScreen), findsOneWidget);
+    expect(find.text('PROTECTED_HOME'), findsNothing);
+    expect(find.text('HOME_NAV'), findsNothing);
+    expect(find.text('Welcome to FirstVue'), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-email-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-password-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-primary-button')), findsOneWidget);
+  });
 }

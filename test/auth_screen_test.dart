@@ -34,6 +34,41 @@ void main() {
     expect(find.text('Settings'), findsNothing);
   });
 
+  testWidgets('mobile viewport shows the full sign-in form, not an empty block', (
+    tester,
+  ) async {
+    const size = Size(390, 844);
+    await tester.binding.setSurfaceSize(size);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(size: size),
+        child: _wrap(const AuthScreen()),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('auth-segment-Sign in')), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-email-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-password-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-primary-button')), findsOneWidget);
+
+    // Password and primary CTA must sit inside the phone viewport. The old
+    // loose Stack collapsed the sheet and left a blank dark block instead.
+    final screen = tester.getRect(find.byType(AuthScreen));
+    final password = tester.getRect(
+      find.byKey(const ValueKey('auth-password-field')),
+    );
+    final button = tester.getRect(
+      find.byKey(const ValueKey('auth-primary-button')),
+    );
+    expect(password.top, greaterThan(screen.top));
+    expect(password.bottom, lessThan(screen.bottom));
+    expect(button.top, greaterThan(password.bottom));
+    expect(button.bottom, lessThan(screen.bottom + 1));
+  });
+
   testWidgets('Sign in / Create account switching updates the form', (
     tester,
   ) async {

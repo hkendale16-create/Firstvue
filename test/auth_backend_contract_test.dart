@@ -59,6 +59,12 @@ void main() {
     expect(authScreen, isNot(contains('auth_email_for_username')));
   });
 
+  test('auth sheet stack expands so the form owns the remaining viewport', () {
+    expect(authScreen, contains('StackFit.expand'));
+    expect(authScreen, contains('auth-password-field'));
+    expect(authScreen, contains('auth-primary-button'));
+  });
+
   test('client bundle contains no service-role credential', () {
     final dart = Directory('lib')
         .listSync(recursive: true)
