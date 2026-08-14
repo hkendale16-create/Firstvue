@@ -26,8 +26,8 @@ void main() {
     await tester.tap(homeNav);
     await tester.pumpAndSettle();
 
-    expect(find.text('SEE FIRST. BOOK FIRST.'), findsOneWidget);
-    expect(find.text('Consider Following'), findsOneWidget);
+    expect(find.text('SEE FIRST. BOOK FIRST.'), findsNothing);
+    expect(find.text('Consider Following'), findsNothing);
 
     final feedsNav = find.text('FEEDS');
     await tester.ensureVisible(feedsNav);

@@ -7,7 +7,9 @@ import '../navigation/firstvue_page_route.dart';
 import '../screens/auth_screen.dart';
 import '../screens/firstvue_business_profile_screen.dart';
 import '../screens/people_to_follow_screen.dart';
+import '../screens/rentals_screen.dart';
 import '../services/recommendations_service.dart';
+import '../services/rentals_store.dart';
 import '../services/saved_items_service.dart';
 import '../services/things_to_do_service.dart';
 import '../services/trending_businesses_service.dart';
@@ -37,6 +39,7 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
     'Recommended',
     'Events',
     'Communities',
+    'Rentals',
   ];
 
   @override
@@ -126,12 +129,15 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
           const _EventsFeedList()
         else if (label == 'Communities')
           HomeCommunitiesSection(refreshToken: widget.refreshToken)
+        else if (label == 'Rentals')
+          const _HomeRentalsSection()
         else
           _MixedSocialFeed(
             key: ValueKey('$label-${widget.refreshToken}'),
             label: label,
             loadBusinesses: () => _loadBusinessesForLabel(label),
             onSeeAllPeople: _openPeopleToFollow,
+            showPeopleToFollow: label == 'Recommended',
           ),
       ],
     );
@@ -142,12 +148,14 @@ class _MixedSocialFeed extends StatelessWidget {
   final String label;
   final Future<List<TrendingBusiness>> Function() loadBusinesses;
   final VoidCallback onSeeAllPeople;
+  final bool showPeopleToFollow;
 
   const _MixedSocialFeed({
     super.key,
     required this.label,
     required this.loadBusinesses,
     required this.onSeeAllPeople,
+    this.showPeopleToFollow = false,
   });
 
   @override
@@ -170,10 +178,22 @@ class _MixedSocialFeed extends StatelessWidget {
                   child: CircularProgressIndicator(color: FirstVueColors.teal),
                 ),
               )
+            else if (businesses.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Text(
+                  label == 'Coming Soon'
+                      ? 'No coming-soon listings near you yet.'
+                      : 'Nothing here yet. Pull to refresh.',
+                  style: TextStyle(color: context.fv.secondaryText),
+                ),
+              )
             else if (businesses.isNotEmpty)
               _InteractiveBusinessCard(business: businesses.first),
-            const SizedBox(height: 18),
-            PeopleToFollowRow(onSeeAll: onSeeAllPeople),
+            if (showPeopleToFollow) ...[
+              const SizedBox(height: 18),
+              PeopleToFollowRow(onSeeAll: onSeeAllPeople),
+            ],
             const SizedBox(height: 18),
             const _FeaturedEventCard(),
             if (businesses.length > 1) ...[
@@ -405,7 +425,12 @@ class _EventsFeedList extends StatelessWidget {
           );
         }
         final recent = snapshot.data![0];
-        final upcoming = snapshot.data![1];
+        final upcomingAll = snapshot.data![1];
+        final recentIds = {for (final e in recent) e.id};
+        final upcoming = [
+          for (final event in upcomingAll)
+            if (!recentIds.contains(event.id)) event,
+        ];
         if (recent.isEmpty && upcoming.isEmpty) {
           return Text(
             'Local events will appear here.',
@@ -447,6 +472,87 @@ class _EventsFeedList extends StatelessWidget {
                 SocialEventCard(event: event),
                 const SizedBox(height: 12),
               ],
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _HomeRentalsSection extends StatelessWidget {
+  const _HomeRentalsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final fv = context.fv;
+    return FutureBuilder<List<RentalListing>>(
+      future: RentalsStore.fetchApprovedListings(limit: 12),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: CircularProgressIndicator(color: FirstVueColors.teal),
+            ),
+          );
+        }
+        if (snapshot.hasError) {
+          return Text(
+            'Unable to load rentals.',
+            style: TextStyle(color: fv.secondaryText),
+          );
+        }
+        final listings = snapshot.data ?? const <RentalListing>[];
+        if (listings.isEmpty) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'No rentals nearby yet.',
+                style: TextStyle(color: fv.secondaryText),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    FirstVuePageRoute(builder: (_) => const RentalsScreen()),
+                  );
+                },
+                child: const Text('Browse rentals'),
+              ),
+            ],
+          );
+        }
+        return Column(
+          children: [
+            for (final listing in listings) ...[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.home_work_outlined, color: fv.primaryText),
+                title: Text(
+                  listing.title,
+                  style: TextStyle(
+                    color: fv.primaryText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  listing.location,
+                  style: TextStyle(color: fv.secondaryText, fontSize: 12),
+                ),
+                trailing: Text(
+                  listing.monthlyPrice ?? listing.weeklyPrice ?? '',
+                  style: const TextStyle(color: FirstVueColors.gold),
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    FirstVuePageRoute(builder: (_) => const RentalsScreen()),
+                  );
+                },
+              ),
+              Divider(color: fv.divider, height: 1),
             ],
           ],
         );

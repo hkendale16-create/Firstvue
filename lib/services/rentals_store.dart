@@ -112,6 +112,35 @@ class RentalsStore {
         .asyncMap(_attachMedia);
   }
 
+  static Future<List<RentalListing>> fetchApprovedListings({
+    int limit = 24,
+  }) async {
+    try {
+      final rows = await _client
+          .from('rental_public_listings')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return await _attachMediaSafely(
+        List<Map<String, dynamic>>.from(
+          rows as List,
+        ).map(RentalListing.fromMap).toList(),
+      );
+    } catch (_) {
+      final rows = await _client
+          .from('rentals')
+          .select()
+          .eq('status', 'approved')
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return await _attachMediaSafely(
+        List<Map<String, dynamic>>.from(
+          rows as List,
+        ).map(RentalListing.fromMap).toList(),
+      );
+    }
+  }
+
   static Stream<List<RentalListing>> watchMyListings() {
     final user = _client.auth.currentUser;
     if (user == null) return Stream.value(const []);
@@ -141,9 +170,7 @@ class RentalsStore {
         .select()
         .eq('status', 'pending')
         .order('created_at', ascending: false);
-    return _attachMediaSafely(
-      rows.map(RentalListing.fromMap).toList(),
-    );
+    return _attachMediaSafely(rows.map(RentalListing.fromMap).toList());
   }
 
   static Future<bool> isCurrentUserAdmin() => AdminAuthService.isAdmin();
@@ -384,10 +411,7 @@ class RentalsStore {
         type: 'rental_inquiry',
         title: 'Inquiry on $rentalTitle',
         body: message,
-        payload: {
-          'rental_id': rentalId,
-          'requester_id': user.id,
-        },
+        payload: {'rental_id': rentalId, 'requester_id': user.id},
       );
     }
 

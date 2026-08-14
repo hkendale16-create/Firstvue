@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../navigation/firstvue_page_route.dart';
 import '../screens/search_screen.dart';
@@ -13,6 +14,7 @@ class FirstVueInlineSearchBar extends StatefulWidget {
   final bool showOpenButton;
   final VoidCallback? onFilterTap;
   final bool filterActive;
+  final bool iconOnly;
 
   const FirstVueInlineSearchBar({
     super.key,
@@ -22,6 +24,7 @@ class FirstVueInlineSearchBar extends StatefulWidget {
     this.showOpenButton = true,
     this.onFilterTap,
     this.filterActive = false,
+    this.iconOnly = false,
   });
 
   @override
@@ -34,6 +37,7 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
   List<SearchAutocompleteResult> _suggestions = const [];
   bool _searching = false;
   bool _focused = false;
+  bool _expanded = false;
 
   InputDecoration _borderlessDecoration({
     required FirstVuePalette fv,
@@ -164,22 +168,68 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
   @override
   Widget build(BuildContext context) {
     final fv = context.fv;
+    if (widget.iconOnly && !_expanded) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: IconButton(
+          tooltip: 'Search',
+          onPressed: () {
+            setState(() => _expanded = true);
+          },
+          icon: Icon(Icons.search, color: fv.primaryText),
+          style: IconButton.styleFrom(
+            minimumSize: const Size(44, 44),
+            tapTargetSize: MaterialTapTargetSize.padded,
+          ),
+        ),
+      );
+    }
     return Padding(
       padding: widget.padding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Focus(
-            onFocusChange: (value) => setState(() => _focused = value),
-            child: TextField(
-              controller: _controller,
-              autofocus: widget.autofocus,
-              style: TextStyle(color: fv.primaryText),
-              onSubmitted: (_) => _openFullSearch(),
-              decoration: _borderlessDecoration(
-                fv: fv,
-                hintText: widget.hintText,
-                suffixIcon: _suffix(fv),
+          CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.escape): () {
+                if (widget.iconOnly) {
+                  setState(() {
+                    _expanded = false;
+                    _controller.clear();
+                    _suggestions = const [];
+                  });
+                }
+              },
+            },
+            child: Focus(
+              onFocusChange: (value) => setState(() => _focused = value),
+              child: TextField(
+                controller: _controller,
+                autofocus: widget.autofocus || widget.iconOnly,
+                style: TextStyle(color: fv.primaryText),
+                onSubmitted: (_) => _openFullSearch(),
+                decoration: _borderlessDecoration(
+                  fv: fv,
+                  hintText: widget.hintText,
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_suffix(fv) != null) _suffix(fv)!,
+                      if (widget.iconOnly)
+                        IconButton(
+                          tooltip: 'Close search',
+                          onPressed: () {
+                            setState(() {
+                              _expanded = false;
+                              _controller.clear();
+                              _suggestions = const [];
+                            });
+                          },
+                          icon: Icon(Icons.close, color: fv.mutedIcon),
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

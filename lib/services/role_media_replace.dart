@@ -17,8 +17,55 @@ class RoleMediaReplace {
     return error is PostgrestException && error.code == '23505';
   }
 
+  /// UPDATE the existing avatar/cover row in place so a unique partial
+  /// index (e.g. business_media_one_avatar_idx) is never violated by
+  /// delete-then-insert races. Inserts only when no role row exists.
+  static Future<void> upsertInPlace({
+    required SupabaseClient client,
+    required String table,
+    required String ownerColumn,
+    required String ownerId,
+    required String role,
+    required String storagePath,
+    required String storageProvider,
+    required String mediaType,
+  }) async {
+    final existing = await client
+        .from(table)
+        .select('id')
+        .eq(ownerColumn, ownerId)
+        .eq('media_role', role)
+        .order('created_at', ascending: false)
+        .limit(1);
+    final rows = List<Map<String, dynamic>>.from(existing as List);
+    final payload = {
+      'storage_path': storagePath,
+      'storage_provider': storageProvider,
+      'media_type': mediaType,
+      'sort_order': 0,
+    };
+    if (rows.isNotEmpty) {
+      await client.from(table).update(payload).eq('id', rows.first['id']);
+      return;
+    }
+    try {
+      await client.from(table).insert({
+        ownerColumn: ownerId,
+        'media_role': role,
+        ...payload,
+      });
+    } catch (error) {
+      if (!isUniqueViolation(error)) rethrow;
+      await client
+          .from(table)
+          .update(payload)
+          .eq(ownerColumn, ownerId)
+          .eq('media_role', role);
+    }
+  }
+
   static Future<({Uint8List bytes, String mediaType, String contentType})>
-      readValidatedBytes(XFile file, {required int maxBytes}) async {
+  readValidatedBytes(XFile file, {required int maxBytes}) async {
     final bytes = await file.readAsBytes();
     if (bytes.isEmpty) {
       throw const StorageException('Selected file is empty.');

@@ -4,6 +4,7 @@ import '../navigation/firstvue_page_route.dart';
 import '../screens/firstvue_business_profile_screen.dart';
 import '../services/event_social_service.dart';
 import '../services/things_to_do_service.dart';
+import '../services/follow_suggestion_store.dart';
 import '../services/trending_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'event_profile_sheet.dart';
@@ -140,6 +141,7 @@ class SocialSearchBar extends StatelessWidget {
   final bool autofocus;
   final VoidCallback? onFilterTap;
   final bool filterActive;
+  final bool iconOnly;
 
   const SocialSearchBar({
     super.key,
@@ -147,6 +149,7 @@ class SocialSearchBar extends StatelessWidget {
     this.autofocus = false,
     this.onFilterTap,
     this.filterActive = false,
+    this.iconOnly = false,
   });
 
   @override
@@ -158,6 +161,7 @@ class SocialSearchBar extends StatelessWidget {
       showOpenButton: false,
       onFilterTap: onFilterTap,
       filterActive: filterActive,
+      iconOnly: iconOnly,
     );
   }
 }
@@ -332,11 +336,29 @@ class PeopleToFollowRow extends StatefulWidget {
 
 class _PeopleToFollowRowState extends State<PeopleToFollowRow> {
   late Future<List<TrendingBusiness>> _future;
+  final _hidden = <String>{};
 
   @override
   void initState() {
     super.initState();
-    _future = TrendingBusinessesService.fetchTrendingNearYou(limit: 8);
+    _future = _load();
+  }
+
+  Future<List<TrendingBusiness>> _load() async {
+    final dismissed = await FollowSuggestionStore.loadDismissed();
+    final items = await TrendingBusinessesService.fetchTrendingNearYou(
+      limit: 8,
+    );
+    return [
+      for (final item in items)
+        if (!dismissed.contains(item.id) && !_hidden.contains(item.id)) item,
+    ];
+  }
+
+  Future<void> _hide(String id) async {
+    setState(() => _hidden.add(id));
+    await FollowSuggestionStore.dismiss(id);
+    if (mounted) setState(() => _future = _load());
   }
 
   @override
@@ -356,7 +378,9 @@ class _PeopleToFollowRowState extends State<PeopleToFollowRow> {
           child: FutureBuilder<List<TrendingBusiness>>(
             future: _future,
             builder: (context, snapshot) {
-              final items = snapshot.data ?? const <TrendingBusiness>[];
+              final items = (snapshot.data ?? const <TrendingBusiness>[])
+                  .where((item) => !_hidden.contains(item.id))
+                  .toList();
               if (snapshot.connectionState == ConnectionState.waiting &&
                   items.isEmpty) {
                 return const Center(
@@ -379,7 +403,11 @@ class _PeopleToFollowRowState extends State<PeopleToFollowRow> {
                 separatorBuilder: (_, _) => const SizedBox(width: 10),
                 itemBuilder: (context, index) {
                   final item = items[index];
-                  return _PeopleFollowCard(item: item);
+                  return _PeopleFollowCard(
+                    item: item,
+                    onDismiss: () => _hide(item.id),
+                    onFollowed: () => _hide(item.id),
+                  );
                 },
               );
             },
@@ -392,8 +420,14 @@ class _PeopleToFollowRowState extends State<PeopleToFollowRow> {
 
 class _PeopleFollowCard extends StatelessWidget {
   final TrendingBusiness item;
+  final VoidCallback onDismiss;
+  final VoidCallback onFollowed;
 
-  const _PeopleFollowCard({required this.item});
+  const _PeopleFollowCard({
+    required this.item,
+    required this.onDismiss,
+    required this.onFollowed,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -416,41 +450,61 @@ class _PeopleFollowCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: fv.borderSubtle),
         ),
-        child: Column(
+        child: Stack(
           children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: fv.elevatedSurface,
-              backgroundImage: item.imageUrl != null
-                  ? NetworkImage(item.imageUrl!)
-                  : null,
-              child: item.imageUrl == null
-                  ? const Icon(Icons.person_rounded, color: FirstVueColors.gold)
-                  : null,
+            Column(
+              children: [
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: fv.elevatedSurface,
+                  backgroundImage: item.imageUrl != null
+                      ? NetworkImage(item.imageUrl!)
+                      : null,
+                  child: item.imageUrl == null
+                      ? const Icon(
+                          Icons.person_rounded,
+                          color: FirstVueColors.gold,
+                        )
+                      : null,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  item.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: fv.primaryText,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+                Text(
+                  role,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: fv.tertiaryText, fontSize: 11),
+                ),
+                const Spacer(),
+                EntityFollowButton(
+                  kind: FollowTargetKind.business,
+                  targetId: item.id,
+                  compact: true,
+                  onChanged: (following) {
+                    if (following) onFollowed();
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              item.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: fv.primaryText,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
+            Positioned(
+              top: -6,
+              right: -6,
+              child: IconButton(
+                tooltip: 'Dismiss suggestion',
+                onPressed: onDismiss,
+                icon: Icon(Icons.close, size: 16, color: fv.tertiaryText),
+                visualDensity: VisualDensity.compact,
               ),
-            ),
-            Text(
-              role,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: fv.tertiaryText, fontSize: 11),
-            ),
-            const Spacer(),
-            EntityFollowButton(
-              kind: FollowTargetKind.business,
-              targetId: item.id,
-              compact: true,
             ),
           ],
         ),

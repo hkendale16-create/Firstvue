@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/industry_catalog.dart';
 import 'social_chrome.dart';
 
 /// Horizontal gold-underline tab strip used across entity public profiles.
@@ -118,42 +119,6 @@ class EntityProfileTabs {
   ];
 
   static List<String> forBusinessType(String? businessType) {
-    final type = (businessType ?? '').toLowerCase();
-    if (type.contains('restaurant') ||
-        type.contains('food') ||
-        type.contains('dining') ||
-        type.contains('cafe') ||
-        type.contains('bakery') ||
-        type.contains('cater')) {
-      return restaurant;
-    }
-    if (type.contains('bar') ||
-        type.contains('lounge') ||
-        type.contains('nightlife') ||
-        type.contains('club') ||
-        type.contains('brewery')) {
-      return bar;
-    }
-    if (type.contains('activity') ||
-        type.contains('attraction') ||
-        type.contains('recreation') ||
-        type.contains('entertainment') ||
-        type.contains('experience') ||
-        type.contains('things to do')) {
-      return activity;
-    }
-    if (type.contains('barber') ||
-        type.contains('beauty') ||
-        type.contains('salon') ||
-        type.contains('spa')) {
-      return beauty;
-    }
-    if (type.contains('event')) {
-      return event;
-    }
-    if (type.contains('rental')) {
-      return rental;
-    }
-    return business;
+    return IndustryCatalog.tabsFor(displayType: businessType);
   }
 }

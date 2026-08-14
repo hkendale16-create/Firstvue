@@ -59,7 +59,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _followingCount = 0;
   int _selectedTab = 0;
   int _pullRefreshToken = 0;
-  final _scaffoldKey = GlobalKey<ScaffoldState>();
   List<OwnedBusiness> _approvedBusinesses = const [];
   bool _hasApprovedProfessional = false;
 
@@ -162,7 +161,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (user == null) {
       if (mounted) {
         setState(() {
-          _stats = const ProfileEngagementStats(postCount: 0, sparksReceived: 0);
+          _stats = const ProfileEngagementStats(
+            postCount: 0,
+            sparksReceived: 0,
+          );
         });
       }
       return;
@@ -225,19 +227,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.photo_camera_outlined, color: Color(0xFFD8B56A)),
-              title: const Text('Change profile photo', style: TextStyle(color: Colors.white)),
+              leading: const Icon(
+                Icons.photo_camera_outlined,
+                color: Color(0xFFD8B56A),
+              ),
+              title: const Text(
+                'Change profile photo',
+                style: TextStyle(color: Colors.white),
+              ),
               onTap: () => Navigator.pop(ctx, 'change'),
             ),
             if (hasAvatar) ...[
               ListTile(
-                leading: const Icon(Icons.visibility_outlined, color: Color(0xFF78B9BE)),
-                title: const Text('View profile photo', style: TextStyle(color: Colors.white)),
+                leading: const Icon(
+                  Icons.visibility_outlined,
+                  color: Color(0xFF78B9BE),
+                ),
+                title: const Text(
+                  'View profile photo',
+                  style: TextStyle(color: Colors.white),
+                ),
                 onTap: () => Navigator.pop(ctx, 'view'),
               ),
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.white54),
-                title: const Text('Remove profile photo', style: TextStyle(color: Colors.white70)),
+                leading: const Icon(
+                  Icons.delete_outline,
+                  color: Colors.white54,
+                ),
+                title: const Text(
+                  'Remove profile photo',
+                  style: TextStyle(color: Colors.white70),
+                ),
                 onTap: () => Navigator.pop(ctx, 'remove'),
               ),
             ],
@@ -280,19 +300,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.photo_library_outlined, color: Color(0xFFD8B56A)),
-              title: const Text('Change cover photo', style: TextStyle(color: Colors.white)),
+              leading: const Icon(
+                Icons.photo_library_outlined,
+                color: Color(0xFFD8B56A),
+              ),
+              title: const Text(
+                'Change cover photo',
+                style: TextStyle(color: Colors.white),
+              ),
               onTap: () => Navigator.pop(ctx, 'change'),
             ),
             if (hasCover) ...[
               ListTile(
-                leading: const Icon(Icons.visibility_outlined, color: Color(0xFF78B9BE)),
-                title: const Text('View cover photo', style: TextStyle(color: Colors.white)),
+                leading: const Icon(
+                  Icons.visibility_outlined,
+                  color: Color(0xFF78B9BE),
+                ),
+                title: const Text(
+                  'View cover photo',
+                  style: TextStyle(color: Colors.white),
+                ),
                 onTap: () => Navigator.pop(ctx, 'view'),
               ),
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.white54),
-                title: const Text('Remove cover photo', style: TextStyle(color: Colors.white70)),
+                leading: const Icon(
+                  Icons.delete_outline,
+                  color: Colors.white54,
+                ),
+                title: const Text(
+                  'Remove cover photo',
+                  style: TextStyle(color: Colors.white70),
+                ),
                 onTap: () => Navigator.pop(ctx, 'remove'),
               ),
             ],
@@ -463,10 +501,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _displayName = updated.displayName;
         }
       });
-      await Future.wait([
-        _loadDisplayName(),
-        _loadProfileImages(),
-      ]);
+      await Future.wait([_loadDisplayName(), _loadProfileImages()]);
       setState(() => _pullRefreshToken++);
     }
   }
@@ -477,9 +512,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await Navigator.push(
         context,
         FirstVuePageRoute(
-          builder: (_) => MyBusinessProfileViewScreen(
-            business: _approvedBusinesses.first,
-          ),
+          builder: (_) =>
+              MyBusinessProfileViewScreen(business: _approvedBusinesses.first),
         ),
       );
       return;
@@ -493,72 +527,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _openMyProfessional() async {
     await Navigator.push(
       context,
-      FirstVuePageRoute(builder: (_) => const MyProfessionalProfileViewScreen()),
+      FirstVuePageRoute(
+        builder: (_) => const MyProfessionalProfileViewScreen(),
+      ),
     );
   }
 
   Widget _buildTabContent(String userId) {
     return switch (_selectedTab) {
       0 => ProfileMyPostsSection(
-          refreshToken: _effectiveRefreshToken,
-          embedded: true,
-        ),
+        refreshToken: _effectiveRefreshToken,
+        embedded: true,
+      ),
       1 => ProfileMediaSection(
-          refreshToken: _effectiveRefreshToken,
-          embedded: true,
-        ),
+        refreshToken: _effectiveRefreshToken,
+        embedded: true,
+      ),
       2 => PortfolioAlbumsSection(
-          ownerType: PortfolioOwnerType.user,
-          ownerId: userId,
-          canManage: true,
-        ),
+        ownerType: PortfolioOwnerType.user,
+        ownerId: userId,
+        canManage: true,
+      ),
       3 => ProfileAffiliationsSection(
-          profileId: userId,
-          showGroups: true,
-          showCommunities: false,
-          refreshToken: _effectiveRefreshToken,
-        ),
+        profileId: userId,
+        showGroups: true,
+        showCommunities: false,
+        refreshToken: _effectiveRefreshToken,
+      ),
       4 => ProfileAffiliationsSection(
-          profileId: userId,
-          showGroups: false,
-          showCommunities: true,
-          refreshToken: _effectiveRefreshToken,
-        ),
+        profileId: userId,
+        showGroups: false,
+        showCommunities: true,
+        refreshToken: _effectiveRefreshToken,
+      ),
       _ => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_approvedBusinesses.isNotEmpty)
-              ListTile(
-                leading: const Icon(Icons.storefront_outlined, color: FirstVueColors.gold),
-                title: Text(
-                  _approvedBusinesses.length == 1
-                      ? 'My Business'
-                      : 'My Businesses',
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: _openMyBusiness,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_approvedBusinesses.isNotEmpty)
+            ListTile(
+              leading: const Icon(
+                Icons.storefront_outlined,
+                color: FirstVueColors.gold,
               ),
-            if (_hasApprovedProfessional)
-              ListTile(
-                leading: const Icon(Icons.work_outline, color: FirstVueColors.gold),
-                title: const Text('My Professional'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: _openMyProfessional,
+              title: Text(
+                _approvedBusinesses.length == 1
+                    ? 'My Business'
+                    : 'My Businesses',
               ),
-            ProfileSavedSection(refreshToken: widget.refreshToken),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Text(
-                'Your about & saved items stay private to you unless you choose to share them.',
-                style: TextStyle(
-                  color: context.fv.secondaryText,
-                  fontSize: 13,
-                  height: 1.4,
-                ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _openMyBusiness,
+            ),
+          if (_hasApprovedProfessional)
+            ListTile(
+              leading: const Icon(
+                Icons.work_outline,
+                color: FirstVueColors.gold,
+              ),
+              title: const Text('My Professional'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _openMyProfessional,
+            ),
+          ProfileSavedSection(refreshToken: widget.refreshToken),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Text(
+              'Your about & saved items stay private to you unless you choose to share them.',
+              style: TextStyle(
+                color: context.fv.secondaryText,
+                fontSize: 13,
+                height: 1.4,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
     };
   }
 
@@ -569,180 +611,185 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final displayName = user == null
         ? 'Guest'
         : (_nameLoading
-            ? (email.isEmpty ? '…' : email.split('@').first)
-            : (_displayName ?? (email.isEmpty ? 'Guest' : email.split('@').first)));
+              ? (email.isEmpty ? '…' : email.split('@').first)
+              : (_displayName ??
+                    (email.isEmpty ? 'Guest' : email.split('@').first)));
     final handle = _username?.trim();
     final subtitle = user == null
         ? 'Sign in to sync your FirstVue account'
         : (handle != null && handle.isNotEmpty
-            ? '@$handle'
-            : (_showEmailOnProfile && email.isNotEmpty ? email : null));
+              ? '@$handle'
+              : (_showEmailOnProfile && email.isNotEmpty ? email : null));
 
     return Scaffold(
-      key: _scaffoldKey,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      endDrawer: FirstVueSettingsDrawer(
-        onSignOut: () {
-          if (mounted) {
-            setState(() {});
-            _loadStats();
-          }
-        },
-        onSignIn: () {
-          if (mounted) setState(() {});
-        },
-      ),
       body: SafeArea(
         child: FirstVueRefreshScaffold(
-        onRefresh: _refreshProfile,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.zero,
-          children: [
-          if (user != null)
-            FollowRequestsSection(
-              onChanged: () {
-                _loadStats();
-                setState(() => _pullRefreshToken++);
-              },
-            ),
-          if (user != null &&
-              !_nameLoading &&
-              (handle == null || handle.isEmpty))
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Material(
-                color: FirstVueColors.surface,
-                borderRadius: BorderRadius.circular(12),
-                child: ListTile(
-                  onTap: _openEditProfile,
-                  shape: RoundedRectangleBorder(
+          onRefresh: _refreshProfile,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            children: [
+              if (user != null)
+                FollowRequestsSection(
+                  onChanged: () {
+                    _loadStats();
+                    setState(() => _pullRefreshToken++);
+                  },
+                ),
+              if (user != null &&
+                  !_nameLoading &&
+                  (handle == null || handle.isEmpty))
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Material(
+                    color: FirstVueColors.surface,
                     borderRadius: BorderRadius.circular(12),
+                    child: ListTile(
+                      onTap: _openEditProfile,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      leading: const Icon(
+                        Icons.alternate_email,
+                        color: FirstVueColors.gold,
+                      ),
+                      title: Text(
+                        'Choose your @handle',
+                        style: TextStyle(
+                          color: context.fv.primaryText,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Your tag must be unique. Display names can be shared.',
+                        style: TextStyle(
+                          color: context.fv.secondaryText,
+                          fontSize: 13,
+                        ),
+                      ),
+                      trailing: Icon(
+                        Icons.chevron_right,
+                        color: context.fv.mutedIcon,
+                      ),
+                    ),
                   ),
-                  leading: const Icon(
-                    Icons.alternate_email,
+                ),
+              SocialProfileHeader(
+                name: displayName,
+                handle: subtitle,
+                bio: 'Discovering local talent',
+                coverImageUrl: _profileImages.cover?.signedUrl,
+                avatarImageUrl: _profileImages.avatar?.signedUrl,
+                coverIsVideo: _profileImages.cover?.isVideo ?? false,
+                avatarIsVideo: _profileImages.avatar?.isVideo ?? false,
+                verified: user != null,
+                centerAvatar: true,
+                onCoverTap: _imageUpdating ? null : _showCoverOptions,
+                onAvatarTap: _imageUpdating ? null : _showAvatarOptions,
+                stats: user == null
+                    ? const []
+                    : [
+                        ProfileStatItem(
+                          label: 'posts',
+                          value: _statsLoading ? '—' : '${_stats.postCount}',
+                        ),
+                        ProfileStatItem(
+                          label: 'followers',
+                          value: _statsLoading ? '—' : '$_followerCount',
+                          onTap: () => _openFollowList(
+                            FollowListMode.followers,
+                            displayName,
+                          ),
+                        ),
+                        ProfileStatItem(
+                          label: 'following',
+                          value: _statsLoading ? '—' : '$_followingCount',
+                          onTap: () => _openFollowList(
+                            FollowListMode.following,
+                            displayName,
+                          ),
+                        ),
+                      ],
+                actions: user == null
+                    ? [
+                        FilledButton(
+                          onPressed: () => _handleAccountTap(user),
+                          child: const Text('Sign in or create account'),
+                        ),
+                      ]
+                    : [
+                        FilledButton(
+                          onPressed: _openEditProfile,
+                          child: const Text('Edit profile'),
+                        ),
+                        OutlinedButton(
+                          onPressed: _shareProfile,
+                          child: const Text('Share profile'),
+                        ),
+                      ],
+                trailing: IconButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      FirstVuePageRoute(
+                        builder: (_) => SettingsShellScreen(
+                          onSignOut: () {
+                            if (mounted) {
+                              setState(() {});
+                              _loadStats();
+                            }
+                          },
+                          onSignIn: () {
+                            if (mounted) setState(() {});
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(
+                    Icons.settings_outlined,
                     color: FirstVueColors.gold,
                   ),
-                  title: Text(
-                    'Choose your @handle',
-                    style: TextStyle(
-                      color: context.fv.primaryText,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'Your tag must be unique. Display names can be shared.',
-                    style: TextStyle(
-                      color: context.fv.secondaryText,
-                      fontSize: 13,
-                    ),
-                  ),
-                  trailing: Icon(
-                    Icons.chevron_right,
-                    color: context.fv.mutedIcon,
-                  ),
+                  tooltip: 'Settings',
                 ),
               ),
-            ),
-          SocialProfileHeader(
-            name: displayName,
-            handle: subtitle,
-            bio: 'Discovering local talent',
-            coverImageUrl: _profileImages.cover?.signedUrl,
-            avatarImageUrl: _profileImages.avatar?.signedUrl,
-            coverIsVideo: _profileImages.cover?.isVideo ?? false,
-            avatarIsVideo: _profileImages.avatar?.isVideo ?? false,
-            verified: user != null,
-            centerAvatar: true,
-            onCoverTap: _imageUpdating ? null : _showCoverOptions,
-            onAvatarTap: _imageUpdating ? null : _showAvatarOptions,
-            stats: user == null
-                ? const []
-                : [
-                    ProfileStatItem(
-                      label: 'posts',
-                      value: _statsLoading ? '—' : '${_stats.postCount}',
+              if (user != null) ...[
+                const SizedBox(height: 16),
+                SocialGoldUnderlineTabs(
+                  labels: _tabLabels,
+                  selectedIndex: _selectedTab,
+                  onSelected: (index) => setState(() => _selectedTab = index),
+                ),
+                const SizedBox(height: 8),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: KeyedSubtree(
+                    key: ValueKey(_selectedTab),
+                    child: _buildTabContent(user.id),
+                  ),
+                ),
+              ],
+              if (user == null) ...[
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: FilledButton(
+                    onPressed: () => _handleAccountTap(user),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: FirstVueColors.gold,
+                      foregroundColor: Colors.black,
+                      minimumSize: const Size.fromHeight(48),
                     ),
-                    ProfileStatItem(
-                      label: 'followers',
-                      value: _statsLoading ? '—' : '$_followerCount',
-                      onTap: () => _openFollowList(
-                        FollowListMode.followers,
-                        displayName,
-                      ),
-                    ),
-                    ProfileStatItem(
-                      label: 'following',
-                      value: _statsLoading ? '—' : '$_followingCount',
-                      onTap: () => _openFollowList(
-                        FollowListMode.following,
-                        displayName,
-                      ),
-                    ),
-                  ],
-            actions: user == null
-                ? [
-                    FilledButton(
-                      onPressed: () => _handleAccountTap(user),
-                      child: const Text('Sign in or create account'),
-                    ),
-                  ]
-                : [
-                    FilledButton(
-                      onPressed: _openEditProfile,
-                      child: const Text('Edit profile'),
-                    ),
-                    OutlinedButton(
-                      onPressed: _shareProfile,
-                      child: const Text('Share profile'),
-                    ),
-                  ],
-            trailing: IconButton(
-              onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
-              icon: const Icon(
-                Icons.settings_outlined,
-                color: FirstVueColors.gold,
-              ),
-              tooltip: 'Settings',
-            ),
+                    child: const Text('Sign in or create account'),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 28),
+            ],
           ),
-          if (user != null) ...[
-            const SizedBox(height: 16),
-            SocialGoldUnderlineTabs(
-              labels: _tabLabels,
-              selectedIndex: _selectedTab,
-              onSelected: (index) => setState(() => _selectedTab = index),
-            ),
-            const SizedBox(height: 8),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: KeyedSubtree(
-                key: ValueKey(_selectedTab),
-                child: _buildTabContent(user.id),
-              ),
-            ),
-          ],
-          if (user == null) ...[
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: FilledButton(
-                onPressed: () => _handleAccountTap(user),
-                style: FilledButton.styleFrom(
-                  backgroundColor: FirstVueColors.gold,
-                  foregroundColor: Colors.black,
-                  minimumSize: const Size.fromHeight(48),
-                ),
-                child: const Text('Sign in or create account'),
-              ),
-            ),
-          ],
-          const SizedBox(height: 28),
-        ],
-      ),
-      ),
+        ),
       ),
     );
   }
 }
-

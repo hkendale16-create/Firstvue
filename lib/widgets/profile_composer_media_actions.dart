@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../config/feature_flags.dart';
 import '../services/live_stream_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'firstvue_ephemeral_toast.dart';
@@ -45,7 +46,7 @@ class ProfileComposerMediaActions extends StatelessWidget {
       message: eligible
           ? 'Live streaming is coming soon. You meet the eligibility requirements.'
           : 'Go Live unlocks with a verified business and '
-              '${LiveStreamEligibility.minFollowers}+ followers.',
+                '${LiveStreamEligibility.minFollowers}+ followers.',
       duration: const Duration(seconds: 3),
     );
   }
@@ -66,12 +67,13 @@ class ProfileComposerMediaActions extends StatelessWidget {
           onTap: enabled ? () => _pickVideos(context) : null,
         ),
         const SizedBox(width: 8),
-        _ActionChip(
-          icon: Icons.sensors,
-          label: 'Go Live',
-          accent: FirstVueColors.coral,
-          onTap: enabled ? () => _goLive(context) : null,
-        ),
+        if (FeatureFlags.liveStreamingEnabled)
+          _ActionChip(
+            icon: Icons.sensors,
+            label: 'Go Live',
+            accent: FirstVueColors.coral,
+            onTap: enabled ? () => _goLive(context) : null,
+          ),
       ],
     );
   }

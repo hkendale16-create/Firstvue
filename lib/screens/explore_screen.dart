@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../constants/business_types.dart';
+import '../utils/explore_category_filter.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../services/community_news_service.dart';
 import '../services/recommendations_service.dart';
+import '../services/rentals_store.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/social_chrome.dart';
@@ -11,12 +13,19 @@ import 'barber_results_screen.dart';
 import 'beauty_discovery_screen.dart';
 import 'discovery_feed_screen.dart';
 import 'other_services_screen.dart';
-import 'people_to_follow_screen.dart';
 import 'post_detail_screen.dart';
 import 'rentals_screen.dart';
 import 'things_to_do_screen.dart';
 
-enum _ExploreChip { businesses, people, events, thingsToDo, food, bars }
+enum _ExploreChip {
+  businesses,
+  people,
+  events,
+  thingsToDo,
+  food,
+  bars,
+  rentals,
+}
 
 class ExploreScreen extends StatefulWidget {
   final VoidCallback? onOpenVueFeed;
@@ -76,30 +85,27 @@ class _ExploreScreenState extends State<ExploreScreen> {
     });
     try {
       final posts = await _fetchPage();
+      var tiles = posts.map(_tileFromPost).toList();
+      if (tiles.isEmpty && _selectedChip == _ExploreChip.rentals) {
+        tiles = await _rentalTiles();
+      }
       if (!mounted) return;
       setState(() {
         _tiles
           ..clear()
-          ..addAll(posts.map(_tileFromPost));
+          ..addAll(tiles);
         _seenIds
           ..clear()
           ..addAll(posts.map((p) => p.id));
         _loading = false;
-        _hasMore = posts.length >= _pageSize;
-        if (_tiles.isEmpty) {
-          _tiles.addAll(_fallbackTiles(context));
-          _hasMore = false;
-        }
+        _hasMore =
+            posts.length >= _pageSize && _selectedChip != _ExploreChip.rentals;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _loading = false;
         _error = 'Unable to load Explore right now.';
-        if (_tiles.isEmpty) {
-          _tiles.addAll(_fallbackTiles(context));
-          _hasMore = false;
-        }
       });
     }
   }
@@ -167,54 +173,21 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _ExploreChip.thingsToDo => (profileType: 'activity', businessType: null),
       _ExploreChip.food => (profileType: null, businessType: 'Restaurant'),
       _ExploreChip.bars => (profileType: null, businessType: 'Bar'),
+      _ExploreChip.rentals => (profileType: 'rental', businessType: null),
       null => (profileType: null, businessType: null),
     };
   }
 
   bool _matchesChip(CommunityNewsPost post) {
-    final type = post.resolvedAuthorProfileType;
-    final businessType = (post.businessType ?? '').toLowerCase();
-    final body = post.body.toLowerCase();
-    final hasActivitySignal =
-        body.contains('#thingstodo') ||
-        body.contains('things to do') ||
-        businessType.contains('activity') ||
-        businessType.contains('attraction') ||
-        businessType.contains('recreation') ||
-        businessType.contains('entertainment') ||
-        businessType.contains('experience');
-    return switch (_selectedChip) {
-      null => true,
-      _ExploreChip.businesses => type == 'business' || post.businessId != null,
-      _ExploreChip.people => type == 'user' && post.businessId == null,
-      _ExploreChip.events => type == 'event' || post.eventId != null,
-      _ExploreChip.thingsToDo =>
-        hasActivitySignal ||
-            type == 'activity' ||
-            (type == 'business' &&
-                (businessType.contains('activity') ||
-                    businessType.contains('attraction') ||
-                    businessType.contains('recreation') ||
-                    businessType.contains('entertainment') ||
-                    businessType.contains('experience'))),
-      _ExploreChip.food =>
-        businessType.contains('restaurant') ||
-            businessType.contains('food') ||
-            businessType.contains('dining') ||
-            businessType.contains('cafe') ||
-            businessType.contains('café') ||
-            businessType.contains('bakery') ||
-            businessType.contains('cater') ||
-            businessType.contains('bistro') ||
-            businessType.contains('truck'),
-      _ExploreChip.bars =>
-        businessType.contains('bar') ||
-            businessType.contains('lounge') ||
-            businessType.contains('club') ||
-            businessType.contains('brewery') ||
-            businessType.contains('nightlife') ||
-            businessType.contains('pub'),
-    };
+    return ExploreCategoryFilter.matches(post, switch (_selectedChip!) {
+      _ExploreChip.businesses => ExploreCategory.businesses,
+      _ExploreChip.people => ExploreCategory.people,
+      _ExploreChip.events => ExploreCategory.events,
+      _ExploreChip.thingsToDo => ExploreCategory.thingsToDo,
+      _ExploreChip.food => ExploreCategory.food,
+      _ExploreChip.bars => ExploreCategory.bars,
+      _ExploreChip.rentals => ExploreCategory.rentals,
+    });
   }
 
   _ExploreTile _tileFromPost(CommunityNewsPost post) {
@@ -272,20 +245,28 @@ class _ExploreScreenState extends State<ExploreScreen> {
     await _reload();
   }
 
-  List<_ExploreTile> _fallbackTiles(BuildContext context) {
-    final categories = _categories(context);
-    const likes = ['2.1k', '1.7k', '843', '2.4k', null, '612'];
-    return [
-      for (var i = 0; i < categories.length; i++)
-        _ExploreTile(
-          handle: socialHandleFromName(categories[i].handle),
-          assetImage: categories[i].imagePath,
-          likeLabel: i < likes.length ? likes[i] : null,
-          showFollowOverlay: i == 1,
-          dateLabel: i == 4 ? 'MAY 24' : null,
-          onTap: categories[i].onTap,
-        ),
-    ];
+  Future<List<_ExploreTile>> _rentalTiles() async {
+    try {
+      final listings = await RentalsStore.fetchApprovedListings();
+      return [
+        for (final listing in listings)
+          _ExploreTile(
+            handle: socialHandleFromName(listing.title),
+            imageUrl: listing.media.isEmpty
+                ? null
+                : listing.media.first.signedUrl,
+            likeLabel: listing.monthlyPrice ?? listing.weeklyPrice,
+            onTap: () {
+              Navigator.push(
+                context,
+                FirstVuePageRoute(builder: (_) => const RentalsScreen()),
+              );
+            },
+          ),
+      ];
+    } catch (_) {
+      return const [];
+    }
   }
 
   @override
@@ -306,21 +287,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ),
             const SizedBox(height: 16),
             SocialSearchBar(
+              iconOnly: true,
               onFilterTap: _openFilters,
               filterActive: _filtersActive,
             ),
             const SizedBox(height: 20),
-            PeopleToFollowRow(
-              onSeeAll: () {
-                Navigator.push(
-                  context,
-                  FirstVuePageRoute(
-                    builder: (_) => const PeopleToFollowScreen(),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 14),
             _ExploreCategoryHeader(
               selected: _selectedChip,
               onSelected: _selectChip,
@@ -333,6 +304,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   child: CircularProgressIndicator(color: FirstVueColors.teal),
                 ),
               )
+            else if (_tiles.isEmpty && _selectedChip != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 36),
+                child: Text(
+                  'No results in this category yet.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: fv.secondaryText),
+                ),
+              )
             else ...[
               GridView.builder(
                 shrinkWrap: true,
@@ -343,9 +323,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   crossAxisSpacing: 12,
                   childAspectRatio: 0.78,
                 ),
-                itemCount: _tiles.length,
+                itemCount: (_tiles.isEmpty ? _shortcutTiles(context) : _tiles)
+                    .length,
                 itemBuilder: (context, index) {
-                  final tile = _tiles[index];
+                  final tile = (_tiles.isEmpty
+                      ? _shortcutTiles(context)
+                      : _tiles)[index];
                   return SocialPostTile(
                     handle: tile.handle,
                     avatarUrl: tile.avatarUrl,
@@ -392,6 +375,22 @@ class _ExploreScreenState extends State<ExploreScreen> {
         ),
       ),
     );
+  }
+
+  List<_ExploreTile> _shortcutTiles(BuildContext context) {
+    final categories = _categories(context);
+    const likes = ['2.1k', '1.7k', '843', '2.4k', null, '612'];
+    return [
+      for (var i = 0; i < categories.length; i++)
+        _ExploreTile(
+          handle: socialHandleFromName(categories[i].handle),
+          assetImage: categories[i].imagePath,
+          likeLabel: i < likes.length ? likes[i] : null,
+          showFollowOverlay: i == 1,
+          dateLabel: i == 4 ? 'MAY 24' : null,
+          onTap: categories[i].onTap,
+        ),
+    ];
   }
 
   static List<_ExploreCategory> _categories(BuildContext context) {
@@ -486,6 +485,7 @@ class _ExploreCategoryHeader extends StatelessWidget {
     _ExploreChip.thingsToDo: 'Things to Do',
     _ExploreChip.food: 'Food',
     _ExploreChip.bars: 'Bars',
+    _ExploreChip.rentals: 'Rentals',
   };
 
   @override

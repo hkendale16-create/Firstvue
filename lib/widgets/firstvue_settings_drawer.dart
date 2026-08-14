@@ -25,21 +25,22 @@ import '../theme/firstvue_theme.dart';
 
 typedef FirstVueSettingsOpen = void Function(Widget screen);
 
-class FirstVueSettingsDrawer extends StatefulWidget {
+/// Full-screen Settings shell (replaces the clipped end drawer).
+class SettingsShellScreen extends StatefulWidget {
   final VoidCallback? onSignOut;
   final VoidCallback? onSignIn;
 
-  const FirstVueSettingsDrawer({
-    super.key,
-    this.onSignOut,
-    this.onSignIn,
-  });
+  const SettingsShellScreen({super.key, this.onSignOut, this.onSignIn});
 
   @override
-  State<FirstVueSettingsDrawer> createState() => _FirstVueSettingsDrawerState();
+  State<SettingsShellScreen> createState() => _SettingsShellScreenState();
 }
 
-class _FirstVueSettingsDrawerState extends State<FirstVueSettingsDrawer> {
+class FirstVueSettingsDrawer extends SettingsShellScreen {
+  const FirstVueSettingsDrawer({super.key, super.onSignOut, super.onSignIn});
+}
+
+class _SettingsShellScreenState extends State<SettingsShellScreen> {
   bool _isAdmin = false;
   bool _adminLoaded = false;
 
@@ -59,13 +60,11 @@ class _FirstVueSettingsDrawerState extends State<FirstVueSettingsDrawer> {
   }
 
   void _open(Widget screen) {
-    Navigator.pop(context);
     Navigator.push(context, FirstVuePageRoute(builder: (_) => screen));
   }
 
   Future<void> _handleAccount() async {
     final user = Supabase.instance.client.auth.currentUser;
-    Navigator.pop(context);
     if (user == null) {
       widget.onSignIn?.call();
       await Navigator.push(
@@ -75,6 +74,7 @@ class _FirstVueSettingsDrawerState extends State<FirstVueSettingsDrawer> {
     } else {
       await Supabase.instance.client.auth.signOut();
       widget.onSignOut?.call();
+      if (mounted) Navigator.pop(context);
     }
   }
 
@@ -83,198 +83,186 @@ class _FirstVueSettingsDrawerState extends State<FirstVueSettingsDrawer> {
     final user = Supabase.instance.client.auth.currentUser;
     final fv = context.fv;
 
-    return Drawer(
+    return Scaffold(
       backgroundColor: fv.background,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.horizontal(left: Radius.circular(20)),
+      appBar: AppBar(
+        backgroundColor: fv.background,
+        foregroundColor: fv.primaryText,
+        title: const Text('Settings'),
       ),
-      child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'SETTINGS',
-                    style: TextStyle(
-                      color: FirstVueColors.gold,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.4,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: Icon(Icons.close, color: fv.tertiaryText),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            _SettingsGroup(
-              title: 'Your profile',
-              children: [
-                _SettingsTile(
-                  icon: Icons.settings_suggest_outlined,
-                  title: 'Entity settings',
-                  subtitle: 'Profile, media, privacy, groups & more',
-                  onTap: user == null
-                      ? _handleAccount
-                      : () => _open(const EntitySettingsScreen()),
-                ),
-                _SettingsTile(
-                  icon: Icons.lock_outline,
-                  title: 'Privacy',
-                  subtitle: 'Visibility & field controls',
-                  onTap: user == null
-                      ? _handleAccount
-                      : () => _open(const PrivacySettingsScreen()),
-                ),
-                _SettingsTile(
-                  icon: Icons.how_to_reg_outlined,
-                  title: 'Get verified',
-                  subtitle: 'Business owner, professional, or organizer',
-                  onTap: user == null
-                      ? _handleAccount
-                      : () => _open(const JoinFirstVueScreen()),
-                ),
-                _SettingsTile(
-                  icon: Icons.storefront_outlined,
-                  title: 'My business profiles',
-                  subtitle: 'Photos, address, menu & details',
-                  onTap: user == null
-                      ? _handleAccount
-                      : () => _open(const MyBusinessesScreen()),
-                ),
-                _SettingsTile(
-                  icon: Icons.badge_outlined,
-                  title: 'My professional profile',
-                  subtitle: 'Individual barber or stylist profile',
-                  onTap: user == null
-                      ? _handleAccount
-                      : () => _open(const MyProfessionalProfileViewScreen()),
-                ),
-              ],
-            ),
-            _SettingsGroup(
-              title: 'Activity',
-              children: [
-                _SettingsTile(
-                  icon: Icons.chat_bubble_outline,
-                  title: 'Messages',
-                  onTap: user == null
-                      ? _handleAccount
-                      : () => _open(const MessagesInboxScreen()),
-                ),
-                _SettingsTile(
-                  icon: Icons.trending_up_rounded,
-                  title: 'Growth, plans & analytics',
-                  onTap: user == null
-                      ? _handleAccount
-                      : () => _open(const BusinessGrowthScreen()),
-                ),
-                _SettingsTile(
-                  icon: Icons.key_outlined,
-                  title: 'My rental listings',
-                  onTap: user == null
-                      ? _handleAccount
-                      : () => _open(const MyRentalListingsScreen()),
-                ),
-                _SettingsTile(
-                  icon: Icons.mark_email_unread_outlined,
-                  title: 'Rental inquiries',
-                  onTap: user == null
-                      ? _handleAccount
-                      : () => _open(const RentalInquiriesScreen()),
-                ),
-              ],
-            ),
-            _SettingsGroup(
-              title: 'Preferences',
-              children: [
-                _SettingsTile(
-                  icon: Icons.palette_outlined,
-                  title: 'Appearance',
-                  subtitle: 'Light, Dark, or System Default',
-                  onTap: () => _open(const AppearanceSettingsScreen()),
-                ),
-                _SettingsTile(
-                  icon: Icons.tune_outlined,
-                  title: 'Location & notifications',
-                  subtitle: 'City, alerts & floating messages bubble',
-                  onTap: user == null
-                      ? _handleAccount
-                      : () => _open(const SettingsPreferencesScreen()),
-                ),
-              ],
-            ),
-            if (_adminLoaded && _isAdmin)
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            children: [
               _SettingsGroup(
-                title: 'Admin tools',
-                titleColor: FirstVueColors.gold,
+                title: 'Your profile',
                 children: [
                   _SettingsTile(
-                    icon: Icons.admin_panel_settings_outlined,
-                    title: 'Approval center',
-                    subtitle: 'Business, professional & organizer',
-                    onTap: () => _open(const AdminApprovalsHubScreen()),
+                    icon: Icons.settings_suggest_outlined,
+                    title: 'Entity settings',
+                    subtitle: 'Profile, media, privacy, groups & more',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => _open(const EntitySettingsScreen()),
                   ),
                   _SettingsTile(
-                    icon: Icons.verified_outlined,
-                    title: 'Business approvals',
-                    onTap: () => _open(const AdminBusinessSubmissionsScreen()),
+                    icon: Icons.lock_outline,
+                    title: 'Privacy',
+                    subtitle: 'Visibility & field controls',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => _open(const PrivacySettingsScreen()),
                   ),
                   _SettingsTile(
                     icon: Icons.how_to_reg_outlined,
-                    title: 'Professional approvals',
-                    onTap: () => _open(const AdminProfessionalProfilesScreen()),
+                    title: 'Get verified',
+                    subtitle: 'Business owner, professional, or organizer',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => _open(const JoinFirstVueScreen()),
                   ),
                   _SettingsTile(
-                    icon: Icons.reviews_outlined,
-                    title: 'Review approvals',
-                    onTap: () => _open(const AdminBusinessReviewsScreen()),
+                    icon: Icons.storefront_outlined,
+                    title: 'My business profiles',
+                    subtitle: 'Photos, address, menu & details',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => _open(const MyBusinessesScreen()),
                   ),
                   _SettingsTile(
-                    icon: Icons.admin_panel_settings_outlined,
-                    title: 'Rental approvals',
-                    onTap: () => _open(const AdminRentalsScreen()),
+                    icon: Icons.badge_outlined,
+                    title: 'My professional profile',
+                    subtitle: 'Individual barber or stylist profile',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => _open(const MyProfessionalProfileViewScreen()),
                   ),
                 ],
               ),
-            _SettingsGroup(
-              title: 'Legal & support',
-              children: [
-                _SettingsTile(
-                  icon: Icons.privacy_tip_outlined,
-                  title: 'Privacy policy',
-                  onTap: () => _open(
-                    const LegalPolicyScreen(type: LegalPolicyType.privacy),
+              _SettingsGroup(
+                title: 'Activity',
+                children: [
+                  _SettingsTile(
+                    icon: Icons.chat_bubble_outline,
+                    title: 'Messages',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => _open(const MessagesInboxScreen()),
                   ),
-                ),
-                _SettingsTile(
-                  icon: Icons.description_outlined,
-                  title: 'Terms of service',
-                  onTap: () => _open(
-                    const LegalPolicyScreen(type: LegalPolicyType.terms),
+                  _SettingsTile(
+                    icon: Icons.trending_up_rounded,
+                    title: 'Growth, plans & analytics',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => _open(const BusinessGrowthScreen()),
                   ),
-                ),
-              ],
-            ),
-            if (user != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: OutlinedButton.icon(
-                  onPressed: _handleAccount,
-                  icon: const Icon(Icons.logout, size: 18),
-                  label: const Text('Sign out'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: fv.secondaryText,
-                    side: BorderSide(color: fv.borderSubtle),
+                  _SettingsTile(
+                    icon: Icons.key_outlined,
+                    title: 'My rental listings',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => _open(const MyRentalListingsScreen()),
                   ),
-                ),
+                  _SettingsTile(
+                    icon: Icons.mark_email_unread_outlined,
+                    title: 'Rental inquiries',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => _open(const RentalInquiriesScreen()),
+                  ),
+                ],
               ),
-          ],
+              _SettingsGroup(
+                title: 'Preferences',
+                children: [
+                  _SettingsTile(
+                    icon: Icons.palette_outlined,
+                    title: 'Appearance',
+                    subtitle: 'Light, Dark, or System Default',
+                    onTap: () => _open(const AppearanceSettingsScreen()),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.tune_outlined,
+                    title: 'Location & notifications',
+                    subtitle: 'City, alerts & floating messages bubble',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => _open(const SettingsPreferencesScreen()),
+                  ),
+                ],
+              ),
+              if (_adminLoaded && _isAdmin)
+                _SettingsGroup(
+                  title: 'Admin tools',
+                  titleColor: FirstVueColors.gold,
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.admin_panel_settings_outlined,
+                      title: 'Approval center',
+                      subtitle: 'Business, professional & organizer',
+                      onTap: () => _open(const AdminApprovalsHubScreen()),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.verified_outlined,
+                      title: 'Business approvals',
+                      onTap: () =>
+                          _open(const AdminBusinessSubmissionsScreen()),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.how_to_reg_outlined,
+                      title: 'Professional approvals',
+                      onTap: () =>
+                          _open(const AdminProfessionalProfilesScreen()),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.reviews_outlined,
+                      title: 'Review approvals',
+                      onTap: () => _open(const AdminBusinessReviewsScreen()),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.admin_panel_settings_outlined,
+                      title: 'Rental approvals',
+                      onTap: () => _open(const AdminRentalsScreen()),
+                    ),
+                  ],
+                ),
+              _SettingsGroup(
+                title: 'Legal & support',
+                children: [
+                  _SettingsTile(
+                    icon: Icons.privacy_tip_outlined,
+                    title: 'Privacy policy',
+                    onTap: () => _open(
+                      const LegalPolicyScreen(type: LegalPolicyType.privacy),
+                    ),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.description_outlined,
+                    title: 'Terms of service',
+                    onTap: () => _open(
+                      const LegalPolicyScreen(type: LegalPolicyType.terms),
+                    ),
+                  ),
+                ],
+              ),
+              if (user != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: OutlinedButton.icon(
+                    onPressed: _handleAccount,
+                    icon: const Icon(Icons.logout, size: 18),
+                    label: const Text('Sign out'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: fv.secondaryText,
+                      side: BorderSide(color: fv.borderSubtle),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -323,11 +311,7 @@ class _SettingsGroup extends StatelessWidget {
                 for (var i = 0; i < children.length; i++) ...[
                   children[i],
                   if (i < children.length - 1)
-                    Divider(
-                      height: 1,
-                      indent: 56,
-                      color: fv.divider,
-                    ),
+                    Divider(height: 1, indent: 56, color: fv.divider),
                 ],
               ],
             ),
@@ -381,10 +365,7 @@ class _SettingsTile extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         subtitle!,
-                        style: TextStyle(
-                          color: fv.secondaryText,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: fv.secondaryText, fontSize: 12),
                       ),
                     ],
                   ],
