@@ -91,4 +91,10 @@ void main() {
     expect(hero.existsSync(), isTrue);
     expect(hero.lengthSync(), lessThan(80 * 1024));
   });
+
+  test('web build script strips unused CanvasKit variants after compile', () {
+    expect(buildWebSh, contains("name 'skwasm*'"));
+    expect(buildWebSh, contains('webparagraph'));
+    expect(buildWebSh, contains("name '*.symbols'"));
+  });
 }

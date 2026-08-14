@@ -36,6 +36,28 @@ flutter build web --release \
   --tree-shake-icons \
   $DART_DEFINE
 
+# This dart2js build only uses the CanvasKit renderer. Flutter still copies
+# skwasm/wimp/webparagraph + *.symbols into build/web/canvaskit — strip them so
+# deploys stay lean and nothing can accidentally fetch multi-MB unused WASM.
+if [ -d "$ROOT_DIR/build/web/canvaskit" ]; then
+  find "$ROOT_DIR/build/web/canvaskit" -type f \( \
+      -name 'skwasm*' -o -name 'wimp*' -o -name '*.symbols' \
+    \) -delete
+  rm -rf "$ROOT_DIR/build/web/canvaskit/webparagraph"
+fi
+
+# Latin-subset the Material Roboto fallback Flutter injects (~168KB → much smaller).
+ROBOTO="$ROOT_DIR/build/web/assets/fonts/fallback/Roboto-Regular.ttf"
+if [ -f "$ROBOTO" ] && command -v pyftsubset >/dev/null 2>&1; then
+  pyftsubset "$ROBOTO" \
+    --output-file="$ROBOTO" \
+    --unicodes='U+0000-00FF,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD' \
+    --layout-features='*' \
+    --glyph-names --symbol-cmap --legacy-cmap --notdef-glyph --notdef-outline \
+    --recommended-glyphs --name-IDs='*' --name-legacy --name-languages='*' \
+    --recalc-bounds --recalc-timestamp || true
+fi
+
 echo "Build complete: $ROOT_DIR/build/web"
 # Tip: do not preload canvaskit/canvaskit.wasm in index.html — Chromium uses
 # canvaskit/chromium/canvaskit.wasm and a wrong preload downloads both.
