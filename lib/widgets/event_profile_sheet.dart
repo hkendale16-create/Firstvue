@@ -4,6 +4,7 @@ import '../services/event_social_service.dart';
 import '../services/things_to_do_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'entity_profile_feed_section.dart';
+import 'network_photo.dart';
 
 class EventProfileSheet extends StatefulWidget {
   final CommunityEvent event;
@@ -97,8 +98,8 @@ class _EventProfileSheetState extends State<EventProfileSheet> {
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(16),
-                      child: Image.network(
-                        event.coverImageUrl!,
+                      child: NetworkPhoto(
+                        url: event.coverImageUrl!,
                         height: 160,
                         width: double.infinity,
                         fit: BoxFit.cover,

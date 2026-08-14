@@ -14,6 +14,7 @@ import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/portfolio_albums_section.dart';
 import '../widgets/signed_media_viewer.dart';
 import '../widgets/shoutout_card.dart';
+import '../widgets/network_photo.dart';
 import '../services/shoutout_service.dart';
 import 'member_public_profile_screen.dart';
 
@@ -312,8 +313,8 @@ class _ProfessionalPublicProfileScreenState
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(16),
-                                child: Image.network(
-                                  media.signedUrl,
+                                child: NetworkPhoto(
+                                  url: media.signedUrl,
                                   width: 150,
                                   height: 170,
                                   fit: BoxFit.cover,
@@ -541,8 +542,8 @@ class _CatalogCard extends StatelessWidget {
     child: Row(
       children: [
         if (item.imageUrl.isNotEmpty)
-          Image.network(
-            item.imageUrl,
+          NetworkPhoto(
+            url: item.imageUrl,
             width: 96,
             height: 108,
             fit: BoxFit.cover,

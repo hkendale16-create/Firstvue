@@ -9,6 +9,7 @@ import '../messaging/screens/messaging_shell_screen.dart';
 import '../messaging/services/fv_messaging_service.dart';
 import '../services/messaging_service.dart';
 import '../services/rentals_store.dart';
+import '../widgets/network_photo.dart';
 
 enum _RentalPriceFilter { weekly, monthly }
 
@@ -957,8 +958,8 @@ class _RentalMediaPreview extends StatelessWidget {
       );
     }
 
-    return Image.network(
-      first.signedUrl,
+    return NetworkPhoto(
+      url: first.signedUrl,
       width: double.infinity,
       height: double.infinity,
       fit: BoxFit.cover,

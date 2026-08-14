@@ -2,7 +2,19 @@
 
 Project: `sdssshegqdwobjelxzkp`
 
-## Steps
+## Critical for photos (signed-in blank images)
+
+If profile **names** load but **pictures/avatars** do not, run this first in the SQL Editor:
+
+1. Open [Supabase SQL Editor](https://supabase.com/dashboard/project/sdssshegqdwobjelxzkp/sql/new)
+2. Paste the full contents of `supabase/APPLY_PUBLIC_MEDIA_READ.sql`
+3. Click **Run** (safe to re-run)
+
+This restores `SELECT` on social media tables and storage buckets so
+`createSignedUrl` works for avatars, VUE, posts, and business media.
+Without it, the app shows names from Postgres but empty image placeholders.
+
+## Steps (other pending migrations)
 
 1. Open [Supabase SQL Editor](https://supabase.com/dashboard/project/sdssshegqdwobjelxzkp/sql/new)
 2. Open `supabase/apply_pending_migrations.sql` in this project

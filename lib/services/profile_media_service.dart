@@ -424,12 +424,13 @@ class ProfileMediaService {
           row['storage_provider'] as String?,
         );
         try {
-          out[profileId] = await MediaStorageService.createReadUrl(
+          final url = await MediaStorageService.createReadUrl(
             bucket: MediaBucket.profile,
             path: path,
             provider: provider,
             context: {'profile_id': profileId},
           );
+          if (url.isNotEmpty) out[profileId] = url;
         } catch (_) {}
       }
       return out;

@@ -5,6 +5,7 @@ import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import '../theme/firstvue_theme.dart';
+import 'network_photo.dart';
 
 /// Muted Explore-grid video preview with visibility-aware controller lifecycle.
 ///
@@ -261,8 +262,8 @@ class _ExploreGridVideoState extends State<ExploreGridVideo> {
               )
             else if (widget.thumbnailUrl != null &&
                 widget.thumbnailUrl!.isNotEmpty)
-              Image.network(
-                widget.thumbnailUrl!,
+              NetworkPhoto(
+                url: widget.thumbnailUrl!,
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) =>
                     ColoredBox(color: fv.elevatedSurface),

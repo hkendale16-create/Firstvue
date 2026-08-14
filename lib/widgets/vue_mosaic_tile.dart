@@ -87,25 +87,21 @@ class VueMosaicTile extends StatelessWidget {
                   children: [
                     GestureDetector(
                       onTap: onOpenProfile,
-                      child: CircleAvatar(
-                        radius: avatarRadius,
-                        backgroundColor: fv.elevatedSurface,
-                        backgroundImage:
+                      child: NetworkCircleAvatar(
+                        imageUrl:
                             item.avatarUrl != null &&
                                 item.avatarUrl!.startsWith('http')
-                            ? NetworkImage(item.avatarUrl!)
+                            ? item.avatarUrl
                             : null,
-                        child:
-                            item.avatarUrl == null ||
-                                !item.avatarUrl!.startsWith('http')
-                            ? Icon(
-                                item.isMember
-                                    ? Icons.person_rounded
-                                    : Icons.storefront_rounded,
-                                size: featured ? 14 : 12,
-                                color: FirstVueColors.gold,
-                              )
-                            : null,
+                        radius: avatarRadius,
+                        backgroundColor: fv.elevatedSurface,
+                        placeholder: Icon(
+                          item.isMember
+                              ? Icons.person_rounded
+                              : Icons.storefront_rounded,
+                          size: featured ? 14 : 12,
+                          color: FirstVueColors.gold,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),

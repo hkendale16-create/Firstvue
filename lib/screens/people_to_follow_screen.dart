@@ -5,6 +5,7 @@ import '../services/trending_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/social_chrome.dart';
 import '../widgets/entity_follow_button.dart';
+import '../widgets/network_photo.dart';
 import 'firstvue_business_profile_screen.dart';
 
 class PeopleToFollowScreen extends StatefulWidget {
@@ -54,18 +55,14 @@ class _PeopleToFollowScreenState extends State<PeopleToFollowScreen> {
               final item = items[index];
               return ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(
+                leading: NetworkCircleAvatar(
+                  imageUrl: item.imageUrl,
                   radius: 24,
                   backgroundColor: fv.elevatedSurface,
-                  backgroundImage: item.imageUrl != null
-                      ? NetworkImage(item.imageUrl!)
-                      : null,
-                  child: item.imageUrl == null
-                      ? const Icon(
-                          Icons.person_rounded,
-                          color: FirstVueColors.gold,
-                        )
-                      : null,
+                  placeholder: const Icon(
+                    Icons.person_rounded,
+                    color: FirstVueColors.gold,
+                  ),
                 ),
                 title: Text(
                   item.name,

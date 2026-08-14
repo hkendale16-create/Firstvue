@@ -8,6 +8,7 @@ import '../services/business_menu_service.dart';
 import '../services/media_storage_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/media_picker_sheet.dart';
+import '../widgets/network_photo.dart';
 import 'business_menu_item_detail_screen.dart';
 
 /// Shopify-simple menu manager for a dining business.
@@ -689,7 +690,7 @@ class _MenuItemEditorSheetState extends State<_MenuItemEditorSheet> {
                   aspectRatio: 16 / 9,
                   child: _imageBytes != null
                       ? Image.memory(_imageBytes!, fit: BoxFit.cover)
-                      : Image.network(_existingImageUrl!, fit: BoxFit.cover),
+                      : NetworkPhoto(url: _existingImageUrl!, fit: BoxFit.cover),
                 ),
               )
             else

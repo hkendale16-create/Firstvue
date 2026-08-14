@@ -1,5 +1,4 @@
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -41,10 +40,23 @@ class MediaStorageService {
       }
     }
 
+    final trimmed = path.trim();
+    if (trimmed.isEmpty) return '';
+
     try {
-      return await _client.storage.from(bucket.id).createSignedUrl(path, 3600);
-    } catch (_) {
+      return await _client.storage
+          .from(bucket.id)
+          .createSignedUrl(trimmed, 3600);
+    } catch (error, stack) {
       // Missing object or storage RLS — callers treat empty as "no media".
+      // Apply supabase/APPLY_PUBLIC_MEDIA_READ.sql if signed-in photos are blank.
+      assert(() {
+        debugPrint(
+          'MediaStorageService.createReadUrl failed '
+          '(${bucket.id}/$trimmed): $error\n$stack',
+        );
+        return true;
+      }());
       return '';
     }
   }

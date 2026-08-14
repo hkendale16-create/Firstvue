@@ -12,6 +12,7 @@ import 'entity_follow_button.dart';
 import 'explore_grid_video.dart';
 import 'facebook_style_profile_header.dart';
 import 'firstvue_inline_search_bar.dart';
+import 'network_photo.dart';
 import 'signed_media_viewer.dart';
 
 const _goldOnWhite = Colors.white;
@@ -455,18 +456,14 @@ class _PeopleFollowCard extends StatelessWidget {
           children: [
             Column(
               children: [
-                CircleAvatar(
+                NetworkCircleAvatar(
+                  imageUrl: item.imageUrl,
                   radius: 28,
                   backgroundColor: fv.elevatedSurface,
-                  backgroundImage: item.imageUrl != null
-                      ? NetworkImage(item.imageUrl!)
-                      : null,
-                  child: item.imageUrl == null
-                      ? const Icon(
-                          Icons.person_rounded,
-                          color: FirstVueColors.gold,
-                        )
-                      : null,
+                  placeholder: const Icon(
+                    Icons.person_rounded,
+                    color: FirstVueColors.gold,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -711,19 +708,15 @@ class SocialPostTile extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              CircleAvatar(
+              NetworkCircleAvatar(
+                imageUrl: avatarUrl,
                 radius: 11,
                 backgroundColor: fv.elevatedSurface,
-                backgroundImage: avatarUrl != null
-                    ? NetworkImage(avatarUrl!)
-                    : null,
-                child: avatarUrl == null
-                    ? const Icon(
-                        Icons.person_rounded,
-                        size: 12,
-                        color: FirstVueColors.gold,
-                      )
-                    : null,
+                placeholder: const Icon(
+                  Icons.person_rounded,
+                  size: 12,
+                  color: FirstVueColors.gold,
+                ),
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -760,8 +753,8 @@ class SocialPostTile extends StatelessWidget {
 
   Widget _tileImage() {
     if (imageUrl != null && imageUrl!.isNotEmpty) {
-      return Image.network(
-        imageUrl!,
+      return NetworkPhoto(
+        url: imageUrl!,
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => assetImage != null
             ? Image.asset(assetImage!, fit: BoxFit.cover)
@@ -857,8 +850,8 @@ class SocialPhotoGrid extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 if (item.imageUrl != null && item.imageUrl!.isNotEmpty)
-                  Image.network(
-                    item.imageUrl!,
+                  NetworkPhoto(
+                    url: item.imageUrl!,
                     fit: BoxFit.cover,
                     errorBuilder: (_, _, _) =>
                         const ColoredBox(color: Color(0xFFEEEAE4)),
@@ -962,19 +955,15 @@ class SocialFeedCard extends StatelessWidget {
                 child: InkWell(
                   onTap: openProfile,
                   borderRadius: BorderRadius.circular(24),
-                  child: CircleAvatar(
+                  child: NetworkCircleAvatar(
+                    imageUrl: imageUrl,
                     radius: 18,
                     backgroundColor: fv.elevatedSurface,
-                    backgroundImage: imageUrl != null
-                        ? NetworkImage(imageUrl!)
-                        : null,
-                    child: imageUrl == null
-                        ? const Icon(
-                            Icons.storefront_outlined,
-                            color: FirstVueColors.gold,
-                            size: 18,
-                          )
-                        : null,
+                    placeholder: const Icon(
+                      Icons.storefront_outlined,
+                      color: FirstVueColors.gold,
+                      size: 18,
+                    ),
                   ),
                 ),
               ),
@@ -1074,8 +1063,8 @@ class SocialFeedCard extends StatelessWidget {
                       child: AspectRatio(
                         aspectRatio: 16 / 10,
                         child: imageUrl != null
-                            ? Image.network(
-                                imageUrl!,
+                            ? NetworkPhoto(
+                                url: imageUrl!,
                                 fit: BoxFit.cover,
                                 errorBuilder: (_, _, _) => Image.asset(
                                   assetImage ??
@@ -1274,8 +1263,8 @@ class _SocialEventCardState extends State<SocialEventCard> {
                   width: 96,
                   height: 96,
                   child: event.coverImageUrl != null
-                      ? Image.network(
-                          event.coverImageUrl!,
+                      ? NetworkPhoto(
+                          url: event.coverImageUrl!,
                           fit: BoxFit.cover,
                           errorBuilder: (_, _, _) => Image.asset(
                             'assets/images/explore_things_to_do.jpg',

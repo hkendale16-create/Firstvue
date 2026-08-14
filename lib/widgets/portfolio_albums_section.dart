@@ -6,6 +6,7 @@ import '../services/portfolio_album_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'firstvue_ephemeral_toast.dart';
 import 'media_picker_sheet.dart';
+import 'network_photo.dart';
 import 'signed_media_viewer.dart';
 
 /// Facebook-style Portfolio / Photos section for managed profiles.
@@ -221,8 +222,8 @@ class _PortfolioAlbumsSectionState extends State<PortfolioAlbumsSection> {
                                     ),
                                   ),
                                 )
-                              : Image.network(
-                                  album.coverUrl!,
+                              : NetworkPhoto(
+                                  url: album.coverUrl!,
                                   fit: BoxFit.cover,
                                   width: double.infinity,
                                   errorBuilder: (_, _, _) => ColoredBox(

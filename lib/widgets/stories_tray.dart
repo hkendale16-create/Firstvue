@@ -7,6 +7,7 @@ import '../screens/story_composer_screen.dart';
 import '../screens/story_viewer_screen.dart';
 import '../services/story_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'network_photo.dart';
 
 class StoriesTray extends StatefulWidget {
   final int refreshToken;
@@ -149,17 +150,14 @@ class _StoryBubble extends StatelessWidget {
                 shape: BoxShape.circle,
                 border: Border.all(color: ringColor, width: 2),
               ),
-              child: CircleAvatar(
+              child: NetworkCircleAvatar(
+                imageUrl: imageUrl,
                 radius: 28,
                 backgroundColor: fv.elevatedSurface,
-                backgroundImage:
-                    imageUrl != null ? NetworkImage(imageUrl!) : null,
-                child: imageUrl == null
-                    ? Icon(
-                        isAdd ? Icons.add : Icons.person_outline,
-                        color: fv.primaryText,
-                      )
-                    : null,
+                placeholder: Icon(
+                  isAdd ? Icons.add : Icons.person_outline,
+                  color: fv.primaryText,
+                ),
               ),
             ),
             const SizedBox(height: 6),

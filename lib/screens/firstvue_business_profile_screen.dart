@@ -24,6 +24,7 @@ import '../widgets/entity_follow_button.dart';
 import '../widgets/shoutout_card.dart';
 import '../services/shoutout_service.dart';
 import '../widgets/portfolio_albums_section.dart';
+import '../widgets/network_photo.dart';
 import '../services/portfolio_album_service.dart';
 import '../messaging/screens/messaging_shell_screen.dart';
 import '../messaging/services/fv_messaging_service.dart';
@@ -884,7 +885,7 @@ class _BusinessMediaGallery extends StatelessWidget {
                     backgroundColor: Colors.transparent,
                     insetPadding: const EdgeInsets.all(16),
                     child: InteractiveViewer(
-                      child: Image.network(item.signedUrl, fit: BoxFit.contain),
+                      child: NetworkPhoto(url: item.signedUrl, fit: BoxFit.contain),
                     ),
                   ),
                 );
@@ -918,8 +919,8 @@ class _BusinessMediaGallery extends StatelessWidget {
                           ),
                         ),
                       )
-                    : Image.network(
-                        item.signedUrl,
+                    : NetworkPhoto(
+                        url: item.signedUrl,
                         width: 250,
                         height: 190,
                         fit: BoxFit.cover,

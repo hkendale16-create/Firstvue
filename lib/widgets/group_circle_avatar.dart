@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/firstvue_theme.dart';
+import 'network_photo.dart';
 
 /// True circular group/community profile image with optional ring.
 class GroupCircleAvatar extends StatelessWidget {
@@ -50,12 +51,11 @@ class GroupCircleAvatar extends StatelessWidget {
             width: size - 9,
             height: size - 9,
             child: hasImage
-                ? Image.network(
-                    imageUrl!,
+                ? NetworkPhoto(
+                    url: imageUrl!,
                     fit: BoxFit.cover,
                     width: size - 9,
                     height: size - 9,
-                    filterQuality: FilterQuality.low,
                     errorBuilder: (_, _, _) => ColoredBox(
                       color: fv.elevatedSurface,
                       child: Icon(

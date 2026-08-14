@@ -7,6 +7,7 @@ import '../theme/firstvue_theme.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/network_photo.dart';
 import 'firstvue_business_profile_screen.dart';
 import 'edit_business_profile_screen.dart';
 
@@ -248,8 +249,8 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
                                         color: Color(0xFF78B9BE),
                                       ),
                                     )
-                                  : Image.network(
-                                      item.signedUrl,
+                                  : NetworkPhoto(
+                                      url: item.signedUrl,
                                       fit: BoxFit.cover,
                                     ),
                             );

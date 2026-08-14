@@ -10,6 +10,7 @@ import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/group_circle_avatar.dart';
+import '../widgets/network_photo.dart';
 import '../auth/ensure_signed_in.dart';
 import 'edit_community_screen.dart';
 import 'member_public_profile_screen.dart';
@@ -306,26 +307,20 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                             borderRadius: BorderRadius.circular(12),
                             child: Row(
                               children: [
-                                CircleAvatar(
+                                NetworkCircleAvatar(
+                                  imageUrl: _leader!.avatarUrl,
                                   radius: 18,
                                   backgroundColor:
                                       FirstVueColors.elevatedSurface,
-                                  backgroundImage: _leader!.avatarUrl != null &&
-                                          _leader!.avatarUrl!.isNotEmpty
-                                      ? NetworkImage(_leader!.avatarUrl!)
-                                      : null,
-                                  child: _leader!.avatarUrl == null ||
-                                          _leader!.avatarUrl!.isEmpty
-                                      ? Text(
-                                          _leader!.displayName.isNotEmpty
-                                              ? _leader!.displayName[0]
-                                                  .toUpperCase()
-                                              : '?',
-                                          style: const TextStyle(
-                                            color: FirstVueColors.gold,
-                                          ),
-                                        )
-                                      : null,
+                                  placeholder: Text(
+                                    _leader!.displayName.isNotEmpty
+                                        ? _leader!.displayName[0]
+                                            .toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                      color: FirstVueColors.gold,
+                                    ),
+                                  ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
@@ -538,26 +533,19 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                     (member) => ListTile(
                                       contentPadding: EdgeInsets.zero,
                                       onTap: () => _openProfile(member),
-                                      leading: CircleAvatar(
+                                      leading: NetworkCircleAvatar(
                                         backgroundColor:
                                             FirstVueColors.elevatedSurface,
-                                        backgroundImage: member.avatarUrl !=
-                                                    null &&
-                                                member.avatarUrl!.isNotEmpty
-                                            ? NetworkImage(member.avatarUrl!)
-                                            : null,
-                                        child: member.avatarUrl == null ||
-                                                member.avatarUrl!.isEmpty
-                                            ? Text(
-                                                member.displayName.isNotEmpty
-                                                    ? member.displayName[0]
-                                                        .toUpperCase()
-                                                    : '?',
-                                                style: const TextStyle(
-                                                  color: FirstVueColors.gold,
-                                                ),
-                                              )
-                                            : null,
+                                        imageUrl: member.avatarUrl,
+                                        placeholder: Text(
+                                          member.displayName.isNotEmpty
+                                              ? member.displayName[0]
+                                                  .toUpperCase()
+                                              : '?',
+                                          style: const TextStyle(
+                                            color: FirstVueColors.gold,
+                                          ),
+                                        ),
                                       ),
                                       title: Text(
                                         member.displayName,
