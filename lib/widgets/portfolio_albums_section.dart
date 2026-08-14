@@ -5,6 +5,7 @@ import '../screens/full_screen_media_viewer.dart';
 import '../services/portfolio_album_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'firstvue_ephemeral_toast.dart';
+import 'media_caption_editor.dart';
 import 'media_picker_sheet.dart';
 import 'network_photo.dart';
 import 'signed_media_viewer.dart';
@@ -307,9 +308,19 @@ class _PortfolioAlbumDetailScreenState
       context,
       mode: MediaPickerMode.photosOnly,
     );
-    if (files == null || files.isEmpty) return;
+    if (files == null || files.isEmpty || !mounted) return;
+    final captioned = await captionLocalMediaBatch(
+      context,
+      files: files,
+      title: 'Caption photo',
+    );
+    if (captioned.isEmpty || !mounted) return;
     try {
-      await PortfolioAlbumService.addPhotos(albumId: _album.id, files: files);
+      await PortfolioAlbumService.addPhotos(
+        albumId: _album.id,
+        files: captioned.map((e) => e.file).toList(),
+        captions: captioned.map((e) => e.caption).toList(),
+      );
       await _load();
     } catch (_) {
       if (!mounted) return;
@@ -463,32 +474,18 @@ class _PortfolioAlbumDetailScreenState
         );
         await _load();
       case 'caption':
-        final controller = TextEditingController(text: item.caption ?? '');
-        final ok = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: FirstVueColors.surface,
-            title: const Text('Caption', style: TextStyle(color: Colors.white)),
-            content: TextField(
-              controller: controller,
-              style: const TextStyle(color: Colors.white),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Save'),
-              ),
-            ],
-          ),
+        final result = await MediaCaptionEditorScreen.open(
+          context,
+          networkUrl: item.signedUrl,
+          isVideo: item.isVideo,
+          initialCaption: item.caption ?? '',
+          title: 'Edit caption',
+          saveLabel: 'Save',
         );
-        if (ok == true) {
+        if (result != null) {
           await PortfolioAlbumService.updateCaption(
             itemId: item.id,
-            caption: controller.text,
+            caption: result.caption,
           );
           await _load();
         }
@@ -500,10 +497,12 @@ class _PortfolioAlbumDetailScreenState
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
-      backgroundColor: FirstVueColors.background,
+      backgroundColor: fv.background,
       appBar: AppBar(
-        backgroundColor: FirstVueColors.background,
+        backgroundColor: fv.background,
+        foregroundColor: fv.primaryText,
         title: Text(_album.title),
         actions: [
           if (widget.canManage) ...[
@@ -530,7 +529,7 @@ class _PortfolioAlbumDetailScreenState
                     widget.canManage
                         ? 'Add photos to this album.'
                         : 'This album is empty.',
-                    style: TextStyle(color: Colors.white.withValues(alpha: .5)),
+                    style: TextStyle(color: fv.secondaryText),
                   ),
                 )
               : GridView.builder(
@@ -543,25 +542,66 @@ class _PortfolioAlbumDetailScreenState
                   ),
                   itemBuilder: (context, index) {
                     final item = _items[index];
+                    final hasCaption =
+                        item.caption?.trim().isNotEmpty == true;
                     return GestureDetector(
                       onTap: () => _itemActions(item),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          SignedMediaThumbnail(
-                            url: item.signedUrl,
-                            isVideo: item.isVideo,
-                            fit: BoxFit.cover,
-                          ),
-                          if (item.isVideo)
-                            const Align(
-                              alignment: Alignment.center,
-                              child: Icon(
-                                Icons.play_circle_outline,
-                                color: Colors.white70,
-                              ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            SignedMediaThumbnail(
+                              url: item.signedUrl,
+                              isVideo: item.isVideo,
+                              fit: BoxFit.cover,
                             ),
-                        ],
+                            if (item.isVideo)
+                              const Align(
+                                alignment: Alignment.center,
+                                child: Icon(
+                                  Icons.play_circle_outline,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            if (hasCaption)
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.transparent,
+                                        fv.background.withValues(alpha: 0.82),
+                                      ],
+                                    ),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      6,
+                                      16,
+                                      6,
+                                      6,
+                                    ),
+                                    child: Text(
+                                      item.caption!.trim(),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: fv.primaryText,
+                                        fontSize: 10,
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     );
                   },

@@ -5,6 +5,7 @@ import '../config/app_config.dart';
 import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../screens/followers_following_screen.dart';
+import '../screens/full_screen_media_viewer.dart';
 import '../services/web_seo_service.dart';
 import '../services/community_news_service.dart';
 import '../services/follow_service.dart';
@@ -413,19 +414,79 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
         itemCount: _gallery.length,
         itemBuilder: (context, index) {
           final media = _gallery[index];
+          final hasCaption = media.caption?.trim().isNotEmpty == true;
           return ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: GestureDetector(
-              onTap: () => openSignedMedia(
-                context,
-                url: media.signedUrl,
-                isVideo: media.isVideo,
-                title: media.isVideo ? 'VIDEO' : 'PHOTO',
-              ),
-              child: SignedMediaThumbnail(
-                url: media.signedUrl,
-                isVideo: media.isVideo,
-                fit: BoxFit.cover,
+              onTap: () async {
+                if (media.isVideo) {
+                  openSignedMedia(
+                    context,
+                    url: media.signedUrl,
+                    isVideo: true,
+                    title: 'VIDEO',
+                  );
+                  return;
+                }
+                final images = _gallery
+                    .where((e) => !e.isVideo)
+                    .map(
+                      (e) => FullScreenMediaItem(
+                        url: e.signedUrl,
+                        isVideo: false,
+                        caption: e.caption,
+                      ),
+                    )
+                    .toList();
+                final imageIndex =
+                    images.indexWhere((e) => e.url == media.signedUrl);
+                await openFullScreenImageViewer(
+                  context,
+                  items: images,
+                  initialIndex: imageIndex < 0 ? 0 : imageIndex,
+                  title: 'PHOTO',
+                );
+              },
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  SignedMediaThumbnail(
+                    url: media.signedUrl,
+                    isVideo: media.isVideo,
+                    fit: BoxFit.cover,
+                  ),
+                  if (hasCaption)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.75),
+                            ],
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(6, 16, 6, 6),
+                          child: Text(
+                            media.caption!.trim(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              height: 1.2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           );

@@ -8,8 +8,10 @@ class ProfileCards {
 
   static const relation = 'profile_public_cards';
   static const columns =
-      'id, display_name, username, is_private, profile_visibility';
+      'id, display_name, username, is_private, profile_visibility, created_at';
   static const nameColumns = 'id, display_name, username';
+  static const columnsNoCreatedAt =
+      'id, display_name, username, is_private, profile_visibility';
 
   static final _client = Supabase.instance.client;
 
@@ -127,10 +129,17 @@ class ProfileCards {
     int limit = 16,
     String? excludeId,
   }) async {
-    Future<List<Map<String, dynamic>>> run(String table, String select) async {
-      var request = _client.from(table).select(select);
+    Future<List<Map<String, dynamic>>> run(
+      String table,
+      String select, {
+      bool orderNewest = false,
+    }) async {
+      dynamic request = _client.from(table).select(select);
       if (excludeId != null && excludeId.isNotEmpty) {
         request = request.neq('id', excludeId);
+      }
+      if (orderNewest) {
+        request = request.order('created_at', ascending: false);
       }
       final rows = await request.limit(limit);
       return List<Map<String, dynamic>>.from(rows as List);
@@ -138,9 +147,10 @@ class ProfileCards {
 
     Future<List<Map<String, dynamic>>> runPublic(
       String table,
-      String select,
-    ) async {
-      var request = _client
+      String select, {
+      bool orderNewest = false,
+    }) async {
+      dynamic request = _client
           .from(table)
           .select(select)
           .eq('is_private', false)
@@ -148,22 +158,33 @@ class ProfileCards {
       if (excludeId != null && excludeId.isNotEmpty) {
         request = request.neq('id', excludeId);
       }
+      if (orderNewest) {
+        request = request.order('created_at', ascending: false);
+      }
       final rows = await request.limit(limit);
       return List<Map<String, dynamic>>.from(rows as List);
     }
 
     try {
-      return await runPublic(relation, columns);
+      return await runPublic(relation, columns, orderNewest: true);
     } catch (error) {
       if (!isMissingRelation(error)) {
         try {
-          return await run(relation, columns);
-        } catch (_) {}
+          return await runPublic(relation, columnsNoCreatedAt);
+        } catch (_) {
+          try {
+            return await run(relation, columnsNoCreatedAt);
+          } catch (_) {}
+        }
       }
       try {
-        return await runPublic('profiles', columns);
+        return await runPublic('profiles', columns, orderNewest: true);
       } catch (_) {
-        return run('profiles', nameColumns);
+        try {
+          return await runPublic('profiles', columnsNoCreatedAt);
+        } catch (_) {
+          return run('profiles', nameColumns);
+        }
       }
     }
   }

@@ -303,6 +303,7 @@ class PortfolioAlbumService {
   static Future<List<PortfolioAlbumItem>> addPhotos({
     required String albumId,
     required List<XFile> files,
+    List<String?>? captions,
   }) async {
     final me = _client.auth.currentUser;
     if (me == null) {
@@ -339,6 +340,9 @@ class PortfolioAlbumService {
       }
       final mediaType = mediaTypeForFile(file, bytes: bytes);
       final contentType = mimeTypeForFile(file, mediaType);
+      final caption = (captions != null && i < captions.length)
+          ? captions[i]?.trim()
+          : null;
       final upload = await MediaStorageService.uploadBytes(
         bucket: ownerType.bucket,
         bytes: bytes,
@@ -350,16 +354,20 @@ class PortfolioAlbumService {
       );
 
       try {
+        final payload = <String, dynamic>{
+          'album_id': albumId,
+          'storage_path': upload.path,
+          'storage_provider': upload.provider.value,
+          'media_type': mediaType,
+          'sort_order': sortOrder,
+          'created_by': me.id,
+        };
+        if (caption != null && caption.isNotEmpty) {
+          payload['caption'] = caption;
+        }
         final row = await _client
             .from('media_album_items')
-            .insert({
-              'album_id': albumId,
-              'storage_path': upload.path,
-              'storage_provider': upload.provider.value,
-              'media_type': mediaType,
-              'sort_order': sortOrder,
-              'created_by': me.id,
-            })
+            .insert(payload)
             .select(
               'id, album_id, storage_path, storage_provider, media_type, '
               'caption, sort_order',
@@ -373,6 +381,7 @@ class PortfolioAlbumService {
             storagePath: upload.path,
             storageProvider: upload.provider,
             mediaType: mediaType,
+            caption: (row['caption'] as String?) ?? caption,
             sortOrder: (row['sort_order'] as num?)?.toInt() ?? 0,
             signedUrl: await MediaStorageService.createReadUrl(
               bucket: ownerType.bucket,

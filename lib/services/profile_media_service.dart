@@ -14,6 +14,7 @@ class ProfileMediaItem {
   final String mediaType;
   final bool featuredForTrending;
   final String mediaRole;
+  final String? caption;
 
   const ProfileMediaItem({
     required this.id,
@@ -23,6 +24,7 @@ class ProfileMediaItem {
     required this.mediaType,
     required this.featuredForTrending,
     this.mediaRole = 'gallery',
+    this.caption,
   });
 
   bool get isVideo =>
@@ -44,6 +46,9 @@ class ProfileMediaService {
   static final _client = Supabase.instance.client;
 
   static const _selectColumns =
+      'id, storage_path, storage_provider, media_type, featured_for_trending, media_role, caption';
+
+  static const _selectColumnsNoCaption =
       'id, storage_path, storage_provider, media_type, featured_for_trending, media_role';
 
   static Future<List<ProfileMediaItem>> fetchMyMedia() => fetchGalleryMedia();
@@ -63,17 +68,28 @@ class ProfileMediaService {
 
       return await _mapRows(rows, user.id);
     } catch (_) {
-      // media_role column may not exist yet — fall back without role filter.
-      final rows = await _client
-          .from('profile_media')
-          .select(
-            'id, storage_path, storage_provider, media_type, featured_for_trending',
-          )
-          .eq('profile_id', user.id)
-          .order('sort_order')
-          .order('created_at');
+      try {
+        final rows = await _client
+            .from('profile_media')
+            .select(_selectColumnsNoCaption)
+            .eq('profile_id', user.id)
+            .or('media_role.eq.gallery,media_role.is.null')
+            .order('sort_order')
+            .order('created_at');
+        return await _mapRows(rows, user.id);
+      } catch (_) {
+        // media_role column may not exist yet — fall back without role filter.
+        final rows = await _client
+            .from('profile_media')
+            .select(
+              'id, storage_path, storage_provider, media_type, featured_for_trending',
+            )
+            .eq('profile_id', user.id)
+            .order('sort_order')
+            .order('created_at');
 
-      return await _mapRows(rows, user.id);
+        return await _mapRows(rows, user.id);
+      }
     }
   }
 
@@ -91,7 +107,7 @@ class ProfileMediaService {
     try {
       final rows = await _client
           .from('profile_media')
-          .select(_selectColumns)
+          .select(_selectColumnsNoCaption)
           .eq('profile_id', profileId)
           .inFilter('media_role', ['avatar', 'cover']);
 
@@ -125,16 +141,27 @@ class ProfileMediaService {
 
       return await _mapRows(rows, profileId);
     } catch (_) {
-      final rows = await _client
-          .from('profile_media')
-          .select(
-            'id, storage_path, storage_provider, media_type, featured_for_trending',
-          )
-          .eq('profile_id', profileId)
-          .order('sort_order')
-          .order('created_at');
+      try {
+        final rows = await _client
+            .from('profile_media')
+            .select(_selectColumnsNoCaption)
+            .eq('profile_id', profileId)
+            .or('media_role.eq.gallery,media_role.is.null')
+            .order('sort_order')
+            .order('created_at');
+        return await _mapRows(rows, profileId);
+      } catch (_) {
+        final rows = await _client
+            .from('profile_media')
+            .select(
+              'id, storage_path, storage_provider, media_type, featured_for_trending',
+            )
+            .eq('profile_id', profileId)
+            .order('sort_order')
+            .order('created_at');
 
-      return await _mapRows(rows, profileId);
+        return await _mapRows(rows, profileId);
+      }
     }
   }
 
@@ -160,6 +187,7 @@ class ProfileMediaService {
       mediaType: (row['media_type'] as String?) ?? 'image',
       featuredForTrending: (row['featured_for_trending'] as bool?) ?? false,
       mediaRole: (row['media_role'] as String?) ?? 'gallery',
+      caption: row['caption'] as String?,
       signedUrl: await MediaStorageService.createReadUrl(
         bucket: MediaBucket.profile,
         path: path,
@@ -169,7 +197,10 @@ class ProfileMediaService {
     );
   }
 
-  static Future<void> uploadMedia(List<XFile> files) async {
+  static Future<void> uploadMedia(
+    List<XFile> files, {
+    List<String?>? captions,
+  }) async {
     final user = _client.auth.currentUser;
     if (user == null) {
       throw const AuthException('Sign in before adding profile photos.');
@@ -187,6 +218,9 @@ class ProfileMediaService {
         : (existing.first['sort_order'] as int) + 1;
 
     for (var index = 0; index < files.length; index++) {
+      final caption = (captions != null && index < captions.length)
+          ? captions[index]
+          : null;
       await _uploadSingle(
         file: files[index],
         userId: user.id,
@@ -194,8 +228,24 @@ class ProfileMediaService {
         sortOrder: firstSortOrder + index,
         mediaRole: 'gallery',
         subfolder: null,
+        caption: caption,
       );
     }
+  }
+
+  static Future<void> updateCaption({
+    required String mediaId,
+    String? caption,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw const AuthException('Sign in before editing captions.');
+    }
+    await _client
+        .from('profile_media')
+        .update({'caption': caption?.trim()})
+        .eq('id', mediaId)
+        .eq('profile_id', user.id);
   }
 
   static Future<void> setAvatar(XFile file) async {
@@ -222,13 +272,25 @@ class ProfileMediaService {
     String profileId,
     String role,
   ) async {
-    final rows = await _client
-        .from('profile_media')
-        .select(_selectColumns)
-        .eq('profile_id', profileId)
-        .eq('media_role', role)
-        .order('created_at', ascending: false);
-    return List<Map<String, dynamic>>.from(rows as List);
+    try {
+      final rows = await _client
+          .from('profile_media')
+          .select(_selectColumnsNoCaption)
+          .eq('profile_id', profileId)
+          .eq('media_role', role)
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(rows as List);
+    } catch (_) {
+      final rows = await _client
+          .from('profile_media')
+          .select(
+            'id, storage_path, storage_provider, media_type, featured_for_trending',
+          )
+          .eq('profile_id', profileId)
+          .eq('media_role', role)
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(rows as List);
+    }
   }
 
   static Future<void> _setRoleImage(
@@ -334,6 +396,7 @@ class ProfileMediaService {
     required int sortOrder,
     required String mediaRole,
     required String? subfolder,
+    String? caption,
   }) async {
     final validated = await RoleMediaReplace.readValidatedBytes(
       file,
@@ -349,7 +412,7 @@ class ProfileMediaService {
       context: {'profile_id': userId},
     );
 
-    final insertPayload = {
+    final insertPayload = <String, dynamic>{
       'profile_id': userId,
       'storage_path': upload.path,
       'storage_provider': upload.provider.value,
@@ -357,10 +420,22 @@ class ProfileMediaService {
       'sort_order': sortOrder,
       'media_role': mediaRole,
     };
+    final trimmed = caption?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) {
+      insertPayload['caption'] = trimmed;
+    }
 
     try {
       await _client.from('profile_media').insert(insertPayload);
-    } catch (_) {
+    } catch (error) {
+      // Older DBs may not have caption yet — retry without it.
+      if (trimmed != null && trimmed.isNotEmpty) {
+        try {
+          insertPayload.remove('caption');
+          await _client.from('profile_media').insert(insertPayload);
+          return;
+        } catch (_) {}
+      }
       await MediaStorageService.deleteObject(
         bucket: MediaBucket.profile,
         path: upload.path,

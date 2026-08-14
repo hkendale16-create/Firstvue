@@ -9,6 +9,8 @@ businesses, and events:
 
 1. Run `supabase/APPLY_DEMO_SEED.sql` in the SQL Editor
 2. See `docs/DEMO_SEED.md` for details and purge steps (`APPLY_DEMO_PURGE.sql`)
+3. Refreshing the app alone does **not** create demo people — the SQL must run once
+4. Optional: run `supabase/APPLY_PROFILE_MEDIA_CAPTIONS.sql` for profile photo captions + newest-first Explore ordering
 
 
 If you are **signed in** and Explore/Feeds fail, Home posts fail, or photos

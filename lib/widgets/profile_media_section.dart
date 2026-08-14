@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../auth/ensure_signed_in.dart';
 import '../services/profile_media_service.dart';
 import 'editable_media_grid.dart';
+import 'media_caption_editor.dart';
 import 'media_picker_sheet.dart';
 
 class ProfileMediaSection extends StatefulWidget {
@@ -55,15 +56,24 @@ class _ProfileMediaSectionState extends State<ProfileMediaSection> {
   Future<void> _addMedia() async {
     final files = await showMediaPickerSheet(context);
     if (files == null || files.isEmpty || !mounted) return;
+    final captioned = await captionLocalMediaBatch(
+      context,
+      files: files,
+      title: 'Caption photo',
+    );
+    if (captioned.isEmpty || !mounted) return;
     setState(() => _uploading = true);
     try {
-      await ProfileMediaService.uploadMedia(files);
+      await ProfileMediaService.uploadMedia(
+        captioned.map((e) => e.file).toList(),
+        captions: captioned.map((e) => e.caption).toList(),
+      );
       await _refresh();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '${files.length} file${files.length == 1 ? '' : 's'} added to your profile.',
+              '${captioned.length} file${captioned.length == 1 ? '' : 's'} added to your profile.',
             ),
           ),
         );
@@ -80,6 +90,32 @@ class _ProfileMediaSectionState extends State<ProfileMediaSection> {
       }
     } finally {
       if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<void> _editCaption(EditableMediaGridItem item) async {
+    final original = _media.firstWhere((entry) => entry.id == item.id);
+    final result = await MediaCaptionEditorScreen.open(
+      context,
+      networkUrl: original.signedUrl,
+      isVideo: original.isVideo,
+      initialCaption: original.caption ?? '',
+      title: 'Edit caption',
+      saveLabel: 'Save',
+    );
+    if (result == null || !mounted) return;
+    try {
+      await ProfileMediaService.updateCaption(
+        mediaId: original.id,
+        caption: result.caption,
+      );
+      await _refresh();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to save caption right now.')),
+        );
+      }
     }
   }
 
@@ -244,10 +280,12 @@ class _ProfileMediaSectionState extends State<ProfileMediaSection> {
                       signedUrl: entry.signedUrl,
                       isVideo: entry.isVideo,
                       featuredForTrending: entry.featuredForTrending,
+                      caption: entry.caption,
                     ),
                 ],
                 onDelete: _deleteMedia,
                 onSetTrendingFeatured: _setTrending,
+                onEditCaption: _editCaption,
                 trendingHint: embedded
                     ? 'Star a photo for your Trending cover.'
                     : 'Tap the star to choose what shows in Trending Near You.',
