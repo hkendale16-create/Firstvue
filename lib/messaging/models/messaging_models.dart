@@ -84,6 +84,7 @@ class FvConversationSummary {
   final String? conversationTypeLabel;
   final bool archived;
   final DateTime? lastActiveAt;
+  final bool isEventHost;
 
   const FvConversationSummary({
     required this.id,
@@ -112,6 +113,7 @@ class FvConversationSummary {
     this.conversationTypeLabel,
     this.archived = false,
     this.lastActiveAt,
+    this.isEventHost = false,
   });
 
   bool get allowsPersonalCalls =>
@@ -159,6 +161,7 @@ class FvConversationSummary {
       conversationTypeLabel: conversationTypeLabel,
       archived: archived ?? this.archived,
       lastActiveAt: lastActiveAt,
+      isEventHost: isEventHost,
     );
   }
 }

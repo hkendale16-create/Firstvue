@@ -293,8 +293,9 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
   }
 
   Future<void> _reload() async {
+    final keepVisible = _posts.isNotEmpty;
     setState(() {
-      _loading = true;
+      if (!keepVisible) _loading = true;
       _error = null;
       _hasMore = true;
     });
@@ -323,7 +324,9 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Could not load this feed.';
+        if (!keepVisible) {
+          _error = 'Could not load this feed.';
+        }
       });
     }
   }
@@ -482,6 +485,9 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
   Widget build(BuildContext context) {
     return RefreshIndicator(
       color: FirstVueColors.gold,
+      displacement: 64,
+      edgeOffset: 8,
+      triggerMode: RefreshIndicatorTriggerMode.onEdge,
       onRefresh: _reload,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),

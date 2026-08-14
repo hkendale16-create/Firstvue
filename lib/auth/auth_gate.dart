@@ -11,6 +11,7 @@ import '../services/deep_link_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_emblem.dart';
 import '../widgets/firstvue_settings_drawer.dart';
+import 'auth_link_handler.dart';
 import 'auth_redirect.dart';
 import 'auth_session_controller.dart';
 
@@ -43,6 +44,7 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _bootstrap() async {
+    await AuthLinkHandler.completeIfNeeded();
     await _auth.start();
     if (!mounted) return;
     if (!_auth.isSignedIn) {

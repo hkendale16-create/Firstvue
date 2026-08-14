@@ -24,6 +24,8 @@ void main() {
     expect(shouldRedirectSignedInToHome('/signin'), isTrue);
     expect(shouldRedirectSignedInToHome('/signup'), isTrue);
     expect(shouldRedirectSignedInToHome('/forgot-password'), isTrue);
+    expect(shouldRedirectSignedInToHome('/auth/confirm'), isTrue);
+    expect(shouldRedirectSignedInToHome('/auth/callback'), isTrue);
     expect(shouldRedirectSignedInToHome('/reset-password'), isFalse);
     expect(shouldRedirectSignedInToHome('/'), isFalse);
     expect(shouldRedirectSignedInToHome('/settings'), isFalse);
