@@ -28,7 +28,18 @@ if ($WebUrl -ne "") {
 }
 
 Write-Host "Building web..."
-& $Flutter build web --no-wasm-dry-run --no-web-resources-cdn --pwa-strategy=none @defineArgs
+& $Flutter build web --release --no-wasm-dry-run --no-web-resources-cdn --pwa-strategy=none --tree-shake-icons @defineArgs
+
+$canvasKitDir = Join-Path $ProjectRoot "build\web\canvaskit"
+if (Test-Path $canvasKitDir) {
+  Get-ChildItem -Path $canvasKitDir -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like 'skwasm*' -or $_.Name -like 'wimp*' -or $_.Name -like '*.symbols' } |
+    Remove-Item -Force -ErrorAction SilentlyContinue
+  $webParagraph = Join-Path $canvasKitDir "webparagraph"
+  if (Test-Path $webParagraph) {
+    Remove-Item -Recurse -Force $webParagraph -ErrorAction SilentlyContinue
+  }
+}
 
 Write-Host ""
 Write-Host "Build complete: $ProjectRoot\build\web"

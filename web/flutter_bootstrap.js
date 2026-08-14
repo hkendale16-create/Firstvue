@@ -17,6 +17,18 @@ _flutter.loader.load({
     canvasKitBaseUrl: 'canvaskit/',
   },
   onEntrypointLoaded: async function (engineInitializer) {
+    // Yield once so the boot splash can paint before the heavy CanvasKit
+    // initialize + main.dart.js evaluation block the main thread.
+    await new Promise(function (resolve) {
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(function () {
+          setTimeout(resolve, 0);
+        });
+      } else {
+        setTimeout(resolve, 0);
+      }
+    });
+
     var appRunner = await engineInitializer.initializeEngine({
       canvasKitBaseUrl: 'canvaskit/',
     });

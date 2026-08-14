@@ -25,6 +25,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="FirstVue">
   <meta name="twitter:description" content="Discover, verify, and choose trusted local beauty and service pros.">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -37,9 +38,14 @@
 
   <title>FirstVue</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="preload" href="canvaskit/canvaskit.wasm" as="fetch" type="application/wasm" crossorigin>
+  <!--
+    Do NOT preload canvaskit/canvaskit.wasm. Chromium browsers load
+    canvaskit/chromium/canvaskit.wasm instead; a hardcoded preload of the
+    legacy build caused Lighthouse to download ~5MB of WASM (both variants).
+    Preload only main.dart.js; Flutter's loader fetches the correct WASM.
+  -->
   <link rel="preload" href="main.dart.js" as="script">
-  <script src="seo-bootstrap.js"></script>
+  <script src="seo-bootstrap.js" defer></script>
   <style>
     html, body {
       height: 100%;
