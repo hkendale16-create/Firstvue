@@ -46,10 +46,7 @@ class TrendingBusinessesService {
   static Future<List<TrendingBusiness>> fetchTrendingNearYou({
     int limit = 8,
   }) async {
-    return _fetchRanked(
-      limit: limit,
-      orderByPopularity: true,
-    );
+    return _fetchRanked(limit: limit, orderByPopularity: true);
   }
 
   static Future<List<TrendingBusiness>> fetchNewNearYou({int limit = 8}) async {
@@ -170,9 +167,7 @@ class TrendingBusinessesService {
     if (rows.isEmpty) return const [];
 
     final prefs = await UserPreferencesService.fetch();
-    final filteredRows = prefs.browseEverywhere
-        ? rows
-        : _filterRowsByPreferredLocation(rows, prefs);
+    final filteredRows = filterByPreferredLocationOrAll(rows, prefs);
 
     Position? position;
     try {
@@ -219,6 +214,16 @@ class TrendingBusinessesService {
     return businesses;
   }
 
+  /// Keep the public catalog when a signed-in location filter matches nothing.
+  static List<dynamic> filterByPreferredLocationOrAll(
+    List<dynamic> rows,
+    UserPreferences prefs,
+  ) {
+    if (rows.isEmpty || prefs.browseEverywhere) return rows;
+    final filtered = _filterRowsByPreferredLocation(rows, prefs);
+    return filtered.isEmpty ? rows : filtered;
+  }
+
   static List<dynamic> _filterRowsByPreferredLocation(
     List<dynamic> rows,
     UserPreferences prefs,
@@ -234,15 +239,20 @@ class TrendingBusinessesService {
       if (locations.isEmpty) return true;
       for (final entry in locations) {
         final location = entry as Map<String, dynamic>;
-        final locationCity = (location['city'] as String?)?.trim().toLowerCase();
-        final locationState =
-            (location['state'] as String?)?.trim().toLowerCase();
-        final cityMatches = city == null ||
+        final locationCity = (location['city'] as String?)
+            ?.trim()
+            .toLowerCase();
+        final locationState = (location['state'] as String?)
+            ?.trim()
+            .toLowerCase();
+        final cityMatches =
+            city == null ||
             city.isEmpty ||
             locationCity == null ||
             locationCity.contains(city) ||
             city.contains(locationCity);
-        final stateMatches = state == null ||
+        final stateMatches =
+            state == null ||
             state.isEmpty ||
             locationState == null ||
             locationState.contains(state) ||
@@ -259,11 +269,16 @@ class TrendingBusinessesService {
   ) async {
     final businessId = row['id'] as String;
 
-    final reviewRows = await _client
-        .from('business_reviews')
-        .select('id')
-        .eq('business_id', businessId)
-        .eq('status', 'approved');
+    List<dynamic> reviewRows = const [];
+    try {
+      reviewRows = await _client
+          .from('business_reviews')
+          .select('id')
+          .eq('business_id', businessId)
+          .eq('status', 'approved');
+    } catch (_) {
+      reviewRows = const [];
+    }
 
     Map<String, dynamic>? fallbackMediaRow;
     try {
@@ -274,7 +289,8 @@ class TrendingBusinessesService {
           .eq('featured_for_trending', true)
           .maybeSingle();
 
-      fallbackMediaRow = mediaRow ??
+      fallbackMediaRow =
+          mediaRow ??
           await _client
               .from('business_media')
               .select(

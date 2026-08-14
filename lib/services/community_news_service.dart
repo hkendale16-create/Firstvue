@@ -409,6 +409,28 @@ class CommunityNewsService {
     return 'user';
   }
 
+  /// True when a ranked/personalized RPC missed the public catalog.
+  ///
+  /// Signed-in users must fall back the same way guests do. Returning an
+  /// empty list only for `auth.uid() != null` hid Home/Feeds after login.
+  static bool rankedRpcMissedCatalog(dynamic result) {
+    return result is! List || result.isEmpty;
+  }
+
+  static List<CommunityNewsPost> _homeVisiblePosts(
+    List<CommunityNewsPost> posts,
+  ) {
+    return posts
+        .where((post) => post.publishDestination.appearsOnHome)
+        .toList(growable: false);
+  }
+
+  static Future<List<CommunityNewsPost>> _publicHomeCatalog({
+    required int limit,
+  }) async {
+    return _homeVisiblePosts(await fetchPosts(limit: limit));
+  }
+
   /// Ranked Home/main Newsfeed (recency + unseen + relevance + controlled variance).
   static Future<List<CommunityNewsPost>> fetchRankedMainFeed({
     int limit = 30,
@@ -421,18 +443,15 @@ class CommunityNewsService {
         'fetch_ranked_main_feed',
         params: {'p_limit': limit, 'p_seed': seed},
       );
-      if (result is! List || result.isEmpty) {
-        return me == null ? await fetchPosts(limit: limit) : const [];
+      if (rankedRpcMissedCatalog(result)) {
+        return await _publicHomeCatalog(limit: limit);
       }
-      final mapped = await _mapPostRows(result, currentUserId: me);
-      return mapped
-          .where((post) => post.publishDestination.appearsOnHome)
-          .toList(growable: false);
+      final mapped = await _mapPostRows(result as List, currentUserId: me);
+      final home = _homeVisiblePosts(mapped);
+      if (home.isEmpty) return await _publicHomeCatalog(limit: limit);
+      return home;
     } catch (_) {
-      final posts = await fetchPosts(limit: limit);
-      return posts
-          .where((post) => post.publishDestination.appearsOnHome)
-          .toList(growable: false);
+      return await _publicHomeCatalog(limit: limit);
     }
   }
 

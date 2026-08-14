@@ -154,13 +154,18 @@ class DiscoveryFeedService {
 
       if (rows.isEmpty) return const [];
 
-      final promotions = await _client
-          .from('business_promotions')
-          .select('business_id')
-          .eq('is_active', true);
-      final promotedIds = promotions
-          .map((row) => row['business_id'] as String)
-          .toSet();
+      var promotedIds = <String>{};
+      try {
+        final promotions = await _client
+            .from('business_promotions')
+            .select('business_id')
+            .eq('is_active', true);
+        promotedIds = promotions
+            .map((row) => row['business_id'] as String)
+            .toSet();
+      } catch (_) {
+        promotedIds = {};
+      }
 
       final ownerIds = rows
           .map(
@@ -169,9 +174,17 @@ class DiscoveryFeedService {
           .whereType<String>()
           .toSet()
           .toList();
-      final ownerRows = ownerIds.isEmpty
-          ? const <Map<String, dynamic>>[]
-          : await ProfileCards.listByIds(ownerIds, select: 'id, display_name');
+      var ownerRows = const <Map<String, dynamic>>[];
+      if (ownerIds.isNotEmpty) {
+        try {
+          ownerRows = await ProfileCards.listByIds(
+            ownerIds,
+            select: 'id, display_name',
+          );
+        } catch (_) {
+          ownerRows = const [];
+        }
+      }
       final ownerNames = <String, String>{
         for (final owner in ownerRows)
           owner['id'] as String:
@@ -272,12 +285,17 @@ class DiscoveryFeedService {
           .map((row) => row['profile_id'] as String)
           .toSet()
           .toList();
-      final nameRows = profileIds.isEmpty
-          ? const <Map<String, dynamic>>[]
-          : await ProfileCards.listByIds(
-              profileIds,
-              select: 'id, display_name, username',
-            );
+      var nameRows = const <Map<String, dynamic>>[];
+      if (profileIds.isNotEmpty) {
+        try {
+          nameRows = await ProfileCards.listByIds(
+            profileIds,
+            select: 'id, display_name, username',
+          );
+        } catch (_) {
+          nameRows = const [];
+        }
+      }
       final profileNames = <String, String>{
         for (final row in nameRows)
           row['id'] as String:
@@ -384,19 +402,23 @@ class DiscoveryFeedService {
       final names = <String, String>{};
       final handles = <String, String>{};
       if (authorIds.isNotEmpty) {
-        final nameRows = await ProfileCards.listByIds(
-          authorIds,
-          select: 'id, display_name, username',
-        );
-        for (final row in nameRows) {
-          names[row['id'] as String] =
-              (row['display_name'] as String?) ?? 'FirstVue member';
-        }
-        for (final row in nameRows) {
-          final username = (row['username'] as String?)?.trim();
-          if (username != null && username.isNotEmpty) {
-            handles[row['id'] as String] = username;
+        try {
+          final nameRows = await ProfileCards.listByIds(
+            authorIds,
+            select: 'id, display_name, username',
+          );
+          for (final row in nameRows) {
+            names[row['id'] as String] =
+                (row['display_name'] as String?) ?? 'FirstVue member';
           }
+          for (final row in nameRows) {
+            final username = (row['username'] as String?)?.trim();
+            if (username != null && username.isNotEmpty) {
+              handles[row['id'] as String] = username;
+            }
+          }
+        } catch (_) {
+          // Missing public cards must not hide VUE posts for signed-in users.
         }
       }
 

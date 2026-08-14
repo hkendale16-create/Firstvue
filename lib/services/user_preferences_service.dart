@@ -1,8 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'user_profile_service.dart';
-
 class UserPreferences {
   final String? locationCity;
   final String? locationState;
@@ -20,9 +18,10 @@ class UserPreferences {
 
   String? get locationLabel {
     if (browseEverywhere) return 'Everywhere';
-    final parts = [locationCity, locationState]
-        .whereType<String>()
-        .where((p) => p.trim().isNotEmpty);
+    final parts = [
+      locationCity,
+      locationState,
+    ].whereType<String>().where((p) => p.trim().isNotEmpty);
     if (parts.isEmpty) return null;
     return parts.join(', ');
   }
@@ -50,6 +49,17 @@ class UserPreferencesService {
 
   static final _client = Supabase.instance.client;
 
+  /// Discovery location comes from the city chip / `user_preferences` row.
+  ///
+  /// Do not merge a profile address into discovery prefs — that made signed-in
+  /// users see a thinner catalog than guests.
+  static UserPreferences discoveryPreferences({
+    UserPreferences? savedRow,
+    required UserPreferences local,
+  }) {
+    return savedRow ?? local;
+  }
+
   static const _prefsCityKey = 'firstvue_pref_city';
   static const _prefsStateKey = 'firstvue_pref_state';
   static const _prefsEverywhereKey = 'firstvue_pref_everywhere';
@@ -69,13 +79,16 @@ class UserPreferencesService {
             .maybeSingle();
 
         if (row != null) {
-          final prefs = UserPreferences(
-            locationCity: row['preferred_city'] as String?,
-            locationState: row['preferred_state'] as String?,
-            browseEverywhere: row['browse_everywhere'] as bool? ?? false,
-            notificationsEnabled: row['push_messages'] as bool? ?? true,
-            floatingBubbleVisible:
-                row['show_floating_messages'] as bool? ?? true,
+          final prefs = discoveryPreferences(
+            savedRow: UserPreferences(
+              locationCity: row['preferred_city'] as String?,
+              locationState: row['preferred_state'] as String?,
+              browseEverywhere: row['browse_everywhere'] as bool? ?? false,
+              notificationsEnabled: row['push_messages'] as bool? ?? true,
+              floatingBubbleVisible:
+                  row['show_floating_messages'] as bool? ?? true,
+            ),
+            local: await _fetchFromLocal(),
           );
           await _cacheLocally(prefs);
           return prefs;
@@ -92,13 +105,16 @@ class UserPreferencesService {
 
           if (row != null) {
             final local = await _fetchFromLocal();
-            final prefs = UserPreferences(
-              locationCity: row['preferred_city'] as String?,
-              locationState: row['preferred_state'] as String?,
-              browseEverywhere: local.browseEverywhere,
-              notificationsEnabled: row['push_messages'] as bool? ?? true,
-              floatingBubbleVisible:
-                  row['show_floating_messages'] as bool? ?? true,
+            final prefs = discoveryPreferences(
+              savedRow: UserPreferences(
+                locationCity: row['preferred_city'] as String?,
+                locationState: row['preferred_state'] as String?,
+                browseEverywhere: local.browseEverywhere,
+                notificationsEnabled: row['push_messages'] as bool? ?? true,
+                floatingBubbleVisible:
+                    row['show_floating_messages'] as bool? ?? true,
+              ),
+              local: local,
             );
             await _cacheLocally(prefs);
             return prefs;
@@ -106,17 +122,9 @@ class UserPreferencesService {
         } catch (_) {}
       }
 
-      final profile = await UserProfileService.fetchProfile();
-      if (profile?.city != null || profile?.state != null) {
-        final local = await _fetchFromLocal();
-        final prefs = UserPreferences(
-          locationCity: profile?.city,
-          locationState: profile?.state,
-          browseEverywhere: local.browseEverywhere,
-        );
-        await _cacheLocally(prefs);
-        return prefs;
-      }
+      // Profile city/state are identity, not a discovery lock. Copying them
+      // here hid the public Home/VUE catalog for every signed-in user who
+      // filled an address, while guests still saw every city.
     }
 
     return _fetchFromLocal();
