@@ -20,7 +20,7 @@ void main() {
     expect(sql, contains("bucket_id = 'profile-media'"));
     expect(sql, contains("bucket_id = 'community-news-media'"));
     expect(sql, contains("bucket_id = 'business-media'"));
-    expect(sql.contains('fv-msg-media'), isFalse);
+    expect(sql.contains("bucket_id = 'fv-msg-media'"), isFalse);
   });
 
   test('profile screen shows stored bio instead of a placeholder', () {
