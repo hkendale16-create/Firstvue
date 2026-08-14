@@ -290,6 +290,14 @@ class CommunityNewsService {
         'code=${error.code} message=${error.message} '
         'details=${error.details} hint=${error.hint}',
       );
+      if (error.code == '42P17' ||
+          error.message.contains('infinite recursion')) {
+        // ignore: avoid_print
+        print(
+          '[$context] Apply supabase/APPLY_FIX_COMMUNITY_RLS_RECURSION.sql '
+          'in the Supabase SQL Editor to restore signed-in feeds.',
+        );
+      }
       return;
     }
     // ignore: avoid_print

@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/media_config.dart';
+import '../config/supabase_config.dart';
 
 class MediaUploadResult {
   final String path;
@@ -19,7 +20,28 @@ class MediaStorageService {
 
   static SupabaseClient get _client => Supabase.instance.client;
 
+  /// Publishable-key client used only as a signed-URL fallback when the
+  /// authenticated session hits broken storage RLS (seen as 503
+  /// DatabaseInvalidObjectDefinition). Social buckets already allow anon reads.
+  static SupabaseClient? _anonSignClient;
+
+  static SupabaseClient get _publicSignClient {
+    return _anonSignClient ??= SupabaseClient(
+      SupabaseConfig.url,
+      SupabaseConfig.publishableKey,
+    );
+  }
+
   static bool get useAwsMedia => MediaConfig.useAwsMedia;
+
+  static bool _isPublicSocialBucket(MediaBucket bucket) {
+    return bucket == MediaBucket.profile ||
+        bucket == MediaBucket.business ||
+        bucket == MediaBucket.professional ||
+        bucket == MediaBucket.communityNews ||
+        bucket == MediaBucket.event ||
+        bucket == MediaBucket.rental;
+  }
 
   static Future<String> createReadUrl({
     required MediaBucket bucket,
@@ -48,8 +70,6 @@ class MediaStorageService {
           .from(bucket.id)
           .createSignedUrl(trimmed, 3600);
     } catch (error, stack) {
-      // Missing object or storage RLS — callers treat empty as "no media".
-      // Apply supabase/APPLY_PUBLIC_MEDIA_READ.sql if signed-in photos are blank.
       assert(() {
         debugPrint(
           'MediaStorageService.createReadUrl failed '
@@ -57,8 +77,27 @@ class MediaStorageService {
         );
         return true;
       }());
-      return '';
     }
+
+    // Authenticated storage signing can fail while anon still works (broken
+    // storage policies / schema). Fall back for public social media only.
+    if (_client.auth.currentSession != null && _isPublicSocialBucket(bucket)) {
+      try {
+        return await _publicSignClient.storage
+            .from(bucket.id)
+            .createSignedUrl(trimmed, 3600);
+      } catch (error, stack) {
+        assert(() {
+          debugPrint(
+            'MediaStorageService.createReadUrl anon fallback failed '
+            '(${bucket.id}/$trimmed): $error\n$stack',
+          );
+          return true;
+        }());
+      }
+    }
+
+    return '';
   }
 
   static Future<MediaUploadResult> uploadBytes({
