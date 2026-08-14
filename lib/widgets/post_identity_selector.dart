@@ -27,33 +27,54 @@ class PostIdentitySelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (options.length <= 1) return const SizedBox.shrink();
+    final fv = context.fv;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: 'Post as',
-          labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+          labelStyle: TextStyle(color: fv.secondaryText, fontSize: 12),
           filled: true,
-          fillColor: FirstVueColors.elevatedSurface,
+          fillColor: fv.elevatedSurface,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 4,
+          ),
         ),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<PostIdentityOption>(
             value: selected,
             isExpanded: true,
-            dropdownColor: FirstVueColors.elevatedSurface,
+            dropdownColor: fv.elevatedSurface,
+            style: TextStyle(color: fv.primaryText, fontSize: 13),
+            iconEnabledColor: fv.primaryText,
+            selectedItemBuilder: (context) {
+              return options
+                  .map(
+                    (option) => Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '${_prefix(option.kind)} · ${option.label}',
+                        style: TextStyle(color: fv.primaryText, fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList();
+            },
             items: options
                 .map(
                   (option) => DropdownMenuItem(
                     value: option,
                     child: Text(
-                      '${_prefix(option.kind)} · ${option.label}',
-                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      '${_prefix(option.kind)} · ${option.label}'
+                      '${option.subtitle == null || option.subtitle!.isEmpty ? '' : ' · ${option.subtitle}'}',
+                      style: TextStyle(color: fv.primaryText, fontSize: 13),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),

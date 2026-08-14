@@ -102,8 +102,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
     setState(() {
       _identityOptions = options;
-      _selectedIdentity =
-          locked ?? restored ?? (options.isEmpty ? null : options.first);
+      if (locked != null) {
+        _selectedIdentity = locked;
+      } else {
+        _selectedIdentity = restored;
+        if (_selectedIdentity == null && options.isNotEmpty) {
+          _selectedIdentity = options.first;
+        }
+      }
+      // Never silently replace a locked entity identity with personal.
+      if (widget.lockIdentity &&
+          locked == null &&
+          options.isNotEmpty &&
+          _selectedIdentity?.isPersonal == true &&
+          options.any((o) => !o.isPersonal)) {
+        _selectedIdentity = options.firstWhere((o) => !o.isPersonal);
+      }
     });
   }
 
@@ -166,8 +180,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         _error = error is AuthException
             ? 'Sign in to post.'
             : error is ArgumentError
-                ? (error.message ?? 'Unable to publish.')
-                : 'Unable to publish. Try again.';
+            ? (error.message ?? 'Unable to publish.')
+            : 'Unable to publish. Try again.';
       });
     }
   }
@@ -224,8 +238,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
               ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 4,
+              ),
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
@@ -236,7 +252,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 items: [
                   DropdownMenuItem(
                     value: 'public',
-                    child: Text('Public', style: TextStyle(color: fv.primaryText)),
+                    child: Text(
+                      'Public',
+                      style: TextStyle(color: fv.primaryText),
+                    ),
                   ),
                   DropdownMenuItem(
                     value: 'followers',
@@ -264,8 +283,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
               ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 4,
+              ),
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<PublishDestination>(
@@ -281,6 +302,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       style: TextStyle(color: fv.primaryText),
                     ),
                   ),
+                  if (_selectedIdentity != null &&
+                      !_selectedIdentity!.isPersonal)
+                    DropdownMenuItem(
+                      value: PublishDestination.entityOnly,
+                      child: Text(
+                        'Entity feed only',
+                        style: TextStyle(color: fv.primaryText),
+                      ),
+                    ),
                   DropdownMenuItem(
                     value: PublishDestination.vue,
                     child: Text(
@@ -368,9 +398,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       color: fill,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: selected
-                            ? FirstVueColors.gold
-                            : fv.borderSubtle,
+                        color: selected ? FirstVueColors.gold : fv.borderSubtle,
                         width: selected ? 2 : 1,
                       ),
                     ),
@@ -419,10 +447,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       LocalMediaThumbnail(
                         file: file,
                         size: 72,
-                        onTap: () => LocalMediaThumbnail.previewLocalFile(
-                          context,
-                          file,
-                        ),
+                        onTap: () =>
+                            LocalMediaThumbnail.previewLocalFile(context, file),
                       ),
                       Positioned(
                         top: -6,

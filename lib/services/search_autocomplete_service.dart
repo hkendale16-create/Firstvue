@@ -76,15 +76,17 @@ class SearchAutocompleteService {
     }
   }
 
-  static SearchAutocompleteResult _profileRowToResult(Map<String, dynamic> row) {
+  static SearchAutocompleteResult _profileRowToResult(
+    Map<String, dynamic> row,
+  ) {
     final username = (row['username'] as String?)?.trim();
     final displayName = (row['display_name'] as String?) ?? 'FirstVue member';
     final city = row['city'] as String?;
     final state = row['state'] as String?;
-    final location = [city, state]
-        .whereType<String>()
-        .where((part) => part.trim().isNotEmpty)
-        .join(', ');
+    final location = [
+      city,
+      state,
+    ].whereType<String>().where((part) => part.trim().isNotEmpty).join(', ');
 
     final handle = username != null && username.isNotEmpty
         ? UsernameService.normalize(username) ?? username.toLowerCase()
@@ -132,9 +134,7 @@ class SearchAutocompleteService {
           .from('businesses')
           .select('id, name, business_type, services')
           .eq('status', 'approved')
-          .or(
-            'name.ilike.%$prefix%,business_type.ilike.%$prefix%',
-          )
+          .or('name.ilike.%$prefix%,business_type.ilike.%$prefix%')
           .limit(8);
 
       var results = rows
@@ -246,27 +246,60 @@ class SearchAutocompleteService {
     try {
       final rows = await _client
           .from('communities')
-          .select('id, name, city, state')
-          .ilike('name', '$prefix%')
+          .select(
+            'id, name, description, category, city, state, metro_area, handle',
+          )
+          .or(
+            'name.ilike.%$prefix%,description.ilike.%$prefix%,'
+            'category.ilike.%$prefix%,city.ilike.%$prefix%,'
+            'metro_area.ilike.%$prefix%,handle.ilike.%$prefix%',
+          )
           .limit(8);
 
       return rows.map((row) {
         final city = row['city'] as String?;
         final state = row['state'] as String?;
+        final handle = row['handle'] as String?;
         final location = [city, state]
             .whereType<String>()
             .where((part) => part.trim().isNotEmpty)
             .join(', ');
+        final subtitleParts = <String>[
+          if (handle != null && handle.trim().isNotEmpty) '@$handle',
+          if (location.isNotEmpty) location else 'Group',
+        ];
 
         return SearchAutocompleteResult(
           id: row['id'] as String,
           label: row['name'] as String,
-          subtitle: location.isNotEmpty ? location : 'Group',
+          subtitle: subtitleParts.join(' · '),
           type: SearchResultType.community,
         );
       }).toList();
     } catch (_) {
-      return const [];
+      try {
+        final rows = await _client
+            .from('communities')
+            .select('id, name, city, state')
+            .ilike('name', '%$prefix%')
+            .limit(8);
+        return rows.map((row) {
+          final city = row['city'] as String?;
+          final state = row['state'] as String?;
+          final location = [city, state]
+              .whereType<String>()
+              .where((part) => part.trim().isNotEmpty)
+              .join(', ');
+          return SearchAutocompleteResult(
+            id: row['id'] as String,
+            label: row['name'] as String,
+            subtitle: location.isNotEmpty ? location : 'Group',
+            type: SearchResultType.community,
+          );
+        }).toList();
+      } catch (_) {
+        return const [];
+      }
     }
   }
 
@@ -276,28 +309,62 @@ class SearchAutocompleteService {
     try {
       final rows = await _client
           .from('community_hubs')
-          .select('id, name, city, state, status')
+          .select(
+            'id, name, description, category, city, state, metro_area, handle, status',
+          )
           .eq('status', 'active')
-          .ilike('name', '$prefix%')
+          .or(
+            'name.ilike.%$prefix%,description.ilike.%$prefix%,'
+            'category.ilike.%$prefix%,city.ilike.%$prefix%,'
+            'metro_area.ilike.%$prefix%,handle.ilike.%$prefix%',
+          )
           .limit(8);
 
       return rows.map((row) {
         final city = row['city'] as String?;
         final state = row['state'] as String?;
+        final handle = row['handle'] as String?;
         final location = [city, state]
             .whereType<String>()
             .where((part) => part.trim().isNotEmpty)
             .join(', ');
+        final subtitleParts = <String>[
+          if (handle != null && handle.trim().isNotEmpty) '@$handle',
+          if (location.isNotEmpty) location else 'Community',
+        ];
 
         return SearchAutocompleteResult(
           id: row['id'] as String,
           label: row['name'] as String,
-          subtitle: location.isNotEmpty ? location : 'Community',
+          subtitle: subtitleParts.join(' · '),
           type: SearchResultType.communityHub,
         );
       }).toList();
     } catch (_) {
-      return const [];
+      try {
+        final rows = await _client
+            .from('community_hubs')
+            .select('id, name, city, state, status')
+            .eq('status', 'active')
+            .ilike('name', '%$prefix%')
+            .limit(8);
+        return rows.map((row) {
+          final city = row['city'] as String?;
+          final state = row['state'] as String?;
+          final location = [city, state]
+              .whereType<String>()
+              .where((part) => part.trim().isNotEmpty)
+              .join(', ');
+          return SearchAutocompleteResult(
+            id: row['id'] as String,
+            label: row['name'] as String,
+            subtitle: location.isNotEmpty ? location : 'Community',
+            type: SearchResultType.communityHub,
+          );
+        }).toList();
+      } catch (_) {
+        return const [];
+      }
     }
   }
 

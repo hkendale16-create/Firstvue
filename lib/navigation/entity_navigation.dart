@@ -7,6 +7,7 @@ import '../screens/community_hub_detail_screen.dart';
 import '../screens/firstvue_business_profile_screen.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../screens/professional_public_profile_screen.dart';
+import '../services/community_news_service.dart';
 import '../services/professional_profiles_service.dart';
 import '../services/shoutout_service.dart';
 import '../services/things_to_do_service.dart';
@@ -101,5 +102,52 @@ class EntityNavigation {
       if (match == null) return;
       await EventProfileSheet.show(context, event: match);
     } catch (_) {}
+  }
+
+  static Future<void> openPostAuthor(
+    BuildContext context, {
+    required CommunityNewsPost post,
+  }) async {
+    final type = post.resolvedAuthorProfileType;
+    final id = post.entityNavigationId;
+    if (id == null || id.trim().isEmpty) {
+      openMemberProfile(context, profileId: post.authorId);
+      return;
+    }
+
+    switch (type) {
+      case 'business':
+        await Navigator.push(
+          context,
+          FirstVuePageRoute(
+            builder: (_) => FirstVueBusinessProfileScreen(businessId: id),
+          ),
+        );
+        return;
+      case 'professional':
+        await _openProfessional(context, id);
+        return;
+      case 'event':
+        await openEvent(context, id);
+        return;
+      case 'community':
+        await Navigator.push(
+          context,
+          FirstVuePageRoute(
+            builder: (_) => CommunityHubDetailScreen(hubId: id),
+          ),
+        );
+        return;
+      case 'group':
+        await Navigator.push(
+          context,
+          FirstVuePageRoute(
+            builder: (_) => CommunityDetailScreen(communityId: id),
+          ),
+        );
+        return;
+      default:
+        openMemberProfile(context, profileId: post.authorId);
+    }
   }
 }

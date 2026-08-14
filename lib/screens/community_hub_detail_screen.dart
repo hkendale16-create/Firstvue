@@ -49,6 +49,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
   Map<String, String> _feedPostIdBySource = const {};
   bool _loading = true;
   bool _isLeader = false;
+  bool _isPendingLeader = false;
   bool _isAuthorized = false;
 
   @override
@@ -58,20 +59,24 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
     _load();
   }
 
-  bool _computeIsLeader(CommunityHub? hub, String? me) {
-    if (hub == null || me == null) return false;
-    return hub.leaderUserId == me || hub.createdByProfileId == me;
-  }
-
   Future<void> _load() async {
     setState(() => _loading = true);
     final hub = await CommunityHubService.fetchHubById(widget.hubId);
     final leader = await CommunityHubService.fetchPrimaryLeader(widget.hubId);
     final editors = await CommunityHubService.fetchEditors(widget.hubId);
     final me = Supabase.instance.client.auth.currentUser?.id;
-    final isLeader = _computeIsLeader(hub, me);
-    final isEditor = me != null &&
-        editors.any((e) => e.userId == me && e.isActive);
+    final isLeader =
+        me != null &&
+        await CommunityHubService.isActiveManager(widget.hubId, profileId: me);
+    final isPendingLeader =
+        !isLeader &&
+        me != null &&
+        await CommunityHubService.hasPendingManagement(
+          widget.hubId,
+          profileId: me,
+        );
+    final isEditor =
+        me != null && editors.any((e) => e.userId == me && e.isActive);
     final isAuthorized = isLeader || isEditor;
 
     List<CommunityGroupMembership> memberships = const [];
@@ -99,10 +104,12 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
         ? await CommunityHubService.fetchPendingHubRoles(widget.hubId)
         : const <Map<String, dynamic>>[];
 
-    final feedPosts =
-        await CommunityNewsService.fetchHubCommunityFeed(widget.hubId);
-    final feedRefs =
-        await CommunityHubService.fetchCommunityFeedPosts(widget.hubId);
+    final feedPosts = await CommunityNewsService.fetchHubCommunityFeed(
+      widget.hubId,
+    );
+    final feedRefs = await CommunityHubService.fetchCommunityFeedPosts(
+      widget.hubId,
+    );
     final feedPostIdBySource = <String, String>{
       for (final ref in feedRefs) ref.sourcePostId: ref.id,
     };
@@ -119,6 +126,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
       _feedPosts = feedPosts;
       _feedPostIdBySource = feedPostIdBySource;
       _isLeader = isLeader;
+      _isPendingLeader = isPendingLeader;
       _isAuthorized = isAuthorized;
       _loading = false;
     });
@@ -160,7 +168,10 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
           final fv = context.fv;
           return AlertDialog(
             backgroundColor: fv.surface,
-            title: Text('No eligible groups', style: TextStyle(color: fv.primaryText)),
+            title: Text(
+              'No eligible groups',
+              style: TextStyle(color: fv.primaryText),
+            ),
             content: Text(
               'You have no groups available to add. Create a group first, then add it here.',
               style: TextStyle(color: fv.secondaryText),
@@ -388,7 +399,9 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
     if (feedPostId == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to remove this post from the feed.')),
+        const SnackBar(
+          content: Text('Unable to remove this post from the feed.'),
+        ),
       );
       return;
     }
@@ -440,9 +453,9 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
 
   Future<void> _showAddEditorDialog() async {
     if (_editors.where((e) => e.isActive).length >= _maxEditors) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Up to 6 Editors allowed.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Up to 6 Editors allowed.')));
       return;
     }
 
@@ -500,9 +513,9 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
     final userId = await _resolveProfileId(raw);
     if (userId == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile not found.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Profile not found.')));
       return;
     }
 
@@ -510,11 +523,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
       final permissions = {
         for (final key in CommunityEditorPermissions.allKeys) key: true,
       };
-      await CommunityEditorService.addEditor(
-        widget.hubId,
-        userId,
-        permissions,
-      );
+      await CommunityEditorService.addEditor(widget.hubId, userId, permissions);
       await _load();
     } catch (error) {
       if (!mounted) return;
@@ -536,9 +545,9 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
       await _load();
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not remove editor.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not remove editor.')));
     }
   }
 
@@ -570,9 +579,9 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
       await _load();
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not remove group.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not remove group.')));
     }
   }
 
@@ -677,61 +686,140 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
               child: CircularProgressIndicator(color: FirstVueColors.teal),
             )
           : hub == null
-              ? const Center(
-                  child: Text(
-                    'Community not found.',
-                    style: TextStyle(color: Color(0xFF5A5668)),
-                  ),
-                )
-              : FirstVueRefreshScaffold(
-                  onRefresh: _load,
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+          ? const Center(
+              child: Text(
+                'Community not found.',
+                style: TextStyle(color: Color(0xFF5A5668)),
+              ),
+            )
+          : FirstVueRefreshScaffold(
+              onRefresh: _load,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+                children: [
+                  if (_isPendingLeader) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: FirstVueColors.gold.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Text(
+                        'Your Community Leader request is still pending. '
+                        'You can view this public Community, but management '
+                        'tools stay locked until leadership is approved.',
+                        style: TextStyle(
+                          color: FirstVueColors.gold,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                  Row(
                     children: [
-                      Row(
+                      GroupCircleAvatar(
+                        imageUrl: hub.coverUrl ?? hub.imageUrl,
+                        size: 84,
+                        ringColor: FirstVueColors.gold,
+                        fallbackIcon: Icons.location_city_rounded,
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              hub.name,
+                              style: const TextStyle(
+                                color: Color(0xFF16131F),
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (hub.category?.trim().isNotEmpty == true)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  hub.category!.trim(),
+                                  style: const TextStyle(
+                                    color: FirstVueColors.teal,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            if (hub.locationLabel != null)
+                              Text(
+                                hub.locationLabel!,
+                                style: const TextStyle(
+                                  color: Color(0xFF5A5668),
+                                ),
+                              ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${_groups.length} groups',
+                              style: const TextStyle(
+                                color: FirstVueColors.gold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_leader != null) ...[
+                    const SizedBox(height: 16),
+                    InkWell(
+                      onTap: () => openMemberProfile(
+                        context,
+                        profileId: _leader!.profileId,
+                        displayName: _leader!.displayName,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Row(
                         children: [
-                          GroupCircleAvatar(
-                            imageUrl: hub.coverUrl ?? hub.imageUrl,
-                            size: 84,
-                            ringColor: FirstVueColors.gold,
-                            fallbackIcon: Icons.location_city_rounded,
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor: FirstVueColors.elevatedSurface,
+                            backgroundImage:
+                                _leader!.avatarUrl != null &&
+                                    _leader!.avatarUrl!.isNotEmpty
+                                ? NetworkImage(_leader!.avatarUrl!)
+                                : null,
+                            child:
+                                _leader!.avatarUrl == null ||
+                                    _leader!.avatarUrl!.isEmpty
+                                ? Text(
+                                    _leader!.displayName.isNotEmpty
+                                        ? _leader!.displayName[0].toUpperCase()
+                                        : '?',
+                                  )
+                                : null,
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  hub.name,
+                                  _leader!.displayName,
                                   style: const TextStyle(
                                     color: Color(0xFF16131F),
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                if (hub.category?.trim().isNotEmpty == true)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2),
-                                    child: Text(
-                                      hub.category!.trim(),
-                                      style: const TextStyle(
-                                        color: FirstVueColors.teal,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ),
-                                if (hub.locationLabel != null)
-                                  Text(
-                                    hub.locationLabel!,
-                                    style: const TextStyle(color: Color(0xFF5A5668)),
-                                  ),
-                                const SizedBox(height: 4),
                                 Text(
-                                  '${_groups.length} groups',
+                                  [
+                                    if (_leader!.username != null)
+                                      '@${_leader!.username}',
+                                    'Community Leader',
+                                  ].join(' · '),
                                   style: const TextStyle(
-                                    color: FirstVueColors.gold,
-                                    fontSize: 13,
+                                    color: FirstVueColors.teal,
+                                    fontSize: 12,
                                   ),
                                 ),
                               ],
@@ -739,527 +827,464 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                           ),
                         ],
                       ),
-                      if (_leader != null) ...[
-                        const SizedBox(height: 16),
-                        InkWell(
-                          onTap: () => openMemberProfile(
-                            context,
-                            profileId: _leader!.profileId,
-                            displayName: _leader!.displayName,
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  _sectionTitle('ABOUT'),
+                  const SizedBox(height: 8),
+                  if (hub.description?.trim().isNotEmpty == true)
+                    Text(
+                      hub.description!.trim(),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: .78),
+                        height: 1.4,
+                      ),
+                    )
+                  else
+                    const Text(
+                      'No description yet.',
+                      style: TextStyle(color: Color(0xFF5A5668)),
+                    ),
+                  if (hub.rules?.trim().isNotEmpty == true) ...[
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Rules',
+                      style: TextStyle(
+                        color: Color(0xFF5A5668),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      hub.rules!.trim(),
+                      style: const TextStyle(
+                        color: Color(0xFF5A5668),
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 28),
+                  Row(
+                    children: [
+                      Expanded(child: _sectionTitle('COMMUNITY EDITORS')),
+                      Text(
+                        'Up to 6 Editors',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: .45),
+                          fontSize: 11,
+                        ),
+                      ),
+                      if (_isLeader) ...[
+                        const SizedBox(width: 4),
+                        IconButton(
+                          onPressed: _showAddEditorDialog,
+                          icon: const Icon(
+                            Icons.person_add_alt_1,
+                            color: FirstVueColors.teal,
+                            size: 20,
                           ),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 18,
-                                backgroundColor: FirstVueColors.elevatedSurface,
-                                backgroundImage: _leader!.avatarUrl != null &&
-                                        _leader!.avatarUrl!.isNotEmpty
-                                    ? NetworkImage(_leader!.avatarUrl!)
-                                    : null,
-                                child: _leader!.avatarUrl == null ||
-                                        _leader!.avatarUrl!.isEmpty
-                                    ? Text(
-                                        _leader!.displayName.isNotEmpty
-                                            ? _leader!.displayName[0]
-                                                .toUpperCase()
-                                            : '?',
-                                      )
-                                    : null,
+                          tooltip: 'Add editor',
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (_editors.isEmpty)
+                    const Text(
+                      'No editors appointed yet.',
+                      style: TextStyle(color: Color(0xFF5A5668)),
+                    )
+                  else
+                    ..._editors.map((editor) {
+                      final label =
+                          editor.displayName?.trim().isNotEmpty == true
+                          ? editor.displayName!
+                          : (editor.username != null
+                                ? '@${editor.username}'
+                                : editor.userId);
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: FirstVueColors.elevatedSurface,
+                          backgroundImage:
+                              editor.avatarUrl != null &&
+                                  editor.avatarUrl!.isNotEmpty
+                              ? NetworkImage(editor.avatarUrl!)
+                              : null,
+                          child:
+                              editor.avatarUrl == null ||
+                                  editor.avatarUrl!.isEmpty
+                              ? Text(
+                                  label.isNotEmpty
+                                      ? label[0].toUpperCase()
+                                      : 'E',
+                                  style: const TextStyle(fontSize: 12),
+                                )
+                              : null,
+                        ),
+                        title: Text(
+                          label,
+                          style: const TextStyle(color: Color(0xFF16131F)),
+                        ),
+                        subtitle: editor.username != null
+                            ? Text(
+                                '@${editor.username}',
+                                style: const TextStyle(
+                                  color: Color(0xFF5A5668),
+                                  fontSize: 12,
+                                ),
+                              )
+                            : null,
+                        trailing: _isLeader
+                            ? IconButton(
+                                onPressed: () => _removeEditor(editor),
+                                icon: const Icon(
+                                  Icons.remove_circle_outline,
+                                  color: FirstVueColors.coral,
+                                  size: 20,
+                                ),
+                                tooltip: 'Remove editor',
+                              )
+                            : null,
+                        onTap: () => openMemberProfile(
+                          context,
+                          profileId: editor.userId,
+                          displayName: label,
+                        ),
+                      );
+                    }),
+                  if (_pendingLeaders.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    _sectionTitle('PENDING LEADERS'),
+                    ..._pendingLeaders.map((req) {
+                      final profile = req['profiles'] as Map<String, dynamic>?;
+                      final name =
+                          (profile?['display_name'] as String?) ?? 'Member';
+                      final profileId = req['profile_id'] as String;
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          name,
+                          style: const TextStyle(color: Color(0xFF16131F)),
+                        ),
+                        subtitle: Text(
+                          (req['role'] as String?) ?? 'leader',
+                          style: const TextStyle(color: Color(0xFF5A5668)),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextButton(
+                              onPressed: () async {
+                                await CommunityHubService.reviewHubRole(
+                                  hubId: widget.hubId,
+                                  profileId: profileId,
+                                  approve: true,
+                                );
+                                await _load();
+                              },
+                              child: const Text('Approve'),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                await CommunityHubService.reviewHubRole(
+                                  hubId: widget.hubId,
+                                  profileId: profileId,
+                                  approve: false,
+                                );
+                                await _load();
+                              },
+                              child: const Text(
+                                'Decline',
+                                style: TextStyle(color: FirstVueColors.coral),
                               ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _leader!.displayName,
-                                      style: const TextStyle(
-                                        color: Color(0xFF16131F),
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                  if (_linkRequests.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    _sectionTitle('GROUP LINK REQUESTS'),
+                    ..._linkRequests.map((req) {
+                      final group = req['communities'] as Map<String, dynamic>?;
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: GroupCircleAvatar(
+                          imageUrl: group?['image_url'] as String?,
+                          size: 44,
+                        ),
+                        title: Text(
+                          (group?['name'] as String?) ?? 'Group',
+                          style: const TextStyle(color: Color(0xFF16131F)),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextButton(
+                              onPressed: () async {
+                                await CommunityHubService.reviewLinkRequest(
+                                  requestId: req['id'] as String,
+                                  approve: true,
+                                );
+                                await _load();
+                              },
+                              child: const Text('Approve'),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                await CommunityHubService.reviewLinkRequest(
+                                  requestId: req['id'] as String,
+                                  approve: false,
+                                );
+                                await _load();
+                              },
+                              child: const Text(
+                                'Decline',
+                                style: TextStyle(color: FirstVueColors.coral),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                  const SizedBox(height: 28),
+                  _sectionTitle('GROUPS'),
+                  const SizedBox(height: 12),
+                  if (_displayMemberships.isEmpty)
+                    const Text(
+                      'No groups linked yet. Create one to get started.',
+                      style: TextStyle(color: Color(0xFF5A5668)),
+                    )
+                  else
+                    ..._displayMemberships.map((membership) {
+                      final group = membership.group;
+                      final name = group?.name ?? 'Group';
+                      final imageUrl = group?.imageUrl;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: GroupCircleAvatar(
+                                imageUrl: imageUrl,
+                                size: 48,
+                                ringColor: membership.canPostToCommunityFeed
+                                    ? FirstVueColors.teal
+                                    : Colors.white24,
+                              ),
+                              title: Text(
+                                name,
+                                style: const TextStyle(
+                                  color: Color(0xFF16131F),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Container(
+                                  margin: const EdgeInsets.only(top: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _statusColor(
+                                      membership,
+                                    ).withValues(alpha: .18),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: _statusColor(
+                                        membership,
+                                      ).withValues(alpha: .45),
                                     ),
-                                    Text(
-                                      [
-                                        if (_leader!.username != null)
-                                          '@${_leader!.username}',
-                                        'Community Leader',
-                                      ].join(' · '),
-                                      style: const TextStyle(
-                                        color: FirstVueColors.teal,
-                                        fontSize: 12,
+                                  ),
+                                  child: Text(
+                                    _statusLabel(membership),
+                                    style: TextStyle(
+                                      color: _statusColor(membership),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              onTap: group == null
+                                  ? null
+                                  : () {
+                                      Navigator.push(
+                                        context,
+                                        FirstVuePageRoute(
+                                          builder: (_) => CommunityDetailScreen(
+                                            communityId: group.id,
+                                            initialCommunity: group,
+                                          ),
+                                        ),
+                                      ).then((_) {
+                                        if (mounted) _load();
+                                      });
+                                    },
+                            ),
+                            if (_isAuthorized && membership.isApproved)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 56),
+                                child: Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  children: [
+                                    if (!membership.canPostToCommunityFeed &&
+                                        !membership.isApprovedForFeed)
+                                      TextButton(
+                                        onPressed: () => _setGroupFeedPosting(
+                                          groupId: membership.groupId,
+                                          allow: true,
+                                        ),
+                                        child: const Text(
+                                          'Approve posting',
+                                          style: TextStyle(
+                                            color: FirstVueColors.teal,
+                                          ),
+                                        ),
+                                      ),
+                                    if (membership.canPostToCommunityFeed ||
+                                        membership.isApprovedForFeed)
+                                      TextButton(
+                                        onPressed: () => _setGroupFeedPosting(
+                                          groupId: membership.groupId,
+                                          allow: false,
+                                        ),
+                                        child: const Text(
+                                          'Revoke posting',
+                                          style: TextStyle(
+                                            color: Colors.orangeAccent,
+                                          ),
+                                        ),
+                                      ),
+                                    TextButton(
+                                      onPressed: () =>
+                                          _removeGroup(membership.groupId),
+                                      child: const Text(
+                                        'Remove group',
+                                        style: TextStyle(
+                                          color: FirstVueColors.coral,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-                      _sectionTitle('ABOUT'),
-                      const SizedBox(height: 8),
-                      if (hub.description?.trim().isNotEmpty == true)
-                        Text(
-                          hub.description!.trim(),
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: .78),
-                            height: 1.4,
-                          ),
-                        )
-                      else
-                        const Text(
-                          'No description yet.',
-                          style: TextStyle(color: Color(0xFF5A5668)),
-                        ),
-                      if (hub.rules?.trim().isNotEmpty == true) ...[
-                        const SizedBox(height: 14),
-                        const Text(
-                          'Rules',
-                          style: TextStyle(
-                            color: Color(0xFF5A5668),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          hub.rules!.trim(),
-                          style: const TextStyle(
-                            color: Color(0xFF5A5668),
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 28),
-                      Row(
-                        children: [
-                          Expanded(child: _sectionTitle('COMMUNITY EDITORS')),
-                          Text(
-                            'Up to 6 Editors',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: .45),
-                              fontSize: 11,
-                            ),
-                          ),
-                          if (_isLeader) ...[
-                            const SizedBox(width: 4),
-                            IconButton(
-                              onPressed: _showAddEditorDialog,
-                              icon: const Icon(
-                                Icons.person_add_alt_1,
-                                color: FirstVueColors.teal,
-                                size: 20,
-                              ),
-                              tooltip: 'Add editor',
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      if (_editors.isEmpty)
-                        const Text(
-                          'No editors appointed yet.',
-                          style: TextStyle(color: Color(0xFF5A5668)),
-                        )
-                      else
-                        ..._editors.map((editor) {
-                          final label = editor.displayName?.trim().isNotEmpty ==
-                                  true
-                              ? editor.displayName!
-                              : (editor.username != null
-                                  ? '@${editor.username}'
-                                  : editor.userId);
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: CircleAvatar(
-                              radius: 18,
-                              backgroundColor: FirstVueColors.elevatedSurface,
-                              backgroundImage: editor.avatarUrl != null &&
-                                      editor.avatarUrl!.isNotEmpty
-                                  ? NetworkImage(editor.avatarUrl!)
-                                  : null,
-                              child: editor.avatarUrl == null ||
-                                      editor.avatarUrl!.isEmpty
-                                  ? Text(
-                                      label.isNotEmpty
-                                          ? label[0].toUpperCase()
-                                          : 'E',
-                                      style: const TextStyle(fontSize: 12),
-                                    )
-                                  : null,
-                            ),
-                            title: Text(
-                              label,
-                              style: const TextStyle(color: Color(0xFF16131F)),
-                            ),
-                            subtitle: editor.username != null
-                                ? Text(
-                                    '@${editor.username}',
-                                    style: const TextStyle(
-                                      color: Color(0xFF5A5668),
-                                      fontSize: 12,
+                            if (_isAuthorized && membership.isPending)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 56),
+                                child: Row(
+                                  children: [
+                                    TextButton(
+                                      onPressed: () async {
+                                        await CommunityHubService.reviewGroupMembership(
+                                          hubId: widget.hubId,
+                                          groupId: membership.groupId,
+                                          approve: true,
+                                        );
+                                        await _load();
+                                      },
+                                      child: const Text('Approve'),
                                     ),
-                                  )
-                                : null,
-                            trailing: _isLeader
-                                ? IconButton(
-                                    onPressed: () => _removeEditor(editor),
-                                    icon: const Icon(
-                                      Icons.remove_circle_outline,
-                                      color: FirstVueColors.coral,
-                                      size: 20,
-                                    ),
-                                    tooltip: 'Remove editor',
-                                  )
-                                : null,
-                            onTap: () => openMemberProfile(
-                              context,
-                              profileId: editor.userId,
-                              displayName: label,
-                            ),
-                          );
-                        }),
-                      if (_pendingLeaders.isNotEmpty) ...[
-                        const SizedBox(height: 24),
-                        _sectionTitle('PENDING LEADERS'),
-                        ..._pendingLeaders.map((req) {
-                          final profile =
-                              req['profiles'] as Map<String, dynamic>?;
-                          final name =
-                              (profile?['display_name'] as String?) ??
-                              'Member';
-                          final profileId = req['profile_id'] as String;
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(
-                              name,
-                              style: const TextStyle(color: Color(0xFF16131F)),
-                            ),
-                            subtitle: Text(
-                              (req['role'] as String?) ?? 'leader',
-                              style: const TextStyle(color: Color(0xFF5A5668)),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                TextButton(
-                                  onPressed: () async {
-                                    await CommunityHubService.reviewHubRole(
-                                      hubId: widget.hubId,
-                                      profileId: profileId,
-                                      approve: true,
-                                    );
-                                    await _load();
-                                  },
-                                  child: const Text('Approve'),
-                                ),
-                                TextButton(
-                                  onPressed: () async {
-                                    await CommunityHubService.reviewHubRole(
-                                      hubId: widget.hubId,
-                                      profileId: profileId,
-                                      approve: false,
-                                    );
-                                    await _load();
-                                  },
-                                  child: const Text(
-                                    'Decline',
-                                    style:
-                                        TextStyle(color: FirstVueColors.coral),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-                      ],
-                      if (_linkRequests.isNotEmpty) ...[
-                        const SizedBox(height: 24),
-                        _sectionTitle('GROUP LINK REQUESTS'),
-                        ..._linkRequests.map((req) {
-                          final group =
-                              req['communities'] as Map<String, dynamic>?;
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: GroupCircleAvatar(
-                              imageUrl: group?['image_url'] as String?,
-                              size: 44,
-                            ),
-                            title: Text(
-                              (group?['name'] as String?) ?? 'Group',
-                              style: const TextStyle(color: Color(0xFF16131F)),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                TextButton(
-                                  onPressed: () async {
-                                    await CommunityHubService.reviewLinkRequest(
-                                      requestId: req['id'] as String,
-                                      approve: true,
-                                    );
-                                    await _load();
-                                  },
-                                  child: const Text('Approve'),
-                                ),
-                                TextButton(
-                                  onPressed: () async {
-                                    await CommunityHubService.reviewLinkRequest(
-                                      requestId: req['id'] as String,
-                                      approve: false,
-                                    );
-                                    await _load();
-                                  },
-                                  child: const Text(
-                                    'Decline',
-                                    style:
-                                        TextStyle(color: FirstVueColors.coral),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-                      ],
-                      const SizedBox(height: 28),
-                      _sectionTitle('GROUPS'),
-                      const SizedBox(height: 12),
-                      if (_displayMemberships.isEmpty)
-                        const Text(
-                          'No groups linked yet. Create one to get started.',
-                          style: TextStyle(color: Color(0xFF5A5668)),
-                        )
-                      else
-                        ..._displayMemberships.map((membership) {
-                          final group = membership.group;
-                          final name = group?.name ?? 'Group';
-                          final imageUrl = group?.imageUrl;
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  leading: GroupCircleAvatar(
-                                    imageUrl: imageUrl,
-                                    size: 48,
-                                    ringColor: membership.canPostToCommunityFeed
-                                        ? FirstVueColors.teal
-                                        : Colors.white24,
-                                  ),
-                                  title: Text(
-                                    name,
-                                    style: const TextStyle(
-                                      color: Color(0xFF16131F),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  subtitle: Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Container(
-                                      margin: const EdgeInsets.only(top: 4),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: _statusColor(membership)
-                                            .withValues(alpha: .18),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: _statusColor(membership)
-                                              .withValues(alpha: .45),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        _statusLabel(membership),
+                                    TextButton(
+                                      onPressed: () async {
+                                        await CommunityHubService.reviewGroupMembership(
+                                          hubId: widget.hubId,
+                                          groupId: membership.groupId,
+                                          approve: false,
+                                        );
+                                        await _load();
+                                      },
+                                      child: const Text(
+                                        'Deny',
                                         style: TextStyle(
-                                          color: _statusColor(membership),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
+                                          color: FirstVueColors.coral,
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  onTap: group == null
-                                      ? null
-                                      : () {
-                                          Navigator.push(
-                                            context,
-                                            FirstVuePageRoute(
-                                              builder: (_) =>
-                                                  CommunityDetailScreen(
-                                                communityId: group.id,
-                                                initialCommunity: group,
-                                              ),
-                                            ),
-                                          ).then((_) {
-                                            if (mounted) _load();
-                                          });
-                                        },
+                                  ],
                                 ),
-                                if (_isAuthorized && membership.isApproved)
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 56),
-                                    child: Wrap(
-                                      spacing: 8,
-                                      runSpacing: 4,
-                                      children: [
-                                        if (!membership.canPostToCommunityFeed &&
-                                            !membership.isApprovedForFeed)
-                                          TextButton(
-                                            onPressed: () =>
-                                                _setGroupFeedPosting(
-                                              groupId: membership.groupId,
-                                              allow: true,
-                                            ),
-                                            child: const Text(
-                                              'Approve posting',
-                                              style: TextStyle(
-                                                color: FirstVueColors.teal,
-                                              ),
-                                            ),
-                                          ),
-                                        if (membership.canPostToCommunityFeed ||
-                                            membership.isApprovedForFeed)
-                                          TextButton(
-                                            onPressed: () =>
-                                                _setGroupFeedPosting(
-                                              groupId: membership.groupId,
-                                              allow: false,
-                                            ),
-                                            child: const Text(
-                                              'Revoke posting',
-                                              style: TextStyle(
-                                                color: Colors.orangeAccent,
-                                              ),
-                                            ),
-                                          ),
-                                        TextButton(
-                                          onPressed: () =>
-                                              _removeGroup(membership.groupId),
-                                          child: const Text(
-                                            'Remove group',
-                                            style: TextStyle(
-                                              color: FirstVueColors.coral,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                if (_isAuthorized && membership.isPending)
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 56),
-                                    child: Row(
-                                      children: [
-                                        TextButton(
-                                          onPressed: () async {
-                                            await CommunityHubService
-                                                .reviewGroupMembership(
-                                              hubId: widget.hubId,
-                                              groupId: membership.groupId,
-                                              approve: true,
-                                            );
-                                            await _load();
-                                          },
-                                          child: const Text('Approve'),
-                                        ),
-                                        TextButton(
-                                          onPressed: () async {
-                                            await CommunityHubService
-                                                .reviewGroupMembership(
-                                              hubId: widget.hubId,
-                                              groupId: membership.groupId,
-                                              approve: false,
-                                            );
-                                            await _load();
-                                          },
-                                          child: const Text(
-                                            'Deny',
-                                            style: TextStyle(
-                                              color: FirstVueColors.coral,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          );
-                        }),
-                      const SizedBox(height: 28),
-                      _sectionTitle('COMMUNITY NEWSFEED'),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Groups publish into this feed.',
-                        style: TextStyle(color: Color(0xFF5A5668), fontSize: 12),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_loading && _feedPosts.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 28),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              color: FirstVueColors.teal,
-                            ),
-                          ),
-                        )
-                      else if (_feedPosts.isEmpty)
-                        const Text(
-                          'No community posts yet.',
-                          style: TextStyle(color: Color(0xFF5A5668)),
-                        )
-                      else
-                        Column(
-                          children: [
-                            for (var index = 0;
-                                index < _feedPosts.length;
-                                index++) ...[
-                              if (index > 0) const SizedBox(height: 10),
-                              CommunityNewsPostCard(
-                                post: _feedPosts[index],
-                                style: CommunityNewsPostCardStyle.timeline,
-                                onTap: () => CommunityNewsPostDetailSheet.show(
-                                  context,
-                                  postId: _feedPosts[index].id,
-                                  initialPost: _feedPosts[index],
-                                ),
-                                onAuthorTap:
-                                    _feedPosts[index].authorId.isNotEmpty
-                                        ? () => openMemberProfile(
-                                              context,
-                                              profileId:
-                                                  _feedPosts[index].authorId,
-                                              displayName:
-                                                  _feedPosts[index].authorName,
-                                            )
-                                        : null,
-                                onSpark: () => _sparkPost(index),
-                                onSave: () => _savePost(index),
-                                onComment: () => FeedCommentsSheet.show(
-                                  context,
-                                  mediaId: _feedPosts[index].commentsMediaId,
-                                  businessName: _feedPosts[index].authorName,
-                                ),
-                                onDelete: _isLeader &&
-                                        _feedPostIdBySource
-                                            .containsKey(_feedPosts[index].id)
-                                    ? () => _softRemoveFeedPost(
-                                          _feedPosts[index],
-                                        )
-                                    : null,
                               ),
-                            ],
                           ],
                         ),
-                    ],
+                      );
+                    }),
+                  const SizedBox(height: 28),
+                  _sectionTitle('COMMUNITY NEWSFEED'),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Groups publish into this feed.',
+                    style: TextStyle(color: Color(0xFF5A5668), fontSize: 12),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  if (_loading && _feedPosts.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 28),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: FirstVueColors.teal,
+                        ),
+                      ),
+                    )
+                  else if (_feedPosts.isEmpty)
+                    const Text(
+                      'No community posts yet.',
+                      style: TextStyle(color: Color(0xFF5A5668)),
+                    )
+                  else
+                    Column(
+                      children: [
+                        for (
+                          var index = 0;
+                          index < _feedPosts.length;
+                          index++
+                        ) ...[
+                          if (index > 0) const SizedBox(height: 10),
+                          CommunityNewsPostCard(
+                            post: _feedPosts[index],
+                            style: CommunityNewsPostCardStyle.timeline,
+                            onTap: () => CommunityNewsPostDetailSheet.show(
+                              context,
+                              postId: _feedPosts[index].id,
+                              initialPost: _feedPosts[index],
+                            ),
+                            onAuthorTap: _feedPosts[index].authorId.isNotEmpty
+                                ? () => openMemberProfile(
+                                    context,
+                                    profileId: _feedPosts[index].authorId,
+                                    displayName: _feedPosts[index].authorName,
+                                  )
+                                : null,
+                            onSpark: () => _sparkPost(index),
+                            onSave: () => _savePost(index),
+                            onComment: () => FeedCommentsSheet.show(
+                              context,
+                              mediaId: _feedPosts[index].commentsMediaId,
+                              businessName: _feedPosts[index].authorName,
+                            ),
+                            onDelete:
+                                _isLeader &&
+                                    _feedPostIdBySource.containsKey(
+                                      _feedPosts[index].id,
+                                    )
+                                ? () => _softRemoveFeedPost(_feedPosts[index])
+                                : null,
+                          ),
+                        ],
+                      ],
+                    ),
+                ],
+              ),
+            ),
     );
   }
 }

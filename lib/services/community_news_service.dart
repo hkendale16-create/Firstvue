@@ -28,6 +28,7 @@ class CommunityNewsPost {
   final String authorName;
   final String? authorUsername;
   final String? authorProfileType;
+  final String? authorProfileId;
   final String? businessId;
   final String? businessName;
   final String? businessType;
@@ -54,6 +55,7 @@ class CommunityNewsPost {
     required this.authorName,
     this.authorUsername,
     this.authorProfileType,
+    this.authorProfileId,
     this.businessId,
     required this.businessName,
     this.businessType,
@@ -75,6 +77,53 @@ class CommunityNewsPost {
   });
 
   String get commentsMediaId => 'news-post:$id';
+
+  String get resolvedAuthorProfileType {
+    final explicit = (authorProfileType ?? '').trim().toLowerCase();
+    if (explicit.isNotEmpty) return explicit;
+    if (businessId != null) return 'business';
+    if (professionalProfileId != null) return 'professional';
+    if (eventId != null) return 'event';
+    if (communityId != null) return 'community';
+    return 'user';
+  }
+
+  bool get isEntityAuthor => resolvedAuthorProfileType != 'user';
+
+  String get displayAuthorName {
+    if (!isEntityAuthor) return authorName;
+    return (businessName ?? communityName ?? authorName).trim().isEmpty
+        ? authorName
+        : (businessName ?? communityName ?? authorName);
+  }
+
+  String? get displayAuthorHandle {
+    final handle = authorUsername?.trim();
+    if (handle == null || handle.isEmpty) return null;
+    return handle.startsWith('@') ? handle : '@$handle';
+  }
+
+  String get entityTypeLabel {
+    return switch (resolvedAuthorProfileType) {
+      'business' => 'Business',
+      'professional' => 'Professional',
+      'event' => 'Event',
+      'community' => 'Community',
+      'group' => 'Group',
+      _ => 'Member',
+    };
+  }
+
+  String? get entityNavigationId {
+    return switch (resolvedAuthorProfileType) {
+      'business' => businessId ?? authorProfileId,
+      'professional' => professionalProfileId ?? authorProfileId,
+      'event' => eventId ?? authorProfileId,
+      'community' => communityId ?? authorProfileId,
+      'group' => communityId ?? authorProfileId,
+      _ => authorId,
+    };
+  }
 
   /// Subtle panel fill for composer / post body backgrounds.
   static Color? backgroundFill(String? key) {
@@ -98,6 +147,7 @@ class CommunityNewsPost {
     String? authorName,
     String? authorUsername,
     String? authorProfileType,
+    String? authorProfileId,
     String? businessId,
     String? businessName,
     String? businessType,
@@ -124,6 +174,7 @@ class CommunityNewsPost {
       authorName: authorName ?? this.authorName,
       authorUsername: authorUsername ?? this.authorUsername,
       authorProfileType: authorProfileType ?? this.authorProfileType,
+      authorProfileId: authorProfileId ?? this.authorProfileId,
       businessId: businessId ?? this.businessId,
       businessName: businessName ?? this.businessName,
       businessType: businessType ?? this.businessType,
@@ -733,15 +784,36 @@ class CommunityNewsService {
           );
         } catch (_) {}
         final authorProfileType = row['author_profile_type'] as String?;
+        final authorProfileId = row['author_profile_id'] as String?;
+        final resolvedType =
+            (authorProfileType ??
+                    (businessId != null
+                        ? 'business'
+                        : professionalProfileId != null
+                        ? 'professional'
+                        : eventId != null
+                        ? 'event'
+                        : communityId != null
+                        ? 'community'
+                        : 'user'))
+                .toLowerCase();
+        final entityDisplayName = contextName?.trim();
+        final displayName =
+            (resolvedType != 'user' &&
+                entityDisplayName != null &&
+                entityDisplayName.isNotEmpty)
+            ? entityDisplayName
+            : (authorNames[authorId] ?? 'FirstVue member');
 
         posts.add(
           CommunityNewsPost(
             id: id,
             body: body,
             authorId: authorId,
-            authorName: authorNames[authorId] ?? 'FirstVue member',
+            authorName: displayName,
             authorUsername: authorUsernames[authorId],
-            authorProfileType: authorProfileType,
+            authorProfileType: authorProfileType ?? resolvedType,
+            authorProfileId: authorProfileId,
             businessId: businessId,
             businessName: contextName,
             businessType: businessId == null

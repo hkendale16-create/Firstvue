@@ -4,18 +4,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../screens/auth_screen.dart';
 import '../services/business_follow_service.dart';
+import '../services/community_hub_service.dart';
 import '../services/community_service.dart';
 import '../services/event_social_service.dart';
 import '../services/follow_service.dart';
 import 'social_chrome.dart';
 
-enum FollowTargetKind {
-  profile,
-  business,
-  communityGroup,
-  communityHub,
-  event,
-}
+enum FollowTargetKind { profile, business, communityGroup, communityHub, event }
 
 /// Shared Follow / Following control that never navigates.
 ///
@@ -78,8 +73,9 @@ class _EntityFollowButtonState extends State<EntityFollowButton> {
             _loading = false;
           });
         case FollowTargetKind.business:
-          final following =
-              await BusinessFollowService.isFollowing(widget.targetId);
+          final following = await BusinessFollowService.isFollowing(
+            widget.targetId,
+          );
           if (!mounted) return;
           setState(() {
             _following = following;
@@ -87,8 +83,7 @@ class _EntityFollowButtonState extends State<EntityFollowButton> {
             _loading = false;
           });
         case FollowTargetKind.communityGroup:
-          final following =
-              await CommunityService.isFollowing(widget.targetId);
+          final following = await CommunityService.isFollowing(widget.targetId);
           if (!mounted) return;
           setState(() {
             _following = following;
@@ -96,19 +91,9 @@ class _EntityFollowButtonState extends State<EntityFollowButton> {
             _loading = false;
           });
         case FollowTargetKind.communityHub:
-          final me = Supabase.instance.client.auth.currentUser;
-          var following = false;
-          if (me != null) {
-            try {
-              final result = await Supabase.instance.client.rpc(
-                'is_community_leader',
-                params: {'p_community_id': widget.targetId},
-              );
-              following = result == true;
-            } catch (_) {
-              following = false;
-            }
-          }
+          final following = await CommunityHubService.isFollowing(
+            widget.targetId,
+          );
           if (!mounted) return;
           setState(() {
             _following = following;
@@ -139,9 +124,9 @@ class _EntityFollowButtonState extends State<EntityFollowButton> {
       widget.onAuthRequired!();
       return Supabase.instance.client.auth.currentUser != null;
     }
-    await Navigator.of(context).push(
-      FirstVuePageRoute(builder: (_) => const AuthScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(FirstVuePageRoute(builder: (_) => const AuthScreen()));
     return Supabase.instance.client.auth.currentUser != null;
   }
 
@@ -158,9 +143,11 @@ class _EntityFollowButtonState extends State<EntityFollowButton> {
     final wasPending = _pending;
 
     // Optimistic UI for non-pending flows.
-    if (!_pending) {
-      setState(() => _following = !wasFollowing);
-      widget.onChanged?.call(!wasFollowing);
+    if (!wasPending) {
+      setState(() {
+        _following = !wasFollowing;
+        _pending = false;
+      });
     }
 
     try {
@@ -205,14 +192,13 @@ class _EntityFollowButtonState extends State<EntityFollowButton> {
             widget.onChanged?.call(true);
           }
         case FollowTargetKind.communityHub:
-          // Leadership cannot be toggled via Follow; no-op with feedback.
-          if (!mounted) return;
-          setState(() => _following = wasFollowing);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Use Community settings to manage membership.'),
-            ),
+          final next = await CommunityHubService.toggleFollow(
+            widget.targetId,
+            currentlyFollowing: wasFollowing,
           );
+          if (!mounted) return;
+          setState(() => _following = next);
+          widget.onChanged?.call(next);
         case FollowTargetKind.event:
           final next = await EventSocialService.toggleFollow(
             widget.targetId,
@@ -229,10 +215,9 @@ class _EntityFollowButtonState extends State<EntityFollowButton> {
         _pending = wasPending;
         _error = 'Could not update follow. Try again.';
       });
-      widget.onChanged?.call(wasFollowing);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_error!)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_error!)));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -256,10 +241,11 @@ class _EntityFollowButtonState extends State<EntityFollowButton> {
           label: label,
           compact: widget.compact,
           filled: !_following && !_pending,
-          onPressed: (_busy || _loading) ? null : () {
-            // Stop parent navigation handlers.
-            _toggle();
-          },
+          onPressed: (_busy || _loading)
+              ? null
+              : () {
+                  _toggle();
+                },
         ),
       ),
     );

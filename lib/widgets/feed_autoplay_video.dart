@@ -28,7 +28,7 @@ class FeedAutoplayVideo extends StatefulWidget {
     this.fit = BoxFit.cover,
     this.borderRadius,
     this.previewOnly = false,
-    this.previewDuration = const Duration(seconds: 4),
+    this.previewDuration = const Duration(seconds: 3),
     this.onTap,
   });
 
@@ -183,17 +183,18 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
 
   @override
   Widget build(BuildContext context) {
-    Widget child = GestureDetector(
-      onTap: widget.onTap,
-      child: _buildContent(),
-    );
+    Widget child = GestureDetector(onTap: widget.onTap, child: _buildContent());
 
     if (widget.borderRadius != null) {
       child = ClipRRect(borderRadius: widget.borderRadius!, child: child);
     }
 
     if (widget.width != null || widget.height != null) {
-      child = SizedBox(width: widget.width, height: widget.height, child: child);
+      child = SizedBox(
+        width: widget.width,
+        height: widget.height,
+        child: child,
+      );
     }
 
     return VisibilityDetector(
@@ -208,7 +209,11 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
       return ColoredBox(
         color: FirstVueColors.elevatedSurface,
         child: const Center(
-          child: Icon(Icons.videocam_off_outlined, color: Colors.white38, size: 36),
+          child: Icon(
+            Icons.videocam_off_outlined,
+            color: Colors.white38,
+            size: 36,
+          ),
         ),
       );
     }
@@ -245,7 +250,9 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
         ),
         if (showPausedOverlay)
           Container(
-            color: Colors.black.withValues(alpha: _previewFinished ? 0.25 : 0.15),
+            color: Colors.black.withValues(
+              alpha: _previewFinished ? 0.25 : 0.15,
+            ),
             child: Center(
               child: Container(
                 padding: const EdgeInsets.all(10),
@@ -254,7 +261,9 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  _previewFinished ? Icons.replay_rounded : Icons.play_arrow_rounded,
+                  _previewFinished
+                      ? Icons.replay_rounded
+                      : Icons.play_arrow_rounded,
                   color: Colors.white,
                   size: 36,
                 ),

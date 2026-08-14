@@ -633,14 +633,6 @@ class SocialPostTile extends StatelessWidget {
                         size: 20,
                       ),
                     ),
-                  if (showPlay && !hasVideo)
-                    Center(
-                      child: Icon(
-                        Icons.play_circle_fill_rounded,
-                        color: Colors.white.withValues(alpha: .92),
-                        size: 42,
-                      ),
-                    ),
                   if (durationLabel != null)
                     Positioned(
                       left: 8,
@@ -819,14 +811,6 @@ class SocialPhotoGrid extends StatelessWidget {
                     child: const Icon(
                       Icons.photo_outlined,
                       color: FirstVueColors.gold,
-                    ),
-                  ),
-                if (item.isVideo)
-                  const Center(
-                    child: Icon(
-                      Icons.play_circle_fill_rounded,
-                      color: Colors.white,
-                      size: 28,
                     ),
                   ),
               ],

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../navigation/entity_navigation.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../screens/auth_screen.dart';
 import '../screens/create_post_screen.dart';
-import '../screens/member_public_profile_screen.dart';
 import '../models/post_identity.dart';
 import '../services/community_news_service.dart';
 import '../services/post_identity_service.dart';
@@ -51,8 +51,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
     final restored = PostIdentityOption.matchStoredKey(options, storedKey);
     setState(() {
       _identityOptions = options;
-      _selectedIdentity =
-          restored ?? (options.isEmpty ? null : options.first);
+      _selectedIdentity = restored ?? (options.isEmpty ? null : options.first);
     });
   }
 
@@ -116,9 +115,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
       if (!mounted) return;
       setState(() {
         _posts = posts
-            .map(
-              (p) => p.copyWith(repostCount: repostCounts[p.id] ?? 0),
-            )
+            .map((p) => p.copyWith(repostCount: repostCounts[p.id] ?? 0))
             .toList();
         _repostedPostIds = reposted;
         _loadingPosts = false;
@@ -186,9 +183,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            updated.savedByMe
-                ? 'Saved to Favorites'
-                : 'Removed from Favorites',
+            updated.savedByMe ? 'Saved to Favorites' : 'Removed from Favorites',
           ),
           duration: const Duration(seconds: 2),
         ),
@@ -293,11 +288,17 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
             children: [
               ListTile(
                 leading: const Icon(Icons.repeat, color: FirstVueColors.teal),
-                title: Text('Repost', style: TextStyle(color: ctx.fv.primaryText)),
+                title: Text(
+                  'Repost',
+                  style: TextStyle(color: ctx.fv.primaryText),
+                ),
                 onTap: () => Navigator.pop(ctx, 'repost'),
               ),
               ListTile(
-                leading: const Icon(Icons.edit_note, color: FirstVueColors.gold),
+                leading: const Icon(
+                  Icons.edit_note,
+                  color: FirstVueColors.gold,
+                ),
                 title: Text(
                   'Repost with comment',
                   style: TextStyle(color: ctx.fv.primaryText),
@@ -363,8 +364,9 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
   }) async {
     setState(() {
       if (wasReposted) {
-        _repostedPostIds =
-            _repostedPostIds.where((id) => id != post.id).toSet();
+        _repostedPostIds = _repostedPostIds
+            .where((id) => id != post.id)
+            .toSet();
       } else {
         _repostedPostIds = {..._repostedPostIds, post.id};
       }
@@ -379,7 +381,9 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(wasReposted ? 'Repost removed' : 'Reposted to your feed'),
+          content: Text(
+            wasReposted ? 'Repost removed' : 'Reposted to your feed',
+          ),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -444,7 +448,11 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
             if (!_loadingPosts)
               IconButton(
                 onPressed: _refresh,
-                icon: const Icon(Icons.refresh, color: FirstVueColors.mutedIcon, size: 20),
+                icon: const Icon(
+                  Icons.refresh,
+                  color: FirstVueColors.mutedIcon,
+                  size: 20,
+                ),
                 tooltip: 'Refresh feed',
                 visualDensity: VisualDensity.compact,
               ),
@@ -492,9 +500,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
                     ),
                     child: Text(
                       'Share news… Use #hashtags and @handles.',
-                      style: TextStyle(
-                        color: context.fv.tertiaryText,
-                      ),
+                      style: TextStyle(color: context.fv.tertiaryText),
                     ),
                   ),
                 ),
@@ -554,11 +560,10 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
                     initialPost: _posts[index],
                   ),
                   onAuthorTap: _posts[index].authorId.isNotEmpty
-                      ? () => openMemberProfile(
-                            context,
-                            profileId: _posts[index].authorId,
-                            displayName: _posts[index].authorName,
-                          )
+                      ? () => EntityNavigation.openPostAuthor(
+                          context,
+                          post: _posts[index],
+                        )
                       : null,
                   onSpark: () => _sparkPost(index),
                   onSave: () => _savePost(index),

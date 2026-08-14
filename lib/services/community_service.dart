@@ -1,7 +1,10 @@
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:flutter/foundation.dart';
+
 import '../config/media_config.dart';
+import '../utils/location_match.dart';
 import 'entity_image_url.dart';
 import 'media_storage_service.dart';
 import 'media_type_helpers.dart';
@@ -60,16 +63,16 @@ class Community {
 
   bool canManageAs(String? profileId) =>
       profileId != null &&
-      (profileId == creatorId ||
-          myRole == 'owner' ||
-          myRole == 'admin');
+      (profileId == creatorId || myRole == 'owner' || myRole == 'admin');
 
   bool get isLeaderRole =>
       myRole == 'owner' || myRole == 'admin' || myRole == 'moderator';
 
   String? get locationLabel {
-    final parts =
-        [city, state].whereType<String>().where((p) => p.trim().isNotEmpty);
+    final parts = [
+      city,
+      state,
+    ].whereType<String>().where((p) => p.trim().isNotEmpty);
     if (parts.isEmpty) return null;
     return parts.join(', ');
   }
@@ -108,14 +111,16 @@ class Community {
       createdAt: createdRaw is String
           ? DateTime.tryParse(createdRaw) ?? DateTime.now()
           : createdRaw is DateTime
-              ? createdRaw
-              : DateTime.now(),
+          ? createdRaw
+          : DateTime.now(),
     );
   }
 
   Future<Community> withResolvedImage() async {
     final resolved = await EntityImageUrl.resolve(
-      storagePath: EntityImageUrl.looksLikeStoragePath(imageUrl) ? imageUrl : null,
+      storagePath: EntityImageUrl.looksLikeStoragePath(imageUrl)
+          ? imageUrl
+          : null,
       legacyUrl: imageUrl,
       provider: MediaStorageProvider.supabase,
     );
@@ -529,8 +534,11 @@ class CommunityService {
       if (error.code != '23505') rethrow;
     }
 
-    return Community.fromRow(row, isMember: true, myRole: 'owner')
-        .withResolvedImage();
+    return Community.fromRow(
+      row,
+      isMember: true,
+      myRole: 'owner',
+    ).withResolvedImage();
   }
 
   static Future<Community> updateCommunity({
@@ -800,8 +808,8 @@ class CommunityService {
       joinedAt: joinedRaw is String
           ? DateTime.tryParse(joinedRaw) ?? DateTime.now()
           : joinedRaw is DateTime
-              ? joinedRaw
-              : DateTime.now(),
+          ? joinedRaw
+          : DateTime.now(),
     );
   }
 
@@ -825,8 +833,7 @@ class CommunityService {
       if (profile == null) return null;
       return CommunityMember(
         userId: profile['id'] as String,
-        displayName:
-            (profile['display_name'] as String?) ?? 'FirstVue member',
+        displayName: (profile['display_name'] as String?) ?? 'FirstVue member',
         username: profile['username'] as String?,
         avatarUrl: profile['avatar_url'] as String?,
         role: 'owner',
@@ -919,36 +926,46 @@ class CommunityService {
           )
           .toList();
       return await _resolveCommunityImages(mapped);
-    } catch (_) {
-      return const [];
+    } catch (error, stack) {
+      debugPrint(
+        'CommunityService.fetchYourCommunities failed: $error\n$stack',
+      );
+      rethrow;
     }
   }
 
-  /// Nearby groups based on user city/state preferences.
+  /// Nearby groups based on user city/state/metro preferences.
+  ///
+  /// Honors browseEverywhere. When a location filter returns no rows, falls
+  /// back to eligible public groups so incomplete optional location fields on
+  /// some rows never hide the entire section.
   static Future<List<Community>> fetchNearbyCommunities({
     int limit = 20,
   }) async {
     try {
       final prefs = await UserPreferencesService.fetch();
-      final city = prefs.locationCity?.trim();
-      final state = prefs.locationState?.trim();
+      final orFilter = LocationMatch.postgrestOrFilter(prefs);
 
-      final rows = await _selectCommunityRows(
-        configure: (query) {
-          var q = query;
-          if (city != null &&
-              city.isNotEmpty &&
-              state != null &&
-              state.isNotEmpty) {
-            q = q.or('city.ilike.%$city%,state.ilike.%$state%');
-          } else if (city != null && city.isNotEmpty) {
-            q = q.ilike('city', '%$city%');
-          } else if (state != null && state.isNotEmpty) {
-            q = q.ilike('state', '%$state%');
-          }
-          return q.order('created_at', ascending: false).limit(limit);
-        },
-      );
+      Future<List<Map<String, dynamic>>> load({required bool applyLocation}) {
+        return _selectCommunityRows(
+          configure: (query) {
+            var q = query;
+            if (applyLocation && orFilter != null) {
+              q = q.or(orFilter);
+            }
+            return q.order('created_at', ascending: false).limit(limit * 2);
+          },
+        );
+      }
+
+      var rows = await load(applyLocation: orFilter != null);
+      if (rows.isEmpty && orFilter != null) {
+        debugPrint(
+          'CommunityService.fetchNearbyCommunities: location filter empty; '
+          'falling back to eligible groups.',
+        );
+        rows = await load(applyLocation: false);
+      }
 
       final membershipMeta = await _myMembershipMeta();
       final memberIds = membershipMeta.entries
@@ -972,10 +989,14 @@ class CommunityService {
               membershipMeta: membershipMeta,
             ),
           )
+          .take(limit)
           .toList();
       return await _resolveCommunityImages(mapped);
-    } catch (_) {
-      return fetchCommunities(limit: limit);
+    } catch (error, stack) {
+      debugPrint(
+        'CommunityService.fetchNearbyCommunities failed: $error\n$stack',
+      );
+      rethrow;
     }
   }
 

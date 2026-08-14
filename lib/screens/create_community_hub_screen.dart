@@ -84,7 +84,8 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
             'Unlike Groups, Communities must be reviewed by FirstVue '
             'administrators before they become active. Submit a request with '
             'your proposed name, description, category, location, and reason. '
-            'You will be the Community Leader if approved.',
+            'Approving the Community makes it discoverable. Leadership is a '
+            'separate request and is not granted automatically.',
             style: TextStyle(color: fv.secondaryText, height: 1.4),
           ),
           actions: [

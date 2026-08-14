@@ -163,8 +163,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return switch (chip) {
       _ExploreChip.businesses => (profileType: 'business', businessType: null),
       _ExploreChip.people => (profileType: 'user', businessType: null),
-      _ExploreChip.events ||
-      _ExploreChip.thingsToDo => (profileType: 'event', businessType: null),
+      _ExploreChip.events => (profileType: 'event', businessType: null),
+      _ExploreChip.thingsToDo => (profileType: 'activity', businessType: null),
       _ExploreChip.food => (profileType: null, businessType: 'Restaurant'),
       _ExploreChip.bars => (profileType: null, businessType: 'Bar'),
       null => (profileType: null, businessType: null),
@@ -172,35 +172,47 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   bool _matchesChip(CommunityNewsPost post) {
-    final type =
-        (post.authorProfileType ??
-                (post.businessId != null
-                    ? 'business'
-                    : post.eventId != null
-                    ? 'event'
-                    : post.professionalProfileId != null
-                    ? 'professional'
-                    : post.communityId != null
-                    ? 'community'
-                    : 'user'))
-            .toLowerCase();
+    final type = post.resolvedAuthorProfileType;
     final businessType = (post.businessType ?? '').toLowerCase();
+    final body = post.body.toLowerCase();
+    final hasActivitySignal =
+        body.contains('#thingstodo') ||
+        body.contains('things to do') ||
+        businessType.contains('activity') ||
+        businessType.contains('attraction') ||
+        businessType.contains('recreation') ||
+        businessType.contains('entertainment') ||
+        businessType.contains('experience');
     return switch (_selectedChip) {
       null => true,
       _ExploreChip.businesses => type == 'business' || post.businessId != null,
       _ExploreChip.people => type == 'user' && post.businessId == null,
-      _ExploreChip.events ||
-      _ExploreChip.thingsToDo => type == 'event' || post.eventId != null,
+      _ExploreChip.events => type == 'event' || post.eventId != null,
+      _ExploreChip.thingsToDo =>
+        hasActivitySignal ||
+            type == 'activity' ||
+            (type == 'business' &&
+                (businessType.contains('activity') ||
+                    businessType.contains('attraction') ||
+                    businessType.contains('recreation') ||
+                    businessType.contains('entertainment') ||
+                    businessType.contains('experience'))),
       _ExploreChip.food =>
         businessType.contains('restaurant') ||
             businessType.contains('food') ||
             businessType.contains('dining') ||
             businessType.contains('cafe') ||
+            businessType.contains('café') ||
+            businessType.contains('bakery') ||
+            businessType.contains('cater') ||
             businessType.contains('bistro') ||
             businessType.contains('truck'),
       _ExploreChip.bars =>
         businessType.contains('bar') ||
             businessType.contains('lounge') ||
+            businessType.contains('club') ||
+            businessType.contains('brewery') ||
+            businessType.contains('nightlife') ||
             businessType.contains('pub'),
     };
   }
