@@ -28,7 +28,7 @@ if ($WebUrl -ne "") {
 }
 
 Write-Host "Building web..."
-& $Flutter build web --no-wasm-dry-run --no-web-resources-cdn --pwa-strategy=none @defineArgs
+& $Flutter build web --release --no-wasm-dry-run --no-web-resources-cdn --pwa-strategy=none --tree-shake-icons @defineArgs
 
 Write-Host ""
 Write-Host "Build complete: $ProjectRoot\build\web"

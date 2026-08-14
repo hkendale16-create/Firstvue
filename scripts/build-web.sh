@@ -28,6 +28,14 @@ fi
 # shellcheck disable=SC2086
 # Local CanvasKit so the app still boots if the gstatic CDN is blocked by CSP.
 # Skip the PWA service worker so phones do not wait to precache ~5MB before paint.
-flutter build web --release --no-wasm-dry-run --no-web-resources-cdn --pwa-strategy=none $DART_DEFINE
+# Tree-shake icons to keep main.dart.js smaller (default, made explicit).
+flutter build web --release \
+  --no-wasm-dry-run \
+  --no-web-resources-cdn \
+  --pwa-strategy=none \
+  --tree-shake-icons \
+  $DART_DEFINE
 
 echo "Build complete: $ROOT_DIR/build/web"
+# Tip: do not preload canvaskit/canvaskit.wasm in index.html — Chromium uses
+# canvaskit/chromium/canvaskit.wasm and a wrong preload downloads both.
