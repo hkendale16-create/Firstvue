@@ -12,7 +12,25 @@ class FirstVueBottomNav extends StatelessWidget {
     required this.onSelected,
   });
 
+  static const homeIndex = 0;
+  static const feedsIndex = 1;
   static const vueIndex = 2;
+  static const exploreIndex = 3;
+  static const profileIndex = 4;
+
+  /// Bottom-nav index for an authenticated route. Null means keep the landing
+  /// tab and push a stacked destination (Settings, messages, a deep link).
+  static int? indexForRoute(String? routeName) {
+    final path = Uri.tryParse(routeName ?? '')?.path ?? routeName ?? '';
+    return switch (path) {
+      '/' || '' || '/vue' => vueIndex,
+      '/feeds' => feedsIndex,
+      '/explore' => exploreIndex,
+      '/profile' => profileIndex,
+      '/home' => homeIndex,
+      _ => null,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {

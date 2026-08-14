@@ -13,6 +13,7 @@ import 'config/supabase_config.dart';
 import 'screens/discovery_feed_screen.dart';
 import 'screens/feeds_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/messages_inbox_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/explore_screen.dart';
 import 'screens/firstvue_business_profile_screen.dart';
@@ -100,14 +101,17 @@ class FirstVueApp extends StatelessWidget {
 }
 
 class FirstVueHome extends StatefulWidget {
-  const FirstVueHome({super.key});
+  const FirstVueHome({super.key, this.initialTab});
+
+  /// Override for tests. Signed-in launches default to VUE.
+  final int? initialTab;
 
   @override
   State<FirstVueHome> createState() => _FirstVueHomeState();
 }
 
 class _FirstVueHomeState extends State<FirstVueHome> {
-  int selectedIndex = 0;
+  late int selectedIndex;
   int _profileRefreshToken = 0;
   int _homeRefreshToken = 0;
   int _notificationBadge = 0;
@@ -115,10 +119,23 @@ class _FirstVueHomeState extends State<FirstVueHome> {
   final _messagesBubbleKey = GlobalKey<FloatingMessagesBubbleState>();
   final _cityChipKey = GlobalKey<HomeCityChipState>();
   final _homeAvatarKey = GlobalKey<_HomeProfileAvatarState>();
+  Widget? _vueTab;
+  Widget? _exploreTab;
 
   @override
   void initState() {
     super.initState();
+    selectedIndex =
+        widget.initialTab ??
+        _consumeLandingTab() ??
+        FirstVueBottomNav.vueIndex;
+    _vueTab = const DiscoveryFeedScreen();
+    if (selectedIndex == FirstVueBottomNav.exploreIndex) {
+      _exploreTab = ExploreScreen(
+        onOpenVueFeed: () =>
+            setState(() => selectedIndex = FirstVueBottomNav.vueIndex),
+      );
+    }
     _openInitialDeepLink();
     _listenForDeepLinks();
     _showBillingResultIfNeeded();
@@ -127,6 +144,19 @@ class _FirstVueHomeState extends State<FirstVueHome> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) showFirstLaunchExperience(context);
     });
+  }
+
+  /// Tab routes are consumed before the first frame so Home never flashes.
+  int? _consumeLandingTab() {
+    if (authSessionController.pendingDeepLink != null) {
+      return FirstVueBottomNav.vueIndex;
+    }
+    final pending = authSessionController.pendingRoute;
+    final tab = FirstVueBottomNav.indexForRoute(pending);
+    if (tab != null) {
+      authSessionController.takePendingRoute();
+    }
+    return tab;
   }
 
   Future<void> _refreshNotificationBadge() async {
@@ -199,7 +229,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
     });
   }
 
-  void _goHome() => setState(() => selectedIndex = 0);
+  void _goHome() => setState(() => selectedIndex = FirstVueBottomNav.homeIndex);
 
   Future<void> _openInitialDeepLink() async {
     final pending = authSessionController.takePendingDeepLink();
@@ -216,6 +246,23 @@ class _FirstVueHomeState extends State<FirstVueHome> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _rootNavigatorKey.currentState?.push(
           FirstVuePageRoute(builder: (_) => const SettingsShellScreen()),
+        );
+      });
+      return;
+    }
+
+    if (pendingRoute == '/messages') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _rootNavigatorKey.currentState?.push(
+          FirstVuePageRoute(builder: (_) => const MessagesInboxScreen()),
+        );
+      });
+      return;
+    }
+    if (pendingRoute == '/notifications') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _rootNavigatorKey.currentState?.push(
+          FirstVuePageRoute(builder: (_) => const NotificationsScreen()),
         );
       });
       return;
@@ -252,7 +299,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
   }
 
   void _openProfile() {
-    setState(() => selectedIndex = 4);
+    setState(() => selectedIndex = FirstVueBottomNav.profileIndex);
   }
 
   Future<void> _refreshHomeTab() async {
@@ -268,14 +315,21 @@ class _FirstVueHomeState extends State<FirstVueHome> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
-          switch (selectedIndex) {
-            1 => FeedsScreen(refreshToken: _homeRefreshToken),
-            2 => const DiscoveryFeedScreen(),
-            3 => ExploreScreen(
-              onOpenVueFeed: () => setState(() => selectedIndex = 2),
+          Offstage(
+            offstage: selectedIndex != FirstVueBottomNav.vueIndex,
+            child: _vueTab ?? const SizedBox.shrink(),
+          ),
+          if (_exploreTab != null)
+            Offstage(
+              offstage: selectedIndex != FirstVueBottomNav.exploreIndex,
+              child: _exploreTab!,
             ),
-            4 => ProfileScreen(refreshToken: _profileRefreshToken),
-            _ => SafeArea(
+          if (selectedIndex == FirstVueBottomNav.feedsIndex)
+            FeedsScreen(refreshToken: _homeRefreshToken),
+          if (selectedIndex == FirstVueBottomNav.profileIndex)
+            ProfileScreen(refreshToken: _profileRefreshToken),
+          if (selectedIndex == FirstVueBottomNav.homeIndex)
+            SafeArea(
               child: FirstVueRefreshScaffold(
                 onRefresh: _refreshHomeTab,
                 child: ListView(
@@ -358,8 +412,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
                 ),
               ),
             ),
-          },
-          if (selectedIndex == 0)
+          if (selectedIndex == FirstVueBottomNav.homeIndex)
             FloatingMessagesBubble(key: _messagesBubbleKey),
         ],
       ),
@@ -369,8 +422,17 @@ class _FirstVueHomeState extends State<FirstVueHome> {
         onSelected: (index) {
           setState(() {
             selectedIndex = index;
-            if (index == 4) _profileRefreshToken++;
-            if (index == 0) {
+            if (index == FirstVueBottomNav.exploreIndex) {
+              _exploreTab ??= ExploreScreen(
+                onOpenVueFeed: () => setState(
+                  () => selectedIndex = FirstVueBottomNav.vueIndex,
+                ),
+              );
+            }
+            if (index == FirstVueBottomNav.profileIndex) {
+              _profileRefreshToken++;
+            }
+            if (index == FirstVueBottomNav.homeIndex) {
               _homeAvatarKey.currentState?.reload();
             }
           });

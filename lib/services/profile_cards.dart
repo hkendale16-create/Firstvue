@@ -116,6 +116,52 @@ class ProfileCards {
     }
   }
 
+  /// Personal-profile directory used by Explore → People recommendations.
+  static Future<List<Map<String, dynamic>>> listPublic({
+    int limit = 16,
+    String? excludeId,
+  }) async {
+    Future<List<Map<String, dynamic>>> run(String table, String select) async {
+      var request = _client.from(table).select(select);
+      if (excludeId != null && excludeId.isNotEmpty) {
+        request = request.neq('id', excludeId);
+      }
+      final rows = await request.limit(limit);
+      return List<Map<String, dynamic>>.from(rows as List);
+    }
+
+    Future<List<Map<String, dynamic>>> runPublic(
+      String table,
+      String select,
+    ) async {
+      var request = _client
+          .from(table)
+          .select(select)
+          .eq('is_private', false)
+          .eq('profile_visibility', 'public');
+      if (excludeId != null && excludeId.isNotEmpty) {
+        request = request.neq('id', excludeId);
+      }
+      final rows = await request.limit(limit);
+      return List<Map<String, dynamic>>.from(rows as List);
+    }
+
+    try {
+      return await runPublic(relation, columns);
+    } catch (error) {
+      if (!isMissingRelation(error)) {
+        try {
+          return await run(relation, columns);
+        } catch (_) {}
+      }
+      try {
+        return await runPublic('profiles', columns);
+      } catch (_) {
+        return run('profiles', nameColumns);
+      }
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> searchByDisplayName({
     required String query,
     String? excludeId,
