@@ -174,7 +174,7 @@ class CommunityEditorService {
         query = query.eq('status', 'active');
       }
       final rows = await query.order('created_at', ascending: true);
-      return _hydrateEditors(rows);
+      return await _hydrateEditors(rows);
     } catch (_) {
       return const [];
     }
@@ -207,7 +207,7 @@ class CommunityEditorService {
         .upsert(payload, onConflict: 'community_id,user_id')
         .select(_columns)
         .single();
-    return _hydrateEditor(row);
+    return await _hydrateEditor(row);
   }
 
   static Future<CommunityEditor> updatePermissions(
@@ -229,7 +229,7 @@ class CommunityEditorService {
         .eq('id', editorId)
         .select(_columns)
         .single();
-    return _hydrateEditor(row);
+    return await _hydrateEditor(row);
   }
 
   /// Soft-remove: set status to revoked (does not delete the row).
