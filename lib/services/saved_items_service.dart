@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'profile_cards.dart';
+
 enum SavedContentType {
   newsPost('news_post'),
   business('business'),
@@ -304,15 +306,7 @@ class SavedItemsService {
   ) async {
     if (authorIds.isEmpty) return {};
     try {
-      final rows = await _client
-          .from('profiles')
-          .select('id, display_name')
-          .inFilter('id', authorIds);
-      return {
-        for (final row in rows)
-          row['id'] as String:
-              (row['display_name'] as String?) ?? 'FirstVue member',
-      };
+      return await ProfileCards.displayNames(authorIds);
     } catch (_) {
       return {};
     }

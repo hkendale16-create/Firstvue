@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'profile_cards.dart';
+
 /// Known Community Editor permission keys (must match DB / RPC checks).
 class CommunityEditorPermissions {
   CommunityEditorPermissions._();
@@ -131,9 +133,25 @@ class CommunityEditorService {
       'id, community_id, user_id, permissions, added_by, status, '
       'created_at, updated_at';
 
-  static const _columnsWithProfile =
-      'id, community_id, user_id, permissions, added_by, status, '
-      'created_at, updated_at, profiles(display_name, username, avatar_url)';
+  static Future<CommunityEditor> _hydrateEditor(Map<String, dynamic> row) async {
+    final map = Map<String, dynamic>.from(row);
+    final userId = map['user_id'] as String?;
+    if (userId != null) {
+      map['profiles'] = await ProfileCards.fetchById(
+        userId,
+        select: ProfileCards.columns,
+      );
+    }
+    return CommunityEditor.fromRow(map);
+  }
+
+  static Future<List<CommunityEditor>> _hydrateEditors(List<dynamic> rows) async {
+    final list = rows
+        .map((row) => Map<String, dynamic>.from(row as Map))
+        .toList();
+    await ProfileCards.attachAsProfiles(list, idKey: 'user_id');
+    return list.map(CommunityEditor.fromRow).toList();
+  }
 
   /// Local helper: whether [editor] has [permission] while active.
   static bool hasPermission(CommunityEditor? editor, String permission) {
@@ -150,27 +168,15 @@ class CommunityEditorService {
     try {
       var query = _client
           .from('community_editors')
-          .select(_columnsWithProfile)
+          .select(_columns)
           .eq('community_id', communityId);
       if (activeOnly) {
         query = query.eq('status', 'active');
       }
       final rows = await query.order('created_at', ascending: true);
-      return rows.map(CommunityEditor.fromRow).toList();
+      return _hydrateEditors(rows);
     } catch (_) {
-      try {
-        var query = _client
-            .from('community_editors')
-            .select(_columns)
-            .eq('community_id', communityId);
-        if (activeOnly) {
-          query = query.eq('status', 'active');
-        }
-        final rows = await query.order('created_at', ascending: true);
-        return rows.map(CommunityEditor.fromRow).toList();
-      } catch (_) {
-        return const [];
-      }
+      return const [];
     }
   }
 
@@ -196,21 +202,12 @@ class CommunityEditorService {
       'updated_at': DateTime.now().toIso8601String(),
     };
 
-    try {
-      final row = await _client
-          .from('community_editors')
-          .upsert(payload, onConflict: 'community_id,user_id')
-          .select(_columnsWithProfile)
-          .single();
-      return CommunityEditor.fromRow(row);
-    } catch (_) {
-      final row = await _client
-          .from('community_editors')
-          .upsert(payload, onConflict: 'community_id,user_id')
-          .select(_columns)
-          .single();
-      return CommunityEditor.fromRow(row);
-    }
+    final row = await _client
+        .from('community_editors')
+        .upsert(payload, onConflict: 'community_id,user_id')
+        .select(_columns)
+        .single();
+    return _hydrateEditor(row);
   }
 
   static Future<CommunityEditor> updatePermissions(
@@ -226,23 +223,13 @@ class CommunityEditorService {
       'updated_at': DateTime.now().toIso8601String(),
     };
 
-    try {
-      final row = await _client
-          .from('community_editors')
-          .update(patch)
-          .eq('id', editorId)
-          .select(_columnsWithProfile)
-          .single();
-      return CommunityEditor.fromRow(row);
-    } catch (_) {
-      final row = await _client
-          .from('community_editors')
-          .update(patch)
-          .eq('id', editorId)
-          .select(_columns)
-          .single();
-      return CommunityEditor.fromRow(row);
-    }
+    final row = await _client
+        .from('community_editors')
+        .update(patch)
+        .eq('id', editorId)
+        .select(_columns)
+        .single();
+    return _hydrateEditor(row);
   }
 
   /// Soft-remove: set status to revoked (does not delete the row).

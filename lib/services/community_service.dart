@@ -8,6 +8,8 @@ import '../utils/location_match.dart';
 import 'entity_image_url.dart';
 import 'media_storage_service.dart';
 import 'media_type_helpers.dart';
+import 'profile_cards.dart';
+import 'profile_media_service.dart';
 import 'user_preferences_service.dart';
 
 /// A FirstVue Group (backed by `public.communities`).
@@ -765,33 +767,30 @@ class CommunityService {
     try {
       final rows = await _client
           .from('community_members')
-          .select(
-            'profile_id, role, status, joined_at, '
-            'profiles(display_name, username, avatar_url)',
-          )
+          .select('profile_id, role, status, joined_at')
           .eq('community_id', communityId)
           .eq('status', status)
           .order('joined_at', ascending: true)
           .limit(limit);
 
-      return rows.map(_mapMember).toList();
-    } catch (_) {
-      // Fallback if avatar_url column is missing on older schemas.
-      try {
-        final rows = await _client
-            .from('community_members')
-            .select(
-              'profile_id, role, status, joined_at, '
-              'profiles(display_name, username)',
-            )
-            .eq('community_id', communityId)
-            .eq('status', status)
-            .order('joined_at', ascending: true)
-            .limit(limit);
-        return rows.map(_mapMember).toList();
-      } catch (_) {
-        return const [];
+      final list = List<Map<String, dynamic>>.from(
+        (rows as List).map((row) => Map<String, dynamic>.from(row as Map)),
+      );
+      await ProfileCards.attachAsProfiles(list, idKey: 'profile_id');
+      final avatars = await ProfileMediaService.fetchAvatarUrlsForProfiles(
+        list.map((row) => row['profile_id'] as String).toList(),
+      );
+      for (final row in list) {
+        final id = row['profile_id'] as String;
+        final profile = Map<String, dynamic>.from(
+          (row['profiles'] as Map<String, dynamic>?) ?? const {},
+        );
+        profile['avatar_url'] = avatars[id];
+        row['profiles'] = profile;
       }
+      return list.map(_mapMember).toList();
+    } catch (_) {
+      return const [];
     }
   }
 
@@ -825,17 +824,16 @@ class CommunityService {
     if (community == null || community.creatorId.isEmpty) return null;
 
     try {
-      final profile = await _client
-          .from('profiles')
-          .select('id, display_name, username, avatar_url')
-          .eq('id', community.creatorId)
-          .maybeSingle();
+      final profile = await ProfileCards.fetchById(community.creatorId);
       if (profile == null) return null;
+      final avatars = await ProfileMediaService.fetchAvatarUrlsForProfiles([
+        community.creatorId,
+      ]);
       return CommunityMember(
-        userId: profile['id'] as String,
+        userId: community.creatorId,
         displayName: (profile['display_name'] as String?) ?? 'FirstVue member',
         username: profile['username'] as String?,
-        avatarUrl: profile['avatar_url'] as String?,
+        avatarUrl: avatars[community.creatorId],
         role: 'owner',
         joinedAt: community.createdAt,
       );

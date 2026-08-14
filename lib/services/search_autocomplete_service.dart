@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'profile_cards.dart';
 import 'username_service.dart';
 
 enum SearchResultType { profile, business, community, communityHub, hashtag }
@@ -22,6 +23,19 @@ class SearchAutocompleteService {
   SearchAutocompleteService._();
 
   static final _client = Supabase.instance.client;
+
+  static Future<List<Map<String, dynamic>>> _profileRows(
+    Future<dynamic> Function(String table) query,
+  ) async {
+    try {
+      final rows = await query(ProfileCards.relation);
+      return List<Map<String, dynamic>>.from(rows as List);
+    } catch (error) {
+      if (!ProfileCards.isMissingRelation(error)) rethrow;
+      final rows = await query('profiles');
+      return List<Map<String, dynamic>>.from(rows as List);
+    }
+  }
 
   /// Minimum trimmed query length before autocomplete runs.
   static bool shouldSearch(String query) {
@@ -62,14 +76,15 @@ class SearchAutocompleteService {
     String prefix,
   ) async {
     try {
-      final rows = await _client
-          .from('profiles')
-          .select('id, display_name, username, city, state')
-          .not('username', 'is', null)
-          .ilike('username', '$prefix%')
-          .order('username')
-          .limit(8);
-
+      final rows = await _profileRows(
+        (table) => _client
+            .from(table)
+            .select('id, display_name, username')
+            .not('username', 'is', null)
+            .ilike('username', '$prefix%')
+            .order('username')
+            .limit(8),
+      );
       return rows.map(_profileRowToResult).toList();
     } catch (_) {
       return const [];
@@ -81,12 +96,6 @@ class SearchAutocompleteService {
   ) {
     final username = (row['username'] as String?)?.trim();
     final displayName = (row['display_name'] as String?) ?? 'FirstVue member';
-    final city = row['city'] as String?;
-    final state = row['state'] as String?;
-    final location = [
-      city,
-      state,
-    ].whereType<String>().where((part) => part.trim().isNotEmpty).join(', ');
 
     final handle = username != null && username.isNotEmpty
         ? UsernameService.normalize(username) ?? username.toLowerCase()
@@ -95,9 +104,7 @@ class SearchAutocompleteService {
     return SearchAutocompleteResult(
       id: row['id'] as String,
       label: handle != null ? '@$handle' : displayName,
-      subtitle: handle != null
-          ? displayName + (location.isNotEmpty ? ' · $location' : '')
-          : (location.isNotEmpty ? location : null),
+      subtitle: handle != null ? displayName : null,
       type: SearchResultType.profile,
     );
   }
@@ -114,11 +121,13 @@ class SearchAutocompleteService {
           ? 'display_name.ilike.%$prefix%,username.ilike.%$handlePart%'
           : 'display_name.ilike.%$prefix%,username.ilike.%$prefix%';
 
-      final rows = await _client
-          .from('profiles')
-          .select('id, display_name, username, city, state')
-          .or(filter)
-          .limit(8);
+      final rows = await _profileRows(
+        (table) => _client
+            .from(table)
+            .select('id, display_name, username')
+            .or(filter)
+            .limit(8),
+      );
 
       return rows.map(_profileRowToResult).toList();
     } catch (_) {

@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'profile_cards.dart';
+
 enum ShoutoutTargetType {
   profile,
   business,
@@ -265,11 +267,10 @@ class ShoutoutService {
         )
         .single();
 
-    final profile = await _client
-        .from('profiles')
-        .select('display_name, username')
-        .eq('id', me.id)
-        .maybeSingle();
+    final profile = await ProfileCards.fetchById(
+      me.id,
+      select: ProfileCards.nameColumns,
+    );
 
     return Shoutout(
       id: row['id'] as String,
@@ -306,10 +307,10 @@ class ShoutoutService {
     final creatorNames = <String, String>{};
     final creatorUsernames = <String, String?>{};
     try {
-      final creators = await _client
-          .from('profiles')
-          .select('id, display_name, username')
-          .inFilter('id', creatorIds.toList());
+      final creators = await ProfileCards.listByIds(
+        creatorIds.toList(),
+        select: ProfileCards.nameColumns,
+      );
       for (final creator in creators) {
         final id = creator['id'] as String;
         creatorNames[id] =
@@ -343,10 +344,10 @@ class ShoutoutService {
 
     await Future.wait([
       loadTargets(ShoutoutTargetType.profile, (ids) async {
-        final rows = await _client
-            .from('profiles')
-            .select('id, display_name, username')
-            .inFilter('id', ids);
+        final rows = await ProfileCards.listByIds(
+          ids,
+          select: ProfileCards.nameColumns,
+        );
         return rows
             .map(
               (row) => {

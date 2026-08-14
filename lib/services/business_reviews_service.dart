@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'profile_cards.dart';
+
 class BusinessReview {
   final String id;
   final int rating;
@@ -98,14 +100,7 @@ class BusinessReviewsService {
     final names = <String, String>{};
     if (reviewerIds.isNotEmpty) {
       try {
-        final profiles = await _client
-            .from('profiles')
-            .select('id, display_name')
-            .inFilter('id', reviewerIds);
-        for (final profile in profiles) {
-          names[profile['id'] as String] =
-              (profile['display_name'] as String?) ?? 'FirstVue member';
-        }
+        names.addAll(await ProfileCards.displayNames(reviewerIds));
       } catch (_) {}
     }
 

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -16,5 +18,17 @@ void main() {
         'exists (select 1 from public.community_hub_roles';
     expect(hubRolesSelectSources, isNot(contains(forbiddenSelfSelect)));
     expect(forbiddenSelfSelect.contains('community_hub_roles'), isTrue);
+  });
+
+  test('20260910 and 20260916 SQL keep hub_roles policies non-recursive', () {
+    const forbidden = 'exists (select 1 from public.community_hub_roles';
+    for (final path in [
+      'supabase/migrations/20260910_community_rls_recursion_media_delete.sql',
+      'supabase/migrations/20260916_profiles_public_card_rls.sql',
+    ]) {
+      final sql = File(path).readAsStringSync();
+      expect(sql.contains(forbidden), isFalse, reason: path);
+      expect(sql.toLowerCase().contains('disable row level security'), isFalse);
+    }
   });
 }

@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'profile_cards.dart';
 import 'profile_media_service.dart';
 
 class MessageRecipient {
@@ -174,7 +175,7 @@ class MessagingService {
 
     var request = _client
         .from('businesses')
-        .select('id, name, created_by, profiles(display_name)')
+        .select('id, name, created_by')
         .eq('status', 'approved')
         .neq('created_by', me);
     final trimmed = query?.trim();
@@ -183,20 +184,21 @@ class MessagingService {
     }
 
     final rows = await request.order('name').limit(30);
-    return rows.map(MessageRecipient.fromBusinessRow).toList();
+    final list = List<Map<String, dynamic>>.from(
+      (rows as List).map((row) => Map<String, dynamic>.from(row as Map)),
+    );
+    await ProfileCards.attachAsProfiles(list, idKey: 'created_by');
+    return list.map(MessageRecipient.fromBusinessRow).toList();
   }
 
   static Future<List<MessageRecipient>> _searchRecipientsFallback(
     String query,
     String me,
   ) async {
-    final profiles = await _client
-        .from('profiles')
-        .select('id, display_name, account_type')
-        .neq('id', me)
-        .not('display_name', 'is', null)
-        .ilike('display_name', '%$query%')
-        .limit(20);
+    final profiles = await ProfileCards.searchByDisplayName(
+      query: query,
+      excludeId: me,
+    );
     return profiles.map(MessageRecipient.fromProfileRow).toList();
   }
 
@@ -227,17 +229,13 @@ class MessagingService {
         .toList();
     final avatars =
         await ProfileMediaService.fetchAvatarUrlsForProfiles(otherIds);
+    final names = await ProfileCards.displayNames(otherIds);
 
     final summaries = <MessageThreadSummary>[];
     for (final thread in threads) {
       final otherId = thread['participant_a'] == me
           ? thread['participant_b'] as String
           : thread['participant_a'] as String;
-      final profile = await _client
-          .from('profiles')
-          .select('display_name')
-          .eq('id', otherId)
-          .maybeSingle();
       final lastMessage = await _client
           .from('direct_messages')
           .select('body, created_at, sender_id')
@@ -263,8 +261,7 @@ class MessagingService {
         MessageThreadSummary(
           id: thread['id'] as String,
           otherUserId: otherId,
-          otherDisplayName:
-              (profile?['display_name'] as String?) ?? 'FirstVue member',
+          otherDisplayName: names[otherId] ?? 'FirstVue member',
           otherAvatarUrl: avatars[otherId],
           businessName: business?['name'] as String?,
           lastPreview:

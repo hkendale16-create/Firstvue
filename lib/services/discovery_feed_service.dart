@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/media_config.dart';
 import 'media_storage_service.dart';
+import 'profile_cards.dart';
 
 enum VueFeedSource { business, member }
 
@@ -149,10 +150,10 @@ class DiscoveryFeedService {
           .toList();
       final ownerRows = ownerIds.isEmpty
           ? const <Map<String, dynamic>>[]
-          : await _client
-                .from('profiles')
-                .select('id, display_name')
-                .inFilter('id', ownerIds);
+          : await ProfileCards.listByIds(
+              ownerIds,
+              select: 'id, display_name',
+            );
       final ownerNames = <String, String>{
         for (final owner in ownerRows)
           owner['id'] as String:
@@ -235,26 +236,14 @@ class DiscoveryFeedService {
     required int limit,
   }) async {
     try {
-      List<dynamic> rows;
-      try {
-        rows = await _client
-            .from('profile_media')
-            .select(
-              'id, storage_path, storage_provider, media_type, featured_for_trending, media_role, profile_id, profiles(display_name)',
-            )
-            .order('featured_for_trending', ascending: false)
-            .order('created_at', ascending: false)
-            .limit(limit);
-      } catch (_) {
-        rows = await _client
-            .from('profile_media')
-            .select(
-              'id, storage_path, storage_provider, media_type, featured_for_trending, media_role, profile_id',
-            )
-            .order('featured_for_trending', ascending: false)
-            .order('created_at', ascending: false)
-            .limit(limit);
-      }
+      final rows = await _client
+          .from('profile_media')
+          .select(
+            'id, storage_path, storage_provider, media_type, featured_for_trending, media_role, profile_id',
+          )
+          .order('featured_for_trending', ascending: false)
+          .order('created_at', ascending: false)
+          .limit(limit);
 
       if (rows.isEmpty) return const [];
 
@@ -264,10 +253,10 @@ class DiscoveryFeedService {
           .toList();
       final nameRows = profileIds.isEmpty
           ? const <Map<String, dynamic>>[]
-          : await _client
-                .from('profiles')
-                .select('id, display_name')
-                .inFilter('id', profileIds);
+          : await ProfileCards.listByIds(
+              profileIds,
+              select: 'id, display_name',
+            );
       final profileNames = <String, String>{
         for (final row in nameRows)
           row['id'] as String:
@@ -277,11 +266,7 @@ class DiscoveryFeedService {
       return await Future.wait(
         rows.map((row) async {
           final profileId = row['profile_id'] as String;
-          final embedded = row['profiles'] as Map<String, dynamic>?;
-          final displayName =
-              embedded?['display_name'] as String? ??
-              profileNames[profileId] ??
-              'FirstVue member';
+          final displayName = profileNames[profileId] ?? 'FirstVue member';
           final mediaType = (row['media_type'] as String?) ?? 'image';
           final storagePath = row['storage_path'] as String;
           final provider = MediaStorageProvider.parse(
@@ -367,10 +352,10 @@ class DiscoveryFeedService {
           .toList();
       final names = <String, String>{};
       if (authorIds.isNotEmpty) {
-        final nameRows = await _client
-            .from('profiles')
-            .select('id, display_name')
-            .inFilter('id', authorIds);
+        final nameRows = await ProfileCards.listByIds(
+          authorIds,
+          select: 'id, display_name',
+        );
         for (final row in nameRows) {
           names[row['id'] as String] =
               (row['display_name'] as String?) ?? 'FirstVue member';
