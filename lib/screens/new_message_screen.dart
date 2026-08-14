@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import '../theme/firstvue_theme.dart';
 import '../navigation/firstvue_page_route.dart';
 
+import '../messaging/screens/direct_conversation_page.dart';
+import '../messaging/models/messaging_models.dart';
+import '../messaging/services/fv_messaging_service.dart';
 import '../services/messaging_service.dart';
-import 'conversation_screen.dart';
 
 class NewMessageScreen extends StatefulWidget {
   final String? initialMessage;
@@ -56,19 +58,26 @@ class _NewMessageScreenState extends State<NewMessageScreen>
     if (_opening) return;
     setState(() => _opening = true);
     try {
-      final threadId = await MessagingService.openThreadWithUser(
+      final threadId = await FvMessagingService.openDirect(
         otherUserId: recipient.userId,
-        businessId: recipient.businessId,
       );
       if (!mounted) return;
       await Navigator.pushReplacement(
         context,
         FirstVuePageRoute(
-          builder: (_) => ConversationScreen(
-            threadId: threadId,
-            title: recipient.displayName,
-            subtitle: recipient.businessName,
-            initialMessage: widget.initialMessage,
+          builder: (_) => DirectConversationPage(
+            identity: const FvMessagingIdentity(
+              kind: FvIdentityKind.personal,
+              label: 'You',
+            ),
+            conversation: FvConversationSummary(
+              id: threadId,
+              kind: FvConversationKind.direct,
+              title: recipient.displayName,
+              lastMessageAt: DateTime.now(),
+              otherProfileId: recipient.userId,
+              requestState: FvRequestState.pending,
+            ),
           ),
         ),
       );

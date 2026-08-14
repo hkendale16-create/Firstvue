@@ -16,8 +16,8 @@ import '../widgets/community_news_post_detail_sheet.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/social_chrome.dart';
-import '../services/messaging_service.dart';
-import 'conversation_screen.dart';
+import '../messaging/screens/messaging_shell_screen.dart';
+import '../messaging/services/fv_messaging_service.dart';
 import '../widgets/feed_comments_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/profile_affiliations_section.dart';
@@ -177,16 +177,11 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
       return;
     }
     try {
-      final threadId = await MessagingService.openThreadWithUser(
+      final threadId = await FvMessagingService.openDirect(
         otherUserId: widget.profileId,
       );
       if (!mounted) return;
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(
-          builder: (_) => ConversationScreen(threadId: threadId, title: _title),
-        ),
-      );
+      await openMessaging(context, conversationId: threadId, title: _title);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

@@ -24,9 +24,10 @@ import '../widgets/shoutout_card.dart';
 import '../services/shoutout_service.dart';
 import '../widgets/portfolio_albums_section.dart';
 import '../services/portfolio_album_service.dart';
+import '../messaging/screens/messaging_shell_screen.dart';
+import '../messaging/services/fv_messaging_service.dart';
 import 'auth_screen.dart';
 import 'business_menu_item_detail_screen.dart';
-import 'conversation_screen.dart';
 import 'meet_the_owner_screen.dart';
 
 class FirstVueBusinessProfileScreen extends StatefulWidget {
@@ -204,20 +205,19 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
         );
         return;
       }
-      final threadId = await MessagingService.openThreadWithUser(
-        otherUserId: ownerId,
-        businessId: widget.details.id,
-      );
+      String threadId;
+      try {
+        threadId = await FvMessagingService.openEntityInbox(
+          entityId: widget.details.id,
+        );
+      } catch (_) {
+        threadId = await FvMessagingService.openDirect(otherUserId: ownerId);
+      }
       if (!mounted) return;
-      await Navigator.push(
+      await openMessaging(
         context,
-        FirstVuePageRoute(
-          builder: (_) => ConversationScreen(
-            threadId: threadId,
-            title: widget.details.name,
-            subtitle: 'Business owner',
-          ),
-        ),
+        conversationId: threadId,
+        title: widget.details.name,
       );
     } catch (_) {
       if (!mounted) return;
@@ -1055,20 +1055,19 @@ class _MessageOwnerButtonState extends State<_MessageOwnerButton> {
         }
         return;
       }
-      final threadId = await MessagingService.openThreadWithUser(
-        otherUserId: ownerId,
-        businessId: widget.businessId,
-      );
+      String threadId;
+      try {
+        threadId = await FvMessagingService.openEntityInbox(
+          entityId: widget.businessId,
+        );
+      } catch (_) {
+        threadId = await FvMessagingService.openDirect(otherUserId: ownerId);
+      }
       if (!mounted) return;
-      await Navigator.push(
+      await openMessaging(
         context,
-        FirstVuePageRoute(
-          builder: (_) => ConversationScreen(
-            threadId: threadId,
-            title: widget.businessName,
-            subtitle: 'Business owner',
-          ),
-        ),
+        conversationId: threadId,
+        title: widget.businessName,
       );
     } catch (_) {
       if (mounted) {

@@ -4,11 +4,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/activity_notifications_service.dart';
 import '../services/follow_service.dart';
+import '../messaging/screens/messaging_shell_screen.dart';
+import '../messaging/services/fv_messaging_service.dart';
 import '../services/messaging_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../screens/auth_screen.dart';
-import '../screens/conversation_screen.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../screens/messages_inbox_screen.dart';
 import '../screens/post_detail_screen.dart';
@@ -250,19 +251,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     required String title,
   }) async {
     try {
-      final threadId = await MessagingService.openThreadWithUser(
+      final threadId = await FvMessagingService.openDirect(
         otherUserId: otherUserId,
       );
       if (!context.mounted) return;
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(
-          builder: (_) => ConversationScreen(
-            threadId: threadId,
-            title: title,
-          ),
-        ),
-      );
+      await openMessaging(context, conversationId: threadId, title: title);
     } catch (_) {}
   }
 }
