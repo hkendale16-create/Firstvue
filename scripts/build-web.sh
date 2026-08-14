@@ -27,6 +27,7 @@ fi
 
 # shellcheck disable=SC2086
 # Local CanvasKit so the app still boots if the gstatic CDN is blocked by CSP.
-flutter build web --release --no-wasm-dry-run --no-web-resources-cdn $DART_DEFINE
+# Skip the PWA service worker so phones do not wait to precache ~5MB before paint.
+flutter build web --release --no-wasm-dry-run --no-web-resources-cdn --pwa-strategy=none $DART_DEFINE
 
 echo "Build complete: $ROOT_DIR/build/web"

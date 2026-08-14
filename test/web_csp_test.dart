@@ -39,4 +39,16 @@ void main() {
     expect(buildWebSh, contains('--no-web-resources-cdn'));
     expect(bootstrap, contains("canvasKitBaseUrl: 'canvaskit/'"));
   });
+
+  test('web bootstrap does not wait for a PWA service worker', () {
+    expect(bootstrap, isNot(contains('serviceWorkerSettings')));
+    expect(buildWebSh, contains('--pwa-strategy=none'));
+  });
+
+  test('Netlify caches CanvasKit and fonts so phones skip the 4MB redownload', () {
+    final toml = File('netlify.toml').readAsStringSync();
+    expect(toml, contains('for = "/canvaskit/*"'));
+    expect(toml, contains('for = "/assets/*"'));
+    expect(toml, contains('max-age=604800'));
+  });
 }
