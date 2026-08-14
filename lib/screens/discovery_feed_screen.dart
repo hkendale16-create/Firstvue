@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../navigation/firstvue_page_route.dart';
 import '../services/discovery_feed_service.dart';
+import '../services/vue_featured_rotation.dart';
 import '../theme/firstvue_theme.dart';
-import '../widgets/explore_grid_video.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/fv_ui.dart';
-import '../widgets/social_chrome.dart';
+import '../widgets/vue_mosaic_layout.dart';
+import '../widgets/vue_mosaic_view.dart';
 import 'create_post_screen.dart';
 import 'firstvue_business_profile_screen.dart';
 import 'full_screen_media_viewer.dart';
@@ -55,8 +56,12 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
           .where((item) => item.mediaUrl.trim().isNotEmpty)
           .toList();
       if (!mounted) return usable;
+      final arranged = reset
+          ? await _arrangeFeatured(usable)
+          : [..._items, ...usable];
+      if (!mounted) return usable;
       setState(() {
-        _items = reset ? usable : [..._items, ...usable];
+        _items = arranged;
         _error = null;
         _hasMore = usable.length >= limit;
       });
@@ -92,6 +97,36 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
       if (mounted) setState(() => _loadingMore = false);
     }
   }
+
+  Future<List<DiscoveryFeedItem>> _arrangeFeatured(
+    List<DiscoveryFeedItem> ranked,
+  ) async {
+    final width = mounted ? MediaQuery.sizeOf(context).width : 390.0;
+    final columns = _crossAxisCount(width);
+    final cells = buildVueMosaic(itemCount: ranked.length, columns: columns);
+    final lastCreator = await VueFeaturedRotation.lastCreator(_vueMode);
+    final arranged = assignVueMosaicItems(
+      ranked: ranked,
+      cells: cells,
+      creatorId: (item) => item.creatorId,
+      lastFeaturedCreatorId: lastCreator,
+    );
+    final featuredCreator = leadingFeaturedCreatorId(
+      items: arranged,
+      cells: cells,
+      creatorId: (item) => item.creatorId,
+    );
+    if (featuredCreator != null) {
+      await VueFeaturedRotation.remember(_vueMode, featuredCreator);
+    }
+    return arranged;
+  }
+
+  VueFeedMode get _vueMode => switch (_mode) {
+    _FeedMode.forYou => VueFeedMode.forYou,
+    _FeedMode.nearby => VueFeedMode.nearby,
+    _FeedMode.trending => VueFeedMode.trending,
+  };
 
   void _openMedia(DiscoveryFeedItem item) {
     if (item.newsPostId != null) {
@@ -268,42 +303,18 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                         },
                         child: FirstVueRefreshScaffold(
                           onRefresh: _refreshFeed,
-                          child: GridView.builder(
+                          child: VueMosaicView(
+                            items: _items,
+                            columns: columns,
+                            loadingMore: _loadingMore,
                             padding: EdgeInsets.fromLTRB(
                               FvUi.gutter,
                               0,
                               FvUi.gutter,
                               88 + bottomInset,
                             ),
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: columns,
-                                  mainAxisSpacing: FvUi.gutter,
-                                  crossAxisSpacing: FvUi.gutter,
-                                  childAspectRatio: 0.72,
-                                ),
-                            itemCount: _items.length + (_loadingMore ? 1 : 0),
-                            itemBuilder: (_, index) {
-                              if (index >= _items.length) {
-                                return const Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.all(12),
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: FirstVueColors.gold,
-                                    ),
-                                  ),
-                                );
-                              }
-                              final item = _items[index];
-                              final featured = index == 0 && columns >= 3;
-                              return _VueMosaicTile(
-                                item: item,
-                                featured: featured,
-                                onOpen: () => _openMedia(item),
-                                onOpenProfile: () => _openProfile(item),
-                              );
-                            },
+                            onOpen: _openMedia,
+                            onOpenProfile: _openProfile,
                           ),
                         ),
                       );
@@ -332,213 +343,6 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                   foregroundColor: Colors.white,
                   elevation: 2,
                   child: const Icon(Icons.add, size: 28),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _VueMosaicTile extends StatelessWidget {
-  final DiscoveryFeedItem item;
-  final bool featured;
-  final VoidCallback onOpen;
-  final VoidCallback onOpenProfile;
-
-  const _VueMosaicTile({
-    required this.item,
-    required this.featured,
-    required this.onOpen,
-    required this.onOpenProfile,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final fv = context.fv;
-    final handle = item.isMember
-        ? socialHandleFromName(item.ownerName)
-        : socialHandleFromName(item.businessName);
-    final categoryLine = [
-      item.businessType,
-      if (item.services.isNotEmpty) item.services.first,
-    ].where((p) => p.trim().isNotEmpty).take(2).join(' · ');
-    final thumbUrl = (item.thumbnailUrl?.trim().isNotEmpty == true)
-        ? item.thumbnailUrl!
-        : item.mediaUrl;
-    final live = item.liveNow;
-
-    return GestureDetector(
-      onTap: onOpen,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(featured ? 4 : 2),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (item.isVideo &&
-                (item.thumbnailUrl == null || item.thumbnailUrl!.isEmpty))
-              ExploreGridVideo(
-                url: item.mediaUrl,
-                thumbnailUrl: thumbUrl.startsWith('http') ? thumbUrl : null,
-                onTap: onOpen,
-              )
-            else if (thumbUrl.startsWith('http'))
-              Image.network(
-                thumbUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => ColoredBox(
-                  color: fv.elevatedSurface,
-                  child: Icon(
-                    Icons.image_not_supported_outlined,
-                    color: fv.mutedIcon,
-                  ),
-                ),
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) return child;
-                  return ColoredBox(
-                    color: fv.elevatedSurface,
-                    child: const Center(
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: FirstVueColors.gold,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              )
-            else
-              ColoredBox(
-                color: fv.elevatedSurface,
-                child: Icon(Icons.photo_outlined, color: fv.mutedIcon),
-              ),
-            if (item.isVideo) ...[
-              const Positioned(
-                top: 8,
-                left: 8,
-                child: Icon(
-                  Icons.movie_filter_outlined,
-                  color: Colors.white,
-                  size: 16,
-                ),
-              ),
-              if (item.durationLabel != null)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Text(
-                    item.durationLabel!,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
-                    ),
-                  ),
-                ),
-            ],
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(8, 18, 8, 8),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0x00000000), Color(0x99000000)],
-                  ),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    GestureDetector(
-                      onTap: onOpenProfile,
-                      child: CircleAvatar(
-                        radius: 11,
-                        backgroundColor: fv.elevatedSurface,
-                        backgroundImage:
-                            item.avatarUrl != null &&
-                                item.avatarUrl!.startsWith('http')
-                            ? NetworkImage(item.avatarUrl!)
-                            : null,
-                        child:
-                            item.avatarUrl == null ||
-                                !item.avatarUrl!.startsWith('http')
-                            ? Icon(
-                                item.isMember
-                                    ? Icons.person_rounded
-                                    : Icons.storefront_rounded,
-                                size: 12,
-                                color: FirstVueColors.gold,
-                              )
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          GestureDetector(
-                            onTap: onOpenProfile,
-                            child: Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    handle.startsWith('@')
-                                        ? handle
-                                        : '@$handle',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ),
-                                if (item.verified) ...[
-                                  const SizedBox(width: 3),
-                                  const Icon(
-                                    Icons.verified,
-                                    color: FirstVueColors.gold,
-                                    size: 12,
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          if (live)
-                            const Text(
-                              '● Live now',
-                              style: TextStyle(
-                                color: FirstVueColors.teal,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            )
-                          else if (categoryLine.isNotEmpty)
-                            Text(
-                              categoryLine,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: .78),
-                                fontSize: 10,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ),

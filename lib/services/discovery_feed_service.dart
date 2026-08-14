@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/media_config.dart';
 import 'media_storage_service.dart';
+import 'media_type_helpers.dart';
 import 'profile_cards.dart';
 
 enum VueFeedSource { business, member }
@@ -21,6 +22,8 @@ class DiscoveryFeedItem {
   final String? thumbnailUrl;
   final String? avatarUrl;
   final String? durationLabel;
+  final String? locationLabel;
+  final String? handle;
   final bool verified;
   final bool sponsored;
   final bool liveNow;
@@ -42,6 +45,8 @@ class DiscoveryFeedItem {
     this.thumbnailUrl,
     this.avatarUrl,
     this.durationLabel,
+    this.locationLabel,
+    this.handle,
     required this.verified,
     required this.sponsored,
     this.liveNow = false,
@@ -51,9 +56,13 @@ class DiscoveryFeedItem {
     this.newsPostId,
   });
 
-  bool get isVideo => mediaType == 'video';
+  bool get isVideo =>
+      mediaTypeFromMetadata(mediaType: mediaType, pathOrUrl: mediaUrl) ==
+      'video';
 
   bool get isMember => source == VueFeedSource.member;
+
+  String get creatorId => ownerId.isNotEmpty ? ownerId : businessId;
 }
 
 class DiscoveryFeedService {
@@ -122,14 +131,26 @@ class DiscoveryFeedService {
     required int limit,
   }) async {
     try {
-      final rows = await _client
-          .from('business_media')
-          .select(
-            'id, storage_path, storage_provider, thumbnail_path, media_type, caption, businesses!inner(id, name, business_type, created_by, verification_status, average_rating, services, status, popularity_score, demand_score)',
-          )
-          .eq('businesses.status', 'approved')
-          .order('created_at', ascending: false)
-          .limit(limit);
+      const fullSelect =
+          'id, storage_path, storage_provider, thumbnail_path, media_type, caption, duration_seconds, businesses!inner(id, name, business_type, created_by, verification_status, average_rating, services, status, popularity_score, demand_score, business_locations(city, state))';
+      const fallbackSelect =
+          'id, storage_path, storage_provider, thumbnail_path, media_type, caption, businesses!inner(id, name, business_type, created_by, verification_status, average_rating, services, status, popularity_score, demand_score)';
+      List<dynamic> rows;
+      try {
+        rows = await _client
+            .from('business_media')
+            .select(fullSelect)
+            .eq('businesses.status', 'approved')
+            .order('created_at', ascending: false)
+            .limit(limit);
+      } catch (_) {
+        rows = await _client
+            .from('business_media')
+            .select(fallbackSelect)
+            .eq('businesses.status', 'approved')
+            .order('created_at', ascending: false)
+            .limit(limit);
+      }
 
       if (rows.isEmpty) return const [];
 
@@ -150,10 +171,7 @@ class DiscoveryFeedService {
           .toList();
       final ownerRows = ownerIds.isEmpty
           ? const <Map<String, dynamic>>[]
-          : await ProfileCards.listByIds(
-              ownerIds,
-              select: 'id, display_name',
-            );
+          : await ProfileCards.listByIds(ownerIds, select: 'id, display_name');
       final ownerNames = <String, String>{
         for (final owner in ownerRows)
           owner['id'] as String:
@@ -165,8 +183,12 @@ class DiscoveryFeedService {
           try {
             final business = row['businesses'] as Map<String, dynamic>;
             final businessId = business['id'] as String;
-            final mediaType = (row['media_type'] as String?) ?? 'image';
+            final storedType = (row['media_type'] as String?) ?? 'image';
             final storagePath = row['storage_path'] as String;
+            final mediaType = mediaTypeFromMetadata(
+              mediaType: storedType,
+              pathOrUrl: storagePath,
+            );
             final thumbPath = row['thumbnail_path'] as String?;
             final provider = MediaStorageProvider.parse(
               row['storage_provider'] as String?,
@@ -208,6 +230,10 @@ class DiscoveryFeedService {
               mediaType: mediaType,
               mediaUrl: mediaUrl,
               thumbnailUrl: thumbnailUrl,
+              durationLabel: _durationLabel(
+                (row['duration_seconds'] as num?)?.toInt(),
+              ),
+              locationLabel: _businessLocationLabel(business),
               verified: business['verification_status'] == 'verified',
               sponsored: promotedIds.contains(businessId),
               liveNow: false,
@@ -250,12 +276,17 @@ class DiscoveryFeedService {
           ? const <Map<String, dynamic>>[]
           : await ProfileCards.listByIds(
               profileIds,
-              select: 'id, display_name',
+              select: 'id, display_name, username',
             );
       final profileNames = <String, String>{
         for (final row in nameRows)
           row['id'] as String:
               (row['display_name'] as String?) ?? 'FirstVue member',
+      };
+      final profileHandles = <String, String>{
+        for (final row in nameRows)
+          if ((row['username'] as String?)?.trim().isNotEmpty == true)
+            row['id'] as String: (row['username'] as String).trim(),
       };
 
       return await Future.wait(
@@ -263,8 +294,12 @@ class DiscoveryFeedService {
           try {
             final profileId = row['profile_id'] as String;
             final displayName = profileNames[profileId] ?? 'FirstVue member';
-            final mediaType = (row['media_type'] as String?) ?? 'image';
+            final storedType = (row['media_type'] as String?) ?? 'image';
             final storagePath = row['storage_path'] as String;
+            final mediaType = mediaTypeFromMetadata(
+              mediaType: storedType,
+              pathOrUrl: storagePath,
+            );
             final provider = MediaStorageProvider.parse(
               row['storage_provider'] as String?,
             );
@@ -295,6 +330,7 @@ class DiscoveryFeedService {
               mediaType: mediaType,
               mediaUrl: mediaUrl,
               thumbnailUrl: mediaType == 'video' ? null : mediaUrl,
+              handle: profileHandles[profileId],
               verified: false,
               sponsored: false,
               rating: 0,
@@ -346,14 +382,21 @@ class DiscoveryFeedService {
           .toSet()
           .toList();
       final names = <String, String>{};
+      final handles = <String, String>{};
       if (authorIds.isNotEmpty) {
         final nameRows = await ProfileCards.listByIds(
           authorIds,
-          select: 'id, display_name',
+          select: 'id, display_name, username',
         );
         for (final row in nameRows) {
           names[row['id'] as String] =
               (row['display_name'] as String?) ?? 'FirstVue member';
+        }
+        for (final row in nameRows) {
+          final username = (row['username'] as String?)?.trim();
+          if (username != null && username.isNotEmpty) {
+            handles[row['id'] as String] = username;
+          }
         }
       }
 
@@ -384,7 +427,10 @@ class DiscoveryFeedService {
             chosen['storage_provider'] as String?,
           ),
         );
-        final mediaType = (chosen['media_type'] as String?) ?? 'image';
+        final mediaType = mediaTypeFromMetadata(
+          mediaType: (chosen['media_type'] as String?) ?? 'image',
+          pathOrUrl: path,
+        );
         if (url.isEmpty) continue;
         final authorId = row['author_id'] as String;
         items.add(
@@ -399,6 +445,7 @@ class DiscoveryFeedService {
             mediaType: mediaType,
             mediaUrl: url,
             thumbnailUrl: mediaType == 'video' ? null : url,
+            handle: handles[authorId],
             verified: false,
             sponsored: false,
             rating: 0,
@@ -429,5 +476,25 @@ class DiscoveryFeedService {
       'media_id': item.mediaId,
       'event_type': eventType,
     });
+  }
+
+  static String? _durationLabel(int? seconds) {
+    if (seconds == null || seconds <= 0) return null;
+    final minutes = seconds ~/ 60;
+    final remainder = seconds % 60;
+    return '$minutes:${remainder.toString().padLeft(2, '0')}';
+  }
+
+  static String? _businessLocationLabel(Map<String, dynamic> business) {
+    final locations = (business['business_locations'] as List?) ?? const [];
+    if (locations.isEmpty) return null;
+    final location = locations.first;
+    if (location is! Map) return null;
+    final parts = [location['city'], location['state']]
+        .whereType<String>()
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty);
+    if (parts.isEmpty) return null;
+    return parts.join(', ');
   }
 }
