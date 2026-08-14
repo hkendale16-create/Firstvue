@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/app_config.dart';
 import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
-import '../screens/auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import '../screens/create_post_screen.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../screens/story_composer_screen.dart';
@@ -177,10 +177,7 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
 
   Future<void> _ensureSignedIn() async {
     if (Supabase.instance.client.auth.currentUser != null) return;
-    await Navigator.push(
-      context,
-      FirstVuePageRoute(builder: (_) => const AuthScreen()),
-    );
+    await ensureSignedIn(context);
   }
 
   Future<bool> _ensureSignedInForAction() async {

@@ -3,8 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
 import '../models/share_payload.dart';
-import '../navigation/firstvue_page_route.dart';
-import '../screens/auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../services/community_news_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -91,10 +90,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     } on AuthException {
       if (!mounted) return;
       setState(() => _post = previous);
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
     } catch (_) {
       if (!mounted) return;
       setState(() => _post = previous);
@@ -112,10 +108,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     } on AuthException {
       if (!mounted) return;
       setState(() => _post = previous);
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
     } catch (_) {
       if (!mounted) return;
       setState(() => _post = previous);

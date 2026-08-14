@@ -4,7 +4,7 @@ import '../navigation/firstvue_page_route.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import '../messaging/screens/messaging_shell_screen.dart';
 import '../messaging/services/fv_messaging_service.dart';
 import '../services/messaging_service.dart';
@@ -26,10 +26,7 @@ class _RentalsScreenState extends State<RentalsScreen> {
 
   Future<void> _agreeToAccess() async {
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       if (Supabase.instance.client.auth.currentUser == null) return;
     }
 
@@ -448,10 +445,7 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
     }
 
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       if (Supabase.instance.client.auth.currentUser == null) return;
     }
 
@@ -801,10 +795,7 @@ class _RentalCard extends StatelessWidget {
                     onPressed: () async {
                       if (Supabase.instance.client.auth.currentUser == null) {
                         Navigator.pop(sheetContext);
-                        await Navigator.push(
-                          context,
-                          FirstVuePageRoute(builder: (_) => const AuthScreen()),
-                        );
+                        await ensureSignedIn(context);
                         return;
                       }
                       await _sendInquiry(
@@ -824,10 +815,7 @@ class _RentalCard extends StatelessWidget {
                     onPressed: () async {
                       if (Supabase.instance.client.auth.currentUser == null) {
                         Navigator.pop(sheetContext);
-                        await Navigator.push(
-                          context,
-                          FirstVuePageRoute(builder: (_) => const AuthScreen()),
-                        );
+                        await ensureSignedIn(context);
                         return;
                       }
                       await _sendInquiry(

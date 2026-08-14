@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
-import '../screens/auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import '../screens/new_message_screen.dart';
 import '../theme/firstvue_theme.dart';
 
@@ -63,10 +63,7 @@ class FirstVueShareSheet extends StatelessWidget {
   Future<void> _messageInApp(BuildContext context) async {
     if (Supabase.instance.client.auth.currentUser == null) {
       if (!context.mounted) return;
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       return;
     }
     _notify(ShareAction.inAppMessage);

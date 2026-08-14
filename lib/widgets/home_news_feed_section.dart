@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../navigation/entity_navigation.dart';
 import '../navigation/firstvue_page_route.dart';
-import '../screens/auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import '../screens/create_post_screen.dart';
 import '../models/post_identity.dart';
 import '../services/community_news_service.dart';
@@ -137,10 +137,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
 
   Future<void> _openCreatePost() async {
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       return;
     }
     final result = await Navigator.push<CommunityNewsPost>(
@@ -196,10 +193,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
             if (i == index) previous else _posts[i],
         ];
       });
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -252,10 +246,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
             if (i == index) previous else _posts[i],
         ];
       });
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -394,10 +385,7 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
             ? {..._repostedPostIds, post.id}
             : _repostedPostIds.where((id) => id != post.id).toSet();
       });
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
     } catch (_) {
       if (!mounted) return;
       setState(() {

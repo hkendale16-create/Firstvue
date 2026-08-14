@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/app_config.dart';
 import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
-import '../screens/auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import '../screens/firstvue_business_profile_screen.dart';
 import '../screens/people_to_follow_screen.dart';
 import '../screens/rentals_screen.dart';
@@ -249,10 +249,7 @@ class _InteractiveBusinessCardState extends State<_InteractiveBusinessCard> {
 
   Future<bool> _ensureSignedIn() async {
     if (Supabase.instance.client.auth.currentUser != null) return true;
-    await Navigator.push(
-      context,
-      FirstVuePageRoute(builder: (_) => const AuthScreen()),
-    );
+    await ensureSignedIn(context);
     if (!mounted) return false;
     return Supabase.instance.client.auth.currentUser != null;
   }

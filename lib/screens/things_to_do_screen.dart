@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import '../navigation/firstvue_page_route.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -11,7 +10,7 @@ import '../theme/firstvue_theme.dart';
 import '../widgets/event_profile_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/media_picker_sheet.dart';
-import 'auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 
 class ThingsToDoScreen extends StatefulWidget {
   const ThingsToDoScreen({super.key});
@@ -40,10 +39,7 @@ class _ThingsToDoScreenState extends State<ThingsToDoScreen> {
 
   Future<void> _postEvent() async {
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       if (!mounted) return;
     }
 
@@ -296,10 +292,7 @@ class _EventCardState extends State<_EventCard> {
           ));
     } on AuthException {
       if (!mounted) return;
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -328,10 +321,7 @@ class _EventCardState extends State<_EventCard> {
           ));
     } on AuthException {
       if (!mounted) return;
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

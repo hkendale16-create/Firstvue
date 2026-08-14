@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../navigation/firstvue_page_route.dart';
-import '../screens/auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import '../services/business_follow_service.dart';
 import '../services/community_hub_service.dart';
 import '../services/community_service.dart';
@@ -124,9 +123,7 @@ class _EntityFollowButtonState extends State<EntityFollowButton> {
       widget.onAuthRequired!();
       return Supabase.instance.client.auth.currentUser != null;
     }
-    await Navigator.of(
-      context,
-    ).push(FirstVuePageRoute(builder: (_) => const AuthScreen()));
+    await ensureSignedIn(context);
     return Supabase.instance.client.auth.currentUser != null;
   }
 

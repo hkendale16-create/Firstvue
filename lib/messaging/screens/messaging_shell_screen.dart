@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../navigation/firstvue_page_route.dart';
-import '../../screens/auth_screen.dart';
+import '../../auth/ensure_signed_in.dart';
 import '../../theme/firstvue_theme.dart';
 import '../models/messaging_models.dart';
 import '../routing/messaging_history.dart';
@@ -575,10 +575,7 @@ Future<void> openMessaging(
   String? title,
 }) async {
   if (FvMessagingService.currentUserId == null) {
-    await Navigator.push(
-      context,
-      FirstVuePageRoute(builder: (_) => const AuthScreen()),
-    );
+    await ensureSignedIn(context);
     if (FvMessagingService.currentUserId == null || !context.mounted) return;
   }
   if (!context.mounted) return;

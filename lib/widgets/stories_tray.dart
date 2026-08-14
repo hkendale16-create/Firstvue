@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../navigation/firstvue_page_route.dart';
-import '../screens/auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import '../screens/story_composer_screen.dart';
 import '../screens/story_viewer_screen.dart';
 import '../services/story_service.dart';
@@ -46,10 +46,7 @@ class _StoriesTrayState extends State<StoriesTray> {
 
   Future<void> _compose() async {
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       if (!mounted || Supabase.instance.client.auth.currentUser == null) {
         return;
       }

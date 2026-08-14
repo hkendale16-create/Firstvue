@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../navigation/firstvue_page_route.dart';
-import '../screens/auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import '../screens/create_post_screen.dart';
 import '../services/community_news_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -92,10 +92,7 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
 
   Future<void> _openCreatePost() async {
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       return;
     }
 

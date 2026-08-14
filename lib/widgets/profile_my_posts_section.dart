@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/share_payload.dart';
-import '../navigation/firstvue_page_route.dart';
 import '../config/app_config.dart';
-import '../screens/auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import '../services/community_news_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'community_news_post_card.dart';
@@ -106,10 +105,7 @@ class _ProfileMyPostsSectionState extends State<ProfileMyPostsSection> {
 
   Future<bool> _ensureSignedIn() async {
     if (Supabase.instance.client.auth.currentUser != null) return true;
-    await Navigator.push(
-      context,
-      FirstVuePageRoute(builder: (_) => const AuthScreen()),
-    );
+    await ensureSignedIn(context);
     return Supabase.instance.client.auth.currentUser != null;
   }
 

@@ -9,7 +9,7 @@ import '../services/firstvue_feedback_sounds.dart';
 import '../services/story_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/vue_video_player.dart';
-import 'auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import 'member_public_profile_screen.dart';
 
 class StoryViewerScreen extends StatefulWidget {
@@ -128,10 +128,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
 
   Future<void> _spark() async {
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       return;
     }
     await FirstVueFeedbackSounds.playSpark(fromUserTap: true);
@@ -144,10 +141,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
     final text = _reply.text.trim();
     if (text.isEmpty) return;
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       return;
     }
     try {

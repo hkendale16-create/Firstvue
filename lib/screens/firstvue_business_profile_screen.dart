@@ -27,7 +27,7 @@ import '../widgets/portfolio_albums_section.dart';
 import '../services/portfolio_album_service.dart';
 import '../messaging/screens/messaging_shell_screen.dart';
 import '../messaging/services/fv_messaging_service.dart';
-import 'auth_screen.dart';
+import '../auth/ensure_signed_in.dart';
 import 'business_menu_item_detail_screen.dart';
 import 'meet_the_owner_screen.dart';
 
@@ -188,10 +188,7 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
 
   Future<void> _openOwnerMessage() async {
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       return;
     }
     try {
@@ -536,10 +533,7 @@ class _BusinessReviewsSectionState extends State<_BusinessReviewsSection> {
 
   Future<void> _startReview() async {
     if (!BusinessReviewsService.isSignedIn) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       if (!mounted || !BusinessReviewsService.isSignedIn) return;
     }
     final submitted = await showModalBottomSheet<bool>(
@@ -1034,10 +1028,7 @@ class _MessageOwnerButtonState extends State<_MessageOwnerButton> {
 
   Future<void> _openMessage() async {
     if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
+      await ensureSignedIn(context);
       return;
     }
     setState(() => _loading = true);
