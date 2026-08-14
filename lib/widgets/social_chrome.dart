@@ -778,9 +778,14 @@ class SocialPostTile extends StatelessWidget {
   }
 
   Widget _fallback() {
-    return const ColoredBox(
-      color: Color(0xFFEEEAE4),
-      child: Icon(Icons.photo_outlined, color: FirstVueColors.gold),
+    return Builder(
+      builder: (context) {
+        final fv = context.fv;
+        return ColoredBox(
+          color: fv.elevatedSurface,
+          child: Icon(Icons.photo_outlined, color: fv.mutedIcon),
+        );
+      },
     );
   }
 }

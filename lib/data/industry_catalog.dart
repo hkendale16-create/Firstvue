@@ -102,6 +102,20 @@ class IndustryCatalog {
       sortOrder: 14,
     ),
     IndustryDefinition(
+      slug: 'makeup-artist',
+      name: 'Makeup Artist',
+      template: IndustryTemplate.beauty,
+      parentSlug: 'beauty-grooming',
+      sortOrder: 15,
+    ),
+    IndustryDefinition(
+      slug: 'hair-salon',
+      name: 'Hair Salon',
+      template: IndustryTemplate.beauty,
+      parentSlug: 'beauty-grooming',
+      sortOrder: 16,
+    ),
+    IndustryDefinition(
       slug: 'food-dining',
       name: 'Food & Dining',
       template: IndustryTemplate.food,
@@ -187,10 +201,77 @@ class IndustryCatalog {
       sortOrder: 70,
     ),
     IndustryDefinition(
+      slug: 'consulting',
+      name: 'Consulting',
+      template: IndustryTemplate.professional,
+      parentSlug: 'professional-services',
+      sortOrder: 71,
+    ),
+    IndustryDefinition(
+      slug: 'home-services',
+      name: 'Home Services',
+      template: IndustryTemplate.professional,
+      sortOrder: 74,
+    ),
+    IndustryDefinition(
+      slug: 'auto-services',
+      name: 'Auto Services',
+      template: IndustryTemplate.professional,
+      parentSlug: 'home-services',
+      sortOrder: 75,
+    ),
+    IndustryDefinition(
+      slug: 'cleaning-services',
+      name: 'Cleaning',
+      template: IndustryTemplate.professional,
+      parentSlug: 'home-services',
+      sortOrder: 76,
+    ),
+    IndustryDefinition(
+      slug: 'health-fitness',
+      name: 'Health & Fitness',
+      template: IndustryTemplate.activity,
+      sortOrder: 78,
+    ),
+    IndustryDefinition(
+      slug: 'fitness-studio',
+      name: 'Fitness Studio',
+      template: IndustryTemplate.activity,
+      parentSlug: 'health-fitness',
+      sortOrder: 79,
+    ),
+    IndustryDefinition(
+      slug: 'gym',
+      name: 'Gym',
+      template: IndustryTemplate.activity,
+      parentSlug: 'health-fitness',
+      sortOrder: 80,
+    ),
+    IndustryDefinition(
+      slug: 'entertainment',
+      name: 'Entertainment',
+      template: IndustryTemplate.event,
+      sortOrder: 82,
+    ),
+    IndustryDefinition(
+      slug: 'venue',
+      name: 'Venue',
+      template: IndustryTemplate.event,
+      parentSlug: 'entertainment',
+      sortOrder: 83,
+    ),
+    IndustryDefinition(
       slug: 'retail',
       name: 'Retail',
       template: IndustryTemplate.retail,
-      sortOrder: 80,
+      sortOrder: 84,
+    ),
+    IndustryDefinition(
+      slug: 'boutique',
+      name: 'Boutique',
+      template: IndustryTemplate.retail,
+      parentSlug: 'retail',
+      sortOrder: 85,
     ),
     IndustryDefinition(
       slug: 'community',
@@ -470,6 +551,66 @@ class IndustryCatalog {
   static bool drinksTabAllowed(IndustryTemplate template) {
     return template == IndustryTemplate.nightlife;
   }
+
+  /// Owner editor modules for the compact tabbed profile editor.
+  static List<String> editorTabsFor({String? slug, String? displayType}) {
+    final def = slug != null && slug.trim().isNotEmpty
+        ? bySlug(slug)
+        : fromDisplayType(displayType);
+    return switch (def.template) {
+      IndustryTemplate.beauty => const [
+        'Basics',
+        'Services',
+        'Hours',
+        'Amenities',
+        'Links',
+      ],
+      IndustryTemplate.food || IndustryTemplate.nightlife => const [
+        'Basics',
+        'Hours',
+        'Menu',
+        'Amenities',
+        'Links',
+      ],
+      IndustryTemplate.event => const ['Basics', 'Hours', 'Amenities', 'Links'],
+      IndustryTemplate.rental => const [
+        'Basics',
+        'Amenities',
+        'Hours',
+        'Links',
+      ],
+      IndustryTemplate.activity => const [
+        'Basics',
+        'Services',
+        'Hours',
+        'Amenities',
+        'Links',
+      ],
+      IndustryTemplate.professional => const [
+        'Basics',
+        'Services',
+        'Hours',
+        'Links',
+      ],
+      IndustryTemplate.retail => const [
+        'Basics',
+        'Hours',
+        'Amenities',
+        'Links',
+      ],
+      IndustryTemplate.community ||
+      IndustryTemplate.general => const ['Basics', 'Hours', 'Links'],
+    };
+  }
+
+  static bool editorShowsMenu(IndustryTemplate template) =>
+      template == IndustryTemplate.food ||
+      template == IndustryTemplate.nightlife;
+
+  static bool editorShowsServices(IndustryTemplate template) =>
+      template == IndustryTemplate.beauty ||
+      template == IndustryTemplate.professional ||
+      template == IndustryTemplate.activity;
 }
 
 extension PricingModeX on PricingMode {

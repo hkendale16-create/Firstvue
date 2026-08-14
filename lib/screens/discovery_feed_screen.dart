@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
-import '../navigation/firstvue_page_route.dart';
 
+import '../navigation/firstvue_page_route.dart';
 import '../services/discovery_feed_service.dart';
-import '../services/business_follow_service.dart';
-import '../services/follow_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../widgets/explore_grid_video.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/fv_ui.dart';
 import '../widgets/social_chrome.dart';
-import 'auth_screen.dart';
-import 'business_profile_screen.dart';
 import 'create_post_screen.dart';
 import 'firstvue_business_profile_screen.dart';
 import 'full_screen_media_viewer.dart';
 import 'member_public_profile_screen.dart';
 import 'post_detail_screen.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 enum _FeedMode { forYou, nearby, trending }
 
@@ -27,17 +24,22 @@ class DiscoveryFeedScreen extends StatefulWidget {
 
 class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   late Future<List<DiscoveryFeedItem>> _feedFuture;
-  List<_FeedItem> _feedItems = const [];
+  List<DiscoveryFeedItem> _items = const [];
   _FeedMode _mode = _FeedMode.forYou;
   String? _error;
+  bool _loadingMore = false;
+  bool _hasMore = true;
 
   @override
   void initState() {
     super.initState();
-    _feedFuture = _loadFeed();
+    _feedFuture = _loadFeed(reset: true);
   }
 
-  Future<List<DiscoveryFeedItem>> _loadFeed() async {
+  Future<List<DiscoveryFeedItem>> _loadFeed({
+    bool reset = false,
+    int limit = 30,
+  }) async {
     final mode = switch (_mode) {
       _FeedMode.forYou => VueFeedMode.forYou,
       _FeedMode.nearby => VueFeedMode.nearby,
@@ -46,17 +48,23 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
     try {
       final items = await DiscoveryFeedService.fetchFeed(
         mode: mode,
+        limit: limit,
+        offset: reset ? 0 : _items.length,
       ).timeout(const Duration(seconds: 20));
-      if (!mounted) return items;
+      final usable = items
+          .where((item) => item.mediaUrl.trim().isNotEmpty)
+          .toList();
+      if (!mounted) return usable;
       setState(() {
-        _feedItems = _connectedItems(items);
+        _items = reset ? usable : [..._items, ...usable];
         _error = null;
+        _hasMore = usable.length >= limit;
       });
-      return items;
+      return usable;
     } catch (error) {
       if (!mounted) return const [];
       setState(() {
-        _feedItems = const [];
+        if (reset) _items = const [];
         _error = 'Unable to load VUE right now.';
       });
       rethrow;
@@ -66,38 +74,53 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   Future<void> _refreshFeed() async {
     setState(() {
       _error = null;
-      _feedFuture = _loadFeed();
+      _hasMore = true;
+      _feedFuture = _loadFeed(reset: true);
     });
     try {
       await _feedFuture;
     } catch (_) {}
   }
 
-  void _openMedia(_FeedItem item) {
-    final connected = item.connected;
-    if (connected?.newsPostId != null) {
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    setState(() => _loadingMore = true);
+    try {
+      await _loadFeed(reset: false);
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  void _openMedia(DiscoveryFeedItem item) {
+    if (item.newsPostId != null) {
       Navigator.push(
         context,
         FirstVuePageRoute(
-          builder: (_) => PostDetailScreen(postId: connected!.newsPostId!),
+          builder: (_) => PostDetailScreen(postId: item.newsPostId!),
         ),
       );
       return;
     }
-    if (item.image.startsWith('http')) {
-      if (item.mediaType == 'video') {
-        openFullScreenVideoPlayer(context, url: item.image, title: item.name);
+    if (item.mediaUrl.startsWith('http')) {
+      if (item.isVideo) {
+        openFullScreenVideoPlayer(
+          context,
+          url: item.mediaUrl,
+          title: item.businessName,
+        );
       } else {
         openFullScreenImageViewer(
           context,
           items: [
             FullScreenMediaItem(
-              url: item.image,
+              url: item.mediaUrl,
               isVideo: false,
               caption: item.caption,
             ),
           ],
-          title: item.name,
+          title: item.businessName,
         );
       }
       return;
@@ -105,116 +128,40 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
     _openProfile(item);
   }
 
-  void _openProfile(_FeedItem item) {
-    final connected = item.connected;
-    if (connected != null && connected.isMember) {
-      DiscoveryFeedService.recordProfileTap(connected);
+  void _openProfile(DiscoveryFeedItem item) {
+    DiscoveryFeedService.recordProfileTap(item);
+    if (item.isMember) {
       openMemberProfile(
         context,
-        profileId: connected.ownerId,
-        displayName: connected.ownerName,
+        profileId: item.ownerId,
+        displayName: item.ownerName,
       );
       return;
     }
-    if (connected != null && connected.businessId.isNotEmpty) {
-      DiscoveryFeedService.recordProfileTap(connected);
+    if (item.businessId.isNotEmpty) {
       Navigator.push(
         context,
         FirstVuePageRoute(
           builder: (_) =>
-              FirstVueBusinessProfileScreen(businessId: connected.businessId),
+              FirstVueBusinessProfileScreen(businessId: item.businessId),
         ),
       );
-      return;
-    }
-    Navigator.push(
-      context,
-      FirstVuePageRoute(
-        builder: (_) => BusinessProfileScreen(
-          businessName: item.name,
-          rating: item.rating,
-          reviews: item.reviews,
-          verified: item.verified,
-          distance: item.distance,
-          specialty: item.specialty,
-          profileIcon: item.icon,
-          profileLabel: 'Discovered on Vue Feed',
-          aboutText:
-              'See services, pricing, reviews, photos, availability, and booking details from this business.',
-        ),
-      ),
-    );
-  }
-
-  Future<void> _toggleFollow(_FeedItem item) async {
-    final connected = item.connected;
-    if (Supabase.instance.client.auth.currentUser == null) {
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(builder: (_) => const AuthScreen()),
-      );
-      if (Supabase.instance.client.auth.currentUser == null) return;
-    }
-    try {
-      if (connected != null && connected.isMember) {
-        final status = await FollowService.followStatus(connected.ownerId);
-        if (status == FollowStatus.following ||
-            status == FollowStatus.pending) {
-          await FollowService.unfollow(connected.ownerId);
-        } else {
-          await FollowService.follow(connected.ownerId);
-        }
-      } else if (connected != null && connected.businessId.isNotEmpty) {
-        final following = await BusinessFollowService.isFollowing(
-          connected.businessId,
-        );
-        await BusinessFollowService.toggle(
-          connected.businessId,
-          currentlyFollowing: following,
-        );
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Open the profile to follow.')),
-        );
-        return;
-      }
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Follow updated')));
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Could not update follow.')));
     }
   }
 
-  List<_FeedItem> _connectedItems(List<DiscoveryFeedItem> items) => items
-      .map(
-        (item) => _FeedItem(
-          item.businessName,
-          item.isMember
-              ? '${item.caption} • @${item.ownerName}'
-              : '${item.caption} • @${item.ownerName}',
-          item.services.isEmpty ? item.businessType : item.services.join(' • '),
-          item.isMember ? 'Member' : 'Nearby',
-          item.rating,
-          0,
-          item.mediaUrl,
-          item.isMember ? Icons.person_rounded : Icons.storefront_rounded,
-          item.verified,
-          item.sponsored,
-          connected: item,
-          mediaType: item.mediaType,
-        ),
-      )
-      .toList();
+  int _crossAxisCount(double width) {
+    if (width >= 1100) return 5;
+    if (width >= 840) return 4;
+    return 3;
+  }
 
   @override
   Widget build(BuildContext context) {
     final fv = context.fv;
+    final width = MediaQuery.sizeOf(context).width;
+    final columns = _crossAxisCount(width);
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+
     return ColoredBox(
       color: fv.background,
       child: SafeArea(
@@ -223,36 +170,58 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
           children: [
             Column(
               children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  child: SocialPageHeader(
-                    title: 'VUE',
-                    subtitle: 'Watch, follow, and book local talent.',
-                  ),
-                ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                  child: SocialPillTabs(
-                    labels: const ['For You', 'Nearby', 'Trending'],
-                    selectedIndex: _mode.index,
-                    onSelected: (index) {
-                      final next = _FeedMode.values[index];
-                      if (next == _mode) return;
-                      setState(() => _mode = next);
-                      _feedFuture = _loadFeed();
-                    },
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                  child: SizedBox(
+                    height: 44,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Text(
+                          'VUE',
+                          style: TextStyle(
+                            fontFamily: 'CormorantGaramond',
+                            color: FirstVueColors.gold,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: IconButton(
+                            tooltip: 'Search',
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Search coming soon.'),
+                                ),
+                              );
+                            },
+                            icon: Icon(Icons.search, color: fv.primaryText),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 0, 16, 10),
-                  child: SocialSearchBar(iconOnly: true),
+                FvUnderlineTabs(
+                  labels: const ['For You', 'Nearby', 'Trending'],
+                  selectedIndex: _mode.index,
+                  onSelected: (index) {
+                    final next = _FeedMode.values[index];
+                    if (next == _mode) return;
+                    setState(() => _mode = next);
+                    _feedFuture = _loadFeed(reset: true);
+                  },
                 ),
+                const SizedBox(height: 6),
                 Expanded(
                   child: FutureBuilder<List<DiscoveryFeedItem>>(
                     future: _feedFuture,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting &&
-                          _feedItems.isEmpty) {
+                          _items.isEmpty) {
                         return const Center(
                           child: CircularProgressIndicator(
                             color: FirstVueColors.gold,
@@ -273,12 +242,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                                 ),
                                 const SizedBox(height: 12),
                                 FilledButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _error = null;
-                                      _feedFuture = _loadFeed();
-                                    });
-                                  },
+                                  onPressed: _refreshFeed,
                                   child: const Text('Retry'),
                                 ),
                               ],
@@ -286,7 +250,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                           ),
                         );
                       }
-                      if (_feedItems.isEmpty) {
+                      if (_items.isEmpty) {
                         return Center(
                           child: Text(
                             'No photos or videos to show yet.',
@@ -294,42 +258,53 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                           ),
                         );
                       }
-                      return FirstVueRefreshScaffold(
-                        onRefresh: _refreshFeed,
-                        child: GridView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                mainAxisSpacing: 14,
-                                crossAxisSpacing: 12,
-                                childAspectRatio: 0.72,
-                              ),
-                          itemCount: _feedItems.length,
-                          itemBuilder: (_, index) {
-                            final item = _feedItems[index];
-                            final isVideo = item.mediaType == 'video';
-                            return SocialPostTile(
-                              handle: socialHandleFromName(item.name),
-                              avatarUrl: item.connected?.mediaUrl,
-                              imageUrl: item.image.startsWith('http')
-                                  ? item.image
-                                  : null,
-                              assetImage: item.image.startsWith('http')
-                                  ? null
-                                  : item.image,
-                              likeLabel: item.reviews > 0
-                                  ? '${item.reviews}'
-                                  : null,
-                              showPlay: isVideo,
-                              durationLabel: isVideo ? '0:03' : null,
-                              live: item.sponsored,
-                              showOutlineFollow: true,
-                              showMenu: false,
-                              onFollow: () => _toggleFollow(item),
-                              onTap: () => _openMedia(item),
-                            );
-                          },
+                      return NotificationListener<ScrollNotification>(
+                        onNotification: (notification) {
+                          if (notification.metrics.pixels >
+                              notification.metrics.maxScrollExtent - 480) {
+                            _loadMore();
+                          }
+                          return false;
+                        },
+                        child: FirstVueRefreshScaffold(
+                          onRefresh: _refreshFeed,
+                          child: GridView.builder(
+                            padding: EdgeInsets.fromLTRB(
+                              FvUi.gutter,
+                              0,
+                              FvUi.gutter,
+                              88 + bottomInset,
+                            ),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: columns,
+                                  mainAxisSpacing: FvUi.gutter,
+                                  crossAxisSpacing: FvUi.gutter,
+                                  childAspectRatio: 0.72,
+                                ),
+                            itemCount: _items.length + (_loadingMore ? 1 : 0),
+                            itemBuilder: (_, index) {
+                              if (index >= _items.length) {
+                                return const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: FirstVueColors.gold,
+                                    ),
+                                  ),
+                                );
+                              }
+                              final item = _items[index];
+                              final featured = index == 0 && columns >= 3;
+                              return _VueMosaicTile(
+                                item: item,
+                                featured: featured,
+                                onOpen: () => _openMedia(item),
+                                onOpenProfile: () => _openProfile(item),
+                              );
+                            },
+                          ),
                         ),
                       );
                     },
@@ -338,25 +313,25 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
               ],
             ),
             Positioned(
-              left: 48,
-              right: 48,
-              bottom: 16,
-              child: FilledButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    FirstVuePageRoute(builder: (_) => const CreatePostScreen()),
-                  );
-                },
-                style: FilledButton.styleFrom(
+              right: 16,
+              bottom: 16 + bottomInset,
+              child: Semantics(
+                button: true,
+                label: 'Create a Vue',
+                child: FloatingActionButton(
+                  heroTag: 'vue-create-fab',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      FirstVuePageRoute(
+                        builder: (_) => const CreatePostScreen(),
+                      ),
+                    );
+                  },
                   backgroundColor: FirstVueColors.gold,
                   foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(48),
-                  shape: const StadiumBorder(),
-                ),
-                child: const Text(
-                  '+ Create a Vue',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  elevation: 2,
+                  child: const Icon(Icons.add, size: 28),
                 ),
               ),
             ),
@@ -367,26 +342,209 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   }
 }
 
-class _FeedItem {
-  final String name, caption, specialty, distance, image;
-  final double rating;
-  final int reviews;
-  final IconData icon;
-  final bool verified, sponsored;
-  final DiscoveryFeedItem? connected;
-  final String? mediaType;
-  const _FeedItem(
-    this.name,
-    this.caption,
-    this.specialty,
-    this.distance,
-    this.rating,
-    this.reviews,
-    this.image,
-    this.icon,
-    this.verified,
-    this.sponsored, {
-    this.connected,
-    this.mediaType,
+class _VueMosaicTile extends StatelessWidget {
+  final DiscoveryFeedItem item;
+  final bool featured;
+  final VoidCallback onOpen;
+  final VoidCallback onOpenProfile;
+
+  const _VueMosaicTile({
+    required this.item,
+    required this.featured,
+    required this.onOpen,
+    required this.onOpenProfile,
   });
+
+  @override
+  Widget build(BuildContext context) {
+    final fv = context.fv;
+    final handle = item.isMember
+        ? socialHandleFromName(item.ownerName)
+        : socialHandleFromName(item.businessName);
+    final categoryLine = [
+      item.businessType,
+      if (item.services.isNotEmpty) item.services.first,
+    ].where((p) => p.trim().isNotEmpty).take(2).join(' · ');
+    final thumbUrl = (item.thumbnailUrl?.trim().isNotEmpty == true)
+        ? item.thumbnailUrl!
+        : item.mediaUrl;
+    final live = item.liveNow;
+
+    return GestureDetector(
+      onTap: onOpen,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(featured ? 4 : 2),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (item.isVideo &&
+                (item.thumbnailUrl == null || item.thumbnailUrl!.isEmpty))
+              ExploreGridVideo(
+                url: item.mediaUrl,
+                thumbnailUrl: thumbUrl.startsWith('http') ? thumbUrl : null,
+                onTap: onOpen,
+              )
+            else if (thumbUrl.startsWith('http'))
+              Image.network(
+                thumbUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => ColoredBox(
+                  color: fv.elevatedSurface,
+                  child: Icon(
+                    Icons.image_not_supported_outlined,
+                    color: fv.mutedIcon,
+                  ),
+                ),
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return ColoredBox(
+                    color: fv.elevatedSurface,
+                    child: const Center(
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: FirstVueColors.gold,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              )
+            else
+              ColoredBox(
+                color: fv.elevatedSurface,
+                child: Icon(Icons.photo_outlined, color: fv.mutedIcon),
+              ),
+            if (item.isVideo) ...[
+              const Positioned(
+                top: 8,
+                left: 8,
+                child: Icon(
+                  Icons.movie_filter_outlined,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+              if (item.durationLabel != null)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Text(
+                    item.durationLabel!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+                    ),
+                  ),
+                ),
+            ],
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(8, 18, 8, 8),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x00000000), Color(0x99000000)],
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    GestureDetector(
+                      onTap: onOpenProfile,
+                      child: CircleAvatar(
+                        radius: 11,
+                        backgroundColor: fv.elevatedSurface,
+                        backgroundImage:
+                            item.avatarUrl != null &&
+                                item.avatarUrl!.startsWith('http')
+                            ? NetworkImage(item.avatarUrl!)
+                            : null,
+                        child:
+                            item.avatarUrl == null ||
+                                !item.avatarUrl!.startsWith('http')
+                            ? Icon(
+                                item.isMember
+                                    ? Icons.person_rounded
+                                    : Icons.storefront_rounded,
+                                size: 12,
+                                color: FirstVueColors.gold,
+                              )
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          GestureDetector(
+                            onTap: onOpenProfile,
+                            child: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    handle.startsWith('@')
+                                        ? handle
+                                        : '@$handle',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                                if (item.verified) ...[
+                                  const SizedBox(width: 3),
+                                  const Icon(
+                                    Icons.verified,
+                                    color: FirstVueColors.gold,
+                                    size: 12,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          if (live)
+                            const Text(
+                              '● Live now',
+                              style: TextStyle(
+                                color: FirstVueColors.teal,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            )
+                          else if (categoryLine.isNotEmpty)
+                            Text(
+                              categoryLine,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: .78),
+                                fontSize: 10,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -17,8 +17,12 @@ class DiscoveryFeedItem {
   final String caption;
   final String mediaType;
   final String mediaUrl;
+  final String? thumbnailUrl;
+  final String? avatarUrl;
+  final String? durationLabel;
   final bool verified;
   final bool sponsored;
+  final bool liveNow;
   final double rating;
   final List<String> services;
   final VueFeedSource source;
@@ -34,8 +38,12 @@ class DiscoveryFeedItem {
     required this.caption,
     required this.mediaType,
     required this.mediaUrl,
+    this.thumbnailUrl,
+    this.avatarUrl,
+    this.durationLabel,
     required this.verified,
     required this.sponsored,
+    this.liveNow = false,
     required this.rating,
     required this.services,
     this.source = VueFeedSource.business,
@@ -54,6 +62,7 @@ class DiscoveryFeedService {
 
   static Future<List<DiscoveryFeedItem>> fetchFeed({
     int limit = 30,
+    int offset = 0,
     VueFeedMode mode = VueFeedMode.forYou,
   }) async {
     const timeout = Duration(seconds: 12);
@@ -64,11 +73,14 @@ class DiscoveryFeedService {
       return run().timeout(timeout, onTimeout: () => const []);
     }
 
-    final businessItems = await safe(() => _fetchBusinessMedia(limit: limit));
-    final memberItems = await safe(
-      () => _fetchMemberProfileMedia(limit: limit),
+    final pageLimit = limit + offset;
+    final businessItems = await safe(
+      () => _fetchBusinessMedia(limit: pageLimit),
     );
-    final vueNews = await safe(() => _fetchVueNewsPosts(limit: limit));
+    final memberItems = await safe(
+      () => _fetchMemberProfileMedia(limit: pageLimit),
+    );
+    final vueNews = await safe(() => _fetchVueNewsPosts(limit: pageLimit));
 
     final mine = me == null
         ? const <DiscoveryFeedItem>[]
@@ -88,7 +100,12 @@ class DiscoveryFeedService {
       VueFeedMode.forYou => others,
     };
 
-    return [...mine, ...others].take(limit).toList();
+    final combined = [
+      ...mine,
+      ...others,
+    ].where((item) => item.mediaUrl.trim().isNotEmpty).toList();
+    if (offset >= combined.length) return const [];
+    return combined.skip(offset).take(limit).toList();
   }
 
   static List<DiscoveryFeedItem> _sortByRecency(List<DiscoveryFeedItem> items) {
@@ -153,16 +170,35 @@ class DiscoveryFeedService {
             final provider = MediaStorageProvider.parse(
               row['storage_provider'] as String?,
             );
-            final readPath = mediaType == 'video'
-                ? storagePath
-                : (thumbPath ?? storagePath);
+            // Prefer stored thumbnails for grid rendering; never require
+            // full-resolution video just to paint the mosaic.
+            final thumbReadPath =
+                thumbPath ?? (mediaType == 'video' ? null : storagePath);
+            if (thumbReadPath == null || thumbReadPath.isEmpty) {
+              // Skip videos without a usable thumbnail in the discovery grid.
+              if (mediaType == 'video') return null;
+            }
+            final mediaReadPath = storagePath;
+            final gridPath = thumbReadPath ?? storagePath;
             final mediaUrl = await MediaStorageService.createReadUrl(
               bucket: MediaBucket.business,
-              path: readPath,
+              path: mediaReadPath,
               provider: provider,
               context: {'business_id': businessId},
             ).timeout(const Duration(seconds: 8), onTimeout: () => '');
             if (mediaUrl.isEmpty) return null;
+            String? thumbnailUrl;
+            if (gridPath != mediaReadPath) {
+              thumbnailUrl = await MediaStorageService.createReadUrl(
+                bucket: MediaBucket.business,
+                path: gridPath,
+                provider: provider,
+                context: {'business_id': businessId},
+              ).timeout(const Duration(seconds: 8), onTimeout: () => '');
+              if (thumbnailUrl.isEmpty) thumbnailUrl = null;
+            } else {
+              thumbnailUrl = mediaUrl;
+            }
             final ownerId = (business['created_by'] as String?) ?? '';
             return DiscoveryFeedItem(
               mediaId: row['id'] as String,
@@ -175,8 +211,10 @@ class DiscoveryFeedService {
               caption: (row['caption'] as String?) ?? 'Discover this business',
               mediaType: mediaType,
               mediaUrl: mediaUrl,
+              thumbnailUrl: thumbnailUrl,
               verified: business['verification_status'] == 'verified',
               sponsored: promotedIds.contains(businessId),
+              liveNow: false,
               rating: (business['average_rating'] as num?)?.toDouble() ?? 0,
               services: List<String>.from(
                 (business['services'] as List?) ?? const [],
@@ -255,6 +293,13 @@ class DiscoveryFeedService {
             provider: provider,
             context: {'profile_id': profileId},
           );
+          if (mediaUrl.isEmpty) {
+            return null;
+          }
+          // Avoid downloading full video for mosaic when no thumb exists.
+          if (mediaType == 'video') {
+            return null;
+          }
           final role = (row['media_role'] as String?) ?? 'gallery';
           final caption = switch (role) {
             'avatar' => 'Profile photo',
@@ -272,6 +317,7 @@ class DiscoveryFeedService {
             caption: caption,
             mediaType: mediaType,
             mediaUrl: mediaUrl,
+            thumbnailUrl: mediaUrl,
             verified: false,
             sponsored: false,
             rating: 0,
@@ -279,7 +325,7 @@ class DiscoveryFeedService {
             source: VueFeedSource.member,
           );
         }),
-      );
+      ).then((rows) => rows.whereType<DiscoveryFeedItem>().toList());
     } catch (_) {
       return const [];
     }
@@ -358,6 +404,9 @@ class DiscoveryFeedService {
             chosen['storage_provider'] as String?,
           ),
         );
+        final mediaType = (chosen['media_type'] as String?) ?? 'image';
+        if (mediaType == 'video') continue;
+        if (url.isEmpty) continue;
         final authorId = row['author_id'] as String;
         items.add(
           DiscoveryFeedItem(
@@ -368,8 +417,9 @@ class DiscoveryFeedService {
             ownerId: authorId,
             ownerName: names[authorId] ?? 'FirstVue member',
             caption: (row['body'] as String?) ?? '',
-            mediaType: (chosen['media_type'] as String?) ?? 'image',
+            mediaType: mediaType,
             mediaUrl: url,
+            thumbnailUrl: url,
             verified: false,
             sponsored: false,
             rating: 0,

@@ -1,10 +1,16 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import '../theme/firstvue_theme.dart';
 import '../navigation/firstvue_page_route.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../constants/business_types.dart';
+import '../services/business_media_service.dart';
 import '../services/business_submission_service.dart';
+import '../widgets/fv_ui.dart';
+import '../widgets/media_picker_sheet.dart';
 import 'auth_screen.dart';
 import 'rentals_screen.dart';
 
@@ -246,13 +252,9 @@ class _ClaimBusinessScreen extends StatelessWidget {
             leading: const Icon(Icons.content_cut, color: Color(0xFFD8B56A)),
             title: Text(
               business.$1,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            subtitle: Text(
-              business.$2,
-            ),
+            subtitle: Text(business.$2),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
               Navigator.push(
@@ -281,19 +283,159 @@ class _NewBusinessScreen extends StatefulWidget {
 
 class _NewBusinessScreenState extends State<_NewBusinessScreen> {
   final _businessController = TextEditingController();
-  String _categoryGroup = defaultBusinessCategoryGroup;
-  late String _category;
+  final _industries = primaryIndustryOptions();
+  late BusinessIndustryOption _industry;
+  BusinessTypeOption? _businessType;
+  final List<String> _services = [];
+  XFile? _avatarFile;
+  Uint8List? _avatarBytes;
+  bool _industryFocused = false;
+  bool _typeFocused = false;
 
   @override
   void initState() {
     super.initState();
-    _category = businessCategoryGroups[_categoryGroup]!.first;
+    _industry = _industries.firstWhere(
+      (i) => i.slug == 'beauty-grooming',
+      orElse: () => _industries.first,
+    );
+    final types = businessTypesForIndustry(_industry.slug);
+    _businessType = types.isEmpty ? null : types.first;
   }
 
   @override
   void dispose() {
     _businessController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAvatar() async {
+    final files = await showImagePickerSheet(context);
+    if (files == null || files.isEmpty || !mounted) return;
+    final bytes = await files.first.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      _avatarFile = files.first;
+      _avatarBytes = bytes;
+    });
+  }
+
+  Future<void> _pickIndustry() async {
+    setState(() {
+      _industryFocused = true;
+      _typeFocused = false;
+    });
+    final selected = await showFvSearchablePicker(
+      context: context,
+      title: 'Choose primary industry',
+      searchHint: 'Search industries',
+      selectedId: _industry.slug,
+      options: [
+        for (final industry in _industries)
+          FvPickerOption(
+            id: industry.slug,
+            label: industry.label,
+            icon: industry.icon,
+            iconColor: industry.accent,
+          ),
+      ],
+    );
+    if (!mounted) return;
+    setState(() => _industryFocused = false);
+    if (selected == null) return;
+    final next = _industries.firstWhere((i) => i.slug == selected.id);
+    final types = businessTypesForIndustry(next.slug);
+    setState(() {
+      _industry = next;
+      _businessType = types.isEmpty ? null : types.first;
+      _services.clear();
+    });
+  }
+
+  Future<void> _pickBusinessType() async {
+    setState(() {
+      _typeFocused = true;
+      _industryFocused = false;
+    });
+    final types = businessTypesForIndustry(_industry.slug);
+    final selected = await showFvSearchablePicker(
+      context: context,
+      title: 'Choose business type',
+      searchHint: 'Search business types',
+      selectedId: _businessType?.slug,
+      options: [
+        for (final type in types)
+          FvPickerOption(
+            id: type.slug,
+            label: type.label,
+            icon: type.icon,
+            iconColor: FirstVueColors.gold,
+          ),
+      ],
+    );
+    if (!mounted) return;
+    setState(() => _typeFocused = false);
+    if (selected == null) return;
+    setState(() {
+      _businessType = types.firstWhere((t) => t.slug == selected.id);
+    });
+  }
+
+  Future<void> _addService() async {
+    final suggestions =
+        industryServiceSuggestions[_industry.slug] ??
+        industryServiceSuggestions['general-business']!;
+    final available = suggestions.where((s) => !_services.contains(s)).toList();
+    const customId = '__custom__';
+    final selected = await showFvSearchablePicker(
+      context: context,
+      title: 'Add service',
+      searchHint: 'Search or pick a service',
+      continueLabel: 'Add',
+      options: [
+        for (final service in available)
+          FvPickerOption(id: service, label: service, icon: Icons.spa_outlined),
+        const FvPickerOption(
+          id: customId,
+          label: 'Custom service…',
+          icon: Icons.edit_outlined,
+        ),
+      ],
+    );
+    if (!mounted || selected == null) return;
+    if (selected.id == customId) {
+      final controller = TextEditingController();
+      final custom = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: ctx.fv.surface,
+          title: const Text('Custom service'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Service name'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      );
+      if (custom == null || custom.isEmpty || !mounted) return;
+      setState(() {
+        if (!_services.contains(custom)) _services.add(custom);
+      });
+      return;
+    }
+    setState(() {
+      if (!_services.contains(selected.label)) _services.add(selected.label);
+    });
   }
 
   void _continue() {
@@ -304,13 +446,23 @@ class _NewBusinessScreenState extends State<_NewBusinessScreen> {
       );
       return;
     }
+    if (_businessType == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose a business type to continue.')),
+      );
+      return;
+    }
     Navigator.push(
       context,
       FirstVuePageRoute(
         builder: (_) => _VerificationFormScreen(
           businessName: name,
-          businessType: _category,
+          businessType: _businessType!.label,
+          industrySlug: _businessType!.slug,
+          services: List<String>.from(_services),
+          avatarFile: _avatarFile,
           isClaim: false,
+          stepLabel: '2 of 3',
         ),
       ),
     );
@@ -318,92 +470,111 @@ class _NewBusinessScreenState extends State<_NewBusinessScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        surfaceTintColor: Colors.transparent,
-        title: const Text('ADD A BUSINESS'),
+      backgroundColor: fv.background,
+      appBar: fvAppBar(
+        context: context,
+        title: 'Add business',
+        subtitle: '1 of 3',
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            TextField(
-              controller: _businessController,
-              decoration: _fieldDecoration('Business name'),
-            ),
-            const SizedBox(height: 14),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'What type of business is this?',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: _categoryGroup,
-              decoration: _fieldDecoration('Business category'),
-              items: businessCategoryGroups.keys
-                  .map(
-                    (group) => DropdownMenuItem(value: group, child: Text(group)),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                if (value == null) return;
-                setState(() {
-                  _categoryGroup = value;
-                  _category = businessCategoryGroups[value]!.first;
-                });
-              },
-            ),
-            const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
-              initialValue: _category,
-              decoration: _fieldDecoration('Specific business type'),
-              items: businessCategoryGroups[_categoryGroup]!
-                  .map(
-                    (type) =>
-                        DropdownMenuItem(value: type, child: Text(type)),
-                  )
-                  .toList(),
-              onChanged: (value) =>
-                  setState(() => _category = value ?? _category),
-            ),
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: ElevatedButton(
-                onPressed: _continue,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD8B56A),
-                  foregroundColor: Colors.black,
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: FvUi.pagePadding(top: 12, bottom: 16),
+              children: [
+                Center(
+                  child: FvCircularPhotoPicker(
+                    image: _avatarBytes == null
+                        ? null
+                        : MemoryImage(_avatarBytes!),
+                    onTap: _pickAvatar,
+                    onRemove: _avatarBytes == null
+                        ? null
+                        : () => setState(() {
+                            _avatarBytes = null;
+                            _avatarFile = null;
+                          }),
+                  ),
                 ),
-                child: const Text('CONTINUE TO VERIFICATION'),
-              ),
+                const SizedBox(height: 22),
+                FvCompactField(
+                  label: 'Business name',
+                  hint: 'Enter business name',
+                  controller: _businessController,
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 14),
+                FvSelectorField(
+                  label: 'Primary industry',
+                  value: _industry.label,
+                  hint: 'Select industry',
+                  icon: _industry.icon,
+                  iconColor: _industry.accent,
+                  focused: _industryFocused,
+                  onTap: _pickIndustry,
+                ),
+                const SizedBox(height: 14),
+                FvSelectorField(
+                  label: 'Business type',
+                  value: _businessType?.label,
+                  hint: 'Select business type',
+                  icon: _businessType?.icon ?? Icons.storefront_outlined,
+                  focused: _typeFocused,
+                  onTap: _pickBusinessType,
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Additional services (optional)',
+                  style: TextStyle(
+                    color: fv.secondaryText,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final service in _services)
+                      FvServiceChip(
+                        label: service,
+                        icon: Icons.content_cut,
+                        onRemove: () =>
+                            setState(() => _services.remove(service)),
+                      ),
+                    FvAddChip(label: 'Add service', onTap: _addService),
+                  ],
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          FvStickyCta(label: 'Continue', onPressed: _continue),
+        ],
       ),
     );
   }
 }
 
-InputDecoration _fieldDecoration(String label) {
-  return InputDecoration(labelText: label);
-}
-
 class _VerificationFormScreen extends StatefulWidget {
   final String businessName;
   final String? businessType;
+  final String? industrySlug;
+  final List<String> services;
+  final XFile? avatarFile;
   final bool isClaim;
+  final String stepLabel;
 
   const _VerificationFormScreen({
     required this.businessName,
     this.businessType,
+    this.industrySlug,
+    this.services = const [],
+    this.avatarFile,
     required this.isClaim,
+    this.stepLabel = '2 of 3',
   });
 
   @override
@@ -442,12 +613,22 @@ class _VerificationFormScreenState extends State<_VerificationFormScreen> {
     setState(() => _isSubmitting = true);
     try {
       if (!widget.isClaim) {
-        await BusinessSubmissionService.submitNewBusiness(
+        final businessId = await BusinessSubmissionService.submitNewBusiness(
           name: widget.businessName,
           businessType: widget.businessType ?? 'Other',
           contactName: _nameController.text.trim(),
           contactEmail: _emailController.text.trim(),
+          services: widget.services,
+          industrySlug: widget.industrySlug,
         );
+        if (widget.avatarFile != null) {
+          try {
+            await BusinessMediaService.setAvatar(
+              businessId: businessId,
+              file: widget.avatarFile!,
+            );
+          } catch (_) {}
+        }
       }
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
@@ -475,58 +656,62 @@ class _VerificationFormScreenState extends State<_VerificationFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        surfaceTintColor: Colors.transparent,
-        title: const Text('VERIFY OWNERSHIP'),
+      backgroundColor: fv.background,
+      appBar: fvAppBar(
+        context: context,
+        title: 'Verify ownership',
+        subtitle: widget.stepLabel,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.businessName,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 9),
-            const Text(
-              'Provide a contact person for this prototype verification submission.',
-              style: TextStyle(height: 1.4),
-            ),
-            const SizedBox(height: 24),
-            TextField(
-              controller: _nameController,
-              decoration: _fieldDecoration('Your full name'),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: _fieldDecoration('Email address'),
-            ),
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD8B56A),
-                  foregroundColor: Colors.black,
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: FvUi.pagePadding(top: 12),
+              children: [
+                Text(
+                  widget.businessName,
+                  style: TextStyle(
+                    color: fv.primaryText,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                child: Text(
-                  _isSubmitting ? 'SUBMITTING...' : 'SUBMIT FOR REVIEW',
+                if (widget.businessType != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.businessType!,
+                    style: TextStyle(color: fv.secondaryText),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Text(
+                  'Provide a contact person for this verification submission.',
+                  style: TextStyle(color: fv.secondaryText, height: 1.4),
                 ),
-              ),
+                const SizedBox(height: 22),
+                FvCompactField(
+                  label: 'Your full name',
+                  hint: 'Full name',
+                  controller: _nameController,
+                ),
+                const SizedBox(height: 14),
+                FvCompactField(
+                  label: 'Email address',
+                  hint: 'name@email.com',
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          FvStickyCta(
+            label: 'Submit for review',
+            loading: _isSubmitting,
+            onPressed: _submit,
+          ),
+        ],
       ),
     );
   }
@@ -543,8 +728,15 @@ class _PendingVerificationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: fv.background,
+      appBar: fvAppBar(
+        context: context,
+        title: 'Add business',
+        subtitle: '3 of 3',
+        onBack: () => Navigator.pop(context),
+      ),
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -554,29 +746,29 @@ class _PendingVerificationScreen extends StatelessWidget {
               children: [
                 const Icon(
                   Icons.pending_actions,
-                  color: Color(0xFFE5C16F),
+                  color: FirstVueColors.gold,
                   size: 58,
                 ),
                 const SizedBox(height: 20),
-                const Text(
-                  'PENDING VERIFICATION',
+                Text(
+                  'Pending verification',
                   textAlign: TextAlign.center,
                   style: TextStyle(
+                    color: fv.primaryText,
                     fontSize: 21,
                     fontWeight: FontWeight.bold,
-                    letterSpacing: 1.3,
                   ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   '$businessName has a ${isClaim ? 'claim' : 'new business'} submission awaiting review. It has not been published or verified.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(height: 1.5),
+                  style: TextStyle(color: fv.secondaryText, height: 1.5),
                 ),
                 const SizedBox(height: 26),
                 OutlinedButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('BACK TO PROFILE'),
+                  child: const Text('Back to profile'),
                 ),
               ],
             ),
@@ -595,7 +787,9 @@ class _WorkflowNotice extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Theme.of(context).extension<FirstVuePalette>()?.elevatedSurface ?? FirstVueColors.elevatedSurface,
+        color:
+            Theme.of(context).extension<FirstVuePalette>()?.elevatedSurface ??
+            FirstVueColors.elevatedSurface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: const Text(

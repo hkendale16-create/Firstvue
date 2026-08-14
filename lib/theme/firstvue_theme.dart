@@ -14,6 +14,7 @@ class FirstVueColors {
   static const blush = Color(0xFFD68E98);
   static const ivory = Color(0xFFF4EFE6);
   static const mutedIcon = Color(0xFF8A9099);
+  static const mutedRed = Color(0xFFE39A9A);
 
   // Legacy dark defaults — prefer Theme / FirstVuePalette when possible.
   static const background = Color(0xFF0E0B1A);
@@ -185,51 +186,51 @@ class FirstVueTheme {
 
   /// Preserves the current FirstVue dark visual identity in ThemeData.
   static ThemeData get elegantDark => _build(
-        brightness: Brightness.dark,
-        palette: FirstVuePalette.dark,
-        scheme: const ColorScheme.dark(
-          surface: Color(0xFF0E0B1A),
-          primary: FirstVueColors.gold,
-          secondary: FirstVueColors.teal,
-          tertiary: FirstVueColors.coral,
-          onPrimary: Color(0xFF17130B),
-          onSecondary: Color(0xFF071315),
-          onSurface: FirstVueColors.ivory,
-          error: Color(0xFFE39A9A),
-        ),
-        buttonForeground: Colors.white,
-        labelMuted: Colors.white60,
-        hintMuted: Colors.white38,
-        overlayStyle: SystemUiOverlayStyle.light.copyWith(
-          statusBarColor: Colors.transparent,
-          systemNavigationBarColor: FirstVuePalette.dark.navBar,
-          systemNavigationBarIconBrightness: Brightness.light,
-        ),
-      );
+    brightness: Brightness.dark,
+    palette: FirstVuePalette.dark,
+    scheme: const ColorScheme.dark(
+      surface: Color(0xFF0E0B1A),
+      primary: FirstVueColors.gold,
+      secondary: FirstVueColors.teal,
+      tertiary: FirstVueColors.coral,
+      onPrimary: Color(0xFF17130B),
+      onSecondary: Color(0xFF071315),
+      onSurface: FirstVueColors.ivory,
+      error: Color(0xFFE39A9A),
+    ),
+    buttonForeground: Colors.white,
+    labelMuted: Colors.white60,
+    hintMuted: Colors.white38,
+    overlayStyle: SystemUiOverlayStyle.light.copyWith(
+      statusBarColor: Colors.transparent,
+      systemNavigationBarColor: FirstVuePalette.dark.navBar,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
 
   /// Proper native-looking light FirstVue theme (not a dark invert).
   static ThemeData get elegantLight => _build(
-        brightness: Brightness.light,
-        palette: FirstVuePalette.light,
-        scheme: const ColorScheme.light(
-          surface: Color(0xFFFFFFFF),
-          primary: FirstVueColors.gold,
-          secondary: FirstVueColors.teal,
-          tertiary: FirstVueColors.coral,
-          onPrimary: Colors.white,
-          onSecondary: Color(0xFF071315),
-          onSurface: Color(0xFF16131F),
-          error: Color(0xFFC04545),
-        ),
-        buttonForeground: Colors.white,
-        labelMuted: Color(0xFF5A5668),
-        hintMuted: Color(0xFF8A8696),
-        overlayStyle: SystemUiOverlayStyle.dark.copyWith(
-          statusBarColor: Colors.transparent,
-          systemNavigationBarColor: FirstVuePalette.light.navBar,
-          systemNavigationBarIconBrightness: Brightness.dark,
-        ),
-      );
+    brightness: Brightness.light,
+    palette: FirstVuePalette.light,
+    scheme: const ColorScheme.light(
+      surface: Color(0xFFFFFFFF),
+      primary: FirstVueColors.gold,
+      secondary: FirstVueColors.teal,
+      tertiary: FirstVueColors.coral,
+      onPrimary: Colors.white,
+      onSecondary: Color(0xFF071315),
+      onSurface: Color(0xFF16131F),
+      error: Color(0xFFC04545),
+    ),
+    buttonForeground: Colors.white,
+    labelMuted: Color(0xFF5A5668),
+    hintMuted: Color(0xFF8A8696),
+    overlayStyle: SystemUiOverlayStyle.dark.copyWith(
+      statusBarColor: Colors.transparent,
+      systemNavigationBarColor: FirstVuePalette.light.navBar,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
 
   /// Back-compat alias used across the codebase.
   static ThemeData get theme => elegantDark;

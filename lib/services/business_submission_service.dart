@@ -39,11 +39,15 @@ class BusinessSubmissionService {
 
   static final _client = Supabase.instance.client;
 
-  static Future<void> submitNewBusiness({
+  /// Creates a pending business and verification submission.
+  /// Returns the new business id so callers can upload avatar media.
+  static Future<String> submitNewBusiness({
     required String name,
     required String businessType,
     required String contactName,
     required String contactEmail,
+    List<String> services = const [],
+    String? industrySlug,
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) {
@@ -57,15 +61,34 @@ class BusinessSubmissionService {
       'updated_at': DateTime.now().toIso8601String(),
     });
 
+    String? primaryIndustryId;
+    final slug = (industrySlug ?? '').trim();
+    if (slug.isNotEmpty) {
+      try {
+        final industry = await _client
+            .from('industries')
+            .select('id')
+            .eq('slug', slug)
+            .maybeSingle();
+        primaryIndustryId = industry?['id'] as String?;
+      } catch (_) {
+        primaryIndustryId = null;
+      }
+    }
+
+    final payload = <String, dynamic>{
+      'name': name,
+      'business_type': businessType,
+      'created_by': user.id,
+      'status': 'pending',
+      'verification_status': 'pending',
+      if (services.isNotEmpty) 'services': services,
+      'primary_industry_id': ?primaryIndustryId,
+    };
+
     final business = await _client
         .from('businesses')
-        .insert({
-          'name': name,
-          'business_type': businessType,
-          'created_by': user.id,
-          'status': 'pending',
-          'verification_status': 'pending',
-        })
+        .insert(payload)
         .select('id')
         .single();
 
@@ -81,6 +104,7 @@ class BusinessSubmissionService {
       await _client.from('businesses').delete().eq('id', businessId);
       rethrow;
     }
+    return businessId;
   }
 
   static Future<List<PendingBusinessSubmission>>
@@ -159,7 +183,9 @@ class BusinessSubmissionService {
         final id = business['id'] as String?;
         if (id == null || seen.contains(id)) continue;
         seen.add(id);
-        businesses.add(_ownedBusinessFromRow(Map<String, dynamic>.from(business)));
+        businesses.add(
+          _ownedBusinessFromRow(Map<String, dynamic>.from(business)),
+        );
       }
       return businesses;
     } catch (error) {
@@ -257,11 +283,14 @@ class BusinessSubmissionService {
         .map((value) => value.trim())
         .where((value) => value.isNotEmpty)
         .toList();
-    await _client.from('businesses').update({
-      'description': description,
-      'services': serviceList,
-      'coming_soon': comingSoon,
-    }).eq('id', business.id);
+    await _client
+        .from('businesses')
+        .update({
+          'description': description,
+          'services': serviceList,
+          'coming_soon': comingSoon,
+        })
+        .eq('id', business.id);
     final existing = await _client
         .from('business_locations')
         .select('id')
@@ -275,8 +304,9 @@ class BusinessSubmissionService {
     };
     final extendedLocation = {
       ...baseLocation,
-      'address_line_2':
-          addressLine2?.trim().isEmpty == true ? null : addressLine2?.trim(),
+      'address_line_2': addressLine2?.trim().isEmpty == true
+          ? null
+          : addressLine2?.trim(),
       'formatted_address': formattedAddress?.trim().isEmpty == true
           ? null
           : formattedAddress?.trim(),
