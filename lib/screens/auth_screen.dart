@@ -484,8 +484,9 @@ class _AuthScreenState extends State<AuthScreen> {
                         alignment: Alignment.topCenter,
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 560),
-                          child: AutofillGroup(
-                            child: SingleChildScrollView(
+                          child: SizedBox.expand(
+                            child: AutofillGroup(
+                              child: SingleChildScrollView(
                               keyboardDismissBehavior:
                                   ScrollViewKeyboardDismissBehavior.onDrag,
                               padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
@@ -519,7 +520,8 @@ class _AuthScreenState extends State<AuthScreen> {
                                     alignment: Alignment.topCenter,
                                     child: _formBody(),
                                   ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
