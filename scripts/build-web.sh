@@ -26,6 +26,7 @@ elif [ -n "${DEPLOY_PRIME_URL:-}" ]; then
 fi
 
 # shellcheck disable=SC2086
-flutter build web --release --no-wasm-dry-run $DART_DEFINE
+# Local CanvasKit so the app still boots if the gstatic CDN is blocked by CSP.
+flutter build web --release --no-wasm-dry-run --no-web-resources-cdn $DART_DEFINE
 
 echo "Build complete: $ROOT_DIR/build/web"
