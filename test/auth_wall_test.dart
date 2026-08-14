@@ -172,4 +172,27 @@ void main() {
     expect(find.text('EXPLORE'), findsNothing);
     expect(find.text('Welcome to FirstVue'), findsOneWidget);
   });
+
+  testWidgets('signed-out explore and vue routes redirect to Sign in', (
+    tester,
+  ) async {
+    final auth = AuthSessionController.test();
+    for (final name in ['/explore', '/vue', '/feeds', '/profile', '/home']) {
+      final route = generateAuthAwareRoute(
+        RouteSettings(name: name),
+        controller: auth,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) =>
+                (route as MaterialPageRoute<void>).builder(context),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.byType(AuthScreen), findsOneWidget, reason: name);
+      expect(find.byType(FirstVueHome), findsNothing, reason: name);
+    }
+  });
 }

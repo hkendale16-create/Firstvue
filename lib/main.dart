@@ -417,7 +417,8 @@ class _HomeProfileAvatarState extends State<_HomeProfileAvatar> {
     final images = await ProfileMediaService.fetchProfileImages();
     if (!mounted) return;
     setState(() {
-      _avatarUrl = images.avatar?.signedUrl;
+      final url = images.avatar?.signedUrl?.trim();
+      _avatarUrl = (url != null && url.isNotEmpty) ? url : null;
       _loading = false;
     });
   }
@@ -426,9 +427,11 @@ class _HomeProfileAvatarState extends State<_HomeProfileAvatar> {
     if (user == null) return null;
     final metadata = user.userMetadata;
     if (metadata == null) return null;
-    return metadata['avatar_url'] as String? ??
+    final raw = metadata['avatar_url'] as String? ??
         metadata['picture'] as String? ??
         metadata['avatar'] as String?;
+    final url = raw?.trim();
+    return (url != null && url.isNotEmpty) ? url : null;
   }
 
   @override
