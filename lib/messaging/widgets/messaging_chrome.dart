@@ -415,6 +415,8 @@ class FvEventConversationRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
                       fvRelativeTime(conv.lastMessageAt),
@@ -422,6 +424,7 @@ class FvEventConversationRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         if (conv.muted)
                           Icon(
@@ -987,16 +990,19 @@ class FvComposer extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
         child: Column(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.lock_outline, size: 11, color: fv.tertiaryText),
-                const SizedBox(width: 4),
-                Text(
-                  'End-to-end encrypted',
-                  style: TextStyle(color: fv.tertiaryText, fontSize: 11),
-                ),
-              ],
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lock_outline, size: 11, color: fv.tertiaryText),
+                  const SizedBox(width: 4),
+                  Text(
+                    'End-to-end encrypted',
+                    style: TextStyle(color: fv.tertiaryText, fontSize: 11),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 6),
             Row(
@@ -1032,7 +1038,7 @@ class FvComposer extends StatelessWidget {
                         borderSide: BorderSide.none,
                       ),
                       contentPadding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-                      suffixIcon: Row(
+                      suffix: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
@@ -1043,12 +1049,12 @@ class FvComposer extends StatelessWidget {
                               fontSize: 11,
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           Icon(
                             Icons.emoji_emotions_outlined,
+                            size: 20,
                             color: fv.mutedIcon,
                           ),
-                          const SizedBox(width: 8),
                         ],
                       ),
                     ),
@@ -1228,7 +1234,9 @@ class FvPlanCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
               FilledButton(
                 onPressed: onJoinLeave,
@@ -1240,7 +1248,6 @@ class FvPlanCard extends StatelessWidget {
                 ),
                 child: Text(plan.joined ? 'Leave plan' : 'Join plan'),
               ),
-              const SizedBox(width: 8),
               FvGoldOutlineButton(label: 'View', onTap: onDetails ?? () {}),
             ],
           ),
@@ -1681,16 +1688,19 @@ class FvEncryptionFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.lock_outline, size: 12, color: context.fv.tertiaryText),
-          const SizedBox(width: 6),
-          Text(
-            'End-to-end encrypted',
-            style: TextStyle(color: context.fv.tertiaryText, fontSize: 11),
-          ),
-        ],
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lock_outline, size: 12, color: context.fv.tertiaryText),
+            const SizedBox(width: 6),
+            Text(
+              'End-to-end encrypted',
+              style: TextStyle(color: context.fv.tertiaryText, fontSize: 11),
+            ),
+          ],
+        ),
       ),
     );
   }

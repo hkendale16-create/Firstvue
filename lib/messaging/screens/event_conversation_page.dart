@@ -426,26 +426,37 @@ class _EventConversationPageState extends State<EventConversationPage> {
           const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 10,
+              runSpacing: 8,
               children: [
-                Icon(Icons.schedule, size: 14, color: fv.secondaryText),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    fvEventWhen(conv.lastMessageAt),
-                    style: TextStyle(color: fv.secondaryText, fontSize: 12),
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.schedule, size: 14, color: fv.secondaryText),
+                    const SizedBox(width: 4),
+                    Text(
+                      fvEventWhen(conv.lastMessageAt),
+                      style: TextStyle(color: fv.secondaryText, fontSize: 12),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Icon(Icons.place_outlined, size: 14, color: fv.secondaryText),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    conv.locationLabel ?? conv.identityContext ?? '',
-                    style: TextStyle(color: fv.secondaryText, fontSize: 12),
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.place_outlined,
+                      size: 14,
+                      color: fv.secondaryText,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      conv.locationLabel ?? conv.identityContext ?? '',
+                      style: TextStyle(color: fv.secondaryText, fontSize: 12),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
                 FvGoldOutlineButton(
                   label: 'View event',
                   onTap: () {

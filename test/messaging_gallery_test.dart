@@ -167,27 +167,52 @@ Widget _wrap(Widget child) {
 
 Future<void> _loadFonts() async {
   final inter = FontLoader('Inter');
-  for (final name in [
-    'Inter-Regular.ttf',
-    'Inter-Bold.ttf',
-    'Inter-SemiBold.ttf',
-  ]) {
-    final file = File('/usr/share/fonts/truetype/macos/$name');
-    if (file.existsSync()) {
-      inter.addFont(Future.value(ByteData.sublistView(file.readAsBytesSync())));
+  var loadedInter = false;
+  if (Platform.environment['CI'] != 'true') {
+    for (final name in [
+      'Inter-Regular.ttf',
+      'Inter-Bold.ttf',
+      'Inter-SemiBold.ttf',
+    ]) {
+      final file = File('/usr/share/fonts/truetype/macos/$name');
+      if (file.existsSync()) {
+        inter.addFont(
+          Future.value(ByteData.sublistView(file.readAsBytesSync())),
+        );
+        loadedInter = true;
+      }
     }
   }
-  await inter.load();
+  if (!loadedInter) {
+    final flutterRoot = Platform.environment['FLUTTER_ROOT'] ?? '/opt/flutter';
+    for (final name in ['Roboto-Regular.ttf', 'Roboto-Bold.ttf']) {
+      final file = File(
+        '$flutterRoot/bin/cache/artifacts/material_fonts/$name',
+      );
+      if (file.existsSync()) {
+        inter.addFont(
+          Future.value(ByteData.sublistView(file.readAsBytesSync())),
+        );
+        loadedInter = true;
+      }
+    }
+  }
+  if (loadedInter) await inter.load();
 
   final icons = FontLoader('MaterialIcons');
-  final iconFile = File(
+  final flutterRoot = Platform.environment['FLUTTER_ROOT'] ?? '/opt/flutter';
+  for (final path in [
+    '$flutterRoot/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
     '/opt/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
-  );
-  if (iconFile.existsSync()) {
-    icons.addFont(
-      Future.value(ByteData.sublistView(iconFile.readAsBytesSync())),
-    );
-    await icons.load();
+  ]) {
+    final iconFile = File(path);
+    if (iconFile.existsSync()) {
+      icons.addFont(
+        Future.value(ByteData.sublistView(iconFile.readAsBytesSync())),
+      );
+      await icons.load();
+      break;
+    }
   }
 }
 
@@ -400,30 +425,41 @@ Widget _eventChat(FvConversationSummary conv) {
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 10,
+            runSpacing: 8,
             children: [
-              Icon(
-                Icons.schedule,
-                size: 14,
-                color: FirstVuePalette.dark.secondaryText,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.schedule,
+                    size: 14,
+                    color: FirstVuePalette.dark.secondaryText,
+                  ),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'Tonight • 8:00 PM',
+                    style: TextStyle(color: Color(0xB3F4EFE6), fontSize: 12),
+                  ),
+                ],
               ),
-              const SizedBox(width: 4),
-              const Text(
-                'Tonight • 8:00 PM',
-                style: TextStyle(color: Color(0xB3F4EFE6), fontSize: 12),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.place_outlined,
+                    size: 14,
+                    color: FirstVuePalette.dark.secondaryText,
+                  ),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'Atlanta, GA',
+                    style: TextStyle(color: Color(0xB3F4EFE6), fontSize: 12),
+                  ),
+                ],
               ),
-              const SizedBox(width: 10),
-              Icon(
-                Icons.place_outlined,
-                size: 14,
-                color: FirstVuePalette.dark.secondaryText,
-              ),
-              const SizedBox(width: 4),
-              const Text(
-                'Atlanta, GA',
-                style: TextStyle(color: Color(0xB3F4EFE6), fontSize: 12),
-              ),
-              const Spacer(),
               FvGoldOutlineButton(label: 'View event', onTap: () {}),
             ],
           ),
@@ -674,6 +710,8 @@ Widget _entityInbox(FvMessagingIdentity identity, DateTime now) {
                   padding: const EdgeInsets.only(top: 12),
                   child: Text(
                     fvInboxStatusLabel(status),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: Colors.white70, fontSize: 13),
                   ),
                 ),
@@ -707,26 +745,33 @@ Widget _entityInbox(FvMessagingIdentity identity, DateTime now) {
           flex: 2,
           child: Column(
             children: [
-              const Padding(
-                padding: EdgeInsets.all(12),
+              Padding(
+                padding: const EdgeInsets.all(12),
                 child: Row(
                   children: [
-                    Text(
-                      'Maya Chen',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
+                    const Flexible(
+                      child: Text(
+                        'Maya Chen',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                    SizedBox(width: 6),
-                    FvEncryptionDot(),
-                    Spacer(),
-                    Text(
-                      'Reply as That Spot',
-                      style: TextStyle(
-                        color: FirstVueColors.gold,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                    const SizedBox(width: 6),
+                    const FvEncryptionDot(),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Reply as ${identity.label}',
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          color: FirstVueColors.gold,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],
