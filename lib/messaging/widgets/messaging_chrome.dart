@@ -373,34 +373,43 @@ class FvEventConversationRow extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        [
-                              conv.conversationTypeLabel ?? 'Attendee chat',
-                              conv.locationLabel,
-                            ]
-                            .whereType<String>()
-                            .where((s) => s.isNotEmpty)
-                            .join(' • '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: fv.secondaryText, fontSize: 12),
-                      ),
-                      Text(
-                        conv.preview ?? '',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: (conv.preview ?? '').startsWith('#')
-                              ? FirstVueColors.teal
-                              : (conv.unread > 0
-                                    ? fv.primaryText
-                                    : fv.secondaryText),
-                          fontWeight: (conv.preview ?? '').startsWith('#')
-                              ? FontWeight.w600
-                              : FontWeight.w400,
-                          fontSize: 13,
-                        ),
-                      ),
+                      ...() {
+                        final meta =
+                            [conv.conversationTypeLabel, conv.locationLabel]
+                                .whereType<String>()
+                                .where((s) => s.isNotEmpty)
+                                .join(' • ');
+                        final preview = conv.preview ?? '';
+                        return [
+                          if (meta.isNotEmpty)
+                            Text(
+                              meta,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: fv.secondaryText,
+                                fontSize: 12,
+                              ),
+                            ),
+                          if (preview.isNotEmpty && preview != meta)
+                            Text(
+                              preview,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: preview.startsWith('#')
+                                    ? FirstVueColors.teal
+                                    : (conv.unread > 0
+                                          ? fv.primaryText
+                                          : fv.secondaryText),
+                                fontWeight: preview.startsWith('#')
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                                fontSize: 13,
+                              ),
+                            ),
+                        ];
+                      }(),
                     ],
                   ),
                 ),
@@ -1410,12 +1419,12 @@ class FvMessagingAppBar extends StatelessWidget {
               icon: const Icon(Icons.arrow_back, color: FirstVueColors.gold),
             ),
           ),
-          const Expanded(
+          Expanded(
             child: Text(
               'Messages',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white,
+                color: context.fv.primaryText,
                 fontWeight: FontWeight.w700,
                 fontSize: 18,
               ),

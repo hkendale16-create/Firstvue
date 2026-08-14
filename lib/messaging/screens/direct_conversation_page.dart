@@ -284,21 +284,36 @@ class _DirectConversationPageState extends State<DirectConversationPage> {
             ),
           ),
           const Spacer(),
+          if (!widget.identity.isPersonal)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Text(
+                'Reply as ${widget.identity.label}',
+                style: const TextStyle(
+                  color: FirstVueColors.gold,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           if (FvCallService.allowsCalls(conv) &&
               widget.identity.isPersonal) ...[
             IconButton(
               tooltip: 'Voice call',
               onPressed: () => _startCall(video: false),
-              icon: Icon(Icons.call_outlined, color: fv.primaryText),
+              icon: const Icon(Icons.call_outlined, color: FirstVueColors.gold),
             ),
             IconButton(
               tooltip: 'Video call',
               onPressed: () => _startCall(video: true),
-              icon: Icon(Icons.videocam_outlined, color: fv.primaryText),
+              icon: const Icon(
+                Icons.videocam_outlined,
+                color: FirstVueColors.gold,
+              ),
             ),
           ],
           PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: fv.primaryText),
+            icon: const Icon(Icons.more_vert, color: FirstVueColors.gold),
             onSelected: (value) async {
               switch (value) {
                 case 'block':

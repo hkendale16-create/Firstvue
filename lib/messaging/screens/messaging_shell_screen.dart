@@ -37,11 +37,11 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
   FvMessagingIdentity? _identity;
   List<FvMessagingIdentity> _identities = const [];
   List<FvConversationSummary> _rows = const [];
-  List<FvConversationSummary> _eventSection = const [];
   FvUnreadTotals _unreads = const FvUnreadTotals();
   String _filter = 'all';
   String _eventBucket = 'happening';
-  String _query = '';
+  String _messagesQuery = '';
+  String _eventsQuery = '';
   bool _loading = true;
   bool _offline = false;
   String? _error;
@@ -132,16 +132,17 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
       _error = null;
     });
     try {
+      final query = _mode == FvMode.messages ? _messagesQuery : _eventsQuery;
       final rows = _mode == FvMode.messages
           ? await FvMessagingService.fetchMessagesInbox(
               identity: identity,
               filter: _filter,
-              query: _query,
+              query: query,
             )
           : await FvMessagingService.fetchEventsInbox(
               identity: identity,
               bucket: _eventBucket,
-              query: _query,
+              query: query,
             );
       final unreads = await FvMessagingService.unreadTotals();
       final requests = _mode == FvMode.messages
@@ -150,22 +151,7 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
               filter: 'requests',
             )
           : const <FvConversationSummary>[];
-      var eventSection = const <FvConversationSummary>[];
       var eventUnread = 0;
-      if (_mode == FvMode.messages && _filter == 'all') {
-        eventSection = await FvMessagingService.fetchEventsInbox(
-          identity: identity,
-          bucket: 'happening',
-          query: _query,
-        );
-        if (eventSection.isEmpty) {
-          eventSection = await FvMessagingService.fetchEventsInbox(
-            identity: identity,
-            bucket: 'upcoming',
-            query: _query,
-          );
-        }
-      }
       final happening = await FvMessagingService.fetchEventsInbox(
         identity: identity,
         bucket: 'happening',
@@ -177,7 +163,6 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
       if (!mounted) return;
       setState(() {
         _rows = rows;
-        _eventSection = eventSection;
         _requestCount = requests.length;
         _eventUnread = eventUnread;
         _unreads = unreads;
@@ -206,7 +191,10 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
     if (_mode == FvMode.events && _eventsScroll.hasClients) {
       _savedEventsOffset = _eventsScroll.offset;
     }
-    setState(() => _mode = mode);
+    setState(() {
+      _mode = mode;
+      _search.text = mode == FvMode.messages ? _messagesQuery : _eventsQuery;
+    });
     _syncUrl();
     _reloadList().then((_) {
       final offset = mode == FvMode.messages
@@ -249,13 +237,13 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
     final fv = context.fv;
     final identity = _identity;
     final width = MediaQuery.sizeOf(context).width;
-    final wide = width >= 900;
-    final ultra = width >= 1180;
     final entityDesktop =
-        ultra &&
+        width >= 1180 &&
         identity != null &&
         !identity.isPersonal &&
         _mode == FvMode.messages;
+    final wide =
+        entityDesktop || (width >= 900 && (identity?.isPersonal ?? true));
 
     return Scaffold(
       backgroundColor: fv.background,
@@ -308,7 +296,11 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
                       ? 'Search messages'
                       : 'Search event conversations',
                   onChanged: (value) {
-                    _query = value;
+                    if (_mode == FvMode.messages) {
+                      _messagesQuery = value;
+                    } else {
+                      _eventsQuery = value;
+                    }
                     _debounce?.cancel();
                     _debounce = Timer(const Duration(milliseconds: 280), () {
                       _reloadList();
@@ -468,7 +460,6 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
       );
     }
     if (_rows.isEmpty &&
-        _eventSection.isEmpty &&
         !(_mode == FvMode.messages && _requestCount > 0 && _filter == 'all')) {
       return FvMessagingStateView(
         message: _mode == FvMode.events
@@ -490,7 +481,6 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
   Widget _messagesList(FirstVuePalette fv, ScrollController controller) {
     final showRequests =
         _requestCount > 0 && (_filter == 'all' || _filter == 'requests');
-    final showEvents = _filter == 'all' && _eventSection.isNotEmpty;
     return RefreshIndicator(
       color: FirstVueColors.gold,
       onRefresh: _reloadList,
@@ -511,15 +501,6 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
               selected: row.id == _openId,
               onTap: () => _openConversation(row),
             ),
-          if (showEvents) ...[
-            const FvSectionLabel('Event conversations'),
-            for (final row in _eventSection)
-              FvEventConversationRow(
-                conversation: row,
-                selected: row.id == _openId,
-                onTap: () => _openConversation(row),
-              ),
-          ],
         ],
       ),
     );

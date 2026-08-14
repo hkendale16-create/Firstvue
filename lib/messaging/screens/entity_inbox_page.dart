@@ -129,7 +129,7 @@ class _EntityInboxPageState extends State<EntityInboxPage> {
           if (!widget.embedded)
             IconButton(
               onPressed: () => Navigator.maybePop(context),
-              icon: Icon(Icons.arrow_back, color: fv.primaryText),
+              icon: const Icon(Icons.arrow_back, color: FirstVueColors.gold),
             ),
           Expanded(
             child: Text(
@@ -267,6 +267,12 @@ class _EntityInboxPageState extends State<EntityInboxPage> {
           decoration: InputDecoration(
             hintText: 'Add tag',
             hintStyle: TextStyle(color: fv.tertiaryText),
+            filled: true,
+            fillColor: fv.elevatedSurface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
           ),
           onSubmitted: (value) async {
             if (value.trim().isEmpty) return;
@@ -294,6 +300,12 @@ class _EntityInboxPageState extends State<EntityInboxPage> {
           decoration: InputDecoration(
             hintText: 'Add an internal note',
             hintStyle: TextStyle(color: fv.tertiaryText),
+            filled: true,
+            fillColor: fv.elevatedSurface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
           ),
         ),
         Align(

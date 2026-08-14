@@ -80,15 +80,14 @@ matching the approved mockups.
 Layout fixtures (not production data) with Inter + Material Icons.
 Custom SpaceGrotesk files are not in the repo (OFL only).
 
-There is no 1:1 private-chat mockup and no desktop entity-inbox mockup in
-the four approved PNGs. Those surfaces still exist in the product.
+There is a fifth review shot for the full event conversation (`05-event-conversation.png`, 390×844), which uses the Events-mode visual system. Event threads are not listed again inside Messages.
 
 | Screen | File | Size |
 | --- | --- | --- |
-| Unified Messages (All + event section) | `/opt/cursor/artifacts/screenshots/01-unified-messages.png` | 390×844 @1.5 |
-| Event conversation (attendee chat) | `/opt/cursor/artifacts/screenshots/02-event-conversation.png` | 390×844 @1.5 |
-| Unified Events hub | `/opt/cursor/artifacts/screenshots/03-unified-events.png` | 390×844 @1.5 |
-| Unified Messages inbox | `/opt/cursor/artifacts/screenshots/04-unified-messages-inbox.png` | 390×844 @1.5 |
+| Unified Messages | `/opt/cursor/artifacts/screenshots/01-unified-messages.png` | 390×844 @1.5 |
+| Unified Events | `/opt/cursor/artifacts/screenshots/02-unified-events.png` | 390×844 @1.5 |
+| Private conversation | `/opt/cursor/artifacts/screenshots/03-private-chat.png` | 390×844 @1.5 |
+| Entity inbox desktop | `/opt/cursor/artifacts/screenshots/04-entity-inbox-desktop.png` | 1440×900 @1.5 |
 
 ## Migration results
 
@@ -119,8 +118,9 @@ restartable, skip-if-exists via `legacy_thread_id`, writes status
 - Report bundles are not yet wrapped to `fv_msg_moderator_keys` when empty.
 - Under-13 enforcement is RPC-side (`birthday` + approved contacts); UI
   for approving contacts is settings-only.
-- Layout follows the four approved mockups: unified Messages, event
-  attendee chat, Events hub, and the Messages inbox with Messages/Events tabs.
+- Layout follows Messages, Events, private chat, and desktop entity inbox.
+  Full event conversation uses the Events visual system and is not listed
+  again inside Messages.
 - Do not delete legacy DMs until an operator verifies migrated counts.
 
 ## Changed files (high level)

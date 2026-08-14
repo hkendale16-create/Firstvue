@@ -58,24 +58,18 @@ void main() {
     await _shot(
       tester: tester,
       path: '${dir.path}/01-unified-messages.png',
+      size: const Size(390, 844),
       child: _messagesShell(
         identities: identities,
         selected: personal,
-        includeEventSection: true,
         now: now,
-        rooftop: rooftop,
       ),
     );
 
     await _shot(
       tester: tester,
-      path: '${dir.path}/02-event-conversation.png',
-      child: _eventChat(rooftop),
-    );
-
-    await _shot(
-      tester: tester,
-      path: '${dir.path}/03-unified-events.png',
+      path: '${dir.path}/02-unified-events.png',
+      size: const Size(390, 844),
       child: _eventsShell(
         identities: identities,
         rows: [
@@ -84,7 +78,6 @@ void main() {
             id: 'e2',
             kind: FvConversationKind.event,
             title: 'That Spot • Happy Hour',
-            preview: 'Attendee chat • 0.7 mi',
             conversationTypeLabel: 'Attendee chat',
             locationLabel: '0.7 mi',
             lastMessageAt: now,
@@ -121,14 +114,23 @@ void main() {
 
     await _shot(
       tester: tester,
-      path: '${dir.path}/04-unified-messages-inbox.png',
-      child: _messagesShell(
-        identities: identities,
-        selected: personal,
-        includeEventSection: false,
-        now: now,
-        rooftop: rooftop,
-      ),
+      path: '${dir.path}/03-private-chat.png',
+      size: const Size(390, 844),
+      child: _privateChat(now),
+    );
+
+    await _shot(
+      tester: tester,
+      path: '${dir.path}/04-entity-inbox-desktop.png',
+      size: const Size(1440, 900),
+      child: _entityInbox(thatSpot, now),
+    );
+
+    await _shot(
+      tester: tester,
+      path: '${dir.path}/05-event-conversation.png',
+      size: const Size(390, 844),
+      child: _eventChat(rooftop),
     );
   });
 }
@@ -231,9 +233,7 @@ List<FvConversationSummary> _inboxRows(DateTime now) {
 Widget _messagesShell({
   required List<FvMessagingIdentity> identities,
   required FvMessagingIdentity selected,
-  required bool includeEventSection,
   required DateTime now,
-  required FvConversationSummary rooftop,
 }) {
   return ColoredBox(
     color: FirstVuePalette.dark.background,
@@ -278,10 +278,6 @@ Widget _messagesShell({
               FvMessageRequestsRow(count: 3, onTap: () {}),
               for (final row in _inboxRows(now))
                 FvConversationRow(conversation: row, onTap: () {}),
-              if (includeEventSection) ...[
-                const FvSectionLabel('Event conversations'),
-                FvEventConversationRow(conversation: rooftop, onTap: () {}),
-              ],
             ],
           ),
         ),
@@ -513,9 +509,9 @@ Widget _eventChat(FvConversationSummary conv) {
 Future<void> _shot({
   required WidgetTester tester,
   required String path,
+  required Size size,
   required Widget child,
 }) async {
-  const size = Size(390, 844);
   await tester.binding.setSurfaceSize(size);
   final key = GlobalKey();
   await tester.pumpWidget(
@@ -534,4 +530,273 @@ Future<void> _shot({
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     File(path).writeAsBytesSync(bytes!.buffer.asUint8List());
   });
+}
+
+Widget _privateChat(DateTime now) {
+  return ColoredBox(
+    color: FirstVuePalette.dark.background,
+    child: Column(
+      children: [
+        SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(4, 4, 8, 8),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Icon(Icons.arrow_back, color: FirstVueColors.gold),
+                ),
+                const CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Color(0xFF1C1829),
+                  child: Text(
+                    'J',
+                    style: TextStyle(
+                      color: FirstVueColors.gold,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Jordan Miles',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
+                          ),
+                          SizedBox(width: 6),
+                          FvEncryptionDot(),
+                        ],
+                      ),
+                      Text(
+                        'Online',
+                        style: TextStyle(
+                          color: FirstVueColors.teal,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Icon(Icons.call_outlined, color: FirstVueColors.gold),
+                ),
+                const SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Icon(
+                    Icons.videocam_outlined,
+                    color: FirstVueColors.gold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            children: [
+              FvMessageBubble(
+                message: FvChatMessage(
+                  id: 'a',
+                  conversationId: '1',
+                  senderId: 'o',
+                  isMine: false,
+                  plaintext: 'Are you still coming through?',
+                  createdAt: now.subtract(const Duration(minutes: 8)),
+                ),
+              ),
+              FvMessageBubble(
+                message: FvChatMessage(
+                  id: 'b',
+                  conversationId: '1',
+                  senderId: 'me',
+                  isMine: true,
+                  plaintext: 'On the way. See you at the door.',
+                  createdAt: now,
+                  delivered: true,
+                  read: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+        FvComposer(controller: TextEditingController(), onSend: () {}),
+      ],
+    ),
+  );
+}
+
+Widget _entityInbox(FvMessagingIdentity identity, DateTime now) {
+  final conv = FvConversationSummary(
+    id: 'c',
+    kind: FvConversationKind.entityInbox,
+    title: 'Maya Chen',
+    preview: 'Do you take walk-ins tonight?',
+    lastMessageAt: now,
+    inboxStatus: FvInboxStatus.assigned,
+    assignmentLabel: 'Assigned to Alex',
+  );
+  return ColoredBox(
+    color: FirstVuePalette.dark.background,
+    child: Row(
+      children: [
+        SizedBox(
+          width: 200,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Text(
+                identity.label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Text(
+                'Shared customer inbox',
+                style: TextStyle(color: Color(0xB3F4EFE6), fontSize: 12),
+              ),
+              for (final status in FvInboxStatus.values)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Text(
+                    fvInboxStatusLabel(status),
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const VerticalDivider(width: 1),
+        Expanded(
+          child: ListView(
+            children: [
+              FvConversationRow(
+                conversation: conv,
+                selected: true,
+                onTap: () {},
+              ),
+              FvConversationRow(
+                conversation: FvConversationSummary(
+                  id: 'd',
+                  kind: FvConversationKind.entityInbox,
+                  title: 'Chris P.',
+                  preview: 'Menu question',
+                  lastMessageAt: now.subtract(const Duration(hours: 3)),
+                ),
+                onTap: () {},
+              ),
+            ],
+          ),
+        ),
+        const VerticalDivider(width: 1),
+        Expanded(
+          flex: 2,
+          child: Column(
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Text(
+                      'Maya Chen',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(width: 6),
+                    FvEncryptionDot(),
+                    Spacer(),
+                    Text(
+                      'Reply as That Spot',
+                      style: TextStyle(
+                        color: FirstVueColors.gold,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  children: [
+                    FvMessageBubble(
+                      message: FvChatMessage(
+                        id: 'm',
+                        conversationId: 'c',
+                        senderId: 'c',
+                        isMine: false,
+                        plaintext: 'Do you take walk-ins tonight?',
+                        createdAt: now,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              FvComposer(
+                controller: TextEditingController(),
+                onSend: () {},
+                hint: 'Reply as That Spot',
+              ),
+            ],
+          ),
+        ),
+        const VerticalDivider(width: 1),
+        SizedBox(
+          width: 300,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              const Text(
+                'Customer',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Text(
+                'Maya Chen',
+                style: TextStyle(color: Color(0xB3F4EFE6)),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Status',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Text(
+                'Assigned',
+                style: TextStyle(color: FirstVueColors.teal),
+              ),
+              FvInternalNoteCard(
+                note: FvInternalNote(
+                  id: 'n',
+                  authorName: 'Alex',
+                  body: 'Asked about patio seating.',
+                  createdAt: now,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }
