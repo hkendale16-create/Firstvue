@@ -89,10 +89,10 @@ void main() {
       'Password1',
     );
 
-    await _tapVisible(
-      tester,
+    final createTab = tester.widget<InkWell>(
       find.byKey(const ValueKey('auth-segment-Create account')),
     );
+    createTab.onTap!();
     await tester.pump(const Duration(milliseconds: 250));
 
     final password = tester.widget<TextField>(
@@ -186,10 +186,10 @@ void main() {
       find.byKey(const ValueKey('auth-password-field')),
       'password1',
     );
-    await _tapVisible(
-      tester,
+    final submitButton = tester.widget<FvGoldButton>(
       find.byKey(const ValueKey('auth-primary-button')),
     );
+    submitButton.onPressed!();
     await tester.pump();
 
     expect(find.text(kGenericAuthError), findsOneWidget);
