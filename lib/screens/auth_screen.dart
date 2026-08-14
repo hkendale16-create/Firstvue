@@ -446,7 +446,8 @@ class _AuthScreenState extends State<AuthScreen> {
     final height = media.size.height;
     final short = height < 700;
     final reduceMotion = media.disableAnimations;
-    final heroHeight = (height * (short ? .34 : .39)).clamp(220.0, 360.0);
+    // Keep the hero compact so the sign-in fields stay above the fold on phones.
+    final heroHeight = (height * (short ? .28 : .32)).clamp(180.0, 280.0);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -458,38 +459,49 @@ class _AuthScreenState extends State<AuthScreen> {
             backgroundColor: const Color(0xFF080D1B),
             resizeToAvoidBottomInset: true,
             body: SafeArea(
+              // StackFit.expand is required: a loose Stack sizes only to the
+              // hero, which collapses the sheet to ~28px and leaves an empty
+              // dark scaffold block over the rest of the phone screen.
               child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  SizedBox(
-                    height: heroHeight,
-                    width: double.infinity,
-                    child: _HeroHeader(compact: short),
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: SizedBox(
+                      height: heroHeight,
+                      width: double.infinity,
+                      child: _HeroHeader(compact: short),
+                    ),
                   ),
                   Positioned(
-                    top: heroHeight - 34,
+                    top: heroHeight - 28,
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    child: DecoratedBox(
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF111726),
+                    child: Material(
+                      color: const Color(0xFF111726),
+                      elevation: 0,
+                      shape: const RoundedRectangleBorder(
                         borderRadius: BorderRadius.vertical(
                           top: Radius.circular(38),
                         ),
-                        border: Border(
-                          top: BorderSide(color: Color(0xFF293148)),
-                        ),
+                        side: BorderSide(color: Color(0xFF293148)),
                       ),
+                      clipBehavior: Clip.antiAlias,
                       child: Align(
                         alignment: Alignment.topCenter,
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 560),
-                          child: SizedBox.expand(
-                            child: AutofillGroup(
-                              child: SingleChildScrollView(
+                          child: AutofillGroup(
+                            child: SingleChildScrollView(
                               keyboardDismissBehavior:
                                   ScrollViewKeyboardDismissBehavior.onDrag,
-                              padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+                              padding: const EdgeInsets.fromLTRB(
+                                24,
+                                24,
+                                24,
+                                40,
+                              ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
@@ -520,8 +532,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                     alignment: Alignment.topCenter,
                                     child: _formBody(),
                                   ),
-                                  ],
-                                ),
+                                ],
                               ),
                             ),
                           ),
