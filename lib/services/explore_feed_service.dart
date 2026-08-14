@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/explore_item.dart';
@@ -8,7 +9,6 @@ import '../services/profile_cards.dart';
 import '../services/profile_media_service.dart';
 import '../services/rentals_store.dart';
 import '../services/things_to_do_service.dart';
-import '../services/user_profile_service.dart';
 import '../utils/explore_category_filter.dart';
 
 /// Isolated Explore queries. Each section uses its own filter configuration.
@@ -24,50 +24,58 @@ class ExploreFeedService {
     DateTime? beforeCreatedAt,
     String? beforeId,
     int limit = pageSize,
-  }) {
-    return switch (section) {
-      ExploreSection.people => _fetchPeople(
-        beforeCreatedAt: beforeCreatedAt,
-        beforeId: beforeId,
-        limit: limit,
-      ),
-      ExploreSection.communities => _fetchCommunities(
-        beforeCreatedAt: beforeCreatedAt,
-        beforeId: beforeId,
-        limit: limit,
-      ),
-      ExploreSection.groups => _fetchGroups(
-        beforeCreatedAt: beforeCreatedAt,
-        beforeId: beforeId,
-        limit: limit,
-      ),
-      ExploreSection.events => _fetchEvents(
-        beforeCreatedAt: beforeCreatedAt,
-        beforeId: beforeId,
-        limit: limit,
-      ),
-      ExploreSection.rentals => _fetchRentals(
-        beforeCreatedAt: beforeCreatedAt,
-        beforeId: beforeId,
-        limit: limit,
-      ),
-      ExploreSection.businesses ||
-      ExploreSection.food ||
-      ExploreSection.bars ||
-      ExploreSection.thingsToDo => _fetchEntityPosts(
-        section: section,
-        beforeCreatedAt: beforeCreatedAt,
-        beforeId: beforeId,
-        limit: limit,
-      ),
-    };
+  }) async {
+    try {
+      return await switch (section) {
+        ExploreSection.people => _fetchPeople(
+          beforeCreatedAt: beforeCreatedAt,
+          beforeId: beforeId,
+          limit: limit,
+        ),
+        ExploreSection.communities => _fetchCommunities(
+          beforeCreatedAt: beforeCreatedAt,
+          beforeId: beforeId,
+          limit: limit,
+        ),
+        ExploreSection.groups => _fetchGroups(
+          beforeCreatedAt: beforeCreatedAt,
+          beforeId: beforeId,
+          limit: limit,
+        ),
+        ExploreSection.events => _fetchEvents(
+          beforeCreatedAt: beforeCreatedAt,
+          beforeId: beforeId,
+          limit: limit,
+        ),
+        ExploreSection.rentals => _fetchRentals(
+          beforeCreatedAt: beforeCreatedAt,
+          beforeId: beforeId,
+          limit: limit,
+        ),
+        ExploreSection.businesses ||
+        ExploreSection.food ||
+        ExploreSection.bars ||
+        ExploreSection.thingsToDo => _fetchEntityPosts(
+          section: section,
+          beforeCreatedAt: beforeCreatedAt,
+          beforeId: beforeId,
+          limit: limit,
+        ),
+      };
+    } catch (error, stack) {
+      debugPrint('ExploreFeedService.fetchPage(${section.name}) failed: $error\n$stack');
+      // Soft-fail so the Explore shell never sticks on the hard error state when
+      // one backend dependency throws. Callers still get an empty page.
+      return ExplorePageResult(items: const [], hasMore: false);
+    }
   }
 
+  /// Prefer identity filters, but never depend on them — PostgREST `is.null`
+  /// chains have failed for some signed-in sessions while plain selects work.
   static dynamic _identityQuery(ExploreSection section, dynamic query) {
     return switch (section) {
-      ExploreSection.people => query
-          .isFilter('business_id', null)
-          .isFilter('community_id', null),
+      // People: avoid is.null chains; client-side classifier is authoritative.
+      ExploreSection.people => query,
       ExploreSection.events => query.or(
         'author_profile_type.eq.event,event_id.not.is.null',
       ),
@@ -99,12 +107,25 @@ class ExploreFeedService {
         beforeId: beforeId,
         configure: (query) => _identityQuery(section, query),
       );
-    } catch (_) {
-      return CommunityNewsService.fetchPosts(
-        limit: limit,
-        beforeCreatedAt: beforeCreatedAt,
-        beforeId: beforeId,
+    } catch (error, stack) {
+      debugPrint(
+        'ExploreFeedService identity query failed for ${section.name}: '
+        '$error\n$stack',
       );
+      try {
+        // Plain feed + client-side section filter — works when null filters 400.
+        return await CommunityNewsService.fetchPosts(
+          limit: limit,
+          beforeCreatedAt: beforeCreatedAt,
+          beforeId: beforeId,
+        );
+      } catch (fallbackError, fallbackStack) {
+        debugPrint(
+          'ExploreFeedService plain posts failed for ${section.name}: '
+          '$fallbackError\n$fallbackStack',
+        );
+        return const [];
+      }
     }
   }
 
@@ -122,7 +143,7 @@ class ExploreFeedService {
       section: ExploreSection.people,
       beforeCreatedAt: beforeCreatedAt,
       beforeId: beforeId,
-      limit: limit * 2,
+      limit: limit * 3,
     );
     for (final post in posts) {
       if (!ExploreCategoryFilter.matches(post, ExploreSection.people)) {
@@ -147,7 +168,13 @@ class ExploreFeedService {
       final ids = byId.keys.take(limit).toList();
       if (ids.isEmpty) return const [];
 
-      final avatars = await ProfileMediaService.fetchAvatarUrlsForProfiles(ids);
+      Map<String, String> avatars = const {};
+      try {
+        avatars = await ProfileMediaService.fetchAvatarUrlsForProfiles(ids);
+      } catch (error, stack) {
+        debugPrint('Explore people avatars failed: $error\n$stack');
+      }
+
       final cards = <ExploreItem>[];
       for (final id in ids) {
         final row = byId[id];
@@ -156,26 +183,25 @@ class ExploreFeedService {
         final visibility =
             (row['profile_visibility'] as String?) ?? 'public';
         if (visibility == 'private') continue;
-        final profile = await UserProfileService.fetchProfileForUser(id);
-        if (profile?.isPrivate == true) continue;
-        final username = profile?.username ?? row['username'] as String?;
+        final username = row['username'] as String?;
+        final displayName =
+            (row['display_name'] as String?)?.trim().isNotEmpty == true
+            ? row['display_name'] as String
+            : 'FirstVue member';
         cards.add(
           ExploreItem.profileItem(
             profile: ExploreProfileCard(
               id: id,
-              displayName:
-                  profile?.displayName ??
-                  row['display_name'] as String? ??
-                  'FirstVue member',
+              displayName: displayName,
               handle: _handle(username),
               avatarUrl: avatars[id],
-              locationLabel: profile?.locationLabel,
             ),
           ),
         );
       }
       return cards;
-    } catch (_) {
+    } catch (error, stack) {
+      debugPrint('Explore people recommendations failed: $error\n$stack');
       return const [];
     }
   }
@@ -233,7 +259,9 @@ class ExploreFeedService {
             ),
           );
         }
-      } catch (_) {}
+      } catch (error, stack) {
+        debugPrint('Explore hubs failed: $error\n$stack');
+      }
     }
 
     try {
@@ -260,7 +288,9 @@ class ExploreFeedService {
           ),
         );
       }
-    } catch (_) {}
+    } catch (error, stack) {
+      debugPrint('Explore community posts failed: $error\n$stack');
+    }
 
     return _page(items, limit: limit);
   }
@@ -289,7 +319,9 @@ class ExploreFeedService {
             ),
           );
         }
-      } catch (_) {}
+      } catch (error, stack) {
+        debugPrint('Explore nearby groups failed: $error\n$stack');
+      }
     }
 
     final posts = await _postsForSection(
@@ -331,7 +363,9 @@ class ExploreFeedService {
             ),
           );
         }
-      } catch (_) {}
+      } catch (error, stack) {
+        debugPrint('Explore events catalog failed: $error\n$stack');
+      }
     }
 
     final posts = await _postsForSection(
@@ -375,7 +409,9 @@ class ExploreFeedService {
             ),
           );
         }
-      } catch (_) {}
+      } catch (error, stack) {
+        debugPrint('Explore rentals catalog failed: $error\n$stack');
+      }
     }
 
     final entityPage = await _fetchEntityPosts(
