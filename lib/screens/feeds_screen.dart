@@ -359,7 +359,10 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loadingMore = false);
+      setState(() {
+        _loadingMore = false;
+        _hasMore = false;
+      });
     }
   }
 

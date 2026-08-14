@@ -46,10 +46,13 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
   Set<String> _repostedPostIds = const {};
   bool _loading = true;
   bool _loadingMore = false;
+  bool _hasMore = true;
   String? _error;
   String? _avatarUrl;
   String _displayName = 'you';
   int _feedLimit = 20;
+  /// Stable for this session so "load more" does not reshuffle the whole feed.
+  late double _rankSeed;
   RealtimeChannel? _newsChannel;
   int _storiesRefresh = 0;
 
@@ -57,6 +60,7 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
   void initState() {
     super.initState();
     _feedLimit = widget.maxPosts;
+    _rankSeed = DateTime.now().millisecondsSinceEpoch.toDouble();
     _bootstrap();
     _subscribeToNewsFeed();
   }
@@ -65,6 +69,9 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
   void didUpdateWidget(covariant HomeCommunityFeedBlock oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.refreshToken != widget.refreshToken) {
+      _rankSeed = DateTime.now().millisecondsSinceEpoch.toDouble();
+      _feedLimit = widget.maxPosts;
+      _hasMore = true;
       _loadFeed();
     }
   }
@@ -136,19 +143,24 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
     }
   }
 
-  Future<void> _loadFeed({bool silent = false}) async {
+  Future<void> _loadFeed({bool silent = false, bool reshuffle = false}) async {
     if (!silent) {
       setState(() {
         _loading = true;
         _error = null;
       });
     }
+    if (reshuffle) {
+      _rankSeed = DateTime.now().millisecondsSinceEpoch.toDouble();
+      _feedLimit = widget.maxPosts;
+      _hasMore = true;
+    }
     try {
       // Ranked main Newsfeed: recency + unseen + relevance + controlled variety.
-      // Seed changes on each refresh so top results are not identical every time.
+      // Seed is stable across load-more so scrolling does not reshuffle posts.
       final posts = await CommunityNewsService.fetchRankedMainFeed(
         limit: _feedLimit,
-        seed: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        seed: _rankSeed,
       );
       final postIds = posts.map((p) => p.id).toList();
       final reposted = await RepostService.fetchMyRepostedIds(postIds);
@@ -161,6 +173,7 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
         _repostedPostIds = reposted;
         _loading = false;
         _error = null;
+        _hasMore = posts.length >= _feedLimit;
       });
     } catch (error) {
       CommunityNewsService.logFeedError(
@@ -170,7 +183,10 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Could not load community posts.';
+        if (!silent || _posts.isEmpty) {
+          _error = 'Could not load community posts.';
+        }
+        if (silent) _hasMore = false;
       });
     }
   }
@@ -221,7 +237,7 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
   }
 
   Future<void> _loadMore() async {
-    if (_loadingMore || _loading) return;
+    if (_loadingMore || _loading || !_hasMore) return;
     setState(() {
       _loadingMore = true;
       _feedLimit += 20;
@@ -460,7 +476,9 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
               ),
               const Spacer(),
               IconButton(
-                onPressed: _loading ? null : _loadFeed,
+                onPressed: _loading
+                    ? null
+                    : () => _loadFeed(reshuffle: true),
                 icon: Icon(Icons.refresh, color: fv.mutedIcon, size: 20),
                 tooltip: 'Refresh feed',
                 visualDensity: VisualDensity.compact,
@@ -479,7 +497,7 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
           _EmptyFeedState(
             title: _error!,
             actionLabel: 'Try again',
-            onAction: _loadFeed,
+            onAction: () => _loadFeed(reshuffle: true),
           )
         else if (_posts.isEmpty)
           const _EmptyFeedState(
@@ -537,7 +555,7 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
                   ),
                 ),
               ],
-              if (_posts.length >= 8) ...[
+              if (_hasMore && _posts.length >= 8) ...[
                 const SizedBox(height: 12),
                 TextButton(
                   onPressed: _loadingMore ? null : _loadMore,

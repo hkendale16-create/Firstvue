@@ -37,7 +37,9 @@ class VueMosaicView extends StatelessWidget {
     final bands = groupVueMosaicBands(cells);
     return ListView.builder(
       padding: padding,
-      physics: const AlwaysScrollableScrollPhysics(),
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: ClampingScrollPhysics(),
+      ),
       itemCount: bands.length + (loadingMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index >= bands.length) {

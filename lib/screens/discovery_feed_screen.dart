@@ -5,6 +5,7 @@ import '../services/discovery_feed_service.dart';
 import '../services/vue_featured_rotation.dart';
 import '../services/vue_tab_preference.dart';
 import '../theme/firstvue_theme.dart';
+import '../utils/scroll_load_more_gate.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/fv_ui.dart';
 import '../widgets/vue_mosaic_layout.dart';
@@ -29,6 +30,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   String? _error;
   bool _loadingMore = false;
   bool _hasMore = true;
+  final _loadMoreGate = ScrollLoadMoreGate(thresholdPx: 480);
 
   @override
   void initState() {
@@ -68,16 +70,17 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
         _error = null;
         _hasMore = usable.length >= limit;
       });
+      if (reset) _loadMoreGate.reset();
       return usable;
     } catch (error) {
       if (!mounted) return const [];
       setState(() {
-        // Keep existing tiles visible on a failed pull-refresh so the page
-        // does not blank while scrolling.
+        // Never blank an already-visible mosaic on refresh / load-more failure.
         if (reset && _items.isEmpty) {
           _error = 'Unable to load VUE right now.';
         } else if (!reset) {
-          _error = 'Unable to load VUE right now.';
+          // Stop the near-bottom retry loop that was reloading until error.
+          _hasMore = false;
         }
       });
       rethrow;
@@ -104,6 +107,18 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
     } finally {
       if (mounted) setState(() => _loadingMore = false);
     }
+  }
+
+  bool _onFeedScroll(ScrollNotification notification) {
+    if (notification is! ScrollUpdateNotification) return false;
+    if (notification.metrics.axis != Axis.vertical) return false;
+    final shouldLoad = _loadMoreGate.onScroll(
+      pixels: notification.metrics.pixels,
+      maxScrollExtent: notification.metrics.maxScrollExtent,
+      canLoadMore: !_loadingMore && _hasMore,
+    );
+    if (shouldLoad) _loadMore();
+    return false;
   }
 
   Future<List<DiscoveryFeedItem>> _arrangeFeatured(
@@ -250,7 +265,13 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                   onSelected: (index) {
                     final next = VueFeedMode.values[index];
                     if (next == _mode) return;
-                    setState(() => _mode = next);
+                    setState(() {
+                      _mode = next;
+                      _error = null;
+                      _hasMore = true;
+                      _items = const [];
+                    });
+                    _loadMoreGate.reset();
                     VueTabPreference.save(next);
                     _feedFuture = _loadFeed(reset: true);
                   },
@@ -268,7 +289,9 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                           ),
                         );
                       }
-                      if (snapshot.hasError || _error != null) {
+                      // Only full-page error when there is nothing to keep on screen.
+                      if (_items.isEmpty &&
+                          (snapshot.hasError || _error != null)) {
                         return Center(
                           child: Padding(
                             padding: const EdgeInsets.all(24),
@@ -299,13 +322,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                         );
                       }
                       return NotificationListener<ScrollNotification>(
-                        onNotification: (notification) {
-                          if (notification.metrics.pixels >
-                              notification.metrics.maxScrollExtent - 480) {
-                            _loadMore();
-                          }
-                          return false;
-                        },
+                        onNotification: _onFeedScroll,
                         child: FirstVueRefreshScaffold(
                           onRefresh: _refreshFeed,
                           child: VueMosaicView(

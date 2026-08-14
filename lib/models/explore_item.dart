@@ -310,9 +310,11 @@ class ExploreSectionStore {
         seenIds: seen,
       );
     } catch (_) {
+      // Stop near-bottom retry loops; user can pull-to-refresh or change tabs.
       _pages[section] = of(section).copyWith(
         loadingMore: false,
-        error: 'Could not load more. Tap to retry.',
+        hasMore: false,
+        error: 'Could not load more. Pull to refresh to retry.',
       );
     }
   }
