@@ -20,6 +20,12 @@ Widget _wrap(
   );
 }
 
+Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
+}
+
 void main() {
   testWidgets('only one authentication call-to-action exists', (tester) async {
     await tester.pumpWidget(_wrap(const AuthScreen()));
@@ -44,7 +50,10 @@ void main() {
     expect(find.text('Email or username'), findsWidgets);
     expect(find.text('Forgot password?'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('auth-segment-Create account')));
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('auth-segment-Create account')),
+    );
     await tester.pump(const Duration(milliseconds: 250));
 
     expect(find.text('Forgot password?'), findsNothing);
@@ -65,7 +74,10 @@ void main() {
     );
     expect(createButton.enabled, isFalse);
 
-    await tester.tap(find.byKey(const ValueKey('auth-segment-Sign in')));
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('auth-segment-Sign in')),
+    );
     await tester.pump(const Duration(milliseconds: 250));
     expect(find.widgetWithText(FvGoldButton, 'Sign in'), findsOneWidget);
   });
@@ -84,7 +96,10 @@ void main() {
       'Password1',
     );
 
-    await tester.tap(find.byKey(const ValueKey('auth-segment-Create account')));
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('auth-segment-Create account')),
+    );
     await tester.pump(const Duration(milliseconds: 250));
 
     final password = tester.widget<TextField>(
@@ -107,7 +122,10 @@ void main() {
   testWidgets('registration exposes required legal pages', (tester) async {
     await tester.pumpWidget(_wrap(const AuthScreen()));
     await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('auth-segment-Create account')));
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('auth-segment-Create account')),
+    );
     await tester.pump(const Duration(milliseconds: 250));
 
     expect(find.text('Terms'), findsOneWidget);
@@ -133,7 +151,7 @@ void main() {
     );
     expect(hidden.obscureText, isTrue);
 
-    await tester.tap(find.byTooltip('Show password'));
+    await _tapVisible(tester, find.byTooltip('Show password'));
     await tester.pump();
     expect(find.byTooltip('Hide password'), findsOneWidget);
     final shown = tester.widget<TextField>(
@@ -175,7 +193,10 @@ void main() {
       find.byKey(const ValueKey('auth-password-field')),
       'password1',
     );
-    await tester.tap(find.byKey(const ValueKey('auth-primary-button')));
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('auth-primary-button')),
+    );
     await tester.pump();
 
     expect(find.text(kGenericAuthError), findsOneWidget);
