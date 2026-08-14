@@ -37,12 +37,18 @@ enum MediaBucket {
 /// Where a media row is stored.
 enum MediaStorageProvider {
   supabase('supabase'),
-  s3('s3');
+  s3('s3'),
+  /// Absolute https URL stored in `storage_path` (demo / external assets).
+  external('external');
 
   final String value;
   const MediaStorageProvider(this.value);
 
   static MediaStorageProvider parse(String? raw) {
-    return raw == 's3' ? MediaStorageProvider.s3 : MediaStorageProvider.supabase;
+    return switch (raw) {
+      's3' => MediaStorageProvider.s3,
+      'external' => MediaStorageProvider.external,
+      _ => MediaStorageProvider.supabase,
+    };
   }
 }

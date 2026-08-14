@@ -55,11 +55,21 @@ class MediaStorageService {
     MediaStorageProvider provider = MediaStorageProvider.supabase,
     Map<String, String>? context,
   }) async {
+    final trimmed = path.trim();
+    if (trimmed.isEmpty) return '';
+
+    // Demo / external assets store absolute URLs in storage_path.
+    if (provider == MediaStorageProvider.external ||
+        trimmed.startsWith('https://') ||
+        trimmed.startsWith('http://')) {
+      return trimmed;
+    }
+
     if (provider == MediaStorageProvider.s3 || useAwsMedia) {
       try {
         return await _awsReadUrl(
           bucket: bucket,
-          path: path,
+          path: trimmed,
           context: context,
         );
       } on StateError catch (error) {
@@ -67,9 +77,6 @@ class MediaStorageService {
         if (!error.message.contains('not configured')) rethrow;
       }
     }
-
-    final trimmed = path.trim();
-    if (trimmed.isEmpty) return '';
 
     try {
       return await _client.storage
