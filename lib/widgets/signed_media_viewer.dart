@@ -1,13 +1,18 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../screens/full_screen_media_viewer.dart';
 import '../services/media_type_helpers.dart';
 import '../theme/firstvue_theme.dart';
+import 'html_video_view.dart';
+import 'network_photo.dart';
 
-/// Thumbnail for a signed network URL — images load directly; videos show the
-/// first frame once the controller initializes.
-class SignedMediaThumbnail extends StatefulWidget {
+/// Thumbnail for a signed network URL.
+///
+/// On web, photos use an HTML `<img>` and clips use `<video playsinline>` so
+/// iPhone Safari can show Supabase media that CanvasKit `fetch()` blocks.
+class SignedMediaThumbnail extends StatelessWidget {
   final String url;
   final bool isVideo;
   final double? width;
@@ -25,47 +30,75 @@ class SignedMediaThumbnail extends StatefulWidget {
     this.borderRadius,
   });
 
+  bool get _treatAsVideo =>
+      isVideo || mediaTypeFromMetadata(pathOrUrl: url) == 'video';
+
   @override
-  State<SignedMediaThumbnail> createState() => _SignedMediaThumbnailState();
+  Widget build(BuildContext context) {
+    Widget child;
+    if (_treatAsVideo) {
+      child = kIsWeb
+          ? Stack(
+              fit: StackFit.expand,
+              children: [
+                HtmlVideoView(key: ValueKey(url), url: url, fit: fit, muted: true),
+                const IgnorePointer(child: _PlayOverlay(compact: true)),
+              ],
+            )
+          : _IoVideoThumb(url: url, fit: fit);
+    } else {
+      child = NetworkPhoto(
+        url: url,
+        width: width,
+        height: height,
+        fit: fit,
+      );
+    }
+
+    if (borderRadius != null) {
+      child = ClipRRect(borderRadius: borderRadius!, child: child);
+    }
+
+    if (width != null || height != null) {
+      child = SizedBox(width: width, height: height, child: child);
+    }
+
+    return child;
+  }
 }
 
-class _SignedMediaThumbnailState extends State<SignedMediaThumbnail> {
-  VideoPlayerController? _controller;
-  bool _videoReady = false;
-  bool _videoFailed = false;
-  bool _forceVideo = false;
+class _IoVideoThumb extends StatefulWidget {
+  final String url;
+  final BoxFit fit;
 
-  bool get _treatAsVideo =>
-      widget.isVideo ||
-      _forceVideo ||
-      mediaTypeFromMetadata(pathOrUrl: widget.url) == 'video';
+  const _IoVideoThumb({required this.url, required this.fit});
+
+  @override
+  State<_IoVideoThumb> createState() => _IoVideoThumbState();
+}
+
+class _IoVideoThumbState extends State<_IoVideoThumb> {
+  VideoPlayerController? _controller;
+  bool _ready = false;
 
   @override
   void initState() {
     super.initState();
-    if (_treatAsVideo) {
-      _initVideo();
-    }
+    _init();
   }
 
   @override
-  void didUpdateWidget(covariant SignedMediaThumbnail oldWidget) {
+  void didUpdateWidget(covariant _IoVideoThumb oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.url != oldWidget.url ||
-        widget.isVideo != oldWidget.isVideo) {
-      _disposeVideo();
-      _forceVideo = false;
-      _videoReady = false;
-      _videoFailed = false;
-      if (_treatAsVideo) {
-        _initVideo();
-      } else {
-        setState(() {});
-      }
+    if (oldWidget.url != widget.url) {
+      _controller?.dispose();
+      _controller = null;
+      _ready = false;
+      _init();
     }
   }
 
-  Future<void> _initVideo() async {
+  Future<void> _init() async {
     final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
     _controller = controller;
     try {
@@ -76,96 +109,24 @@ class _SignedMediaThumbnailState extends State<SignedMediaThumbnail> {
         await controller.dispose();
         return;
       }
-      setState(() {
-        _videoReady = true;
-        _videoFailed = false;
-      });
+      setState(() => _ready = true);
     } catch (_) {
-      if (!mounted || _controller != controller) return;
-      setState(() => _videoFailed = true);
+      await controller.dispose();
+      if (mounted && _controller == controller) {
+        setState(() => _controller = null);
+      }
     }
-  }
-
-  void _disposeVideo() {
-    _controller?.dispose();
-    _controller = null;
   }
 
   @override
   void dispose() {
-    _disposeVideo();
+    _controller?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    Widget child;
-    if (_treatAsVideo) {
-      child = _buildVideoThumbnail();
-    } else {
-      child = Image.network(
-        widget.url,
-        width: widget.width,
-        height: widget.height,
-        fit: widget.fit,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return _placeholder(
-            child: const Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: FirstVueColors.gold,
-                ),
-              ),
-            ),
-          );
-        },
-        errorBuilder: (_, _, _) {
-          if (!_forceVideo && !pathHasKnownImageExtension(widget.url)) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted || _forceVideo) return;
-              setState(() => _forceVideo = true);
-              _initVideo();
-            });
-            return _placeholder(
-              child: const Center(
-                child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: FirstVueColors.teal,
-                  ),
-                ),
-              ),
-            );
-          }
-          return _placeholder(
-            child: const Icon(
-              Icons.broken_image_outlined,
-              color: Colors.white38,
-            ),
-          );
-        },
-      );
-    }
-
-    if (widget.borderRadius != null) {
-      child = ClipRRect(borderRadius: widget.borderRadius!, child: child);
-    }
-
-    if (widget.width != null || widget.height != null) {
-      child = SizedBox(width: widget.width, height: widget.height, child: child);
-    }
-
-    return child;
-  }
-
-  Widget _buildVideoThumbnail() {
-    if (_videoReady && _controller != null) {
+    if (_ready && _controller != null) {
       return Stack(
         fit: StackFit.expand,
         children: [
@@ -183,37 +144,11 @@ class _SignedMediaThumbnailState extends State<SignedMediaThumbnail> {
       );
     }
 
-    if (_videoFailed) {
-      return _placeholder(
-        child: const Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.videocam_off_outlined, color: Colors.white38, size: 28),
-            SizedBox(height: 4),
-            Text('Video', style: TextStyle(color: Colors.white38, fontSize: 10)),
-          ],
-        ),
-      );
-    }
-
-    return _placeholder(
-      child: const Center(
-        child: SizedBox(
-          width: 22,
-          height: 22,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: FirstVueColors.teal,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _placeholder({required Widget child}) {
-    return ColoredBox(
+    return const ColoredBox(
       color: FirstVueColors.elevatedSurface,
-      child: child,
+      child: Center(
+        child: Icon(Icons.play_circle_outline, color: Colors.white54, size: 36),
+      ),
     );
   }
 }
@@ -293,7 +228,7 @@ class _SignedMediaViewerDialogState extends State<_SignedMediaViewerDialog> {
   @override
   void initState() {
     super.initState();
-    if (_treatAsVideo) {
+    if (_treatAsVideo && !kIsWeb) {
       _initVideo();
     }
   }
@@ -370,7 +305,7 @@ class _SignedMediaViewerDialogState extends State<_SignedMediaViewerDialog> {
             Flexible(
               child: _treatAsVideo ? _buildVideo() : _buildImage(),
             ),
-            if (_treatAsVideo && _ready && !_failed)
+            if (!kIsWeb && _treatAsVideo && _ready && !_failed)
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: FilledButton.icon(
@@ -391,18 +326,9 @@ class _SignedMediaViewerDialogState extends State<_SignedMediaViewerDialog> {
 
   Widget _buildImage() {
     return InteractiveViewer(
-      child: Image.network(
-        widget.url,
+      child: NetworkPhoto(
+        url: widget.url,
         fit: BoxFit.contain,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return const Padding(
-            padding: EdgeInsets.all(48),
-            child: Center(
-              child: CircularProgressIndicator(color: FirstVueColors.gold),
-            ),
-          );
-        },
         errorBuilder: (_, _, _) => const Padding(
           padding: EdgeInsets.all(32),
           child: Column(
@@ -422,6 +348,21 @@ class _SignedMediaViewerDialogState extends State<_SignedMediaViewerDialog> {
   }
 
   Widget _buildVideo() {
+    if (kIsWeb) {
+      return SizedBox(
+        height: 360,
+        width: double.infinity,
+        child: HtmlVideoView(
+          url: widget.url,
+          autoplay: true,
+          controls: true,
+          looping: true,
+          muted: false,
+          fit: BoxFit.contain,
+        ),
+      );
+    }
+
     if (_failed) {
       return const Padding(
         padding: EdgeInsets.all(32),

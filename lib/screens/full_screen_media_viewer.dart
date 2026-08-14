@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../navigation/firstvue_page_route.dart';
 import '../theme/firstvue_theme.dart';
+import '../widgets/html_video_view.dart';
+import '../widgets/network_photo.dart';
 
 class FullScreenMediaItem {
   final String url;
@@ -130,8 +133,8 @@ class _FullScreenImageViewerPageState extends State<FullScreenImageViewerPage> {
                   minScale: 1,
                   maxScale: 4,
                   child: Center(
-                    child: Image.network(
-                      item.url,
+                    child: NetworkPhoto(
+                      url: item.url,
                       fit: BoxFit.contain,
                       errorBuilder: (_, _, _) => const Icon(
                         Icons.broken_image_outlined,
@@ -194,7 +197,9 @@ class _FullScreenVideoPlayerPageState extends State<FullScreenVideoPlayerPage> {
   @override
   void initState() {
     super.initState();
-    _init();
+    if (!kIsWeb) {
+      _init();
+    }
   }
 
   Future<void> _init() async {
@@ -255,16 +260,26 @@ class _FullScreenVideoPlayerPageState extends State<FullScreenVideoPlayerPage> {
         foregroundColor: Colors.white,
         title: Text(widget.title ?? 'VIDEO'),
         actions: [
-          IconButton(
-            onPressed: _ready ? _toggleMute : null,
-            icon: Icon(_muted ? Icons.volume_off : Icons.volume_up),
-          ),
+          if (!kIsWeb)
+            IconButton(
+              onPressed: _ready ? _toggleMute : null,
+              icon: Icon(_muted ? Icons.volume_off : Icons.volume_up),
+            ),
         ],
       ),
       body: Column(
         children: [
           Expanded(
-            child: GestureDetector(
+            child: kIsWeb
+                ? HtmlVideoView(
+                    url: widget.url,
+                    autoplay: true,
+                    controls: true,
+                    looping: widget.loop,
+                    muted: false,
+                    fit: BoxFit.contain,
+                  )
+                : GestureDetector(
               onTap: _togglePlay,
               child: Center(
                 child: _failed
@@ -303,7 +318,7 @@ class _FullScreenVideoPlayerPageState extends State<FullScreenVideoPlayerPage> {
               ),
             ),
           ),
-          if (_ready && c != null)
+          if (!kIsWeb && _ready && c != null)
             VideoProgressIndicator(
               c,
               allowScrubbing: true,
