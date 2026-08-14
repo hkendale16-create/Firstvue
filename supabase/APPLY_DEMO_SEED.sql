@@ -89,9 +89,7 @@ begin
     check (storage_provider in ('supabase', 's3', 'external'));
 end $$;
 
--- Wipe previous demo pack (auth delete cascades profiles + dependents).
--- Match by fixed demo UUIDs / emails too — a partial prior run can leave
--- auth.users without profiles, which would skip purge if we only look at profiles.
+-- Wipe previous demo pack thoroughly (partial runs leave auth users without profiles).
 do $$
 declare
   demo_ids uuid[] := array[
@@ -125,16 +123,47 @@ declare
 begin
   select coalesce(array_agg(id), '{}') into extra_ids
   from public.profiles
-  where is_demo = true or username like 'fvdemo_%';
+  where coalesce(is_demo, false) = true or username like 'fvdemo_%';
 
-  demo_ids := (select array_agg(distinct x) from unnest(demo_ids || extra_ids) as x);
+  demo_ids := (
+    select coalesce(array_agg(distinct x), demo_ids)
+    from unnest(demo_ids || extra_ids) as x
+  );
 
+  delete from public.community_news_post_media
+  where post_id in (
+    select id from public.community_news_posts
+    where coalesce(is_demo, false) = true or author_id = any(demo_ids)
+  );
   delete from public.community_news_posts
-  where is_demo = true or author_id = any(demo_ids);
+  where coalesce(is_demo, false) = true or author_id = any(demo_ids);
   delete from public.community_events
-  where is_demo = true or organizer_id = any(demo_ids);
+  where coalesce(is_demo, false) = true or organizer_id = any(demo_ids);
+  delete from public.business_media
+  where business_id in (
+    select id from public.businesses
+    where coalesce(is_demo, false) = true or created_by = any(demo_ids)
+  );
+  delete from public.business_locations
+  where business_id in (
+    select id from public.businesses
+    where coalesce(is_demo, false) = true or created_by = any(demo_ids)
+  );
+  delete from public.business_memberships
+  where profile_id = any(demo_ids)
+     or business_id in (
+       select id from public.businesses
+       where coalesce(is_demo, false) = true or created_by = any(demo_ids)
+     );
   delete from public.businesses
-  where is_demo = true or created_by = any(demo_ids);
+  where coalesce(is_demo, false) = true or created_by = any(demo_ids);
+  delete from public.profile_media where profile_id = any(demo_ids);
+  delete from public.community_organizers where profile_id = any(demo_ids);
+  delete from public.profiles
+  where id = any(demo_ids) or username like 'fvdemo_%';
+  delete from auth.identities
+  where user_id = any(demo_ids)
+     or user_id in (select id from auth.users where email like '%@firstvue.demo');
   delete from auth.users
   where id = any(demo_ids) or email like '%@firstvue.demo';
 end $$;
@@ -178,7 +207,16 @@ insert into _fv_demo (n, id, email, username, display_name, bio, city, state, ac
   (24, 'a0000000-0000-4000-8000-000000000024'::uuid, 'fvdemo24@firstvue.demo', 'fvdemo_kai', 'Kai Johnson', 'Creator filming day-in-the-life around town.', 'Atlanta', 'GA', 'customer'),
   (25, 'a0000000-0000-4000-8000-000000000025'::uuid, 'fvdemo25@firstvue.demo', 'fvdemo_nina', 'Nina Brooks', 'Community host connecting makers and markets.', 'Atlanta', 'GA', 'customer');
 
--- Create auth users (trigger builds profiles).
+-- Create auth users WITHOUT the signup trigger (we insert profiles ourselves).
+-- Otherwise a missing/partial trigger path leaves auth.users with no profiles.
+do $$
+begin
+  alter table auth.users disable trigger on_auth_user_created_firstvue;
+exception
+  when undefined_object then null;
+  when insufficient_privilege then null;
+end $$;
+
 insert into auth.users (
   instance_id,
   id,
@@ -224,7 +262,22 @@ select
   '',
   false
 from _fv_demo d
-on conflict (id) do nothing;
+on conflict (id) do update
+set
+  email = excluded.email,
+  encrypted_password = excluded.encrypted_password,
+  email_confirmed_at = coalesce(auth.users.email_confirmed_at, excluded.email_confirmed_at),
+  raw_app_meta_data = excluded.raw_app_meta_data,
+  raw_user_meta_data = excluded.raw_user_meta_data,
+  updated_at = now();
+
+do $$
+begin
+  alter table auth.users enable trigger on_auth_user_created_firstvue;
+exception
+  when undefined_object then null;
+  when insufficient_privilege then null;
+end $$;
 
 -- Identities required for GoTrue email login.
 delete from auth.identities
@@ -255,27 +308,78 @@ select
   now()
 from _fv_demo d;
 
--- Enrich profiles.
-update public.profiles p
+-- Explicitly create/update profiles (do not rely on auth trigger).
+insert into public.profiles (
+  id,
+  display_name,
+  username,
+  bio,
+  city,
+  state,
+  account_type,
+  is_private,
+  profile_visibility,
+  is_demo,
+  terms_accepted_at,
+  privacy_accepted_at,
+  updated_at
+)
+select
+  d.id,
+  d.display_name,
+  d.username,
+  d.bio,
+  d.city,
+  d.state,
+  d.account_type,
+  false,
+  'public',
+  true,
+  now(),
+  now(),
+  now()
+from _fv_demo d
+on conflict (id) do update
 set
-  display_name = d.display_name,
-  username = d.username,
-  bio = d.bio,
-  city = d.city,
-  state = d.state,
-  account_type = d.account_type,
+  display_name = excluded.display_name,
+  username = excluded.username,
+  bio = excluded.bio,
+  city = excluded.city,
+  state = excluded.state,
+  account_type = excluded.account_type,
   is_private = false,
   profile_visibility = 'public',
   is_demo = true,
-  terms_accepted_at = coalesce(p.terms_accepted_at, now()),
-  privacy_accepted_at = coalesce(p.privacy_accepted_at, now()),
-  updated_at = now()
-from _fv_demo d
-where p.id = d.id;
+  terms_accepted_at = coalesce(public.profiles.terms_accepted_at, excluded.terms_accepted_at),
+  privacy_accepted_at = coalesce(public.profiles.privacy_accepted_at, excluded.privacy_accepted_at),
+  updated_at = now();
 
--- Organizers for event hosts.
+-- Hard stop if profiles did not land (prevents the organizers FK error).
+do $$
+declare
+  profile_count int;
+  auth_count int;
+begin
+  select count(*) into auth_count from auth.users where id in (select id from _fv_demo);
+  select count(*) into profile_count from public.profiles where id in (select id from _fv_demo);
+  if auth_count < 25 then
+    raise exception
+      'Demo seed aborted: expected 25 auth.users, found %. Check auth.users insert permissions.',
+      auth_count;
+  end if;
+  if profile_count < 25 then
+    raise exception
+      'Demo seed aborted: expected 25 profiles, found %. Organizers were not inserted.',
+      profile_count;
+  end if;
+end $$;
+
+-- Organizers for event hosts (only rows that definitely exist in profiles).
 insert into public.community_organizers (profile_id)
-select d.id from _fv_demo d where d.n in (12, 13, 14, 20, 21, 25)
+select d.id
+from _fv_demo d
+join public.profiles p on p.id = d.id
+where d.n in (12, 13, 14, 20, 21, 25)
 on conflict (profile_id) do nothing;
 
 
