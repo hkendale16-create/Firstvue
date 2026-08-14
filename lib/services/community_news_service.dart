@@ -638,8 +638,8 @@ class CommunityNewsService {
       final rows = await _selectPosts((query) {
         var q = query
             .eq('author_id', me.id)
-            .filter('business_id', 'is', null)
-            .filter('professional_profile_id', 'is', null)
+            .isFilter('business_id', null)
+            .isFilter('professional_profile_id', null)
             .order('created_at', ascending: false)
             .limit(limit);
         if (beforeCreatedAt != null) {

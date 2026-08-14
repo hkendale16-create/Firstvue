@@ -175,21 +175,16 @@ class DiscoveryFeedService {
             // full-resolution video just to paint the mosaic.
             final thumbReadPath =
                 thumbPath ?? (mediaType == 'video' ? null : storagePath);
-            if (thumbReadPath == null || thumbReadPath.isEmpty) {
-              // Skip videos without a usable thumbnail in the discovery grid.
-              if (mediaType == 'video') return null;
-            }
-            final mediaReadPath = storagePath;
             final gridPath = thumbReadPath ?? storagePath;
             final mediaUrl = await MediaStorageService.createReadUrl(
               bucket: MediaBucket.business,
-              path: mediaReadPath,
+              path: storagePath,
               provider: provider,
               context: {'business_id': businessId},
             ).timeout(const Duration(seconds: 8), onTimeout: () => '');
             if (mediaUrl.isEmpty) return null;
             String? thumbnailUrl;
-            if (gridPath != mediaReadPath) {
+            if (gridPath != storagePath) {
               thumbnailUrl = await MediaStorageService.createReadUrl(
                 bucket: MediaBucket.business,
                 path: gridPath,
@@ -265,50 +260,50 @@ class DiscoveryFeedService {
 
       return await Future.wait(
         rows.map((row) async {
-          final profileId = row['profile_id'] as String;
-          final displayName = profileNames[profileId] ?? 'FirstVue member';
-          final mediaType = (row['media_type'] as String?) ?? 'image';
-          final storagePath = row['storage_path'] as String;
-          final provider = MediaStorageProvider.parse(
-            row['storage_provider'] as String?,
-          );
-          final mediaUrl = await MediaStorageService.createReadUrl(
-            bucket: MediaBucket.profile,
-            path: storagePath,
-            provider: provider,
-            context: {'profile_id': profileId},
-          );
-          if (mediaUrl.isEmpty) {
-            return null;
-          }
-          // Avoid downloading full video for mosaic when no thumb exists.
-          if (mediaType == 'video') {
-            return null;
-          }
-          final role = (row['media_role'] as String?) ?? 'gallery';
-          final caption = switch (role) {
-            'avatar' => 'Profile photo',
-            'cover' => 'Cover photo',
-            _ => 'Member spotlight on Vue',
-          };
+          try {
+            final profileId = row['profile_id'] as String;
+            final displayName = profileNames[profileId] ?? 'FirstVue member';
+            final mediaType = (row['media_type'] as String?) ?? 'image';
+            final storagePath = row['storage_path'] as String;
+            final provider = MediaStorageProvider.parse(
+              row['storage_provider'] as String?,
+            );
+            final mediaUrl = await MediaStorageService.createReadUrl(
+              bucket: MediaBucket.profile,
+              path: storagePath,
+              provider: provider,
+              context: {'profile_id': profileId},
+            );
+            if (mediaUrl.isEmpty) {
+              return null;
+            }
+            final role = (row['media_role'] as String?) ?? 'gallery';
+            final caption = switch (role) {
+              'avatar' => 'Profile photo',
+              'cover' => 'Cover photo',
+              _ => 'Member spotlight on Vue',
+            };
 
-          return DiscoveryFeedItem(
-            mediaId: row['id'] as String,
-            businessId: '',
-            businessName: displayName,
-            businessType: 'FirstVue member',
-            ownerId: profileId,
-            ownerName: displayName,
-            caption: caption,
-            mediaType: mediaType,
-            mediaUrl: mediaUrl,
-            thumbnailUrl: mediaUrl,
-            verified: false,
-            sponsored: false,
-            rating: 0,
-            services: const [],
-            source: VueFeedSource.member,
-          );
+            return DiscoveryFeedItem(
+              mediaId: row['id'] as String,
+              businessId: '',
+              businessName: displayName,
+              businessType: 'FirstVue member',
+              ownerId: profileId,
+              ownerName: displayName,
+              caption: caption,
+              mediaType: mediaType,
+              mediaUrl: mediaUrl,
+              thumbnailUrl: mediaType == 'video' ? null : mediaUrl,
+              verified: false,
+              sponsored: false,
+              rating: 0,
+              services: const [],
+              source: VueFeedSource.member,
+            );
+          } catch (_) {
+            return null;
+          }
         }),
       ).then((rows) => rows.whereType<DiscoveryFeedItem>().toList());
     } catch (_) {
@@ -390,7 +385,6 @@ class DiscoveryFeedService {
           ),
         );
         final mediaType = (chosen['media_type'] as String?) ?? 'image';
-        if (mediaType == 'video') continue;
         if (url.isEmpty) continue;
         final authorId = row['author_id'] as String;
         items.add(
@@ -404,7 +398,7 @@ class DiscoveryFeedService {
             caption: (row['body'] as String?) ?? '',
             mediaType: mediaType,
             mediaUrl: url,
-            thumbnailUrl: url,
+            thumbnailUrl: mediaType == 'video' ? null : url,
             verified: false,
             sponsored: false,
             rating: 0,

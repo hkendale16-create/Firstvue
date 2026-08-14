@@ -41,7 +41,12 @@ class MediaStorageService {
       }
     }
 
-    return _client.storage.from(bucket.id).createSignedUrl(path, 3600);
+    try {
+      return await _client.storage.from(bucket.id).createSignedUrl(path, 3600);
+    } catch (_) {
+      // Missing object or storage RLS — callers treat empty as "no media".
+      return '';
+    }
   }
 
   static Future<MediaUploadResult> uploadBytes({

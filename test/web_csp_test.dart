@@ -26,6 +26,15 @@ void main() {
     expect(csp, contains("worker-src 'self' blob:"));
   });
 
+  test('CSP connect-src allows Flutter to fetch Supabase media over HTTPS', () {
+    expect(csp, contains('connect-src'));
+    expect(
+      csp.contains('https:') || csp.contains('https://*.storage.supabase.co'),
+      isTrue,
+      reason: 'CanvasKit loads photos via fetch(); img-src https: is not enough',
+    );
+  });
+
   test('web builds ship local CanvasKit instead of the gstatic CDN', () {
     expect(buildWebSh, contains('--no-web-resources-cdn'));
     expect(bootstrap, contains("canvasKitBaseUrl: 'canvaskit/'"));
