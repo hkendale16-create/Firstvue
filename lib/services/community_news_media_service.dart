@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/media_config.dart';
 import 'media_type_helpers.dart';
 import 'media_storage_service.dart';
+import 'role_media_replace.dart';
 
 class CommunityNewsMediaItem {
   final String id;
@@ -132,23 +133,15 @@ class CommunityNewsMediaService {
     final items = <CommunityNewsMediaItem>[];
     for (var index = 0; index < files.length; index++) {
       final file = files[index];
-      final bytes = await file.readAsBytes();
-      if (bytes.isEmpty) {
-        throw const StorageException('Selected file is empty.');
-      }
-      if (bytes.length > _maxMediaBytes) {
-        throw const StorageException(
-          'Each photo or video must be 50 MB or smaller.',
-        );
-      }
-
-      final mediaType = mediaTypeForFile(file, bytes: bytes);
-      final contentType = mimeTypeForFile(file, mediaType);
+      final validated = await RoleMediaReplace.readValidatedBytes(
+        file,
+        maxBytes: _maxMediaBytes,
+      );
       final uploadResult = await _uploadWithFallback(
         postId: postId,
-        bytes: bytes,
-        contentType: contentType,
-        fileName: file.name,
+        bytes: validated.bytes,
+        contentType: validated.contentType,
+        fileName: validated.fileName,
         index: index,
       );
 
@@ -161,7 +154,7 @@ class CommunityNewsMediaService {
                 'post_id': postId,
                 'storage_path': uploadResult.upload.path,
                 'storage_provider': uploadResult.upload.provider.value,
-                'media_type': mediaType,
+                'media_type': validated.mediaType,
                 'sort_order': index,
                 'storage_bucket': uploadResult.bucket.id,
               })
@@ -176,7 +169,7 @@ class CommunityNewsMediaService {
                 'post_id': postId,
                 'storage_path': uploadResult.upload.path,
                 'storage_provider': uploadResult.upload.provider.value,
-                'media_type': mediaType,
+                'media_type': validated.mediaType,
                 'sort_order': index,
               })
               .select('id, storage_path, storage_provider, media_type')
@@ -188,7 +181,7 @@ class CommunityNewsMediaService {
             id: row['id'] as String,
             storagePath: uploadResult.upload.path,
             storageProvider: uploadResult.upload.provider,
-            mediaType: mediaType,
+            mediaType: validated.mediaType,
             storageBucket: uploadResult.bucket,
             signedUrl: await MediaStorageService.createReadUrl(
               bucket: uploadResult.bucket,

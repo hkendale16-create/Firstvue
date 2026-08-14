@@ -237,7 +237,7 @@ class BusinessMediaService {
       bucket: MediaBucket.business,
       bytes: validated.bytes,
       contentType: validated.contentType,
-      fileName: file.name,
+      fileName: validated.fileName,
       index: 0,
       subfolder: subfolder,
       context: {'business_id': businessId},
@@ -307,23 +307,15 @@ class BusinessMediaService {
     required String mediaRole,
     required String? subfolder,
   }) async {
-    final bytes = await file.readAsBytes();
-    if (bytes.isEmpty) {
-      throw const StorageException('Selected file is empty.');
-    }
-    if (bytes.length > _maxMediaBytes) {
-      throw const StorageException(
-        'Each photo or video must be 50 MB or smaller.',
-      );
-    }
-
-    final mediaType = mediaTypeForFile(file, bytes: bytes);
-    final contentType = mimeTypeForFile(file, mediaType);
+    final validated = await RoleMediaReplace.readValidatedBytes(
+      file,
+      maxBytes: _maxMediaBytes,
+    );
     final upload = await MediaStorageService.uploadBytes(
       bucket: MediaBucket.business,
-      bytes: bytes,
-      contentType: contentType,
-      fileName: file.name,
+      bytes: validated.bytes,
+      contentType: validated.contentType,
+      fileName: validated.fileName,
       index: index,
       subfolder: subfolder,
       context: {'business_id': businessId},
@@ -333,7 +325,7 @@ class BusinessMediaService {
       'business_id': businessId,
       'storage_path': upload.path,
       'storage_provider': upload.provider.value,
-      'media_type': mediaType,
+      'media_type': validated.mediaType,
       'sort_order': sortOrder,
       'media_role': mediaRole,
     };
