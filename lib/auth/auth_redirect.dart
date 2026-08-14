@@ -12,15 +12,20 @@ const kPublicAuthRoutes = {
   '/reset-password',
   '/auth/callback',
   '/auth/confirm',
+  '/terms',
+  '/privacy',
 };
 
 bool isPublicAuthRoute(String? name) {
   if (name == null || name.isEmpty) return true;
   final path = Uri.tryParse(name)?.path ?? name;
   if (kPublicAuthRoutes.contains(path)) return true;
-  // Hash or query auth callbacks from Supabase.
-  if (path.startsWith('/auth/')) return true;
-  return false;
+  return path.startsWith('/auth/');
+}
+
+bool isLegalRoute(String? name) {
+  final path = Uri.tryParse(name ?? '')?.path ?? name ?? '';
+  return path == '/terms' || path == '/privacy';
 }
 
 bool shouldRedirectSignedOutToSignIn(String? routeName) {
@@ -56,39 +61,38 @@ const kAllowedAuthRedirectHosts = {
 String? sanitizeAuthRedirect(String? raw) {
   if (raw == null) return null;
   final trimmed = raw.trim();
-  if (trimmed.isEmpty) return null;
-  if (trimmed.startsWith('//')) return null;
+  if (trimmed.isEmpty || trimmed.startsWith('//')) return null;
   final uri = Uri.tryParse(trimmed);
   if (uri == null) return null;
   if (uri.hasScheme) {
     final origin = Uri.tryParse(AppConfig.webBaseUrl);
     if (origin == null || uri.host != origin.host) return null;
     final path = uri.path.isEmpty ? '/' : uri.path;
-    if (!path.startsWith('/')) return '/$path';
     return kAllowedPostAuthRoutes.contains(path) ? path : '/';
   }
-  if (!trimmed.startsWith('/')) return null;
-  if (trimmed.contains('://')) return null;
-  final path = Uri.tryParse(trimmed)?.path ?? trimmed;
+  if (!trimmed.startsWith('/') || trimmed.contains('://')) return null;
+  final path = uri.path;
   if (kAllowedPostAuthRoutes.contains(path)) return path;
   if (isPublicAuthRoute(path)) return path;
   return null;
 }
 
-/// Absolute callback used for password reset and OAuth. Never an open redirect.
-String approvedAuthCallbackUrl() {
-  final raw = AppConfig.webBaseUrl;
-  final uri = Uri.tryParse(raw);
+/// Absolute allowlisted callback used for password recovery and OAuth.
+String approvedAuthCallbackUrl({String path = '/auth/callback'}) {
+  final safePath = path == '/reset-password' ||
+          path == '/auth/callback' ||
+          path == '/auth/confirm'
+      ? path
+      : '/auth/callback';
+  final uri = Uri.tryParse(AppConfig.webBaseUrl);
   if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
-    return 'https://firstvue.app';
+    return 'https://firstvue.app$safePath';
   }
-  if (kAllowedAuthRedirectHosts.contains(uri.host)) {
-    return uri.origin;
+  if (kAllowedAuthRedirectHosts.contains(uri.host) ||
+      (kIsWeb && uri.host == Uri.base.host)) {
+    return uri.replace(path: safePath, query: null, fragment: null).toString();
   }
-  if (kIsWeb && uri.host == Uri.base.host) {
-    return uri.origin;
-  }
-  return 'https://firstvue.app';
+  return 'https://firstvue.app$safePath';
 }
 
 enum AuthSheetMode { signIn, createAccount, forgotPassword, recovery }
@@ -99,7 +103,6 @@ AuthSheetMode authModeFromRoute(String? name) {
     '/signup' || '/register' => AuthSheetMode.createAccount,
     '/forgot-password' => AuthSheetMode.forgotPassword,
     '/reset-password' => AuthSheetMode.recovery,
-    '/auth/callback' || '/auth/confirm' => AuthSheetMode.signIn,
     _ => AuthSheetMode.signIn,
   };
 }
