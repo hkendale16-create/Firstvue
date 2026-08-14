@@ -6,17 +6,10 @@ import 'package:firstvue/widgets/fv_gold_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Widget _wrap(
-  Widget child, {
-  ThemeData? theme,
-  Size size = const Size(390, 844),
-}) {
+Widget _wrap(Widget child, {ThemeData? theme}) {
   return MaterialApp(
     theme: theme ?? FirstVueTheme.elegantDark,
-    home: MediaQuery(
-      data: MediaQueryData(size: size),
-      child: child,
-    ),
+    home: child,
   );
 }
 
