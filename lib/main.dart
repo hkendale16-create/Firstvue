@@ -417,7 +417,7 @@ class _HomeProfileAvatarState extends State<_HomeProfileAvatar> {
     final images = await ProfileMediaService.fetchProfileImages();
     if (!mounted) return;
     setState(() {
-      final url = images.avatar?.signedUrl?.trim();
+      final url = images.avatar?.signedUrl.trim();
       _avatarUrl = (url != null && url.isNotEmpty) ? url : null;
       _loading = false;
     });
