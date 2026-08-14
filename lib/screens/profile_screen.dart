@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -53,7 +55,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _statsLoading = false;
   String? _displayName;
   String? _username;
+  String? _bio;
   bool _nameLoading = false;
+  StreamSubscription<AuthState>? _authSub;
   bool _showEmailOnProfile = false;
   int _followerCount = 0;
   int _followingCount = 0;
@@ -74,6 +78,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _reloadProfile();
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((_) {
+      if (mounted) _reloadProfile();
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
+  }
+
+  void _reloadProfile() {
     _loadProfileImages();
     _loadStats();
     _loadDisplayName();
@@ -127,6 +144,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() {
           _displayName = null;
           _username = null;
+          _bio = null;
         });
       }
       return;
@@ -140,6 +158,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ? profile!.displayName!.trim()
           : user.email?.split('@').first;
       _username = username ?? profile?.username;
+      final bio = profile?.bio?.trim();
+      _bio = (bio != null && bio.isNotEmpty) ? bio : null;
       _nameLoading = false;
     });
   }
@@ -148,11 +168,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void didUpdateWidget(covariant ProfileScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.refreshToken != widget.refreshToken) {
-      _loadProfileImages();
-      _loadStats();
-      _loadDisplayName();
-      _loadPrivacy();
-      _loadManagedProfiles();
+      _reloadProfile();
     }
   }
 
@@ -170,18 +186,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
     setState(() => _statsLoading = true);
-    final results = await Future.wait([
-      CommunityNewsService.fetchMyEngagementStats(),
-      FollowService.fetchFollowerCount(user.id),
-      FollowService.fetchFollowingCount(user.id),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _stats = results[0] as ProfileEngagementStats;
-      _followerCount = results[1] as int;
-      _followingCount = results[2] as int;
-      _statsLoading = false;
-    });
+    try {
+      final results = await Future.wait([
+        CommunityNewsService.fetchMyEngagementStats(),
+        FollowService.fetchFollowerCount(user.id),
+        FollowService.fetchFollowingCount(user.id),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _stats = results[0] as ProfileEngagementStats;
+        _followerCount = results[1] as int;
+        _followingCount = results[2] as int;
+        _statsLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _statsLoading = false);
+    }
   }
 
   void _openFollowList(FollowListMode mode, String displayName) {
@@ -678,7 +699,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               SocialProfileHeader(
                 name: displayName,
                 handle: subtitle,
-                bio: 'Discovering local talent',
+                bio: _bio,
                 coverImageUrl: _profileImages.cover?.signedUrl,
                 avatarImageUrl: _profileImages.avatar?.signedUrl,
                 coverIsVideo: _profileImages.cover?.isVideo ?? false,
