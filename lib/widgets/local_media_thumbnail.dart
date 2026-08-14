@@ -18,8 +18,6 @@ class LocalMediaThumbnail extends StatelessWidget {
     this.onTap,
   });
 
-  bool get _isVideo => mediaTypeForFile(file) == 'video';
-
   @override
   Widget build(BuildContext context) {
     final child = ClipRRect(
@@ -27,45 +25,45 @@ class LocalMediaThumbnail extends StatelessWidget {
       child: SizedBox(
         width: size,
         height: size,
-        child: _isVideo ? _videoPlaceholder() : _imagePreview(),
+        child: FutureBuilder<List<int>>(
+          future: file.readAsBytes(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const ColoredBox(
+                color: Color(0xFF151B22),
+                child: Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              );
+            }
+            if (snapshot.hasError || !snapshot.hasData) {
+              return const ColoredBox(
+                color: Color(0xFF151B22),
+                child: Icon(Icons.image_outlined, color: Color(0xFFD8B56A)),
+              );
+            }
+            final bytes = snapshot.data!;
+            if (mediaTypeForFile(file, bytes: bytes) == 'video') {
+              return _videoPlaceholder();
+            }
+            return Image.memory(
+              Uint8List.fromList(bytes),
+              fit: BoxFit.cover,
+              width: size,
+              height: size,
+            );
+          },
+        ),
       ),
     );
 
     if (onTap == null) return child;
 
     return GestureDetector(onTap: onTap, child: child);
-  }
-
-  Widget _imagePreview() {
-    return FutureBuilder<List<int>>(
-      future: file.readAsBytes(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const ColoredBox(
-            color: Color(0xFF151B22),
-            child: Center(
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          );
-        }
-        if (snapshot.hasError || !snapshot.hasData) {
-          return const ColoredBox(
-            color: Color(0xFF151B22),
-            child: Icon(Icons.image_outlined, color: Color(0xFFD8B56A)),
-          );
-        }
-        return Image.memory(
-          Uint8List.fromList(snapshot.data!),
-          fit: BoxFit.cover,
-          width: size,
-          height: size,
-        );
-      },
-    );
   }
 
   Widget _videoPlaceholder() {
@@ -82,7 +80,8 @@ class LocalMediaThumbnail extends StatelessWidget {
   }
 
   static Future<void> previewLocalFile(BuildContext context, XFile file) async {
-    if (mediaTypeForFile(file) == 'video') {
+    final bytes = await file.readAsBytes();
+    if (mediaTypeForFile(file, bytes: bytes) == 'video') {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -92,7 +91,6 @@ class LocalMediaThumbnail extends StatelessWidget {
       return;
     }
 
-    final bytes = await file.readAsBytes();
     if (!context.mounted) return;
     await showDialog<void>(
       context: context,
@@ -101,7 +99,10 @@ class LocalMediaThumbnail extends StatelessWidget {
         backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.all(16),
         child: InteractiveViewer(
-          child: Image.memory(bytes, fit: BoxFit.contain),
+          child: Image.memory(
+            Uint8List.fromList(bytes),
+            fit: BoxFit.contain,
+          ),
         ),
       ),
     );

@@ -24,7 +24,9 @@ class CommunityNewsMediaItem {
     this.storageBucket = MediaBucket.communityNews,
   });
 
-  bool get isVideo => mediaType == 'video';
+  bool get isVideo =>
+      mediaTypeFromMetadata(mediaType: mediaType, pathOrUrl: storagePath) ==
+      'video';
 }
 
 class CommunityNewsMediaService {
@@ -140,7 +142,7 @@ class CommunityNewsMediaService {
         );
       }
 
-      final mediaType = mediaTypeForFile(file);
+      final mediaType = mediaTypeForFile(file, bytes: bytes);
       final contentType = mimeTypeForFile(file, mediaType);
       final uploadResult = await _uploadWithFallback(
         postId: postId,

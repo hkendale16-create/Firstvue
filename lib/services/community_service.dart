@@ -1027,7 +1027,7 @@ class CommunityMediaService {
       throw const StorageException('Group image must be 10 MB or smaller.');
     }
 
-    final mediaType = mediaTypeForFile(file);
+    final mediaType = mediaTypeForFile(file, bytes: bytes);
     if (mediaType != 'image') {
       throw const StorageException('Group profile image must be a photo.');
     }
@@ -1058,7 +1058,7 @@ class CommunityMediaService {
       throw const StorageException('Community image must be 10 MB or smaller.');
     }
 
-    final mediaType = mediaTypeForFile(file);
+    final mediaType = mediaTypeForFile(file, bytes: bytes);
     if (mediaType != 'image') {
       throw const StorageException('Community profile image must be a photo.');
     }

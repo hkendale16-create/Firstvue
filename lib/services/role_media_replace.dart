@@ -65,7 +65,11 @@ class RoleMediaReplace {
   }
 
   static Future<({Uint8List bytes, String mediaType, String contentType})>
-  readValidatedBytes(XFile file, {required int maxBytes}) async {
+  readValidatedBytes(
+    XFile file, {
+    required int maxBytes,
+    bool imagesOnly = false,
+  }) async {
     final bytes = await file.readAsBytes();
     if (bytes.isEmpty) {
       throw const StorageException('Selected file is empty.');
@@ -75,7 +79,12 @@ class RoleMediaReplace {
         'Each photo or video must be ${(maxBytes / (1024 * 1024)).round()} MB or smaller.',
       );
     }
-    final mediaType = mediaTypeForFile(file);
+    final mediaType = mediaTypeForFile(file, bytes: bytes);
+    if (imagesOnly && mediaType == 'video') {
+      throw const StorageException(
+        'Choose a photo (JPEG, PNG, WebP, GIF, or HEIC). Videos belong in Photos & Videos.',
+      );
+    }
     final contentType = mimeTypeForFile(file, mediaType);
     return (bytes: bytes, mediaType: mediaType, contentType: contentType);
   }

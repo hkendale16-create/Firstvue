@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../screens/full_screen_media_viewer.dart';
+import '../services/media_type_helpers.dart';
 import '../theme/firstvue_theme.dart';
 
 /// Thumbnail for a signed network URL — images load directly; videos show the
@@ -32,11 +33,17 @@ class _SignedMediaThumbnailState extends State<SignedMediaThumbnail> {
   VideoPlayerController? _controller;
   bool _videoReady = false;
   bool _videoFailed = false;
+  bool _forceVideo = false;
+
+  bool get _treatAsVideo =>
+      widget.isVideo ||
+      _forceVideo ||
+      mediaTypeFromMetadata(pathOrUrl: widget.url) == 'video';
 
   @override
   void initState() {
     super.initState();
-    if (widget.isVideo) {
+    if (_treatAsVideo) {
       _initVideo();
     }
   }
@@ -44,15 +51,16 @@ class _SignedMediaThumbnailState extends State<SignedMediaThumbnail> {
   @override
   void didUpdateWidget(covariant SignedMediaThumbnail oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.url != oldWidget.url || widget.isVideo != oldWidget.isVideo) {
+    if (widget.url != oldWidget.url ||
+        widget.isVideo != oldWidget.isVideo) {
       _disposeVideo();
-      if (widget.isVideo) {
+      _forceVideo = false;
+      _videoReady = false;
+      _videoFailed = false;
+      if (_treatAsVideo) {
         _initVideo();
       } else {
-        setState(() {
-          _videoReady = false;
-          _videoFailed = false;
-        });
+        setState(() {});
       }
     }
   }
@@ -92,7 +100,7 @@ class _SignedMediaThumbnailState extends State<SignedMediaThumbnail> {
   @override
   Widget build(BuildContext context) {
     Widget child;
-    if (widget.isVideo) {
+    if (_treatAsVideo) {
       child = _buildVideoThumbnail();
     } else {
       child = Image.network(
@@ -115,9 +123,33 @@ class _SignedMediaThumbnailState extends State<SignedMediaThumbnail> {
             ),
           );
         },
-        errorBuilder: (_, _, _) => _placeholder(
-          child: const Icon(Icons.broken_image_outlined, color: Colors.white38),
-        ),
+        errorBuilder: (_, _, _) {
+          if (!_forceVideo && !pathHasKnownImageExtension(widget.url)) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || _forceVideo) return;
+              setState(() => _forceVideo = true);
+              _initVideo();
+            });
+            return _placeholder(
+              child: const Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: FirstVueColors.teal,
+                  ),
+                ),
+              ),
+            );
+          }
+          return _placeholder(
+            child: const Icon(
+              Icons.broken_image_outlined,
+              color: Colors.white38,
+            ),
+          );
+        },
       );
     }
 
@@ -254,10 +286,14 @@ class _SignedMediaViewerDialogState extends State<_SignedMediaViewerDialog> {
   bool _failed = false;
   bool _playing = false;
 
+  bool get _treatAsVideo =>
+      widget.isVideo ||
+      mediaTypeFromMetadata(pathOrUrl: widget.url) == 'video';
+
   @override
   void initState() {
     super.initState();
-    if (widget.isVideo) {
+    if (_treatAsVideo) {
       _initVideo();
     }
   }
@@ -315,7 +351,7 @@ class _SignedMediaViewerDialogState extends State<_SignedMediaViewerDialog> {
                 children: [
                   Expanded(
                     child: Text(
-                      widget.title ?? (widget.isVideo ? 'VIDEO' : 'PHOTO'),
+                      widget.title ?? (_treatAsVideo ? 'VIDEO' : 'PHOTO'),
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -332,9 +368,9 @@ class _SignedMediaViewerDialogState extends State<_SignedMediaViewerDialog> {
               ),
             ),
             Flexible(
-              child: widget.isVideo ? _buildVideo() : _buildImage(),
+              child: _treatAsVideo ? _buildVideo() : _buildImage(),
             ),
-            if (widget.isVideo && _ready && !_failed)
+            if (_treatAsVideo && _ready && !_failed)
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: FilledButton.icon(

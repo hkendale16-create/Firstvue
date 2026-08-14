@@ -174,7 +174,7 @@ class StoryService {
     if (user == null) throw const AuthException('Sign in to add a Story.');
 
     final bytes = await file.readAsBytes();
-    final kind = mediaTypeForFile(file);
+    final kind = mediaTypeForFile(file, bytes: bytes);
     final contentType = mimeTypeForFile(file, kind);
     final uploaded = await MediaStorageService.uploadBytes(
       bucket: MediaBucket.profile,
