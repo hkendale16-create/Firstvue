@@ -251,7 +251,7 @@ class ProfileMediaService {
       bucket: MediaBucket.profile,
       bytes: validated.bytes,
       contentType: validated.contentType,
-      fileName: file.name,
+      fileName: validated.fileName,
       index: 0,
       subfolder: subfolder,
       context: {'profile_id': userId},
@@ -335,23 +335,15 @@ class ProfileMediaService {
     required String mediaRole,
     required String? subfolder,
   }) async {
-    final bytes = await file.readAsBytes();
-    if (bytes.isEmpty) {
-      throw const StorageException('Selected file is empty.');
-    }
-    if (bytes.length > _maxMediaBytes) {
-      throw const StorageException(
-        'Each photo or video must be 50 MB or smaller.',
-      );
-    }
-
-    final mediaType = mediaTypeForFile(file, bytes: bytes);
-    final contentType = mimeTypeForFile(file, mediaType);
+    final validated = await RoleMediaReplace.readValidatedBytes(
+      file,
+      maxBytes: _maxMediaBytes,
+    );
     final upload = await MediaStorageService.uploadBytes(
       bucket: MediaBucket.profile,
-      bytes: bytes,
-      contentType: contentType,
-      fileName: file.name,
+      bytes: validated.bytes,
+      contentType: validated.contentType,
+      fileName: validated.fileName,
       index: index,
       subfolder: subfolder,
       context: {'profile_id': userId},
@@ -361,7 +353,7 @@ class ProfileMediaService {
       'profile_id': userId,
       'storage_path': upload.path,
       'storage_provider': upload.provider.value,
-      'media_type': mediaType,
+      'media_type': validated.mediaType,
       'sort_order': sortOrder,
       'media_role': mediaRole,
     };
@@ -388,6 +380,23 @@ class ProfileMediaService {
         provider: media.storageProvider,
       );
     } catch (_) {}
+  }
+
+  /// Deletes every photo/video on the signed-in profile so a prototype
+  /// account can start over without wiping the database.
+  static Future<void> clearMyMedia() async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw const AuthException('Sign in to reset your photos.');
+    }
+
+    final rows = await _client
+        .from('profile_media')
+        .select(_selectColumns)
+        .eq('profile_id', user.id);
+    for (final row in List<Map<String, dynamic>>.from(rows as List)) {
+      await deleteMedia(await _rowToItem(row, user.id));
+    }
   }
 
   /// Batch-resolve avatar signed URLs for list UIs (profiles.avatar_url DNE).

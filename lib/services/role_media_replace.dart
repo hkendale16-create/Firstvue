@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'media_type_helpers.dart';
+import 'media_transcode.dart';
 
 /// Shared helpers for avatar/cover replace flows across entity media tables.
 class RoleMediaReplace {
@@ -64,7 +65,9 @@ class RoleMediaReplace {
     }
   }
 
-  static Future<({Uint8List bytes, String mediaType, String contentType})>
+  static Future<
+    ({Uint8List bytes, String mediaType, String contentType, String fileName})
+  >
   readValidatedBytes(
     XFile file, {
     required int maxBytes,
@@ -85,7 +88,22 @@ class RoleMediaReplace {
         'Choose a photo (JPEG, PNG, WebP, GIF, or HEIC). Videos belong in Photos & Videos.',
       );
     }
-    final contentType = mimeTypeForFile(file, mediaType);
-    return (bytes: bytes, mediaType: mediaType, contentType: contentType);
+    if (mediaType == 'image') {
+      final jpeg = jpegBytesFromStill(bytes);
+      if (jpeg != null) {
+        return (
+          bytes: jpeg,
+          mediaType: 'image',
+          contentType: 'image/jpeg',
+          fileName: jpegFileName(file.name),
+        );
+      }
+    }
+    return (
+      bytes: bytes,
+      mediaType: mediaType,
+      contentType: mimeTypeForFile(file, mediaType),
+      fileName: file.name,
+    );
   }
 }

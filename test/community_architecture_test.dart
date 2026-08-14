@@ -151,6 +151,14 @@ void main() {
         'image',
       );
       expect(mediaTypeFromMetadata(), 'image');
+      expect(
+        mediaTypeFromMetadata(
+          mediaType: 'image',
+          pathOrUrl:
+              'https://cdn.example/storage/v1/object/sign/profile-media/u/scaled_IMG_0917.png?token=abc.mov.sig',
+        ),
+        'image',
+      );
     });
   });
 
