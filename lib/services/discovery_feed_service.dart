@@ -56,10 +56,19 @@ class DiscoveryFeedService {
     int limit = 30,
     VueFeedMode mode = VueFeedMode.forYou,
   }) async {
+    const timeout = Duration(seconds: 12);
     final me = _client.auth.currentUser?.id;
-    final businessItems = await _fetchBusinessMedia(limit: limit);
-    final memberItems = await _fetchMemberProfileMedia(limit: limit);
-    final vueNews = await _fetchVueNewsPosts(limit: limit);
+    Future<List<DiscoveryFeedItem>> safe(
+      Future<List<DiscoveryFeedItem>> Function() run,
+    ) {
+      return run().timeout(timeout, onTimeout: () => const []);
+    }
+
+    final businessItems = await safe(() => _fetchBusinessMedia(limit: limit));
+    final memberItems = await safe(
+      () => _fetchMemberProfileMedia(limit: limit),
+    );
+    final vueNews = await safe(() => _fetchVueNewsPosts(limit: limit));
 
     final mine = me == null
         ? const <DiscoveryFeedItem>[]
@@ -133,46 +142,52 @@ class DiscoveryFeedService {
               (owner['display_name'] as String?) ?? 'FirstVue owner',
       };
 
-      return await Future.wait(
+      final mapped = await Future.wait(
         rows.map((row) async {
-          final business = row['businesses'] as Map<String, dynamic>;
-          final businessId = business['id'] as String;
-          final mediaType = (row['media_type'] as String?) ?? 'image';
-          final storagePath = row['storage_path'] as String;
-          final thumbPath = row['thumbnail_path'] as String?;
-          final provider = MediaStorageProvider.parse(
-            row['storage_provider'] as String?,
-          );
-          final readPath = mediaType == 'video'
-              ? storagePath
-              : (thumbPath ?? storagePath);
-          final mediaUrl = await MediaStorageService.createReadUrl(
-            bucket: MediaBucket.business,
-            path: readPath,
-            provider: provider,
-            context: {'business_id': businessId},
-          );
-          final ownerId = (business['created_by'] as String?) ?? '';
-          return DiscoveryFeedItem(
-            mediaId: row['id'] as String,
-            businessId: businessId,
-            businessName: business['name'] as String,
-            businessType:
-                (business['business_type'] as String?) ?? 'Local business',
-            ownerId: ownerId,
-            ownerName: ownerNames[ownerId] ?? business['name'] as String,
-            caption: (row['caption'] as String?) ?? 'Discover this business',
-            mediaType: mediaType,
-            mediaUrl: mediaUrl,
-            verified: business['verification_status'] == 'verified',
-            sponsored: promotedIds.contains(businessId),
-            rating: (business['average_rating'] as num?)?.toDouble() ?? 0,
-            services: List<String>.from(
-              (business['services'] as List?) ?? const [],
-            ),
-          );
+          try {
+            final business = row['businesses'] as Map<String, dynamic>;
+            final businessId = business['id'] as String;
+            final mediaType = (row['media_type'] as String?) ?? 'image';
+            final storagePath = row['storage_path'] as String;
+            final thumbPath = row['thumbnail_path'] as String?;
+            final provider = MediaStorageProvider.parse(
+              row['storage_provider'] as String?,
+            );
+            final readPath = mediaType == 'video'
+                ? storagePath
+                : (thumbPath ?? storagePath);
+            final mediaUrl = await MediaStorageService.createReadUrl(
+              bucket: MediaBucket.business,
+              path: readPath,
+              provider: provider,
+              context: {'business_id': businessId},
+            ).timeout(const Duration(seconds: 8), onTimeout: () => '');
+            if (mediaUrl.isEmpty) return null;
+            final ownerId = (business['created_by'] as String?) ?? '';
+            return DiscoveryFeedItem(
+              mediaId: row['id'] as String,
+              businessId: businessId,
+              businessName: business['name'] as String,
+              businessType:
+                  (business['business_type'] as String?) ?? 'Local business',
+              ownerId: ownerId,
+              ownerName: ownerNames[ownerId] ?? business['name'] as String,
+              caption: (row['caption'] as String?) ?? 'Discover this business',
+              mediaType: mediaType,
+              mediaUrl: mediaUrl,
+              verified: business['verification_status'] == 'verified',
+              sponsored: promotedIds.contains(businessId),
+              rating: (business['average_rating'] as num?)?.toDouble() ?? 0,
+              services: List<String>.from(
+                (business['services'] as List?) ?? const [],
+              ),
+            );
+          } catch (_) {
+            return null;
+          }
         }),
       );
+      return mapped.whereType<DiscoveryFeedItem>().toList();
     } catch (_) {
       return const [];
     }
@@ -221,47 +236,50 @@ class DiscoveryFeedService {
               (row['display_name'] as String?) ?? 'FirstVue member',
       };
 
-      return await Future.wait(rows.map((row) async {
-        final profileId = row['profile_id'] as String;
-        final embedded = row['profiles'] as Map<String, dynamic>?;
-        final displayName = embedded?['display_name'] as String? ??
-            profileNames[profileId] ??
-            'FirstVue member';
-        final mediaType = (row['media_type'] as String?) ?? 'image';
-        final storagePath = row['storage_path'] as String;
-        final provider = MediaStorageProvider.parse(
-          row['storage_provider'] as String?,
-        );
-        final mediaUrl = await MediaStorageService.createReadUrl(
-          bucket: MediaBucket.profile,
-          path: storagePath,
-          provider: provider,
-          context: {'profile_id': profileId},
-        );
-        final role = (row['media_role'] as String?) ?? 'gallery';
-        final caption = switch (role) {
-          'avatar' => 'Profile photo',
-          'cover' => 'Cover photo',
-          _ => 'Member spotlight on Vue',
-        };
+      return await Future.wait(
+        rows.map((row) async {
+          final profileId = row['profile_id'] as String;
+          final embedded = row['profiles'] as Map<String, dynamic>?;
+          final displayName =
+              embedded?['display_name'] as String? ??
+              profileNames[profileId] ??
+              'FirstVue member';
+          final mediaType = (row['media_type'] as String?) ?? 'image';
+          final storagePath = row['storage_path'] as String;
+          final provider = MediaStorageProvider.parse(
+            row['storage_provider'] as String?,
+          );
+          final mediaUrl = await MediaStorageService.createReadUrl(
+            bucket: MediaBucket.profile,
+            path: storagePath,
+            provider: provider,
+            context: {'profile_id': profileId},
+          );
+          final role = (row['media_role'] as String?) ?? 'gallery';
+          final caption = switch (role) {
+            'avatar' => 'Profile photo',
+            'cover' => 'Cover photo',
+            _ => 'Member spotlight on Vue',
+          };
 
-        return DiscoveryFeedItem(
-          mediaId: row['id'] as String,
-          businessId: '',
-          businessName: displayName,
-          businessType: 'FirstVue member',
-          ownerId: profileId,
-          ownerName: displayName,
-          caption: caption,
-          mediaType: mediaType,
-          mediaUrl: mediaUrl,
-          verified: false,
-          sponsored: false,
-          rating: 0,
-          services: const [],
-          source: VueFeedSource.member,
-        );
-      }));
+          return DiscoveryFeedItem(
+            mediaId: row['id'] as String,
+            businessId: '',
+            businessName: displayName,
+            businessType: 'FirstVue member',
+            ownerId: profileId,
+            ownerName: displayName,
+            caption: caption,
+            mediaType: mediaType,
+            mediaUrl: mediaUrl,
+            verified: false,
+            sponsored: false,
+            rating: 0,
+            services: const [],
+            source: VueFeedSource.member,
+          );
+        }),
+      );
     } catch (_) {
       return const [];
     }

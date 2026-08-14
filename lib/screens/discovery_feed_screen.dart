@@ -11,7 +11,9 @@ import 'auth_screen.dart';
 import 'business_profile_screen.dart';
 import 'create_post_screen.dart';
 import 'firstvue_business_profile_screen.dart';
+import 'full_screen_media_viewer.dart';
 import 'member_public_profile_screen.dart';
+import 'post_detail_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 enum _FeedMode { forYou, nearby, trending }
@@ -27,45 +29,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   late Future<List<DiscoveryFeedItem>> _feedFuture;
   List<_FeedItem> _feedItems = const [];
   _FeedMode _mode = _FeedMode.forYou;
-
-  static const _items = [
-    _FeedItem(
-      'Marcus Reed',
-      'Fresh skin fade in Midtown',
-      'Fades • Beard work • Designs',
-      '1.2 mi',
-      4.9,
-      328,
-      'assets/images/explore_barbers.jpg',
-      Icons.content_cut,
-      true,
-      false,
-    ),
-    _FeedItem(
-      'Velvet Room Salon',
-      'Silk press with movement and shine',
-      'Silk press • Color • Natural hair',
-      '1.6 mi',
-      4.9,
-      186,
-      'assets/images/explore_salons.jpg',
-      Icons.chair_alt_rounded,
-      true,
-      true,
-    ),
-    _FeedItem(
-      'Lumen Beauty Studio',
-      'A quick brow transformation',
-      'Skin • Brows • Makeup',
-      '1.8 mi',
-      4.8,
-      224,
-      'assets/images/explore_beauty.jpg',
-      Icons.auto_awesome,
-      false,
-      false,
-    ),
-  ];
+  String? _error;
 
   @override
   void initState() {
@@ -79,17 +43,66 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
       _FeedMode.nearby => VueFeedMode.nearby,
       _FeedMode.trending => VueFeedMode.trending,
     };
-    final items = await DiscoveryFeedService.fetchFeed(mode: mode);
-    if (!mounted) return items;
-    final mapped = _connectedItems(items);
-    setState(() {
-      _feedItems = mapped.isEmpty ? _items : mapped;
-    });
-    return items;
+    try {
+      final items = await DiscoveryFeedService.fetchFeed(
+        mode: mode,
+      ).timeout(const Duration(seconds: 20));
+      if (!mounted) return items;
+      setState(() {
+        _feedItems = _connectedItems(items);
+        _error = null;
+      });
+      return items;
+    } catch (error) {
+      if (!mounted) return const [];
+      setState(() {
+        _feedItems = const [];
+        _error = 'Unable to load VUE right now.';
+      });
+      rethrow;
+    }
   }
 
   Future<void> _refreshFeed() async {
-    await _loadFeed();
+    setState(() {
+      _error = null;
+      _feedFuture = _loadFeed();
+    });
+    try {
+      await _feedFuture;
+    } catch (_) {}
+  }
+
+  void _openMedia(_FeedItem item) {
+    final connected = item.connected;
+    if (connected?.newsPostId != null) {
+      Navigator.push(
+        context,
+        FirstVuePageRoute(
+          builder: (_) => PostDetailScreen(postId: connected!.newsPostId!),
+        ),
+      );
+      return;
+    }
+    if (item.image.startsWith('http')) {
+      if (item.mediaType == 'video') {
+        openFullScreenVideoPlayer(context, url: item.image, title: item.name);
+      } else {
+        openFullScreenImageViewer(
+          context,
+          items: [
+            FullScreenMediaItem(
+              url: item.image,
+              isVideo: false,
+              caption: item.caption,
+            ),
+          ],
+          title: item.name,
+        );
+      }
+      return;
+    }
+    _openProfile(item);
   }
 
   void _openProfile(_FeedItem item) {
@@ -145,14 +158,16 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
     try {
       if (connected != null && connected.isMember) {
         final status = await FollowService.followStatus(connected.ownerId);
-        if (status == FollowStatus.following || status == FollowStatus.pending) {
+        if (status == FollowStatus.following ||
+            status == FollowStatus.pending) {
           await FollowService.unfollow(connected.ownerId);
         } else {
           await FollowService.follow(connected.ownerId);
         }
       } else if (connected != null && connected.businessId.isNotEmpty) {
-        final following =
-            await BusinessFollowService.isFollowing(connected.businessId);
+        final following = await BusinessFollowService.isFollowing(
+          connected.businessId,
+        );
         await BusinessFollowService.toggle(
           connected.businessId,
           currentlyFollowing: following,
@@ -165,14 +180,14 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
         return;
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Follow updated')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Follow updated')));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not update follow.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not update follow.')));
     }
   }
 
@@ -230,56 +245,89 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                 ),
                 const Padding(
                   padding: EdgeInsets.fromLTRB(16, 0, 16, 10),
-                  child: SocialSearchBar(),
+                  child: SocialSearchBar(iconOnly: true),
                 ),
                 Expanded(
                   child: FutureBuilder<List<DiscoveryFeedItem>>(
                     future: _feedFuture,
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
+                      if (snapshot.connectionState == ConnectionState.waiting &&
+                          _feedItems.isEmpty) {
                         return const Center(
                           child: CircularProgressIndicator(
                             color: FirstVueColors.gold,
                           ),
                         );
                       }
-                      final items = _feedItems.isEmpty ? _items : _feedItems;
+                      if (snapshot.hasError || _error != null) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _error ?? 'Unable to load VUE right now.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: fv.secondaryText),
+                                ),
+                                const SizedBox(height: 12),
+                                FilledButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _error = null;
+                                      _feedFuture = _loadFeed();
+                                    });
+                                  },
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                      if (_feedItems.isEmpty) {
+                        return Center(
+                          child: Text(
+                            'No photos or videos to show yet.',
+                            style: TextStyle(color: fv.secondaryText),
+                          ),
+                        );
+                      }
                       return FirstVueRefreshScaffold(
                         onRefresh: _refreshFeed,
                         child: GridView.builder(
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
                           gridDelegate:
                               const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 14,
-                            crossAxisSpacing: 12,
-                            childAspectRatio: 0.72,
-                          ),
-                          itemCount: items.length,
+                                crossAxisCount: 2,
+                                mainAxisSpacing: 14,
+                                crossAxisSpacing: 12,
+                                childAspectRatio: 0.72,
+                              ),
+                          itemCount: _feedItems.length,
                           itemBuilder: (_, index) {
-                            final item = items[index];
+                            final item = _feedItems[index];
+                            final isVideo = item.mediaType == 'video';
                             return SocialPostTile(
                               handle: socialHandleFromName(item.name),
                               avatarUrl: item.connected?.mediaUrl,
-                              imageUrl:
-                                  item.connected != null ? item.image : null,
-                              assetImage:
-                                  item.connected == null ? item.image : null,
+                              imageUrl: item.image.startsWith('http')
+                                  ? item.image
+                                  : null,
+                              assetImage: item.image.startsWith('http')
+                                  ? null
+                                  : item.image,
                               likeLabel: item.reviews > 0
                                   ? '${item.reviews}'
-                                  : index.isEven
-                                      ? '2.1k'
-                                      : '843',
-                              showPlay: true,
-                              durationLabel: item.mediaType == 'video' ||
-                                      item.connected == null
-                                  ? '0:12'
                                   : null,
+                              showPlay: isVideo,
+                              durationLabel: isVideo ? '0:03' : null,
                               live: item.sponsored,
                               showOutlineFollow: true,
                               showMenu: false,
                               onFollow: () => _toggleFollow(item),
-                              onTap: () => _openProfile(item),
+                              onTap: () => _openMedia(item),
                             );
                           },
                         ),
@@ -297,9 +345,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    FirstVuePageRoute(
-                      builder: (_) => const CreatePostScreen(),
-                    ),
+                    FirstVuePageRoute(builder: (_) => const CreatePostScreen()),
                   );
                 },
                 style: FilledButton.styleFrom(

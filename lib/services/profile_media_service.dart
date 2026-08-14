@@ -44,8 +44,7 @@ class ProfileMediaService {
   static const _selectColumns =
       'id, storage_path, storage_provider, media_type, featured_for_trending, media_role';
 
-  static Future<List<ProfileMediaItem>> fetchMyMedia() =>
-      fetchGalleryMedia();
+  static Future<List<ProfileMediaItem>> fetchMyMedia() => fetchGalleryMedia();
 
   static Future<List<ProfileMediaItem>> fetchGalleryMedia() async {
     final user = _client.auth.currentUser;
@@ -256,8 +255,9 @@ class ProfileMediaService {
     );
 
     try {
-      final rpcName =
-          role == 'avatar' ? 'replace_profile_avatar' : 'replace_profile_cover';
+      final rpcName = role == 'avatar'
+          ? 'replace_profile_avatar'
+          : 'replace_profile_cover';
       await _client.rpc(
         rpcName,
         params: {
@@ -278,45 +278,16 @@ class ProfileMediaService {
         );
         rethrow;
       }
-      await _client
-          .from('profile_media')
-          .delete()
-          .eq('profile_id', userId)
-          .eq('media_role', role);
-      try {
-        await _client.from('profile_media').insert({
-          'profile_id': userId,
-          'storage_path': upload.path,
-          'storage_provider': upload.provider.value,
-          'media_type': validated.mediaType,
-          'sort_order': 0,
-          'media_role': role,
-        });
-      } catch (fallbackError) {
-        if (RoleMediaReplace.isUniqueViolation(fallbackError)) {
-          await _client
-              .from('profile_media')
-              .delete()
-              .eq('profile_id', userId)
-              .eq('media_role', role);
-          await _client.from('profile_media').insert({
-            'profile_id': userId,
-            'storage_path': upload.path,
-            'storage_provider': upload.provider.value,
-            'media_type': validated.mediaType,
-            'sort_order': 0,
-            'media_role': role,
-          });
-        } else {
-          await MediaStorageService.deleteObject(
-            bucket: MediaBucket.profile,
-            path: upload.path,
-            provider: upload.provider,
-            context: {'profile_id': userId},
-          );
-          rethrow;
-        }
-      }
+      await RoleMediaReplace.upsertInPlace(
+        client: _client,
+        table: 'profile_media',
+        ownerColumn: 'profile_id',
+        ownerId: userId,
+        role: role,
+        storagePath: upload.path,
+        storageProvider: upload.provider.value,
+        mediaType: validated.mediaType,
+      );
     } catch (error) {
       await MediaStorageService.deleteObject(
         bucket: MediaBucket.profile,

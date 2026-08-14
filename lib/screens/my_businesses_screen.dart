@@ -7,6 +7,7 @@ import '../services/business_media_service.dart';
 import '../services/business_menu_service.dart';
 import '../services/business_social_links_service.dart';
 import '../services/business_submission_service.dart';
+import '../services/entity_deletion_service.dart';
 import '../services/entity_details_service.dart';
 import '../widgets/editable_media_grid.dart';
 import '../widgets/entity_details_form.dart';
@@ -64,7 +65,11 @@ class _MyBusinessesScreenState extends State<MyBusinessesScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.error_outline, color: fv.secondaryText, size: 40),
+                    Icon(
+                      Icons.error_outline,
+                      color: fv.secondaryText,
+                      size: 40,
+                    ),
                     const SizedBox(height: 12),
                     Text(
                       snapshot.error.toString(),
@@ -157,10 +162,7 @@ class _MyBusinessesScreenState extends State<MyBusinessesScreen> {
                     '${business.businessType} • ${business.status.toUpperCase()}',
                     style: TextStyle(color: fv.secondaryText),
                   ),
-                  trailing: Icon(
-                    Icons.chevron_right,
-                    color: fv.tertiaryText,
-                  ),
+                  trailing: Icon(Icons.chevron_right, color: fv.tertiaryText),
                   onTap: () async {
                     await Navigator.push(
                       context,
@@ -238,8 +240,9 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
   }
 
   Future<void> _loadEntityDetails() async {
-    final details =
-        await EntityDetailsService.fetchBusinessDetails(widget.business.id);
+    final details = await EntityDetailsService.fetchBusinessDetails(
+      widget.business.id,
+    );
     if (!mounted) return;
     setState(() => _entityDetails = details);
   }
@@ -273,8 +276,12 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
     final links = await BusinessSocialLinksService.fetchForBusiness(
       widget.business.id,
     );
-    if (BusinessMenuService.isDiningBusinessType(widget.business.businessType)) {
-      final specials = await BusinessMenuService.fetchSpecials(widget.business.id);
+    if (BusinessMenuService.isDiningBusinessType(
+      widget.business.businessType,
+    )) {
+      final specials = await BusinessMenuService.fetchSpecials(
+        widget.business.id,
+      );
       _specialLines.text = specials
           .map(
             (item) =>
@@ -294,8 +301,9 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
   }
 
   Future<void> _loadProfileImages() async {
-    final images =
-        await BusinessMediaService.fetchProfileImages(widget.business.id);
+    final images = await BusinessMediaService.fetchProfileImages(
+      widget.business.id,
+    );
     if (!mounted) return;
     setState(() => _profileImages = images);
   }
@@ -311,9 +319,9 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
       );
       await _loadProfileImages();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cover photo updated.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Cover photo updated.')));
       }
     } catch (error) {
       if (mounted) {
@@ -337,9 +345,9 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
       );
       await _loadProfileImages();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile photo updated.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Profile photo updated.')));
       }
     } catch (error) {
       if (mounted) {
@@ -394,8 +402,9 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
     _city.text = value['city']!;
     _state.text = value['state']!;
     _zip.text = value['zip']!;
-    _country.text =
-        (value['country']?.trim().isNotEmpty == true) ? value['country']! : 'US';
+    _country.text = (value['country']?.trim().isNotEmpty == true)
+        ? value['country']!
+        : 'US';
     _formattedAddress = value['formatted_address'];
     _placeId = value['place_id'];
     _latitude = double.tryParse(value['latitude'] ?? '');
@@ -428,7 +437,8 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
     super.dispose();
   }
 
-  List<({String title, String description, String price})> _parseSpecialLines() {
+  List<({String title, String description, String price})>
+  _parseSpecialLines() {
     return _specialLines.text
         .split('\n')
         .map((line) => line.trim())
@@ -442,6 +452,64 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
           );
         })
         .toList();
+  }
+
+  Future<void> _confirmPermanentDelete() async {
+    final name = widget.business.name;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          title: const Text('Permanently delete business?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'This removes $name, its posts, catalogs, inventory, and media. '
+                'Reviews and comments stay anonymized. This cannot be undone.',
+              ),
+              const SizedBox(height: 12),
+              Text('Type DELETE to confirm deleting "$name".'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(hintText: 'DELETE'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (controller.text.trim() == 'DELETE') {
+                  Navigator.pop(ctx, true);
+                }
+              },
+              child: const Text('Delete forever'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await EntityDeletionService.deleteOwnedBusiness(widget.business.id);
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$name was permanently deleted.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
   }
 
   Future<void> _save() async {
@@ -477,7 +545,9 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
         businessId: widget.business.id,
         links: links,
       );
-      if (BusinessMenuService.isDiningBusinessType(widget.business.businessType)) {
+      if (BusinessMenuService.isDiningBusinessType(
+        widget.business.businessType,
+      )) {
         await BusinessMenuService.replaceSpecials(
           businessId: widget.business.id,
           specials: _parseSpecialLines(),
@@ -524,9 +594,9 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
       );
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to add media: $error')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Unable to add media: $error')));
       }
     } finally {
       if (mounted) setState(() => _uploading = false);
@@ -617,209 +687,226 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen>
   }
 
   Widget _buildEditForm(FirstVuePalette fv) => ListView(
-        padding: const EdgeInsets.all(20),
+    padding: const EdgeInsets.all(20),
+    children: [
+      Text(
+        'PUBLIC PROFILE DETAILS',
+        style: TextStyle(
+          color: fv.primaryText,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.4,
+        ),
+      ),
+      const SizedBox(height: 14),
+      Text(
+        'Switch to Preview as user to see how customers will view your profile. Photos use saved uploads; text fields update live.',
+        style: TextStyle(color: fv.tertiaryText, fontSize: 12, height: 1.4),
+      ),
+      const SizedBox(height: 14),
+      EntityProfileMediaEditor(
+        avatarUrl: _profileImages.avatar?.signedUrl,
+        coverUrl: _profileImages.cover?.signedUrl,
+        updating: _profileMediaUpdating,
+        placeholderIcon: Icons.storefront_outlined,
+        onChangeCover: _changeCover,
+        onChangeAvatar: _changeAvatar,
+        onRemoveCover: _profileImages.cover == null ? null : _removeCover,
+        onRemoveAvatar: _profileImages.avatar == null ? null : _removeAvatar,
+      ),
+      const SizedBox(height: 24),
+      EntityDetailsForm(
+        fields: EntityDetailSchemas.forBusinessType(
+          widget.business.businessType,
+        ),
+        initialValues: _entityDetails,
+        onChanged: (values) => _entityDetails = values,
+      ),
+      const SizedBox(height: 24),
+      _Field(controller: _about, label: 'About your business', lines: 4),
+      const SizedBox(height: 12),
+      _Field(
+        controller: _services,
+        label: 'Services (separate with commas)',
+        lines: 2,
+      ),
+      const SizedBox(height: 12),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(
+          'Mark as coming soon',
+          style: TextStyle(color: fv.primaryText),
+        ),
+        subtitle: Text(
+          'Shows your business in the Coming Soon tab when enabled.',
+          style: TextStyle(color: fv.secondaryText, fontSize: 12),
+        ),
+        value: _comingSoon,
+        activeThumbColor: FirstVueColors.warmGold,
+        onChanged: (value) => setState(() => _comingSoon = value),
+      ),
+      const SizedBox(height: 12),
+      _Field(controller: _instagram, label: 'Instagram URL'),
+      const SizedBox(height: 12),
+      _Field(controller: _facebook, label: 'Facebook URL'),
+      const SizedBox(height: 12),
+      _Field(controller: _youtube, label: 'YouTube URL'),
+      if (BusinessMenuService.isDiningBusinessType(
+        widget.business.businessType,
+      )) ...[
+        const SizedBox(height: 18),
+        Text(
+          'MENU & SPECIALS',
+          style: TextStyle(
+            color: fv.primaryText,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.4,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Manage dishes with categories, photos, and availability.',
+          style: TextStyle(color: fv.secondaryText, fontSize: 12),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              FirstVuePageRoute(
+                builder: (_) => BusinessMenuEditorScreen(
+                  businessId: widget.business.id,
+                  businessName: widget.business.name,
+                ),
+              ),
+            );
+            if (mounted) setState(() => _previewToken++);
+          },
+          icon: const Icon(Icons.restaurant_menu_outlined),
+          label: const Text('OPEN MENU MANAGER'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: FirstVueColors.warmGold,
+            side: const BorderSide(color: FirstVueColors.warmGold),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Specials (one per line: Name | Price | Description)',
+          style: TextStyle(color: fv.secondaryText, fontSize: 12),
+        ),
+        const SizedBox(height: 8),
+        _Field(controller: _specialLines, label: 'Specials', lines: 4),
+      ],
+      const SizedBox(height: 18),
+      Text(
+        'ADDRESS',
+        style: TextStyle(
+          color: fv.primaryText,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.4,
+        ),
+      ),
+      const SizedBox(height: 12),
+      SmartAddressField(
+        streetController: _address,
+        unitController: _unit,
+        cityController: _city,
+        stateController: _state,
+        zipController: _zip,
+        countryController: _country,
+        onSelected: _onAddressSelected,
+      ),
+      const SizedBox(height: 24),
+      Row(
         children: [
-          Text(
-            'PUBLIC PROFILE DETAILS',
-            style: TextStyle(
-              color: fv.primaryText,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.4,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Switch to Preview as user to see how customers will view your profile. Photos use saved uploads; text fields update live.',
-            style: TextStyle(color: fv.tertiaryText, fontSize: 12, height: 1.4),
-          ),
-          const SizedBox(height: 14),
-          EntityProfileMediaEditor(
-            avatarUrl: _profileImages.avatar?.signedUrl,
-            coverUrl: _profileImages.cover?.signedUrl,
-            updating: _profileMediaUpdating,
-            placeholderIcon: Icons.storefront_outlined,
-            onChangeCover: _changeCover,
-            onChangeAvatar: _changeAvatar,
-            onRemoveCover: _profileImages.cover == null ? null : _removeCover,
-            onRemoveAvatar:
-                _profileImages.avatar == null ? null : _removeAvatar,
-          ),
-          const SizedBox(height: 24),
-          EntityDetailsForm(
-            fields: EntityDetailSchemas.forBusinessType(
-              widget.business.businessType,
-            ),
-            initialValues: _entityDetails,
-            onChanged: (values) => _entityDetails = values,
-          ),
-          const SizedBox(height: 24),
-          _Field(controller: _about, label: 'About your business', lines: 4),
-          const SizedBox(height: 12),
-          _Field(
-            controller: _services,
-            label: 'Services (separate with commas)',
-            lines: 2,
-          ),
-          const SizedBox(height: 12),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(
-              'Mark as coming soon',
-              style: TextStyle(color: fv.primaryText),
-            ),
-            subtitle: Text(
-              'Shows your business in the Coming Soon tab when enabled.',
-              style: TextStyle(color: fv.secondaryText, fontSize: 12),
-            ),
-            value: _comingSoon,
-            activeThumbColor: FirstVueColors.warmGold,
-            onChanged: (value) => setState(() => _comingSoon = value),
-          ),
-          const SizedBox(height: 12),
-          _Field(controller: _instagram, label: 'Instagram URL'),
-          const SizedBox(height: 12),
-          _Field(controller: _facebook, label: 'Facebook URL'),
-          const SizedBox(height: 12),
-          _Field(controller: _youtube, label: 'YouTube URL'),
-          if (BusinessMenuService.isDiningBusinessType(
-            widget.business.businessType,
-          )) ...[
-            const SizedBox(height: 18),
-            Text(
-              'MENU & SPECIALS',
+          Expanded(
+            child: Text(
+              'PHOTOS & VIDEOS',
               style: TextStyle(
                 color: fv.primaryText,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.4,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Manage dishes with categories, photos, and availability.',
-              style: TextStyle(color: fv.secondaryText, fontSize: 12),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  FirstVuePageRoute(
-                    builder: (_) => BusinessMenuEditorScreen(
-                      businessId: widget.business.id,
-                      businessName: widget.business.name,
-                    ),
-                  ),
-                );
-                if (mounted) setState(() => _previewToken++);
-              },
-              icon: const Icon(Icons.restaurant_menu_outlined),
-              label: const Text('OPEN MENU MANAGER'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: FirstVueColors.warmGold,
-                side: const BorderSide(color: FirstVueColors.warmGold),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Specials (one per line: Name | Price | Description)',
-              style: TextStyle(color: fv.secondaryText, fontSize: 12),
-            ),
-            const SizedBox(height: 8),
-            _Field(controller: _specialLines, label: 'Specials', lines: 4),
-          ],
-          const SizedBox(height: 18),
-          Text(
-            'ADDRESS',
-            style: TextStyle(
-              color: fv.primaryText,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.4,
-            ),
           ),
-          const SizedBox(height: 12),
-          SmartAddressField(
-            streetController: _address,
-            unitController: _unit,
-            cityController: _city,
-            stateController: _state,
-            zipController: _zip,
-            countryController: _country,
-            onSelected: _onAddressSelected,
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'PHOTOS & VIDEOS',
-                  style: TextStyle(
-                    color: fv.primaryText,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.4,
-                  ),
-                ),
-              ),
-              TextButton.icon(
-                onPressed: _uploading ? null : _showMediaPicker,
-                icon: _uploading
-                    ? const SizedBox.square(
-                        dimension: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.add_photo_alternate_outlined),
-                label: Text(_uploading ? 'UPLOADING' : 'ADD MEDIA'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          FutureBuilder<List<BusinessMediaItem>>(
-            future: _media,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return Text(
-                  'Unable to load business media.',
-                  style: TextStyle(color: fv.secondaryText),
-                );
-              }
-              if (!snapshot.hasData) {
-                return const Center(
-                  child: CircularProgressIndicator(
-                    color: FirstVueColors.warmGold,
-                  ),
-                );
-              }
-              if (snapshot.data!.isEmpty) {
-                return Text(
-                  'Add photos or videos — they appear immediately on your profile.',
-                  style: TextStyle(color: fv.secondaryText, fontSize: 12),
-                );
-              }
-              return EditableMediaGrid(
-                items: [
-                  for (final media in snapshot.data!)
-                    EditableMediaGridItem(
-                      id: media.id,
-                      signedUrl: media.signedUrl,
-                      isVideo: media.isVideo,
-                      featuredForTrending: media.featuredForTrending,
-                    ),
-                ],
-                onDelete: _deletePhotoFromGrid,
-                onSetTrendingFeatured: _setTrendingFeatured,
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _saving ? null : _save,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: FirstVueColors.warmGold,
-              foregroundColor: Colors.black,
-            ),
-            child: Text(_saving ? 'SAVING...' : 'SAVE PROFILE DETAILS'),
+          TextButton.icon(
+            onPressed: _uploading ? null : _showMediaPicker,
+            icon: _uploading
+                ? const SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.add_photo_alternate_outlined),
+            label: Text(_uploading ? 'UPLOADING' : 'ADD MEDIA'),
           ),
         ],
-      );
+      ),
+      const SizedBox(height: 10),
+      FutureBuilder<List<BusinessMediaItem>>(
+        future: _media,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Text(
+              'Unable to load business media.',
+              style: TextStyle(color: fv.secondaryText),
+            );
+          }
+          if (!snapshot.hasData) {
+            return const Center(
+              child: CircularProgressIndicator(color: FirstVueColors.warmGold),
+            );
+          }
+          if (snapshot.data!.isEmpty) {
+            return Text(
+              'Add photos or videos — they appear immediately on your profile.',
+              style: TextStyle(color: fv.secondaryText, fontSize: 12),
+            );
+          }
+          return EditableMediaGrid(
+            items: [
+              for (final media in snapshot.data!)
+                EditableMediaGridItem(
+                  id: media.id,
+                  signedUrl: media.signedUrl,
+                  isVideo: media.isVideo,
+                  featuredForTrending: media.featuredForTrending,
+                ),
+            ],
+            onDelete: _deletePhotoFromGrid,
+            onSetTrendingFeatured: _setTrendingFeatured,
+          );
+        },
+      ),
+      const SizedBox(height: 24),
+      ElevatedButton(
+        onPressed: _saving ? null : _save,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: FirstVueColors.warmGold,
+          foregroundColor: Colors.black,
+        ),
+        child: Text(_saving ? 'SAVING...' : 'SAVE PROFILE DETAILS'),
+      ),
+      const SizedBox(height: 28),
+      const Divider(),
+      const SizedBox(height: 12),
+      Text(
+        'Danger zone',
+        style: TextStyle(
+          color: fv.error,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.1,
+        ),
+      ),
+      const SizedBox(height: 8),
+      OutlinedButton(
+        onPressed: _confirmPermanentDelete,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: fv.error,
+          side: BorderSide(color: fv.error),
+        ),
+        child: const Text('Permanently delete this business'),
+      ),
+    ],
+  );
 }
 
 class _Field extends StatelessWidget {

@@ -46,8 +46,7 @@ class ProfessionalMediaService {
 
   static Future<List<ProfessionalMediaItem>> fetchMedia(
     String professionalProfileId,
-  ) =>
-      fetchGalleryMedia(professionalProfileId);
+  ) => fetchGalleryMedia(professionalProfileId);
 
   static Future<List<ProfessionalMediaItem>> fetchGalleryMedia(
     String professionalProfileId,
@@ -274,45 +273,16 @@ class ProfessionalMediaService {
         );
         rethrow;
       }
-      await _client
-          .from('professional_media')
-          .delete()
-          .eq('professional_profile_id', professionalProfileId)
-          .eq('media_role', role);
-      try {
-        await _client.from('professional_media').insert({
-          'professional_profile_id': professionalProfileId,
-          'storage_path': upload.path,
-          'storage_provider': upload.provider.value,
-          'media_type': validated.mediaType,
-          'sort_order': 0,
-          'media_role': role,
-        });
-      } catch (fallbackError) {
-        if (RoleMediaReplace.isUniqueViolation(fallbackError)) {
-          await _client
-              .from('professional_media')
-              .delete()
-              .eq('professional_profile_id', professionalProfileId)
-              .eq('media_role', role);
-          await _client.from('professional_media').insert({
-            'professional_profile_id': professionalProfileId,
-            'storage_path': upload.path,
-            'storage_provider': upload.provider.value,
-            'media_type': validated.mediaType,
-            'sort_order': 0,
-            'media_role': role,
-          });
-        } else {
-          await MediaStorageService.deleteObject(
-            bucket: MediaBucket.professional,
-            path: upload.path,
-            provider: upload.provider,
-            context: {'professional_profile_id': professionalProfileId},
-          );
-          rethrow;
-        }
-      }
+      await RoleMediaReplace.upsertInPlace(
+        client: _client,
+        table: 'professional_media',
+        ownerColumn: 'professional_profile_id',
+        ownerId: professionalProfileId,
+        role: role,
+        storagePath: upload.path,
+        storageProvider: upload.provider.value,
+        mediaType: validated.mediaType,
+      );
     } catch (_) {
       await MediaStorageService.deleteObject(
         bucket: MediaBucket.professional,

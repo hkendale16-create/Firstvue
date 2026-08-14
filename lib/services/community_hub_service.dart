@@ -425,12 +425,18 @@ class CommunityHubService {
     if (me == null) return const [];
 
     try {
-      final roleRows = await _client
-          .from('community_hub_roles')
-          .select('hub_id')
-          .eq('profile_id', me.id)
-          .eq('status', 'active')
-          .limit(limit);
+      List roleRows;
+      try {
+        roleRows = await _client
+            .from('community_hub_roles')
+            .select('hub_id')
+            .eq('profile_id', me.id)
+            .eq('status', 'active')
+            .limit(limit);
+      } catch (_) {
+        // Recursive RLS on community_hub_roles must not blank Communities.
+        roleRows = const [];
+      }
 
       final memberGroupRows = await _client
           .from('community_members')

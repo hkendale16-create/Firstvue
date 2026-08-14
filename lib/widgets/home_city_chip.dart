@@ -8,11 +8,13 @@ import 'location_autocomplete_field.dart';
 class HomeCityChip extends StatefulWidget {
   final VoidCallback? onLocationChanged;
   final bool compact;
+  final bool pinOnly;
 
   const HomeCityChip({
     super.key,
     this.onLocationChanged,
     this.compact = false,
+    this.pinOnly = false,
   });
 
   @override
@@ -45,8 +47,9 @@ class HomeCityChipState extends State<HomeCityChip> {
 
     var browseEverywhere = prefs.browseEverywhere;
     var selectedState = prefs.locationState;
-    final cityController =
-        TextEditingController(text: prefs.locationCity ?? '');
+    final cityController = TextEditingController(
+      text: prefs.locationCity ?? '',
+    );
 
     final saved = await showModalBottomSheet<bool>(
       context: context,
@@ -81,9 +84,9 @@ class HomeCityChipState extends State<HomeCityChip> {
                     Text(
                       'Choose everywhere or pick a US state and city.',
                       style: TextStyle(
-                        color: Theme.of(context)
-                            .extension<FirstVuePalette>()
-                            ?.secondaryText,
+                        color: Theme.of(
+                          context,
+                        ).extension<FirstVuePalette>()?.secondaryText,
                         fontSize: 13,
                       ),
                     ),
@@ -91,9 +94,7 @@ class HomeCityChipState extends State<HomeCityChip> {
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(
-                        browseEverywhere
-                            ? Icons.public
-                            : Icons.public_outlined,
+                        browseEverywhere ? Icons.public : Icons.public_outlined,
                         color: FirstVueColors.teal,
                       ),
                       title: const Text('Everywhere'),
@@ -112,7 +113,8 @@ class HomeCityChipState extends State<HomeCityChip> {
                     if (!browseEverywhere) ...[
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
-                        initialValue: selectedState != null &&
+                        initialValue:
+                            selectedState != null &&
                                 UsLocations.states.contains(selectedState)
                             ? selectedState
                             : null,
@@ -162,7 +164,9 @@ class HomeCityChipState extends State<HomeCityChip> {
                                 selectedState!.trim().isEmpty)) {
                           ScaffoldMessenger.of(sheetContext).showSnackBar(
                             const SnackBar(
-                              content: Text('Select a state or choose Everywhere.'),
+                              content: Text(
+                                'Select a state or choose Everywhere.',
+                              ),
                             ),
                           );
                           return;
@@ -203,15 +207,28 @@ class HomeCityChipState extends State<HomeCityChip> {
   @override
   Widget build(BuildContext context) {
     final fv = context.fv;
+    if (widget.pinOnly) {
+      return IconButton(
+        tooltip: _label ?? 'Set location',
+        onPressed: _loading ? null : _openPicker,
+        icon: Icon(
+          _label == 'Everywhere' ? Icons.public : Icons.location_on,
+          color: FirstVueColors.teal,
+        ),
+        style: IconButton.styleFrom(
+          minimumSize: const Size(44, 44),
+          tapTargetSize: MaterialTapTargetSize.padded,
+        ),
+      );
+    }
     final content = Row(
       mainAxisSize: widget.compact ? MainAxisSize.min : MainAxisSize.max,
-      mainAxisAlignment:
-          widget.compact ? MainAxisAlignment.start : MainAxisAlignment.center,
+      mainAxisAlignment: widget.compact
+          ? MainAxisAlignment.start
+          : MainAxisAlignment.center,
       children: [
         Icon(
-          _label == 'Everywhere'
-              ? Icons.public
-              : Icons.location_on_outlined,
+          _label == 'Everywhere' ? Icons.public : Icons.location_on_outlined,
           color: FirstVueColors.teal.withValues(alpha: .92),
           size: widget.compact ? 14 : 18,
         ),
@@ -255,8 +272,10 @@ class HomeCityChipState extends State<HomeCityChip> {
         highlightColor: FirstVueColors.teal.withValues(alpha: .06),
         child: widget.compact
             ? Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: fv.elevatedSurface,
                   borderRadius: BorderRadius.circular(20),

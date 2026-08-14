@@ -22,7 +22,6 @@ import 'theme/firstvue_theme.dart';
 import 'widgets/firstvue_bottom_nav.dart';
 import 'widgets/firstvue_onboarding.dart';
 import 'widgets/firstvue_refresh_scaffold.dart';
-import 'widgets/firstvue_settings_drawer.dart';
 import 'widgets/floating_messages_bubble.dart';
 import 'widgets/firstvue_animated_header_title.dart';
 import 'widgets/home_city_chip.dart';
@@ -151,9 +150,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
 
   void _openPostDetail(String postId) {
     _rootNavigatorKey.currentState?.push(
-      FirstVuePageRoute(
-        builder: (_) => PostDetailScreen(postId: postId),
-      ),
+      FirstVuePageRoute(builder: (_) => PostDetailScreen(postId: postId)),
     );
   }
 
@@ -179,9 +176,9 @@ class _FirstVueHomeState extends State<FirstVueHome> {
         _ => null,
       };
       if (message != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
       }
     });
   }
@@ -234,112 +231,98 @@ class _FirstVueHomeState extends State<FirstVueHome> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      endDrawer: const FirstVueSettingsDrawer(),
       body: Stack(
         children: [
           switch (selectedIndex) {
-        1 => FeedsScreen(refreshToken: _homeRefreshToken),
-        2 => const DiscoveryFeedScreen(),
-        3 => ExploreScreen(
+            1 => FeedsScreen(refreshToken: _homeRefreshToken),
+            2 => const DiscoveryFeedScreen(),
+            3 => ExploreScreen(
               onOpenVueFeed: () => setState(() => selectedIndex = 2),
             ),
-        4 => ProfileScreen(refreshToken: _profileRefreshToken),
-        _ => SafeArea(
-          child: FirstVueRefreshScaffold(
-            onRefresh: _refreshHomeTab,
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              children: [
-              Row(
-                children: [
-                  _HomeProfileAvatar(
-                    key: _homeAvatarKey,
-                    refreshToken: _homeRefreshToken,
-                    onTap: _openProfile,
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: _goHome,
-                      behavior: HitTestBehavior.opaque,
-                      child: Column(
-                        children: [
-                          const FirstVueAnimatedHeaderTitle(),
-                          const SizedBox(height: 4),
-                          Text(
-                            'SEE FIRST. BOOK FIRST.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: FirstVueColors.gold.withValues(alpha: .62),
-                              fontSize: 9.5,
-                              letterSpacing: 2.2,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  HomeCityChip(
-                    key: _cityChipKey,
-                    compact: true,
-                    onLocationChanged: _refreshHomeTab,
-                  ),
-                  IconButton(
-                    onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        FirstVuePageRoute(
-                          builder: (_) => const NotificationsScreen(),
-                        ),
-                      );
-                      await _refreshNotificationBadge();
-                    },
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                    icon: Stack(
-                      clipBehavior: Clip.none,
+            4 => ProfileScreen(refreshToken: _profileRefreshToken),
+            _ => SafeArea(
+              child: FirstVueRefreshScaffold(
+                onRefresh: _refreshHomeTab,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  children: [
+                    Row(
                       children: [
-                        const Icon(
-                          Icons.notifications_none_rounded,
-                          color: FirstVueColors.gold,
-                          size: 26,
+                        _HomeProfileAvatar(
+                          key: _homeAvatarKey,
+                          refreshToken: _homeRefreshToken,
+                          onTap: _openProfile,
                         ),
-                        Positioned(
-                          right: -1,
-                          top: -1,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: _notificationBadge > 0
-                                  ? FirstVueColors.coral
-                                  : Colors.transparent,
-                              shape: BoxShape.circle,
-                            ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: _goHome,
+                            behavior: HitTestBehavior.opaque,
+                            child: const FirstVueAnimatedHeaderTitle(),
+                          ),
+                        ),
+                        HomeCityChip(
+                          key: _cityChipKey,
+                          compact: true,
+                          pinOnly: true,
+                          onLocationChanged: _refreshHomeTab,
+                        ),
+                        IconButton(
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              FirstVuePageRoute(
+                                builder: (_) => const NotificationsScreen(),
+                              ),
+                            );
+                            await _refreshNotificationBadge();
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 40,
+                            minHeight: 40,
+                          ),
+                          icon: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              const Icon(
+                                Icons.notifications_none_rounded,
+                                color: FirstVueColors.gold,
+                                size: 26,
+                              ),
+                              Positioned(
+                                right: -1,
+                                top: -1,
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: _notificationBadge > 0
+                                        ? FirstVueColors.coral
+                                        : Colors.transparent,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 14),
+
+                    const SocialSearchBar(iconOnly: true),
+
+                    const SizedBox(height: 16),
+
+                    HomeDiscoverySection(refreshToken: _homeRefreshToken),
+
+                    const SizedBox(height: 12),
+                  ],
+                ),
               ),
-
-              const SizedBox(height: 14),
-
-              const SocialSearchBar(),
-
-              const SizedBox(height: 16),
-
-              HomeDiscoverySection(
-                refreshToken: _homeRefreshToken,
-              ),
-
-              const SizedBox(height: 12),
-            ],
-          ),
-        ),
-        ),
+            ),
           },
           if (selectedIndex == 0)
             FloatingMessagesBubble(key: _messagesBubbleKey),
@@ -439,12 +422,12 @@ class _HomeProfileAvatarState extends State<_HomeProfileAvatar> {
                   ),
                 )
               : avatarUrl != null
-                  ? Image.network(
-                      avatarUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => _placeholder(user),
-                    )
-                  : _placeholder(user),
+              ? Image.network(
+                  avatarUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => _placeholder(user),
+                )
+              : _placeholder(user),
         ),
       ),
     );
@@ -584,7 +567,9 @@ class _FuturisticButtonState extends State<FuturisticButton> {
                         color: Colors.white.withValues(alpha: .72),
                         fontSize: 10.5,
                         height: 1.15,
-                        shadows: const [Shadow(color: Colors.black, blurRadius: 8)],
+                        shadows: const [
+                          Shadow(color: Colors.black, blurRadius: 8),
+                        ],
                       ),
                     ),
                   ],
@@ -670,7 +655,9 @@ class ElegantSymbol extends StatelessWidget {
       child: Icon(
         icon,
         size: size * .52,
-        color: flat ? FirstVueColors.ivory : (active ? accent : FirstVueColors.ivory),
+        color: flat
+            ? FirstVueColors.ivory
+            : (active ? accent : FirstVueColors.ivory),
       ),
     );
   }

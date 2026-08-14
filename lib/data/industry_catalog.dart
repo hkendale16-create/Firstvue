@@ -1,0 +1,498 @@
+/// Centralized industry catalog and template registry.
+///
+/// Keys are stable slugs, never display text. Shared by entity setup, public
+/// profile tabs, Explore filters, search, recommendations, and analytics.
+library;
+
+enum IndustryTemplate {
+  beauty,
+  food,
+  nightlife,
+  event,
+  rental,
+  activity,
+  professional,
+  retail,
+  community,
+  general,
+}
+
+enum PricingMode { exact, startingAt, free, contact }
+
+class IndustryDefinition {
+  final String slug;
+  final String name;
+  final String? parentSlug;
+  final IndustryTemplate template;
+  final int sortOrder;
+
+  const IndustryDefinition({
+    required this.slug,
+    required this.name,
+    required this.template,
+    this.parentSlug,
+    this.sortOrder = 100,
+  });
+
+  bool get isBroad => parentSlug == null;
+}
+
+class TemplatePreview {
+  final IndustryTemplate template;
+  final List<String> tabs;
+  final List<String> modules;
+  final List<String> actions;
+
+  const TemplatePreview({
+    required this.template,
+    required this.tabs,
+    required this.modules,
+    required this.actions,
+  });
+}
+
+class TemplateChangePreview {
+  final List<String> added;
+  final List<String> hidden;
+  final List<String> retained;
+
+  const TemplateChangePreview({
+    required this.added,
+    required this.hidden,
+    required this.retained,
+  });
+}
+
+class IndustryCatalog {
+  IndustryCatalog._();
+
+  static const industries = <IndustryDefinition>[
+    IndustryDefinition(
+      slug: 'beauty-grooming',
+      name: 'Beauty & Grooming',
+      template: IndustryTemplate.beauty,
+      sortOrder: 10,
+    ),
+    IndustryDefinition(
+      slug: 'barbershop',
+      name: 'Barbershop',
+      template: IndustryTemplate.beauty,
+      parentSlug: 'beauty-grooming',
+      sortOrder: 11,
+    ),
+    IndustryDefinition(
+      slug: 'salon',
+      name: 'Salon',
+      template: IndustryTemplate.beauty,
+      parentSlug: 'beauty-grooming',
+      sortOrder: 12,
+    ),
+    IndustryDefinition(
+      slug: 'spa',
+      name: 'Spa',
+      template: IndustryTemplate.beauty,
+      parentSlug: 'beauty-grooming',
+      sortOrder: 13,
+    ),
+    IndustryDefinition(
+      slug: 'nail-salon',
+      name: 'Nail Salon',
+      template: IndustryTemplate.beauty,
+      parentSlug: 'beauty-grooming',
+      sortOrder: 14,
+    ),
+    IndustryDefinition(
+      slug: 'food-dining',
+      name: 'Food & Dining',
+      template: IndustryTemplate.food,
+      sortOrder: 20,
+    ),
+    IndustryDefinition(
+      slug: 'restaurant',
+      name: 'Restaurant',
+      template: IndustryTemplate.food,
+      parentSlug: 'food-dining',
+      sortOrder: 21,
+    ),
+    IndustryDefinition(
+      slug: 'cafe',
+      name: 'Cafe',
+      template: IndustryTemplate.food,
+      parentSlug: 'food-dining',
+      sortOrder: 22,
+    ),
+    IndustryDefinition(
+      slug: 'bakery',
+      name: 'Bakery',
+      template: IndustryTemplate.food,
+      parentSlug: 'food-dining',
+      sortOrder: 23,
+    ),
+    IndustryDefinition(
+      slug: 'nightlife',
+      name: 'Nightlife',
+      template: IndustryTemplate.nightlife,
+      sortOrder: 30,
+    ),
+    IndustryDefinition(
+      slug: 'bar',
+      name: 'Bar',
+      template: IndustryTemplate.nightlife,
+      parentSlug: 'nightlife',
+      sortOrder: 31,
+    ),
+    IndustryDefinition(
+      slug: 'lounge',
+      name: 'Lounge',
+      template: IndustryTemplate.nightlife,
+      parentSlug: 'nightlife',
+      sortOrder: 32,
+    ),
+    IndustryDefinition(
+      slug: 'events',
+      name: 'Events',
+      template: IndustryTemplate.event,
+      sortOrder: 40,
+    ),
+    IndustryDefinition(
+      slug: 'event-organizer',
+      name: 'Event Organizer',
+      template: IndustryTemplate.event,
+      parentSlug: 'events',
+      sortOrder: 41,
+    ),
+    IndustryDefinition(
+      slug: 'rentals',
+      name: 'Rentals',
+      template: IndustryTemplate.rental,
+      sortOrder: 50,
+    ),
+    IndustryDefinition(
+      slug: 'activities',
+      name: 'Activities',
+      template: IndustryTemplate.activity,
+      sortOrder: 60,
+    ),
+    IndustryDefinition(
+      slug: 'activity-provider',
+      name: 'Activity Provider',
+      template: IndustryTemplate.activity,
+      parentSlug: 'activities',
+      sortOrder: 61,
+    ),
+    IndustryDefinition(
+      slug: 'professional-services',
+      name: 'Professional Services',
+      template: IndustryTemplate.professional,
+      sortOrder: 70,
+    ),
+    IndustryDefinition(
+      slug: 'retail',
+      name: 'Retail',
+      template: IndustryTemplate.retail,
+      sortOrder: 80,
+    ),
+    IndustryDefinition(
+      slug: 'community',
+      name: 'Community',
+      template: IndustryTemplate.community,
+      sortOrder: 90,
+    ),
+    IndustryDefinition(
+      slug: 'group',
+      name: 'Group',
+      template: IndustryTemplate.community,
+      parentSlug: 'community',
+      sortOrder: 91,
+    ),
+    IndustryDefinition(
+      slug: 'general-business',
+      name: 'General Business',
+      template: IndustryTemplate.general,
+      sortOrder: 200,
+    ),
+  ];
+
+  static const _coreTabs = ['FEED', 'PHOTOS', 'REVIEWS', 'SHOUT-OUTS', 'ABOUT'];
+
+  static IndustryDefinition bySlug(String? slug) {
+    final key = (slug ?? '').trim().toLowerCase();
+    for (final item in industries) {
+      if (item.slug == key) return item;
+    }
+    return fromDisplayType(slug);
+  }
+
+  static IndustryDefinition fromDisplayType(String? display) {
+    final type = (display ?? '').toLowerCase();
+    if (type.contains('barber')) return bySlug('barbershop');
+    if (type.contains('salon') || type.contains('stylist')) {
+      return bySlug('salon');
+    }
+    if (type.contains('spa') ||
+        type.contains('nail') ||
+        type.contains('beauty')) {
+      return bySlug('spa');
+    }
+    if (type.contains('restaurant') ||
+        type.contains('food') ||
+        type.contains('dining') ||
+        type.contains('bistro') ||
+        type.contains('cater')) {
+      return bySlug('restaurant');
+    }
+    if (type.contains('cafe') ||
+        type.contains('café') ||
+        type.contains('bakery')) {
+      return bySlug('cafe');
+    }
+    if (type.contains('bar') ||
+        type.contains('lounge') ||
+        type.contains('nightlife') ||
+        type.contains('club') ||
+        type.contains('brewery') ||
+        type.contains('pub')) {
+      return bySlug('bar');
+    }
+    if (type.contains('event')) return bySlug('event-organizer');
+    if (type.contains('rental')) return bySlug('rentals');
+    if (type.contains('activit') ||
+        type.contains('attraction') ||
+        type.contains('recreation') ||
+        type.contains('experience')) {
+      return bySlug('activity-provider');
+    }
+    if (type.contains('retail') ||
+        type.contains('shop') ||
+        type.contains('store')) {
+      return bySlug('retail');
+    }
+    if (type.contains('community') || type.contains('group')) {
+      return bySlug('community');
+    }
+    return bySlug('general-business');
+  }
+
+  static TemplatePreview previewFor(IndustryTemplate template) {
+    return switch (template) {
+      IndustryTemplate.beauty => const TemplatePreview(
+        template: IndustryTemplate.beauty,
+        tabs: [
+          'SERVICES',
+          'FEED',
+          'PHOTOS',
+          'PORTFOLIO',
+          'REVIEWS',
+          'SHOUT-OUTS',
+          'ABOUT',
+        ],
+        modules: [
+          'Services',
+          'Duration',
+          'Pricing',
+          'Staff',
+          'Portfolio',
+          'Availability',
+          'Hours',
+          'Location',
+          'Policies',
+          'Reviews',
+        ],
+        actions: ['Book', 'Follow', 'Message'],
+      ),
+      IndustryTemplate.food => const TemplatePreview(
+        template: IndustryTemplate.food,
+        tabs: ['MENU', ..._coreTabs],
+        modules: [
+          'Menu',
+          'Pricing',
+          'Dietary tags',
+          'Hours',
+          'Address',
+          'Contact',
+          'Reservation link',
+        ],
+        actions: ['Order', 'Reserve', 'Follow', 'Message', 'Call'],
+      ),
+      IndustryTemplate.nightlife => const TemplatePreview(
+        template: IndustryTemplate.nightlife,
+        tabs: ['DRINKS', ..._coreTabs],
+        modules: [
+          'Drinks',
+          'Happy hour',
+          'Events',
+          'Hours',
+          'Age requirements',
+          'Reservations',
+          'Location',
+        ],
+        actions: ['Follow', 'Message', 'Reserve'],
+      ),
+      IndustryTemplate.event => const TemplatePreview(
+        template: IndustryTemplate.event,
+        tabs: _coreTabs,
+        modules: [
+          'Schedule',
+          'Venue',
+          'Host contact',
+          'Tickets',
+          'Capacity',
+          'Accessibility',
+          'Media',
+        ],
+        actions: ['Follow', 'Message', 'RSVP'],
+      ),
+      IndustryTemplate.rental => const TemplatePreview(
+        template: IndustryTemplate.rental,
+        tabs: ['PROPERTY', 'FEED', 'PHOTOS', 'REVIEWS', 'AMENITIES', 'ABOUT'],
+        modules: [
+          'Rental type',
+          'Location privacy',
+          'Pricing',
+          'Deposits',
+          'Availability',
+          'Amenities',
+          'Rules',
+          'Inquiries',
+        ],
+        actions: ['Inquire', 'Follow', 'Message'],
+      ),
+      IndustryTemplate.activity => const TemplatePreview(
+        template: IndustryTemplate.activity,
+        tabs: ['EXPERIENCES', ..._coreTabs],
+        modules: [
+          'Activity type',
+          'Schedule',
+          'Duration',
+          'Pricing',
+          'Capacity',
+          'Difficulty',
+          'Meeting location',
+        ],
+        actions: ['Book', 'Follow', 'Message'],
+      ),
+      IndustryTemplate.professional => const TemplatePreview(
+        template: IndustryTemplate.professional,
+        tabs: [
+          'SERVICES',
+          'FEED',
+          'PHOTOS',
+          'PORTFOLIO',
+          'REVIEWS',
+          'SHOUT-OUTS',
+          'ABOUT',
+        ],
+        modules: [
+          'Services',
+          'Pricing',
+          'Credentials',
+          'Specialties',
+          'Portfolio',
+          'Service area',
+        ],
+        actions: ['Consult', 'Follow', 'Message'],
+      ),
+      IndustryTemplate.retail => const TemplatePreview(
+        template: IndustryTemplate.retail,
+        tabs: ['SHOP', ..._coreTabs],
+        modules: [
+          'Collections',
+          'Products',
+          'Pricing',
+          'Inventory',
+          'Pickup',
+          'Hours',
+          'Address',
+        ],
+        actions: ['Follow', 'Message', 'Call'],
+      ),
+      IndustryTemplate.community => const TemplatePreview(
+        template: IndustryTemplate.community,
+        tabs: [
+          'FEED',
+          'PHOTOS',
+          'REVIEWS',
+          'SHOUT-OUTS',
+          'ABOUT',
+          'GROUPS',
+          'MEMBERS',
+        ],
+        modules: [
+          'About',
+          'City',
+          'Membership rules',
+          'Privacy',
+          'Leaders',
+          'Isolated feed',
+          'Events',
+        ],
+        actions: ['Join', 'Follow', 'Report'],
+      ),
+      IndustryTemplate.general => const TemplatePreview(
+        template: IndustryTemplate.general,
+        tabs: _coreTabs,
+        modules: ['About', 'Hours', 'Location', 'Contact', 'Media', 'Reviews'],
+        actions: ['Follow', 'Message'],
+      ),
+    };
+  }
+
+  static List<String> tabsFor({String? slug, String? displayType}) {
+    final def = slug != null && slug.trim().isNotEmpty
+        ? bySlug(slug)
+        : fromDisplayType(displayType);
+    return previewFor(def.template).tabs;
+  }
+
+  /// Changing industry never deletes data. This only describes UI modules.
+  static TemplateChangePreview previewChange({
+    required IndustryTemplate from,
+    required IndustryTemplate to,
+  }) {
+    final current = previewFor(from);
+    final next = previewFor(to);
+    final retained = current.modules
+        .where(next.modules.contains)
+        .toList(growable: false);
+    final hidden = current.modules
+        .where((m) => !next.modules.contains(m))
+        .toList(growable: false);
+    final added = next.modules
+        .where((m) => !current.modules.contains(m))
+        .toList(growable: false);
+    return TemplateChangePreview(
+      added: added,
+      hidden: hidden,
+      retained: retained,
+    );
+  }
+
+  static bool drinksTabAllowed(IndustryTemplate template) {
+    return template == IndustryTemplate.nightlife;
+  }
+}
+
+extension PricingModeX on PricingMode {
+  String get storageValue => switch (this) {
+    PricingMode.exact => 'exact',
+    PricingMode.startingAt => 'starting_at',
+    PricingMode.free => 'free',
+    PricingMode.contact => 'contact',
+  };
+
+  String get label => switch (this) {
+    PricingMode.exact => 'Exact',
+    PricingMode.startingAt => 'Starting at',
+    PricingMode.free => 'Free',
+    PricingMode.contact => 'Contact for price',
+  };
+
+  static PricingMode parse(String? value) {
+    return switch (value) {
+      'starting_at' => PricingMode.startingAt,
+      'free' => PricingMode.free,
+      'contact' => PricingMode.contact,
+      _ => PricingMode.exact,
+    };
+  }
+}

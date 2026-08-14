@@ -4,7 +4,6 @@ import '../navigation/firstvue_page_route.dart';
 import '../screens/communities_screen.dart';
 import '../screens/community_detail_screen.dart';
 import '../screens/community_hub_detail_screen.dart';
-import '../screens/create_community_hub_screen.dart';
 import '../screens/create_community_screen.dart';
 import '../services/community_hub_service.dart';
 import '../services/community_service.dart';
@@ -48,19 +47,46 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
       _error = null;
     });
     try {
-      final results = await Future.wait([
-        CommunityService.fetchYourCommunities(limit: 16),
-        CommunityService.fetchNearbyCommunities(limit: 16),
-        CommunityHubService.fetchYourHubs(limit: 12),
-        CommunityHubService.fetchNearbyHubs(limit: 12),
-      ]);
+      Object? firstError;
+      Future<T> safe<T>(Future<T> Function() run, T fallback) async {
+        try {
+          return await run();
+        } catch (e) {
+          firstError ??= e;
+          return fallback;
+        }
+      }
+
+      final yours = await safe(
+        () => CommunityService.fetchYourCommunities(limit: 16),
+        const <Community>[],
+      );
+      final nearbyGroups = await safe(
+        () => CommunityService.fetchNearbyCommunities(limit: 16),
+        const <Community>[],
+      );
+      final yourHubs = await safe(
+        () => CommunityHubService.fetchYourHubs(limit: 12),
+        const <CommunityHub>[],
+      );
+      final nearbyHubs = await safe(
+        () => CommunityHubService.fetchNearbyHubs(limit: 12),
+        const <CommunityHub>[],
+      );
       if (!mounted) return;
+      final failedAll =
+          yours.isEmpty &&
+          nearbyGroups.isEmpty &&
+          yourHubs.isEmpty &&
+          nearbyHubs.isEmpty &&
+          firstError != null;
       setState(() {
-        _yours = results[0] as List<Community>;
-        _nearbyGroups = results[1] as List<Community>;
-        _yourHubs = results[2] as List<CommunityHub>;
-        _nearbyHubs = results[3] as List<CommunityHub>;
+        _yours = yours;
+        _nearbyGroups = nearbyGroups;
+        _yourHubs = yourHubs;
+        _nearbyHubs = nearbyHubs;
         _loading = false;
+        _error = failedAll ? firstError.toString() : null;
       });
     } catch (error) {
       if (!mounted) return;
@@ -86,25 +112,6 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
             communityId: created.id,
             initialCommunity: created,
           ),
-        ),
-      );
-      if (mounted) await _load();
-    }
-  }
-
-  Future<void> _openCreateHub() async {
-    final created = await Navigator.push<CommunityHub>(
-      context,
-      FirstVuePageRoute(builder: (_) => const CreateCommunityHubScreen()),
-    );
-    if (created != null && mounted) {
-      await _load();
-      if (!mounted) return;
-      await Navigator.push(
-        context,
-        FirstVuePageRoute(
-          builder: (_) =>
-              CommunityHubDetailScreen(hubId: created.id, initialHub: created),
         ),
       );
       if (mounted) await _load();
@@ -208,9 +215,9 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
         else
           _GroupCircleRow(
             groups: _yours,
-            includeCreate: true,
-            emptyLabel: 'Create or join a group',
-            onCreate: _openCreateGroup,
+            includeCreate: false,
+            emptyLabel: 'Join a group to see it here',
+            onCreate: _openAll,
             onOpen: _openGroup,
             onEmptyTap: _openAll,
           ),
@@ -285,7 +292,7 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
                 ),
               ),
             ),
-            TextButton(onPressed: _openCreateHub, child: const Text('Create')),
+            TextButton(onPressed: _openAll, child: const Text('See all')),
           ],
         ),
         const SizedBox(height: 12),
@@ -298,7 +305,7 @@ class _HomeCommunitiesSectionState extends State<HomeCommunitiesSection> {
           )
         else if (_nearbyHubs.isEmpty)
           GestureDetector(
-            onTap: _openCreateHub,
+            onTap: _openAll,
             child: Text(
               'Approved Communities in your area will appear here. '
               'Community approval is separate from Community Leader approval.',

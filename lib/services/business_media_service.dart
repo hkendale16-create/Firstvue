@@ -263,45 +263,16 @@ class BusinessMediaService {
         );
         rethrow;
       }
-      await _client
-          .from('business_media')
-          .delete()
-          .eq('business_id', businessId)
-          .eq('media_role', role);
-      try {
-        await _client.from('business_media').insert({
-          'business_id': businessId,
-          'storage_path': upload.path,
-          'storage_provider': upload.provider.value,
-          'media_type': validated.mediaType,
-          'sort_order': 0,
-          'media_role': role,
-        });
-      } catch (fallbackError) {
-        if (RoleMediaReplace.isUniqueViolation(fallbackError)) {
-          await _client
-              .from('business_media')
-              .delete()
-              .eq('business_id', businessId)
-              .eq('media_role', role);
-          await _client.from('business_media').insert({
-            'business_id': businessId,
-            'storage_path': upload.path,
-            'storage_provider': upload.provider.value,
-            'media_type': validated.mediaType,
-            'sort_order': 0,
-            'media_role': role,
-          });
-        } else {
-          await MediaStorageService.deleteObject(
-            bucket: MediaBucket.business,
-            path: upload.path,
-            provider: upload.provider,
-            context: {'business_id': businessId},
-          );
-          rethrow;
-        }
-      }
+      await RoleMediaReplace.upsertInPlace(
+        client: _client,
+        table: 'business_media',
+        ownerColumn: 'business_id',
+        ownerId: businessId,
+        role: role,
+        storagePath: upload.path,
+        storageProvider: upload.provider.value,
+        mediaType: validated.mediaType,
+      );
     } catch (_) {
       await MediaStorageService.deleteObject(
         bucket: MediaBucket.business,
