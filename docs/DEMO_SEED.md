@@ -3,13 +3,16 @@
 Temporary pack so Explore, Feeds, VUE, businesses, and events look fully populated.
 All rows are marked `is_demo = true` and usernames start with `fvdemo_`.
 
+> **Important:** Refreshing the app does **not** create demo people. You must
+> run the SQL seed in Supabase once (steps below). After that, hard-refresh.
+
 ## What you get
 
 | Kind | Count | Notes |
 | --- | --- | --- |
 | People | 25 | Public profiles + avatars + gallery shots |
 | Posts | ~43 | Feed + VUE destinations with images |
-| Businesses | 5 | Approved, labeled `[DEMO]` |
+| Businesses | 5 | Verified, labeled `[DEMO]` |
 | Events | 3 | Future dates, labeled `[DEMO]` |
 
 Demo login password for every seeded auth user (optional): `FirstVueDemo!25`  
@@ -21,7 +24,8 @@ Emails: `fvdemo01@firstvue.demo` … `fvdemo25@firstvue.demo`
 2. Paste **entire** `supabase/APPLY_DEMO_SEED.sql`
 3. Run
 4. Confirm the verification query shows ~25 people, ~43 posts, 5 businesses, 3 events
-5. Refresh the live site (hard refresh on phone)
+5. (Recommended) Also run `supabase/APPLY_PROFILE_MEDIA_CAPTIONS.sql` so Explore orders newest people first
+6. Refresh the live site (hard refresh on phone)
 
 Also ship the app build that includes **external media URL** support (`MediaStorageProvider.external`), otherwise demo images will not resolve on VUE/feeds.
 

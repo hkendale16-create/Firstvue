@@ -201,9 +201,24 @@ class ExploreFeedService {
     int limit = 8,
   }) async {
     try {
-      final rows = await ProfileCards.listPublic(limit: limit * 2, excludeId: _me);
+      final rows = await ProfileCards.listPublic(limit: limit * 3, excludeId: _me);
+      // Prefer freshly created / demo pack profiles so seeded people surface
+      // even before created_at lands on profile_public_cards.
+      final sorted = [...rows]..sort((a, b) {
+        final aDemo =
+            ((a['username'] as String?) ?? '').startsWith('fvdemo_') ? 0 : 1;
+        final bDemo =
+            ((b['username'] as String?) ?? '').startsWith('fvdemo_') ? 0 : 1;
+        if (aDemo != bDemo) return aDemo.compareTo(bDemo);
+        final aCreated = a['created_at'] as String?;
+        final bCreated = b['created_at'] as String?;
+        if (aCreated != null && bCreated != null) {
+          return bCreated.compareTo(aCreated);
+        }
+        return 0;
+      });
       final byId = <String, Map<String, dynamic>>{
-        for (final row in rows)
+        for (final row in sorted)
           if (row['id'] is String) row['id'] as String: row,
       };
       final ids = byId.keys.take(limit).toList();
