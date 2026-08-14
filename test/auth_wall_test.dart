@@ -2,6 +2,7 @@ import 'package:firstvue/auth/auth_gate.dart';
 import 'package:firstvue/auth/auth_session_controller.dart';
 import 'package:firstvue/main.dart';
 import 'package:firstvue/screens/auth_screen.dart';
+import 'package:firstvue/screens/legal_policy_screen.dart';
 import 'package:firstvue/widgets/firstvue_settings_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -92,6 +93,29 @@ void main() {
     expect(find.byType(AuthScreen), findsOneWidget);
     expect(find.text('Welcome to FirstVue'), findsOneWidget);
     expect(find.text('HOME'), findsNothing);
+  });
+
+
+  testWidgets('signed-out users can open required legal pages', (tester) async {
+    final auth = AuthSessionController.test();
+    final route = generateAuthAwareRoute(
+      const RouteSettings(name: '/privacy'),
+      controller: auth,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) =>
+              (route as MaterialPageRoute<void>).builder(context),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(LegalPolicyScreen), findsOneWidget);
+    expect(find.text('PRIVACY POLICY'), findsOneWidget);
+    expect(find.byType(FirstVueHome), findsNothing);
   });
 
   testWidgets('signed-in user opening Sign in is redirected to Home', (
