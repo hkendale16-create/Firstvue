@@ -28,6 +28,6 @@ void main() {
 
   test('web builds ship local CanvasKit instead of the gstatic CDN', () {
     expect(buildWebSh, contains('--no-web-resources-cdn'));
-    expect(bootstrap, contains('useLocalCanvasKit: true'));
+    expect(bootstrap, contains("canvasKitBaseUrl: 'canvaskit/'"));
   });
 }
