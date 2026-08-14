@@ -10,6 +10,7 @@ Widget buildHtmlVideo({
   required bool looping,
   required bool muted,
   required BoxFit fit,
+  BorderRadius? borderRadius,
 }) {
   return const ColoredBox(
     color: FirstVueColors.elevatedSurface,

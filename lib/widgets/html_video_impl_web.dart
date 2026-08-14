@@ -8,6 +8,7 @@ Widget buildHtmlVideo({
   required bool looping,
   required bool muted,
   required BoxFit fit,
+  BorderRadius? borderRadius,
 }) {
   return HtmlElementView.fromTagName(
     tagName: 'video',
@@ -24,6 +25,11 @@ Widget buildHtmlVideo({
       video.style.height = '100%';
       video.style.objectFit = fit == BoxFit.contain ? 'contain' : 'cover';
       video.style.backgroundColor = '#151B22';
+      if (borderRadius != null) {
+        final r = borderRadius.topLeft.x;
+        video.style.borderRadius = '${r}px';
+        video.style.overflow = 'hidden';
+      }
       video.src = url;
     },
   );

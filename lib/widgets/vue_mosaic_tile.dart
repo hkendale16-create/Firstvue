@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/discovery_feed_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'network_avatar.dart';
 import 'network_photo.dart';
 import 'social_chrome.dart';
 
@@ -41,155 +42,155 @@ class VueMosaicTile extends StatelessWidget {
     final metaSize = featured ? 11.0 : 10.0;
     final avatarRadius = featured ? 13.0 : 11.0;
 
+    final radius = BorderRadius.circular(featured ? 6 : 3);
+
     return GestureDetector(
       onTap: onOpen,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(featured ? 6 : 3),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            _media(fv, thumbUrl),
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color(0x00000000),
-                    Color(0x00000000),
-                    Color(0x99000000),
-                  ],
-                  stops: [0, 0.45, 1],
-                ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _media(fv, thumbUrl, radius),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0x00000000),
+                  Color(0x00000000),
+                  Color(0x99000000),
+                ],
+                stops: [0, 0.45, 1],
               ),
             ),
-            if (item.liveNow)
-              const Positioned(top: 8, left: 8, child: _LiveNowBadge()),
-            if (showVideoChrome)
-              Positioned(
-                top: 8,
-                right: 8,
-                child: _VideoIndicator(durationLabel: item.durationLabel),
-              ),
+          ),
+          if (item.liveNow)
+            const Positioned(top: 8, left: 8, child: _LiveNowBadge()),
+          if (showVideoChrome)
             Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  featured ? 10 : 8,
-                  18,
-                  featured ? 10 : 8,
-                  featured ? 10 : 8,
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    GestureDetector(
-                      onTap: onOpenProfile,
-                      child: CircleAvatar(
+              top: 8,
+              right: 8,
+              child: _VideoIndicator(durationLabel: item.durationLabel),
+            ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                featured ? 10 : 8,
+                18,
+                featured ? 10 : 8,
+                featured ? 10 : 8,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  GestureDetector(
+                    onTap: onOpenProfile,
+                    child: NetworkAvatar(
+                      imageUrl:
+                          item.avatarUrl != null &&
+                              item.avatarUrl!.startsWith('http')
+                          ? item.avatarUrl
+                          : null,
+                      radius: avatarRadius,
+                      fallback: CircleAvatar(
                         radius: avatarRadius,
                         backgroundColor: fv.elevatedSurface,
-                        backgroundImage:
-                            item.avatarUrl != null &&
-                                item.avatarUrl!.startsWith('http')
-                            ? NetworkImage(item.avatarUrl!)
-                            : null,
-                        child:
-                            item.avatarUrl == null ||
-                                !item.avatarUrl!.startsWith('http')
-                            ? Icon(
-                                item.isMember
-                                    ? Icons.person_rounded
-                                    : Icons.storefront_rounded,
-                                size: featured ? 14 : 12,
-                                color: FirstVueColors.gold,
-                              )
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: onOpenProfile,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    handle.startsWith('@')
-                                        ? handle
-                                        : '@$handle',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: nameSize,
-                                      height: 1.1,
-                                      shadows: const [
-                                        Shadow(
-                                          color: Colors.black54,
-                                          blurRadius: 6,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                if (item.verified) ...[
-                                  const SizedBox(width: 3),
-                                  Icon(
-                                    Icons.verified,
-                                    color: FirstVueColors.gold,
-                                    size: featured ? 14 : 12,
-                                  ),
-                                ],
-                              ],
-                            ),
-                            if (location.isNotEmpty)
-                              Text(
-                                location,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: .86),
-                                  fontSize: metaSize,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            if (categoryLine.isNotEmpty)
-                              Text(
-                                categoryLine,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: .74),
-                                  fontSize: metaSize,
-                                ),
-                              ),
-                          ],
+                        child: Icon(
+                          item.isMember
+                              ? Icons.person_rounded
+                              : Icons.storefront_rounded,
+                          size: featured ? 14 : 12,
+                          color: FirstVueColors.gold,
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: onOpenProfile,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  handle.startsWith('@') ? handle : '@$handle',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: nameSize,
+                                    height: 1.1,
+                                    shadows: const [
+                                      Shadow(
+                                        color: Colors.black54,
+                                        blurRadius: 6,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              if (item.verified) ...[
+                                const SizedBox(width: 3),
+                                Icon(
+                                  Icons.verified,
+                                  color: FirstVueColors.gold,
+                                  size: featured ? 14 : 12,
+                                ),
+                              ],
+                            ],
+                          ),
+                          if (location.isNotEmpty)
+                            Text(
+                              location,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: .86),
+                                fontSize: metaSize,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          if (categoryLine.isNotEmpty)
+                            Text(
+                              categoryLine,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: .74),
+                                fontSize: metaSize,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _media(FirstVuePalette fv, String thumbUrl) {
+  Widget _media(FirstVuePalette fv, String thumbUrl, BorderRadius radius) {
     // Mosaic tiles stay still: cover-crop the thumbnail. Playback happens
     // in the full-screen viewer so the grid does not size tiles from video.
     if (thumbUrl.startsWith('http')) {
       return SizedBox.expand(
-        child: NetworkPhoto(url: thumbUrl, fit: BoxFit.cover),
+        child: NetworkPhoto(
+          url: thumbUrl,
+          fit: BoxFit.cover,
+          borderRadius: radius,
+        ),
       );
     }
     return ColoredBox(

@@ -7,6 +7,7 @@ import '../screens/story_composer_screen.dart';
 import '../screens/story_viewer_screen.dart';
 import '../services/story_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'network_avatar.dart';
 
 class StoriesTray extends StatefulWidget {
   final int refreshToken;
@@ -92,10 +93,7 @@ class _StoriesTrayState extends State<StoriesTray> {
           }
           final ringIndex = hasMine ? index : index - 1;
           if (_loading && _rings.isEmpty) {
-            return _StoryBubble(
-              label: 'Stories',
-              ringColor: fv.borderSubtle,
-            );
+            return _StoryBubble(label: 'Stories', ringColor: fv.borderSubtle);
           }
           final ring = _rings[ringIndex];
           return _StoryBubble(
@@ -104,9 +102,7 @@ class _StoriesTrayState extends State<StoriesTray> {
             unseen: ring.hasUnseen,
             onTap: () => _open(ringIndex),
             onLongPress: ring.isMine ? _compose : null,
-            ringColor: ring.hasUnseen
-                ? FirstVueColors.coral
-                : fv.borderSubtle,
+            ringColor: ring.hasUnseen ? FirstVueColors.coral : fv.borderSubtle,
           );
         },
       ),
@@ -149,17 +145,17 @@ class _StoryBubble extends StatelessWidget {
                 shape: BoxShape.circle,
                 border: Border.all(color: ringColor, width: 2),
               ),
-              child: CircleAvatar(
+              child: NetworkAvatar(
+                imageUrl: imageUrl,
                 radius: 28,
-                backgroundColor: fv.elevatedSurface,
-                backgroundImage:
-                    imageUrl != null ? NetworkImage(imageUrl!) : null,
-                child: imageUrl == null
-                    ? Icon(
-                        isAdd ? Icons.add : Icons.person_outline,
-                        color: fv.primaryText,
-                      )
-                    : null,
+                fallback: CircleAvatar(
+                  radius: 28,
+                  backgroundColor: fv.elevatedSurface,
+                  child: Icon(
+                    isAdd ? Icons.add : Icons.person_outline,
+                    color: fv.primaryText,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 6),

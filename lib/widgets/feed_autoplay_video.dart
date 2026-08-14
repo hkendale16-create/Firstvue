@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import '../theme/firstvue_theme.dart';
+import 'html_video_view.dart';
 
 /// Feed video that autoplays muted when mostly on screen.
 ///
@@ -56,12 +58,15 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
   @override
   void initState() {
     super.initState();
-    _initController();
+    if (!kIsWeb) {
+      _initController();
+    }
   }
 
   @override
   void didUpdateWidget(covariant FeedAutoplayVideo oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (kIsWeb) return;
     if (oldWidget.url != widget.url) {
       _disposeController();
       _previewFinished = false;
@@ -185,7 +190,7 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
   Widget build(BuildContext context) {
     Widget child = GestureDetector(onTap: widget.onTap, child: _buildContent());
 
-    if (widget.borderRadius != null) {
+    if (!kIsWeb && widget.borderRadius != null) {
       child = ClipRRect(borderRadius: widget.borderRadius!, child: child);
     }
 
@@ -205,6 +210,16 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
   }
 
   Widget _buildContent() {
+    if (kIsWeb) {
+      return HtmlVideoView(
+        url: widget.url,
+        autoplay: true,
+        muted: true,
+        looping: !widget.previewOnly,
+        fit: widget.fit,
+        borderRadius: widget.borderRadius,
+      );
+    }
     if (_failed) {
       return ColoredBox(
         color: FirstVueColors.elevatedSurface,

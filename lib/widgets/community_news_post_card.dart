@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../navigation/firstvue_page_route.dart';
@@ -718,10 +719,12 @@ class _MediaTile extends StatelessWidget {
           return Stack(
             alignment: Alignment.center,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(fullWidth ? 0 : 12),
-                child: child,
-              ),
+              kIsWeb
+                  ? child!
+                  : ClipRRect(
+                      borderRadius: BorderRadius.circular(fullWidth ? 0 : 12),
+                      child: child,
+                    ),
               if (sparkFlash.value > 0)
                 IgnorePointer(
                   child: Opacity(

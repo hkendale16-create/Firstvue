@@ -41,7 +41,13 @@ class SignedMediaThumbnail extends StatelessWidget {
           ? Stack(
               fit: StackFit.expand,
               children: [
-                HtmlVideoView(key: ValueKey(url), url: url, fit: fit, muted: true),
+                HtmlVideoView(
+                  key: ValueKey(url),
+                  url: url,
+                  fit: fit,
+                  muted: true,
+                  borderRadius: borderRadius,
+                ),
                 const IgnorePointer(child: _PlayOverlay(compact: true)),
               ],
             )
@@ -52,10 +58,11 @@ class SignedMediaThumbnail extends StatelessWidget {
         width: width,
         height: height,
         fit: fit,
+        borderRadius: kIsWeb ? borderRadius : null,
       );
     }
 
-    if (borderRadius != null) {
+    if (!kIsWeb && borderRadius != null) {
       child = ClipRRect(borderRadius: borderRadius!, child: child);
     }
 
@@ -190,11 +197,8 @@ class SignedMediaViewer {
     return showDialog<void>(
       context: context,
       barrierColor: Colors.black87,
-      builder: (ctx) => _SignedMediaViewerDialog(
-        url: url,
-        isVideo: isVideo,
-        title: title,
-      ),
+      builder: (ctx) =>
+          _SignedMediaViewerDialog(url: url, isVideo: isVideo, title: title),
     );
   }
 }
@@ -222,8 +226,7 @@ class _SignedMediaViewerDialogState extends State<_SignedMediaViewerDialog> {
   bool _playing = false;
 
   bool get _treatAsVideo =>
-      widget.isVideo ||
-      mediaTypeFromMetadata(pathOrUrl: widget.url) == 'video';
+      widget.isVideo || mediaTypeFromMetadata(pathOrUrl: widget.url) == 'video';
 
   @override
   void initState() {
@@ -302,9 +305,7 @@ class _SignedMediaViewerDialogState extends State<_SignedMediaViewerDialog> {
                 ],
               ),
             ),
-            Flexible(
-              child: _treatAsVideo ? _buildVideo() : _buildImage(),
-            ),
+            Flexible(child: _treatAsVideo ? _buildVideo() : _buildImage()),
             if (!kIsWeb && _treatAsVideo && _ready && !_failed)
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -314,7 +315,9 @@ class _SignedMediaViewerDialogState extends State<_SignedMediaViewerDialog> {
                     backgroundColor: FirstVueColors.teal,
                     foregroundColor: Colors.white,
                   ),
-                  icon: Icon(_playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                  icon: Icon(
+                    _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  ),
                   label: Text(_playing ? 'PAUSE' : 'PLAY'),
                 ),
               ),
@@ -334,7 +337,11 @@ class _SignedMediaViewerDialogState extends State<_SignedMediaViewerDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.broken_image_outlined, color: Colors.white38, size: 48),
+              Icon(
+                Icons.broken_image_outlined,
+                color: Colors.white38,
+                size: 48,
+              ),
               SizedBox(height: 12),
               Text(
                 'Unable to load this image.',

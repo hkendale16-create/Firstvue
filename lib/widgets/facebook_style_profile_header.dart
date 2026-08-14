@@ -8,11 +8,7 @@ class ProfileStatItem {
   final String value;
   final VoidCallback? onTap;
 
-  const ProfileStatItem({
-    required this.label,
-    required this.value,
-    this.onTap,
-  });
+  const ProfileStatItem({required this.label, required this.value, this.onTap});
 }
 
 class FacebookStyleProfileHeader extends StatelessWidget {
@@ -107,31 +103,33 @@ class FacebookStyleProfileHeader extends StatelessWidget {
               bottom: -44,
               child: GestureDetector(
                 onTap: onAvatarTap,
-                child: CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                  child: Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: FirstVueColors.gold,
-                    ),
-                    child: CircleAvatar(
-                      radius: 44,
-                      backgroundColor: context.fv.elevatedSurface,
-                      child: hasAvatar
-                          ? ClipOval(
-                              child: SignedMediaThumbnail(
-                                url: avatarImageUrl!,
-                                isVideo: avatarIsVideo,
-                                width: 88,
-                                height: 88,
-                                fit: BoxFit.cover,
-                              ),
-                            )
-                          : Icon(avatarIcon, color: FirstVueColors.teal, size: 42),
-                    ),
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    border: Border.all(color: FirstVueColors.gold, width: 3),
                   ),
+                  child: hasAvatar
+                      ? SignedMediaThumbnail(
+                          url: avatarImageUrl!,
+                          isVideo: avatarIsVideo,
+                          width: 94,
+                          height: 94,
+                          fit: BoxFit.cover,
+                          borderRadius: BorderRadius.circular(47),
+                        )
+                      : CircleAvatar(
+                          radius: 47,
+                          backgroundColor: context.fv.elevatedSurface,
+                          child: Icon(
+                            avatarIcon,
+                            color: FirstVueColors.teal,
+                            size: 42,
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -161,12 +159,16 @@ class FacebookStyleProfileHeader extends StatelessWidget {
               if (statusLabel != null) ...[
                 const SizedBox(height: 10),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: .15),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: statusColor.withValues(alpha: .5)),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: .5),
+                    ),
                   ),
                   child: Text(
                     statusLabel!,
@@ -241,10 +243,7 @@ class _StatColumn extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           stat.label,
-          style: TextStyle(
-            color: context.fv.tertiaryText,
-            fontSize: 12,
-          ),
+          style: TextStyle(color: context.fv.tertiaryText, fontSize: 12),
         ),
       ],
     );
@@ -294,7 +293,9 @@ class ProfileViewSection extends StatelessWidget {
           Container(
             width: double.infinity,
             decoration: BoxDecoration(
-              color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
+              color:
+                  Theme.of(context).extension<FirstVuePalette>()?.surface ??
+                  FirstVueColors.surface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: context.fv.borderSubtle),
             ),
@@ -303,11 +304,7 @@ class ProfileViewSection extends StatelessWidget {
                 for (var i = 0; i < children.length; i++) ...[
                   children[i],
                   if (i < children.length - 1)
-                    Divider(
-                      height: 1,
-                      indent: 16,
-                      color: context.fv.divider,
-                    ),
+                    Divider(height: 1, indent: 16, color: context.fv.divider),
                 ],
               ],
             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/firstvue_theme.dart';
+import 'network_photo.dart';
 
 /// True circular group/community profile image with optional ring.
 class GroupCircleAvatar extends StatelessWidget {
@@ -32,10 +33,7 @@ class GroupCircleAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
-          colors: [
-            ring.withValues(alpha: .95),
-            ring.withValues(alpha: .35),
-          ],
+          colors: [ring.withValues(alpha: .95), ring.withValues(alpha: .35)],
         ),
       ),
       child: Container(
@@ -45,27 +43,17 @@ class GroupCircleAvatar extends StatelessWidget {
           color: Color(0xFF080B0F),
         ),
         padding: const EdgeInsets.all(2),
-        child: ClipOval(
-          child: SizedBox(
-            width: size - 9,
-            height: size - 9,
-            child: hasImage
-                ? Image.network(
-                    imageUrl!,
-                    fit: BoxFit.cover,
-                    width: size - 9,
-                    height: size - 9,
-                    filterQuality: FilterQuality.low,
-                    errorBuilder: (_, _, _) => ColoredBox(
-                      color: fv.elevatedSurface,
-                      child: Icon(
-                        fallbackIcon,
-                        color: FirstVueColors.teal,
-                        size: size * 0.35,
-                      ),
-                    ),
-                  )
-                : ColoredBox(
+        child: SizedBox(
+          width: size - 9,
+          height: size - 9,
+          child: hasImage
+              ? NetworkPhoto(
+                  url: imageUrl!,
+                  fit: BoxFit.cover,
+                  width: size - 9,
+                  height: size - 9,
+                  borderRadius: BorderRadius.circular((size - 9) / 2),
+                  errorBuilder: (_, _, _) => ColoredBox(
                     color: fv.elevatedSurface,
                     child: Icon(
                       fallbackIcon,
@@ -73,7 +61,15 @@ class GroupCircleAvatar extends StatelessWidget {
                       size: size * 0.35,
                     ),
                   ),
-          ),
+                )
+              : ColoredBox(
+                  color: fv.elevatedSurface,
+                  child: Icon(
+                    fallbackIcon,
+                    color: FirstVueColors.teal,
+                    size: size * 0.35,
+                  ),
+                ),
         ),
       ),
     );
@@ -128,10 +124,7 @@ class GroupCircleTile extends StatelessWidget {
                 child: const Icon(Icons.add, color: FirstVueColors.coral),
               )
             else
-              GroupCircleAvatar(
-                imageUrl: imageUrl,
-                ringColor: ringColor,
-              ),
+              GroupCircleAvatar(imageUrl: imageUrl, ringColor: ringColor),
             const SizedBox(height: 8),
             Text(
               label,

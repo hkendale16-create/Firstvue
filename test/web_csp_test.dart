@@ -26,12 +26,18 @@ void main() {
     expect(csp, contains("worker-src 'self' blob:"));
   });
 
+  test('CSP frame-src allows Flutter HTML media platform views', () {
+    expect(csp, contains("frame-src 'self' blob:"));
+    expect(csp, contains('https://js.stripe.com'));
+  });
+
   test('CSP connect-src allows Flutter to fetch Supabase media over HTTPS', () {
     expect(csp, contains('connect-src'));
     expect(
       csp.contains('https:') || csp.contains('https://*.storage.supabase.co'),
       isTrue,
-      reason: 'CanvasKit loads photos via fetch(); img-src https: is not enough',
+      reason:
+          'CanvasKit loads photos via fetch(); img-src https: is not enough',
     );
   });
 
@@ -45,10 +51,13 @@ void main() {
     expect(buildWebSh, contains('--pwa-strategy=none'));
   });
 
-  test('Netlify caches CanvasKit and fonts so phones skip the 4MB redownload', () {
-    final toml = File('netlify.toml').readAsStringSync();
-    expect(toml, contains('for = "/canvaskit/*"'));
-    expect(toml, contains('for = "/assets/*"'));
-    expect(toml, contains('max-age=604800'));
-  });
+  test(
+    'Netlify caches CanvasKit and fonts so phones skip the 4MB redownload',
+    () {
+      final toml = File('netlify.toml').readAsStringSync();
+      expect(toml, contains('for = "/canvaskit/*"'));
+      expect(toml, contains('for = "/assets/*"'));
+      expect(toml, contains('max-age=604800'));
+    },
+  );
 }

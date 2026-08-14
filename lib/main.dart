@@ -31,6 +31,7 @@ import 'widgets/floating_messages_bubble.dart';
 import 'widgets/firstvue_animated_header_title.dart';
 import 'widgets/home_city_chip.dart';
 import 'widgets/home_discovery_section.dart';
+import 'widgets/network_photo.dart';
 import 'widgets/social_chrome.dart';
 import 'services/profile_media_service.dart';
 
@@ -444,26 +445,25 @@ class _HomeProfileAvatarState extends State<_HomeProfileAvatar> {
           shape: BoxShape.circle,
           border: Border.all(color: FirstVueColors.gold, width: 1.5),
         ),
-        child: ClipOval(
-          child: _loading
-              ? const ColoredBox(
-                  color: FirstVueColors.surface,
-                  child: Center(
-                    child: SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
+        child: _loading
+            ? const ColoredBox(
+                color: FirstVueColors.surface,
+                child: Center(
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                )
-              : avatarUrl != null
-              ? Image.network(
-                  avatarUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => _placeholder(user),
-                )
-              : _placeholder(user),
-        ),
+                ),
+              )
+            : avatarUrl != null
+            ? NetworkPhoto(
+                url: avatarUrl,
+                fit: BoxFit.cover,
+                borderRadius: BorderRadius.circular(22),
+                errorBuilder: (_, _, _) => _placeholder(user),
+              )
+            : ClipOval(child: _placeholder(user)),
       ),
     );
   }

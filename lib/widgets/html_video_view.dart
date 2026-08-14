@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'html_video_impl.dart'
-    if (dart.library.js_interop) 'html_video_impl_web.dart' as impl;
+    if (dart.library.js_interop) 'html_video_impl_web.dart'
+    as impl;
 
 /// HTML `<video>` surface for Flutter web (iPhone Safari can show MOV/MP4).
 class HtmlVideoView extends StatelessWidget {
@@ -11,6 +12,7 @@ class HtmlVideoView extends StatelessWidget {
   final bool looping;
   final bool muted;
   final BoxFit fit;
+  final BorderRadius? borderRadius;
 
   const HtmlVideoView({
     super.key,
@@ -20,6 +22,7 @@ class HtmlVideoView extends StatelessWidget {
     this.looping = false,
     this.muted = true,
     this.fit = BoxFit.cover,
+    this.borderRadius,
   });
 
   @override
@@ -31,6 +34,7 @@ class HtmlVideoView extends StatelessWidget {
       looping: looping,
       muted: muted,
       fit: fit,
+      borderRadius: borderRadius,
     );
   }
 }
