@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/firstvue_theme.dart';
+import 'network_photo.dart';
 
 /// Compact avatar for lists — uses image URL or initial; video URLs show as image.
 class ProfileAvatarThumbnail extends StatelessWidget {
@@ -20,26 +21,21 @@ class ProfileAvatarThumbnail extends StatelessWidget {
     final initial = displayName.trim().isNotEmpty
         ? displayName.trim()[0].toUpperCase()
         : '?';
+    final showPhoto =
+        imageUrl != null && imageUrl!.isNotEmpty && !_looksLikeVideo(imageUrl!);
 
-    return CircleAvatar(
+    return NetworkCircleAvatar(
+      imageUrl: showPhoto ? imageUrl : null,
       radius: radius,
       backgroundColor: FirstVueColors.elevatedSurface,
-      backgroundImage:
-          imageUrl != null && imageUrl!.isNotEmpty && !_looksLikeVideo(imageUrl!)
-              ? NetworkImage(imageUrl!)
-              : null,
-      child: imageUrl == null ||
-              imageUrl!.isEmpty ||
-              _looksLikeVideo(imageUrl!)
-          ? Text(
-              initial,
-              style: TextStyle(
-                color: FirstVueColors.gold,
-                fontWeight: FontWeight.bold,
-                fontSize: radius * 0.85,
-              ),
-            )
-          : null,
+      placeholder: Text(
+        initial,
+        style: TextStyle(
+          color: FirstVueColors.gold,
+          fontWeight: FontWeight.bold,
+          fontSize: radius * 0.85,
+        ),
+      ),
     );
   }
 

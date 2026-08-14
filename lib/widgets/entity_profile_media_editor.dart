@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/firstvue_theme.dart';
+import 'network_photo.dart';
 
 /// Cover + profile photo controls for business and professional edit screens.
 class EntityProfileMediaEditor extends StatelessWidget {
@@ -61,35 +62,40 @@ class EntityProfileMediaEditor extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: fv.borderSubtle),
-              gradient: coverUrl == null
-                  ? LinearGradient(
-                      colors: [
-                        fv.elevatedSurface,
-                        FirstVueColors.teal.withValues(alpha: .55),
-                      ],
-                    )
-                  : null,
-              image: coverUrl != null
-                  ? DecorationImage(
-                      image: NetworkImage(coverUrl!),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
             ),
-            child: Align(
-              alignment: Alignment.bottomRight,
-              child: TextButton.icon(
-                onPressed: updating ? null : onChangeCover,
-                icon: Icon(
-                  Icons.photo_camera_outlined,
-                  size: 18,
-                  color: fv.primaryText,
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (coverUrl != null)
+                  NetworkPhoto(url: coverUrl!, fit: BoxFit.cover)
+                else
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          fv.elevatedSurface,
+                          FirstVueColors.teal.withValues(alpha: .55),
+                        ],
+                      ),
+                    ),
+                  ),
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: TextButton.icon(
+                    onPressed: updating ? null : onChangeCover,
+                    icon: Icon(
+                      Icons.photo_camera_outlined,
+                      size: 18,
+                      color: fv.primaryText,
+                    ),
+                    label: Text(
+                      'Cover photo',
+                      style: TextStyle(color: fv.primaryText),
+                    ),
+                  ),
                 ),
-                label: Text(
-                  'Cover photo',
-                  style: TextStyle(color: fv.primaryText),
-                ),
-              ),
+              ],
             ),
           ),
         ),
@@ -110,14 +116,15 @@ class EntityProfileMediaEditor extends StatelessWidget {
           children: [
             GestureDetector(
               onTap: updating ? null : onChangeAvatar,
-              child: CircleAvatar(
+              child: NetworkCircleAvatar(
+                imageUrl: avatarUrl,
                 radius: 40,
                 backgroundColor: fv.elevatedSurface,
-                backgroundImage:
-                    avatarUrl != null ? NetworkImage(avatarUrl!) : null,
-                child: avatarUrl == null
-                    ? Icon(placeholderIcon, color: FirstVueColors.teal, size: 34)
-                    : null,
+                placeholder: Icon(
+                  placeholderIcon,
+                  color: FirstVueColors.teal,
+                  size: 34,
+                ),
               ),
             ),
             const SizedBox(width: 12),

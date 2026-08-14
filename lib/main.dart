@@ -31,6 +31,7 @@ import 'widgets/floating_messages_bubble.dart';
 import 'widgets/firstvue_animated_header_title.dart';
 import 'widgets/home_city_chip.dart';
 import 'widgets/home_discovery_section.dart';
+import 'widgets/network_photo.dart';
 import 'widgets/social_chrome.dart';
 import 'services/profile_media_service.dart';
 
@@ -457,8 +458,8 @@ class _HomeProfileAvatarState extends State<_HomeProfileAvatar> {
                   ),
                 )
               : avatarUrl != null
-              ? Image.network(
-                  avatarUrl,
+              ? NetworkPhoto(
+                  url: avatarUrl,
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => _placeholder(user),
                 )

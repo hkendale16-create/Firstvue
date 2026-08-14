@@ -10,6 +10,7 @@ import '../theme/firstvue_theme.dart';
 import '../widgets/event_profile_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/media_picker_sheet.dart';
+import '../widgets/network_photo.dart';
 import '../auth/ensure_signed_in.dart';
 
 class ThingsToDoScreen extends StatefulWidget {
@@ -366,8 +367,8 @@ class _EventCardState extends State<_EventCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (event.coverImageUrl != null)
-            Image.network(
-              event.coverImageUrl!,
+            NetworkPhoto(
+              url: event.coverImageUrl!,
               height: 140,
               width: double.infinity,
               fit: BoxFit.cover,

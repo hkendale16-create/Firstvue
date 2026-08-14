@@ -3,8 +3,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../../theme/firstvue_theme.dart';
-import '../models/messaging_models.dart';
+import '../../widgets/network_photo.dart';
 import '../../widgets/profile_avatar_thumbnail.dart';
+import '../models/messaging_models.dart';
 
 const kFvTouchTarget = 44.0;
 
@@ -338,8 +339,8 @@ class FvEventConversationRow extends StatelessWidget {
                               color: FirstVueColors.gold,
                             ),
                           )
-                        : Image.network(
-                            conv.avatarUrl!,
+                        : NetworkPhoto(
+                            url: conv.avatarUrl!,
                             fit: BoxFit.cover,
                             errorBuilder: (_, _, _) => ColoredBox(
                               color: fv.elevatedSurface,
@@ -501,8 +502,8 @@ class FvFeaturedEventCard extends StatelessWidget {
                             ),
                           ),
                         )
-                      : Image.network(
-                          conversation.avatarUrl!,
+                      : NetworkPhoto(
+                          url: conversation.avatarUrl!,
                           fit: BoxFit.cover,
                           errorBuilder: (_, _, _) => ColoredBox(
                             color: fv.surface,

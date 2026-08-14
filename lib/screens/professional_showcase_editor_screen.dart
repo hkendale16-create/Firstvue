@@ -3,6 +3,7 @@ import '../theme/firstvue_theme.dart';
 
 import '../services/professional_profiles_service.dart';
 import '../services/professional_showcase_service.dart';
+import '../widgets/network_photo.dart';
 
 class ProfessionalShowcaseEditorScreen extends StatefulWidget {
   final ProfessionalProfile profile;
@@ -374,8 +375,8 @@ class _CatalogImage extends StatelessWidget {
     }
     return ClipRRect(
       borderRadius: BorderRadius.circular(13),
-      child: Image.network(
-        url,
+      child: NetworkPhoto(
+        url: url,
         width: size,
         height: size,
         fit: BoxFit.cover,

@@ -16,6 +16,7 @@ import '../widgets/feed_comments_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/group_circle_avatar.dart';
+import '../widgets/network_photo.dart';
 import 'community_detail_screen.dart';
 import 'create_community_screen.dart';
 import 'community_hub_settings_screen.dart';
@@ -778,23 +779,15 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                       borderRadius: BorderRadius.circular(12),
                       child: Row(
                         children: [
-                          CircleAvatar(
+                          NetworkCircleAvatar(
+                            imageUrl: _leader!.avatarUrl,
                             radius: 18,
                             backgroundColor: FirstVueColors.elevatedSurface,
-                            backgroundImage:
-                                _leader!.avatarUrl != null &&
-                                    _leader!.avatarUrl!.isNotEmpty
-                                ? NetworkImage(_leader!.avatarUrl!)
-                                : null,
-                            child:
-                                _leader!.avatarUrl == null ||
-                                    _leader!.avatarUrl!.isEmpty
-                                ? Text(
-                                    _leader!.displayName.isNotEmpty
-                                        ? _leader!.displayName[0].toUpperCase()
-                                        : '?',
-                                  )
-                                : null,
+                            placeholder: Text(
+                              _leader!.displayName.isNotEmpty
+                                  ? _leader!.displayName[0].toUpperCase()
+                                  : '?',
+                            ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
@@ -902,24 +895,16 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                                 : editor.userId);
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
-                        leading: CircleAvatar(
+                        leading: NetworkCircleAvatar(
+                          imageUrl: editor.avatarUrl,
                           radius: 18,
                           backgroundColor: FirstVueColors.elevatedSurface,
-                          backgroundImage:
-                              editor.avatarUrl != null &&
-                                  editor.avatarUrl!.isNotEmpty
-                              ? NetworkImage(editor.avatarUrl!)
-                              : null,
-                          child:
-                              editor.avatarUrl == null ||
-                                  editor.avatarUrl!.isEmpty
-                              ? Text(
-                                  label.isNotEmpty
-                                      ? label[0].toUpperCase()
-                                      : 'E',
-                                  style: const TextStyle(fontSize: 12),
-                                )
-                              : null,
+                          placeholder: Text(
+                            label.isNotEmpty
+                                ? label[0].toUpperCase()
+                                : 'E',
+                            style: const TextStyle(fontSize: 12),
+                          ),
                         ),
                         title: Text(
                           label,

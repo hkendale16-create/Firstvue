@@ -67,3 +67,63 @@ class NetworkPhoto extends StatelessWidget {
     );
   }
 }
+
+/// Circular avatar that loads remote images via [NetworkPhoto] (web-safe).
+///
+/// Prefer this over [CircleAvatar.backgroundImage] with [NetworkImage] —
+/// [NetworkImage] still uses CanvasKit `fetch()` and fails on signed URLs.
+class NetworkCircleAvatar extends StatelessWidget {
+  final String? imageUrl;
+  final double radius;
+  final Color? backgroundColor;
+  final Widget? placeholder;
+  final Widget Function(BuildContext, Object, StackTrace?)? errorBuilder;
+
+  const NetworkCircleAvatar({
+    super.key,
+    this.imageUrl,
+    this.radius = 20,
+    this.backgroundColor,
+    this.placeholder,
+    this.errorBuilder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final size = radius * 2;
+    final bg = backgroundColor ?? FirstVueColors.elevatedSurface;
+    final url = imageUrl?.trim() ?? '';
+    final hasUrl = url.isNotEmpty;
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: ClipOval(
+        child: hasUrl
+            ? NetworkPhoto(
+                url: url,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                errorBuilder:
+                    errorBuilder ??
+                    (context, error, stack) =>
+                        ColoredBox(color: bg, child: _placeholderChild()),
+              )
+            : ColoredBox(color: bg, child: _placeholderChild()),
+      ),
+    );
+  }
+
+  Widget _placeholderChild() {
+    return Center(
+      child:
+          placeholder ??
+          Icon(
+            Icons.person_rounded,
+            size: radius,
+            color: FirstVueColors.gold,
+          ),
+    );
+  }
+}

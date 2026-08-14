@@ -9,6 +9,7 @@ import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/portfolio_albums_section.dart';
+import '../widgets/network_photo.dart';
 import 'professional_profile_editor_screen.dart';
 import 'professional_public_profile_screen.dart';
 import 'professional_showcase_editor_screen.dart';
@@ -288,8 +289,8 @@ class _MyProfessionalProfileViewScreenState
                       itemBuilder: (context, index) {
                         return ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            _media[index].signedUrl,
+                          child: NetworkPhoto(
+                            url: _media[index].signedUrl,
                             fit: BoxFit.cover,
                           ),
                         );

@@ -13,6 +13,7 @@ import '../widgets/feed_comments_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/community_news_post_detail_sheet.dart';
 import '../widgets/event_profile_sheet.dart';
+import '../widgets/network_photo.dart';
 
 const _screenBackground = Color(0xFF080B0F);
 
@@ -299,8 +300,8 @@ class _TrendingFeedCard extends StatelessWidget {
                     fit: StackFit.expand,
                     children: [
                       business.imageUrl != null && !business.featuredIsVideo
-                          ? Image.network(
-                              business.imageUrl!,
+                          ? NetworkPhoto(
+                              url: business.imageUrl!,
                               fit: BoxFit.cover,
                               errorBuilder: (_, _, _) => Image.asset(
                                 'assets/images/explore_barbershops.jpg',

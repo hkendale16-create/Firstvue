@@ -4,6 +4,7 @@ import '../config/media_config.dart';
 import '../services/business_menu_service.dart';
 import '../services/media_storage_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../widgets/network_photo.dart';
 
 Future<void> showBusinessMenuItemDetail(
   BuildContext context,
@@ -94,8 +95,8 @@ class _BusinessMenuItemDetailSheetState
                 borderRadius: BorderRadius.circular(14),
                 child: AspectRatio(
                   aspectRatio: 16 / 10,
-                  child: Image.network(
-                    _imageUrl!,
+                  child: NetworkPhoto(
+                    url: _imageUrl!,
                     fit: BoxFit.cover,
                     errorBuilder: (_, error, stackTrace) => const SizedBox.shrink(),
                   ),

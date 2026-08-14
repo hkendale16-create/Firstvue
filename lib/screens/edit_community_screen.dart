@@ -7,6 +7,7 @@ import '../services/community_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/location_autocomplete_field.dart';
 import '../widgets/media_picker_sheet.dart';
+import '../widgets/network_photo.dart';
 
 class EditCommunityScreen extends StatefulWidget {
   final Community community;
@@ -109,12 +110,32 @@ class _EditCommunityScreenState extends State<EditCommunityScreen> {
     }
   }
 
-  ImageProvider? get _previewImage {
-    if (_newImageBytes != null) return MemoryImage(_newImageBytes!);
-    if (_removeImage) return null;
+  Widget _previewAvatar() {
+    const placeholder = Icon(
+      Icons.add_a_photo_outlined,
+      color: FirstVueColors.teal,
+    );
+    if (_newImageBytes != null) {
+      return CircleAvatar(
+        radius: 46,
+        backgroundColor: FirstVueColors.elevatedSurface,
+        backgroundImage: MemoryImage(_newImageBytes!),
+      );
+    }
+    if (_removeImage) {
+      return const NetworkCircleAvatar(
+        radius: 46,
+        backgroundColor: FirstVueColors.elevatedSurface,
+        placeholder: placeholder,
+      );
+    }
     final url = widget.community.imageUrl;
-    if (url != null && url.isNotEmpty) return NetworkImage(url);
-    return null;
+    return NetworkCircleAvatar(
+      imageUrl: (url != null && url.isNotEmpty) ? url : null,
+      radius: 46,
+      backgroundColor: FirstVueColors.elevatedSurface,
+      placeholder: placeholder,
+    );
   }
 
   @override
@@ -144,17 +165,7 @@ class _EditCommunityScreenState extends State<EditCommunityScreen> {
               children: [
                 GestureDetector(
                   onTap: _saving ? null : _pickImage,
-                  child: CircleAvatar(
-                    radius: 46,
-                    backgroundColor: FirstVueColors.elevatedSurface,
-                    backgroundImage: _previewImage,
-                    child: _previewImage == null
-                        ? const Icon(
-                            Icons.add_a_photo_outlined,
-                            color: FirstVueColors.teal,
-                          )
-                        : null,
-                  ),
+                  child: _previewAvatar(),
                 ),
                 TextButton(
                   onPressed: _saving

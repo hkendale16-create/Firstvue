@@ -9,6 +9,7 @@ import '../services/firstvue_feedback_sounds.dart';
 import '../services/story_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/vue_video_player.dart';
+import '../widgets/network_photo.dart';
 import '../auth/ensure_signed_in.dart';
 import 'member_public_profile_screen.dart';
 
@@ -189,8 +190,8 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
                       autoPlay: true,
                       startMuted: false,
                     )
-                  : Image.network(
-                      story.mediaUrl,
+                  : NetworkPhoto(
+                      url: story.mediaUrl,
                       fit: BoxFit.contain,
                       errorBuilder: (_, _, _) => const ColoredBox(
                         color: Colors.black,
@@ -257,18 +258,14 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
                         ),
                         child: Row(
                           children: [
-                            CircleAvatar(
+                            NetworkCircleAvatar(
+                              imageUrl: story.ownerAvatarUrl,
                               radius: 16,
-                              backgroundImage: story.ownerAvatarUrl != null
-                                  ? NetworkImage(story.ownerAvatarUrl!)
-                                  : null,
-                              child: story.ownerAvatarUrl == null
-                                  ? Text(
-                                      story.ownerName.isEmpty
-                                          ? '?'
-                                          : story.ownerName[0].toUpperCase(),
-                                    )
-                                  : null,
+                              placeholder: Text(
+                                story.ownerName.isEmpty
+                                    ? '?'
+                                    : story.ownerName[0].toUpperCase(),
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Text(
