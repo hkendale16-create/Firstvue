@@ -267,7 +267,12 @@ class ExploreSectionStore {
         cursorId: page.cursorId,
         seenIds: seen,
       );
-    } catch (_) {
+    } catch (error, stack) {
+      assert(() {
+        // ignore: avoid_print
+        print('ExploreSectionStore.load($section) failed: $error\n$stack');
+        return true;
+      }());
       _pages[section] = of(section).copyWith(
         loading: false,
         error: 'Unable to load this section right now.',

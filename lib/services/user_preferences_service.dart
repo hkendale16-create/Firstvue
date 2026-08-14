@@ -123,31 +123,39 @@ class UserPreferencesService {
   }
 
   static Future<UserPreferences> _fetchFromLocal() async {
-    final sp = await SharedPreferences.getInstance();
-    return UserPreferences(
-      locationCity: sp.getString(_prefsCityKey),
-      locationState: sp.getString(_prefsStateKey),
-      browseEverywhere: sp.getBool(_prefsEverywhereKey) ?? false,
-      notificationsEnabled: sp.getBool(_prefsNotificationsKey) ?? true,
-      floatingBubbleVisible: sp.getBool(_prefsBubbleKey) ?? true,
-    );
+    try {
+      final sp = await SharedPreferences.getInstance();
+      return UserPreferences(
+        locationCity: sp.getString(_prefsCityKey),
+        locationState: sp.getString(_prefsStateKey),
+        browseEverywhere: sp.getBool(_prefsEverywhereKey) ?? false,
+        notificationsEnabled: sp.getBool(_prefsNotificationsKey) ?? true,
+        floatingBubbleVisible: sp.getBool(_prefsBubbleKey) ?? true,
+      );
+    } catch (_) {
+      return const UserPreferences();
+    }
   }
 
   static Future<void> _cacheLocally(UserPreferences prefs) async {
-    final sp = await SharedPreferences.getInstance();
-    if (prefs.locationCity != null) {
-      await sp.setString(_prefsCityKey, prefs.locationCity!);
-    } else {
-      await sp.remove(_prefsCityKey);
+    try {
+      final sp = await SharedPreferences.getInstance();
+      if (prefs.locationCity != null) {
+        await sp.setString(_prefsCityKey, prefs.locationCity!);
+      } else {
+        await sp.remove(_prefsCityKey);
+      }
+      if (prefs.locationState != null) {
+        await sp.setString(_prefsStateKey, prefs.locationState!);
+      } else {
+        await sp.remove(_prefsStateKey);
+      }
+      await sp.setBool(_prefsEverywhereKey, prefs.browseEverywhere);
+      await sp.setBool(_prefsNotificationsKey, prefs.notificationsEnabled);
+      await sp.setBool(_prefsBubbleKey, prefs.floatingBubbleVisible);
+    } catch (_) {
+      // Local cache is best-effort — never break Explore / nearby queries.
     }
-    if (prefs.locationState != null) {
-      await sp.setString(_prefsStateKey, prefs.locationState!);
-    } else {
-      await sp.remove(_prefsStateKey);
-    }
-    await sp.setBool(_prefsEverywhereKey, prefs.browseEverywhere);
-    await sp.setBool(_prefsNotificationsKey, prefs.notificationsEnabled);
-    await sp.setBool(_prefsBubbleKey, prefs.floatingBubbleVisible);
   }
 
   static Future<void> updateLocation({

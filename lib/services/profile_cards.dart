@@ -29,9 +29,12 @@ class ProfileCards {
 
     try {
       return await run(relation);
-    } catch (error) {
-      if (!isMissingRelation(error)) rethrow;
-      return run('profiles');
+    } catch (_) {
+      try {
+        return await run('profiles');
+      } catch (_) {
+        return const [];
+      }
     }
   }
 
@@ -50,9 +53,12 @@ class ProfileCards {
 
     try {
       return await run(relation);
-    } catch (error) {
-      if (!isMissingRelation(error)) rethrow;
-      return run('profiles');
+    } catch (_) {
+      try {
+        return await run('profiles');
+      } catch (_) {
+        return null;
+      }
     }
   }
 

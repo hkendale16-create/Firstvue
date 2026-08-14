@@ -301,31 +301,46 @@ class IndustryCatalog {
     for (final item in industries) {
       if (item.slug == key) return item;
     }
-    return fromDisplayType(slug);
+    // Unknown / free-text slug: map by keywords without recursing back into
+    // bySlug (avoids stack overflows on values like "bartender").
+    return _mapDisplayType(key);
   }
 
   static IndustryDefinition fromDisplayType(String? display) {
-    final type = (display ?? '').toLowerCase();
-    if (type.contains('barber')) return bySlug('barbershop');
+    return _mapDisplayType((display ?? '').toLowerCase());
+  }
+
+  static IndustryDefinition _resolveKnown(String slug) {
+    for (final item in industries) {
+      if (item.slug == slug) return item;
+    }
+    for (final item in industries) {
+      if (item.slug == 'general-business') return item;
+    }
+    return industries.last;
+  }
+
+  static IndustryDefinition _mapDisplayType(String type) {
+    if (type.contains('barber')) return _resolveKnown('barbershop');
     if (type.contains('salon') || type.contains('stylist')) {
-      return bySlug('salon');
+      return _resolveKnown('salon');
     }
     if (type.contains('spa') ||
         type.contains('nail') ||
         type.contains('beauty')) {
-      return bySlug('spa');
+      return _resolveKnown('spa');
     }
     if (type.contains('restaurant') ||
         type.contains('food') ||
         type.contains('dining') ||
         type.contains('bistro') ||
         type.contains('cater')) {
-      return bySlug('restaurant');
+      return _resolveKnown('restaurant');
     }
     if (type.contains('cafe') ||
         type.contains('café') ||
         type.contains('bakery')) {
-      return bySlug('cafe');
+      return _resolveKnown('cafe');
     }
     if (type.contains('bar') ||
         type.contains('lounge') ||
@@ -333,25 +348,25 @@ class IndustryCatalog {
         type.contains('club') ||
         type.contains('brewery') ||
         type.contains('pub')) {
-      return bySlug('bar');
+      return _resolveKnown('bar');
     }
-    if (type.contains('event')) return bySlug('event-organizer');
-    if (type.contains('rental')) return bySlug('rentals');
+    if (type.contains('event')) return _resolveKnown('event-organizer');
+    if (type.contains('rental')) return _resolveKnown('rentals');
     if (type.contains('activit') ||
         type.contains('attraction') ||
         type.contains('recreation') ||
         type.contains('experience')) {
-      return bySlug('activity-provider');
+      return _resolveKnown('activity-provider');
     }
     if (type.contains('retail') ||
         type.contains('shop') ||
         type.contains('store')) {
-      return bySlug('retail');
+      return _resolveKnown('retail');
     }
     if (type.contains('community') || type.contains('group')) {
-      return bySlug('community');
+      return _resolveKnown('community');
     }
-    return bySlug('general-business');
+    return _resolveKnown('general-business');
   }
 
   static TemplatePreview previewFor(IndustryTemplate template) {

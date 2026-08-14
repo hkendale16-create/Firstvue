@@ -728,6 +728,22 @@ class CommunityNewsService {
   }) async {
     if (rows.isEmpty) return const [];
 
+    try {
+      return await _mapPostRowsUnsafe(rows, currentUserId: currentUserId);
+    } catch (error, stack) {
+      assert(() {
+        // ignore: avoid_print
+        print('_mapPostRows failed: $error\n$stack');
+        return true;
+      }());
+      return const [];
+    }
+  }
+
+  static Future<List<CommunityNewsPost>> _mapPostRowsUnsafe(
+    List<dynamic> rows, {
+    required String? currentUserId,
+  }) async {
     final postIds = rows.map((row) => row['id'] as String).toList();
     final authorIds = rows
         .map((row) => row['author_id'] as String)
