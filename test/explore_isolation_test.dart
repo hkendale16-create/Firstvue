@@ -1,11 +1,9 @@
 import 'package:firstvue/config/media_config.dart';
 import 'package:firstvue/models/explore_item.dart';
-import 'package:firstvue/models/explore_section.dart';
 import 'package:firstvue/models/publish_destination.dart';
 import 'package:firstvue/services/community_news_media_service.dart';
 import 'package:firstvue/services/community_news_service.dart';
 import 'package:firstvue/utils/explore_category_filter.dart';
-import 'package:firstvue/utils/explore_classifier.dart';
 import 'package:firstvue/widgets/firstvue_bottom_nav.dart';
 import 'package:flutter_test/flutter_test.dart';
 
