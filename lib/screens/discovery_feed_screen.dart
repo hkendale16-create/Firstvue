@@ -72,8 +72,13 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
     } catch (error) {
       if (!mounted) return const [];
       setState(() {
-        if (reset) _items = const [];
-        _error = 'Unable to load VUE right now.';
+        // Keep existing tiles visible on a failed pull-refresh so the page
+        // does not blank while scrolling.
+        if (reset && _items.isEmpty) {
+          _error = 'Unable to load VUE right now.';
+        } else if (!reset) {
+          _error = 'Unable to load VUE right now.';
+        }
       });
       rethrow;
     }

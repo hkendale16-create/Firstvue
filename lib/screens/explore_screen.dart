@@ -191,7 +191,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
         onRefresh: () => _loadSection(_section, refresh: true),
         child: ListView(
           controller: _scrollController,
-          physics: const AlwaysScrollableScrollPhysics(),
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: ClampingScrollPhysics(),
+          ),
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           children: [
             const SocialPageHeader(

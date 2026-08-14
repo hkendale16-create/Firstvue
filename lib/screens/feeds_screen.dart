@@ -21,6 +21,7 @@ import '../widgets/community_news_post_card.dart';
 import '../widgets/community_news_post_detail_sheet.dart';
 import '../widgets/feed_comments_sheet.dart';
 import '../widgets/feed_impression_tracker.dart';
+import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/group_circle_avatar.dart';
 import '../widgets/home_community_feed_block.dart';
@@ -483,14 +484,12 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      color: FirstVueColors.gold,
-      displacement: 64,
-      edgeOffset: 8,
-      triggerMode: RefreshIndicatorTriggerMode.onEdge,
+    return FirstVueRefreshScaffold(
       onRefresh: _reload,
       child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: ClampingScrollPhysics(),
+        ),
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         children: [
           if (widget.header != null) ...[
