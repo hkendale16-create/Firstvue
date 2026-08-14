@@ -2,6 +2,19 @@
 
 Project: `sdssshegqdwobjelxzkp`
 
+## Critical for signed-in feeds / Explore (do this first)
+
+If you are **signed in** and Explore/Feeds fail, Home posts fail, or photos
+fail while **signed-out** pages still work, run this in the SQL Editor:
+
+1. Open [Supabase SQL Editor](https://supabase.com/dashboard/project/sdssshegqdwobjelxzkp/sql/new)
+2. Paste `supabase/APPLY_FIX_COMMUNITY_RLS_RECURSION.sql`
+3. Click **Run** (safe to re-run)
+
+This removes `42P17 infinite recursion detected in policy for relation
+"community_members"` which blocks authenticated `community_news_posts` and
+`communities` reads.
+
 ## Critical for photos (signed-in blank images)
 
 If profile **names** load but **pictures/avatars** do not, run this first in the SQL Editor:

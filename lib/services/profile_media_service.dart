@@ -416,6 +416,7 @@ class ProfileMediaService {
         params: {'p_profile_ids': ids},
       );
       final out = <String, String>{};
+      final signJobs = <Future<void>>[];
       for (final row in List<Map<String, dynamic>>.from(rows as List)) {
         final profileId = row['profile_id'] as String?;
         final path = row['storage_path'] as String?;
@@ -423,25 +424,32 @@ class ProfileMediaService {
         final provider = MediaStorageProvider.parse(
           row['storage_provider'] as String?,
         );
-        try {
-          final url = await MediaStorageService.createReadUrl(
-            bucket: MediaBucket.profile,
-            path: path,
-            provider: provider,
-            context: {'profile_id': profileId},
-          );
-          if (url.isNotEmpty) out[profileId] = url;
-        } catch (_) {}
+        signJobs.add(() async {
+          try {
+            final url = await MediaStorageService.createReadUrl(
+              bucket: MediaBucket.profile,
+              path: path,
+              provider: provider,
+              context: {'profile_id': profileId},
+            );
+            if (url.isNotEmpty) out[profileId] = url;
+          } catch (_) {}
+        }());
       }
+      await Future.wait(signJobs);
       return out;
     } catch (_) {
-      // Fallback when RPC is not applied yet.
+      // Fallback when RPC is not applied yet — cap concurrency cost.
       final out = <String, String>{};
-      for (final id in ids) {
-        final images = await fetchProfileImagesForUser(id);
-        final url = images.avatar?.signedUrl;
-        if (url != null) out[id] = url;
-      }
+      await Future.wait(
+        ids.map((id) async {
+          try {
+            final images = await fetchProfileImagesForUser(id);
+            final url = images.avatar?.signedUrl;
+            if (url != null && url.isNotEmpty) out[id] = url;
+          } catch (_) {}
+        }),
+      );
       return out;
     }
   }

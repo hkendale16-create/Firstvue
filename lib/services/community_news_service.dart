@@ -267,19 +267,30 @@ class CommunityNewsService {
 
     try {
       return await run(_postColumnsWithBackground);
-    } catch (_) {
+    } catch (error) {
+      // Column fallbacks cannot fix RLS recursion — retrying only multiplies
+      // statement-timeout waits and leaves Explore stuck on skeletons.
+      if (isRlsRecursionError(error)) rethrow;
       try {
         return await run(_postColumns);
-      } catch (_) {
+      } catch (error2) {
+        if (isRlsRecursionError(error2)) rethrow;
         try {
           return await run(
             'id, body, created_at, author_id, business_id, community_id, visibility',
           );
-        } catch (_) {
+        } catch (error3) {
+          if (isRlsRecursionError(error3)) rethrow;
           return await run(_postColumnsBase);
         }
       }
     }
+  }
+
+  static bool isRlsRecursionError(Object error) {
+    if (error is! PostgrestException) return false;
+    return error.code == '42P17' ||
+        error.message.contains('infinite recursion');
   }
 
   static void logFeedError(Object error, {String context = 'NewsFeed'}) {
@@ -290,6 +301,13 @@ class CommunityNewsService {
         'code=${error.code} message=${error.message} '
         'details=${error.details} hint=${error.hint}',
       );
+      if (isRlsRecursionError(error)) {
+        // ignore: avoid_print
+        print(
+          '[$context] Apply supabase/APPLY_FIX_COMMUNITY_RLS_RECURSION.sql '
+          'in the Supabase SQL Editor to restore signed-in feeds.',
+        );
+      }
       return;
     }
     // ignore: avoid_print
