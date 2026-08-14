@@ -1,0 +1,147 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// Directory reads for other members. After 20260916, `profiles` table SELECT
+/// is own-row + admin only. Public identity lives on `profile_public_cards`
+/// (no phone, birthday, coordinates, or other PII).
+class ProfileCards {
+  ProfileCards._();
+
+  static const relation = 'profile_public_cards';
+  static const columns =
+      'id, display_name, username, is_private, profile_visibility';
+  static const nameColumns = 'id, display_name, username';
+
+  static final _client = Supabase.instance.client;
+
+  static bool isMissingRelation(Object error) {
+    return error is PostgrestException && error.code == 'PGRST205';
+  }
+
+  static Future<List<Map<String, dynamic>>> listByIds(
+    List<String> ids, {
+    String select = nameColumns,
+  }) async {
+    if (ids.isEmpty) return const [];
+    Future<List<Map<String, dynamic>>> run(String table) async {
+      final rows = await _client.from(table).select(select).inFilter('id', ids);
+      return List<Map<String, dynamic>>.from(rows as List);
+    }
+
+    try {
+      return await run(relation);
+    } catch (error) {
+      if (!isMissingRelation(error)) rethrow;
+      return run('profiles');
+    }
+  }
+
+  static Future<Map<String, dynamic>?> fetchById(
+    String id, {
+    String select = nameColumns,
+  }) async {
+    if (id.trim().isEmpty) return null;
+    Future<Map<String, dynamic>?> run(String table) async {
+      return await _client
+          .from(table)
+          .select(select)
+          .eq('id', id)
+          .maybeSingle();
+    }
+
+    try {
+      return await run(relation);
+    } catch (error) {
+      if (!isMissingRelation(error)) rethrow;
+      return run('profiles');
+    }
+  }
+
+  static Future<Map<String, String>> displayNames(List<String> ids) async {
+    final rows = await listByIds(ids, select: 'id, display_name');
+    return {
+      for (final row in rows)
+        row['id'] as String:
+            (row['display_name'] as String?) ?? 'FirstVue member',
+    };
+  }
+
+  static Future<String?> displayName(String id) async {
+    final row = await fetchById(id, select: 'display_name');
+    return row?['display_name'] as String?;
+  }
+
+  static Future<Map<String, Map<String, dynamic>>> mapByIds(
+    List<String> ids,
+  ) async {
+    final rows = await listByIds(ids, select: columns);
+    return {for (final row in rows) row['id'] as String: row};
+  }
+
+  /// Copies [idKey] cards onto each row as `profiles` so existing embed
+  /// mappers keep working after table SELECT is own-row only.
+  static Future<void> attachAsProfiles(
+    List<Map<String, dynamic>> rows, {
+    required String idKey,
+  }) async {
+    final ids = rows
+        .map((row) => row[idKey] as String?)
+        .whereType<String>()
+        .toSet()
+        .toList();
+    final byId = await mapByIds(ids);
+    for (final row in rows) {
+      final id = row[idKey] as String?;
+      if (id != null) {
+        row['profiles'] = byId[id];
+      }
+    }
+  }
+
+  static Future<Map<String, dynamic>?> fetchByUsername(String username) async {
+    final normalized = username.trim().toLowerCase();
+    if (normalized.isEmpty) return null;
+    Future<Map<String, dynamic>?> run(String table) async {
+      return await _client
+          .from(table)
+          .select(columns)
+          .eq('username', normalized)
+          .maybeSingle();
+    }
+
+    try {
+      return await run(relation);
+    } catch (error) {
+      if (!isMissingRelation(error)) rethrow;
+      return run('profiles');
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> searchByDisplayName({
+    required String query,
+    String? excludeId,
+    int limit = 20,
+  }) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return const [];
+
+    Future<List<Map<String, dynamic>>> run(String table) async {
+      var request = _client
+          .from(table)
+          .select(nameColumns)
+          .not('display_name', 'is', null)
+          .ilike('display_name', '%$trimmed%');
+      if (excludeId != null && excludeId.isNotEmpty) {
+        request = request.neq('id', excludeId);
+      }
+      final rows = await request.limit(limit);
+      return List<Map<String, dynamic>>.from(rows as List);
+    }
+
+    try {
+      return await run(relation);
+    } catch (error) {
+      if (!isMissingRelation(error)) rethrow;
+      return run('profiles');
+    }
+  }
+}

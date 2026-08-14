@@ -259,6 +259,38 @@ class MessagingCrypto {
     return Uint8List.fromList(clear);
   }
 
+  static Future<WrappedSecret> wrapWithSymmetricKey({
+    required Uint8List privateKey,
+    required Uint8List wrappingKey,
+  }) async {
+    final nonce = await randomBytes(12);
+    final box = await _aesGcm.encrypt(
+      privateKey,
+      secretKey: SecretKey(wrappingKey),
+      nonce: nonce,
+    );
+    return WrappedSecret(
+      ciphertext: Uint8List.fromList(box.concatenation(nonce: false)),
+      nonce: nonce,
+      senderPublicKey: Uint8List(0),
+    );
+  }
+
+  static Future<Uint8List> unwrapWithSymmetricKey({
+    required WrappedSecret wrapped,
+    required Uint8List wrappingKey,
+  }) async {
+    final clear = await _aesGcm.decrypt(
+      SecretBox.fromConcatenation(
+        [...wrapped.nonce, ...wrapped.ciphertext],
+        nonceLength: 12,
+        macLength: 16,
+      ),
+      secretKey: SecretKey(wrappingKey),
+    );
+    return Uint8List.fromList(clear);
+  }
+
   static bool withinEditWindow(DateTime createdAt, {DateTime? now}) {
     final t = now ?? DateTime.now();
     return t.difference(createdAt) <= const Duration(minutes: 15);

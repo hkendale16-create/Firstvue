@@ -12,6 +12,7 @@ import '../services/business_reviews_service.dart';
 import '../services/business_social_links_service.dart';
 import '../services/entity_details_service.dart';
 import '../services/messaging_service.dart';
+import '../services/profile_cards.dart';
 import '../widgets/social_platform_icon.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/entity_details_form.dart';
@@ -1127,13 +1128,8 @@ class _MeetOwnerButtonState extends State<_MeetOwnerButton> {
         widget.businessId,
       );
       if (ownerId == null) throw StateError('missing owner');
-      final profile = await Supabase.instance.client
-          .from('profiles')
-          .select('display_name')
-          .eq('id', ownerId)
-          .maybeSingle();
       final ownerName =
-          (profile?['display_name'] as String?) ?? 'Business owner';
+          (await ProfileCards.displayName(ownerId)) ?? 'Business owner';
       if (!mounted) return;
       await Navigator.push(
         context,

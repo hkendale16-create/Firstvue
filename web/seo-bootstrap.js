@@ -56,6 +56,24 @@
     });
   }
 
+  function fetchProfileCard(id, select) {
+    return supabaseGet(
+      'profile_public_cards?id=eq.' +
+        encodeURIComponent(id) +
+        '&select=' +
+        select +
+        '&limit=1',
+    ).catch(function () {
+      return supabaseGet(
+        'profiles?id=eq.' +
+          encodeURIComponent(id) +
+          '&select=' +
+          select +
+          '&limit=1',
+      );
+    });
+  }
+
   var params = new URLSearchParams(window.location.search);
   var profileId = params.get('profile');
   var postId = params.get('post');
@@ -73,11 +91,9 @@
         var body = (row.body || '').trim();
         var snippet =
           body.length > 160 ? body.substring(0, 160) + '…' : body;
-        return supabaseGet(
-          'profiles?id=eq.' +
-            encodeURIComponent(row.author_id) +
-            '&select=display_name&limit=1',
-        ).then(function (profiles) {
+        return fetchProfileCard(row.author_id, 'display_name').then(function (
+          profiles,
+        ) {
           var name =
             (profiles && profiles[0] && profiles[0].display_name) ||
             'FirstVue member';
@@ -99,19 +115,14 @@
   }
 
   if (profileId) {
-    supabaseGet(
-      'profiles?id=eq.' +
-        encodeURIComponent(profileId) +
-        '&select=display_name,username,bio&limit=1',
-    )
+    fetchProfileCard(profileId, 'display_name,username')
       .then(function (rows) {
         var row = rows && rows[0];
         if (!row) return;
         var name = row.display_name || row.username || 'FirstVue member';
-        var bio = (row.bio || '').trim();
         applySeo(
           name + ' on FirstVue',
-          bio || 'View this member profile on FirstVue.',
+          'View this member profile on FirstVue.',
           origin + '/?profile=' + encodeURIComponent(profileId),
         );
       })

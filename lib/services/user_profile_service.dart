@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'profile_cards.dart';
+
 class UserProfile {
   final String id;
   final String? displayName;
@@ -52,14 +54,8 @@ class UserProfileService {
 
   static Future<String?> fetchDisplayNameForUser(String profileId) async {
     if (profileId.trim().isEmpty) return null;
-
     try {
-      final row = await _client
-          .from('profiles')
-          .select('display_name')
-          .eq('id', profileId)
-          .maybeSingle();
-      return row?['display_name'] as String?;
+      return await ProfileCards.displayName(profileId);
     } catch (_) {
       return null;
     }
@@ -74,6 +70,35 @@ class UserProfileService {
   static Future<UserProfile?> fetchProfileForUser(String profileId) async {
     if (profileId.trim().isEmpty) return null;
 
+    final me = _client.auth.currentUser?.id;
+    if (me == profileId) {
+      final own = await _fetchOwnProfileRow(profileId);
+      if (own != null) return _fromRow(own);
+    }
+
+    try {
+      final result = await _client.rpc(
+        'fetch_public_profile',
+        params: {'p_profile_id': profileId},
+      );
+      if (result is Map) {
+        return _fromRow(Map<String, dynamic>.from(result));
+      }
+    } catch (_) {
+      // RPC missing or denied — fall through to public cards.
+    }
+
+    final card = await ProfileCards.fetchById(
+      profileId,
+      select: ProfileCards.columns,
+    );
+    if (card == null) return null;
+    return _fromRow(card);
+  }
+
+  static Future<Map<String, dynamic>?> _fetchOwnProfileRow(
+    String profileId,
+  ) async {
     const columnSets = <String>[
       'id, display_name, username, bio, city, state, website, phone, birthday, '
           'is_private, profile_visibility, show_email_on_profile, field_visibility',
@@ -85,22 +110,19 @@ class UserProfileService {
       'id, display_name, username, bio, city, state',
     ];
 
-    Map<String, dynamic>? row;
     for (final columns in columnSets) {
       try {
-        row = await _client
+        return await _client
             .from('profiles')
             .select(columns)
             .eq('id', profileId)
             .maybeSingle();
-        break;
-      } catch (_) {
-        row = null;
-      }
+      } catch (_) {}
     }
+    return null;
+  }
 
-    if (row == null) return null;
-
+  static UserProfile _fromRow(Map<String, dynamic> row) {
     return UserProfile(
       id: row['id'] as String,
       displayName: row['display_name'] as String?,

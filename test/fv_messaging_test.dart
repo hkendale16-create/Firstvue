@@ -26,6 +26,21 @@ void main() {
     expect(payload.concatenated, isNot(contains(utf8Bytes('hello'))));
   });
 
+  test('symmetric wrap hides the raw private key', () async {
+    final privateKey = await MessagingCrypto.randomBytes(32);
+    final wrappingKey = await MessagingCrypto.randomBytes(32);
+    final wrapped = await MessagingCrypto.wrapWithSymmetricKey(
+      privateKey: privateKey,
+      wrappingKey: wrappingKey,
+    );
+    expect(wrapped.ciphertext, isNot(equals(privateKey)));
+    final opened = await MessagingCrypto.unwrapWithSymmetricKey(
+      wrapped: wrapped,
+      wrappingKey: wrappingKey,
+    );
+    expect(opened, equals(privateKey));
+  });
+
   test('wrong conversation secret cannot decrypt', () async {
     final a = await MessagingCrypto.newConversationSecret();
     final b = await MessagingCrypto.newConversationSecret();

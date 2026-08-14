@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/media_config.dart';
 import 'community_news_media_service.dart';
 import 'media_storage_service.dart';
+import 'profile_cards.dart';
 
 enum ProfileActivityType {
   newsPost,
@@ -231,14 +232,19 @@ class ProfileActivityService {
     try {
       final rows = await _client
           .from('community_news_posts')
-          .select('id, body, created_at, profiles(display_name)')
+          .select('id, body, created_at, author_id')
           .eq('business_id', businessId)
           .eq('status', 'approved')
           .order('created_at', ascending: false)
           .limit(limit);
 
+      final list = List<Map<String, dynamic>>.from(
+        (rows as List).map((row) => Map<String, dynamic>.from(row as Map)),
+      );
+      await ProfileCards.attachAsProfiles(list, idKey: 'author_id');
+
       return await _mapNewsPostRows(
-        rows,
+        list,
         titleForRow: (row, _) {
           final profile = row['profiles'] as Map<String, dynamic>?;
           final author =
@@ -258,13 +264,17 @@ class ProfileActivityService {
     try {
       final rows = await _client
           .from('community_news_posts')
-          .select('id, body, created_at, profiles(display_name)')
+          .select('id, body, created_at, author_id')
           .eq('professional_profile_id', professionalProfileId)
           .eq('status', 'approved')
           .order('created_at', ascending: false)
           .limit(limit);
+      final list = List<Map<String, dynamic>>.from(
+        (rows as List).map((row) => Map<String, dynamic>.from(row as Map)),
+      );
+      await ProfileCards.attachAsProfiles(list, idKey: 'author_id');
       return await _mapNewsPostRows(
-        rows,
+        list,
         titleForRow: (row, _) {
           final profile = row['profiles'] as Map<String, dynamic>?;
           final author =
@@ -284,13 +294,17 @@ class ProfileActivityService {
     try {
       final rows = await _client
           .from('community_news_posts')
-          .select('id, body, created_at, profiles(display_name)')
+          .select('id, body, created_at, author_id')
           .eq('event_id', eventId)
           .eq('status', 'approved')
           .order('created_at', ascending: false)
           .limit(limit);
+      final list = List<Map<String, dynamic>>.from(
+        (rows as List).map((row) => Map<String, dynamic>.from(row as Map)),
+      );
+      await ProfileCards.attachAsProfiles(list, idKey: 'author_id');
       return await _mapNewsPostRows(
-        rows,
+        list,
         titleForRow: (row, _) {
           final profile = row['profiles'] as Map<String, dynamic>?;
           final author =
@@ -504,17 +518,22 @@ class ProfileActivityService {
       };
       final rows = await _client
           .from('community_news_post_sparks')
-          .select('created_at, post_id, user_id, profiles(display_name)')
+          .select('created_at, post_id, user_id')
           .inFilter('post_id', postBodies.keys.toList())
           .neq('user_id', userId)
           .order('created_at', ascending: false)
           .limit(limit);
 
+      final list = List<Map<String, dynamic>>.from(
+        (rows as List).map((row) => Map<String, dynamic>.from(row as Map)),
+      );
+      await ProfileCards.attachAsProfiles(list, idKey: 'user_id');
+
       final mediaByPost = await CommunityNewsMediaService.fetchMediaByPostIds(
         postBodies.keys.toList(),
       );
 
-      return rows.map((row) {
+      return list.map((row) {
         final profile = row['profiles'] as Map<String, dynamic>?;
         final sparker =
             (profile?['display_name'] as String?) ?? 'Someone';

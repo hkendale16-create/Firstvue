@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/media_config.dart';
 import 'media_storage_service.dart';
 import 'media_type_helpers.dart';
+import 'profile_cards.dart';
 import 'profile_media_service.dart';
 
 class StoryItem {
@@ -261,15 +262,7 @@ class StoryService {
   static Future<Map<String, String>> _profileNames(List<String> ids) async {
     if (ids.isEmpty) return {};
     try {
-      final rows = await _client
-          .from('profiles')
-          .select('id, display_name')
-          .inFilter('id', ids);
-      return {
-        for (final row in rows)
-          row['id'] as String:
-              (row['display_name'] as String?) ?? 'FirstVue member',
-      };
+      return await ProfileCards.displayNames(ids);
     } catch (_) {
       return {};
     }

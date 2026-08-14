@@ -8,6 +8,7 @@ import 'community_editor_service.dart';
 import 'community_service.dart';
 import 'entity_image_url.dart';
 import 'media_storage_service.dart';
+import 'profile_cards.dart';
 import 'profile_media_service.dart';
 import 'user_preferences_service.dart';
 
@@ -790,11 +791,10 @@ class CommunityHubService {
       final hub = await fetchHubById(hubId);
       if (hub?.leaderUserId != null && hub!.leaderUserId!.isNotEmpty) {
         final profileId = hub.leaderUserId!;
-        final profile = await _client
-            .from('profiles')
-            .select('display_name, username')
-            .eq('id', profileId)
-            .maybeSingle();
+        final profile = await ProfileCards.fetchById(
+          profileId,
+          select: ProfileCards.nameColumns,
+        );
         final avatars = await ProfileMediaService.fetchAvatarUrlsForProfiles([
           profileId,
         ]);
@@ -833,11 +833,10 @@ class CommunityHubService {
       }
 
       final profileId = chosen['profile_id'] as String;
-      final profile = await _client
-          .from('profiles')
-          .select('display_name, username')
-          .eq('id', profileId)
-          .maybeSingle();
+      final profile = await ProfileCards.fetchById(
+        profileId,
+        select: ProfileCards.nameColumns,
+      );
       final avatars = await ProfileMediaService.fetchAvatarUrlsForProfiles([
         profileId,
       ]);
@@ -1089,13 +1088,15 @@ class CommunityHubService {
     try {
       final rows = await _client
           .from('community_hub_roles')
-          .select(
-            'profile_id, role, status, created_at, profiles(display_name)',
-          )
+          .select('profile_id, role, status, created_at')
           .eq('hub_id', hubId)
           .eq('status', 'pending')
           .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(rows);
+      final list = List<Map<String, dynamic>>.from(
+        (rows as List).map((row) => Map<String, dynamic>.from(row as Map)),
+      );
+      await ProfileCards.attachAsProfiles(list, idKey: 'profile_id');
+      return list;
     } catch (_) {
       return const [];
     }

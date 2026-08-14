@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'profile_cards.dart';
+
 enum UsernameAvailability {
   empty,
   invalid,
@@ -65,11 +67,7 @@ class UsernameService {
   static Future<String?> fetchUsernameForUser(String profileId) async {
     if (profileId.trim().isEmpty) return null;
     try {
-      final row = await _client
-          .from('profiles')
-          .select('username')
-          .eq('id', profileId)
-          .maybeSingle();
+      final row = await ProfileCards.fetchById(profileId, select: 'username');
       final username = row?['username'] as String?;
       if (username == null || username.trim().isEmpty) return null;
       return username.trim();
@@ -112,11 +110,7 @@ class UsernameService {
     final normalized = normalize(username);
     if (normalized == null) return null;
     try {
-      final row = await _client
-          .from('profiles')
-          .select('id')
-          .eq('username', normalized)
-          .maybeSingle();
+      final row = await ProfileCards.fetchByUsername(normalized);
       return row?['id'] as String?;
     } catch (_) {
       return null;

@@ -8,6 +8,7 @@ import 'community_news_media_service.dart';
 import 'community_service.dart';
 import 'follow_service.dart';
 import 'post_metadata_service.dart';
+import 'profile_cards.dart';
 import 'saved_items_service.dart';
 import '../models/publish_destination.dart';
 
@@ -900,15 +901,7 @@ class CommunityNewsService {
   ) async {
     if (authorIds.isEmpty) return {};
     try {
-      final rows = await _client
-          .from('profiles')
-          .select('id, display_name')
-          .inFilter('id', authorIds);
-      return {
-        for (final row in rows)
-          row['id'] as String:
-              (row['display_name'] as String?) ?? 'FirstVue member',
-      };
+      return await ProfileCards.displayNames(authorIds);
     } catch (_) {
       return {};
     }
@@ -919,10 +912,10 @@ class CommunityNewsService {
   ) async {
     if (authorIds.isEmpty) return {};
     try {
-      final rows = await _client
-          .from('profiles')
-          .select('id, username')
-          .inFilter('id', authorIds);
+      final rows = await ProfileCards.listByIds(
+        authorIds,
+        select: 'id, username',
+      );
       return {
         for (final row in rows)
           if ((row['username'] as String?)?.trim().isNotEmpty == true)
@@ -1632,10 +1625,10 @@ class CommunityNewsService {
       final ids = rows.map((row) => row['user_id'] as String).toList();
       if (ids.isEmpty) return const [];
 
-      final profiles = await _client
-          .from('profiles')
-          .select('id, display_name, username, avatar_url')
-          .inFilter('id', ids);
+      final profiles = await ProfileCards.listByIds(
+        ids,
+        select: 'id, display_name, username',
+      );
 
       final byId = {for (final row in profiles) row['id'] as String: row};
 

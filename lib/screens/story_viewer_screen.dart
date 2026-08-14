@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../navigation/firstvue_page_route.dart';
+import '../messaging/services/fv_messaging_service.dart';
 import '../services/firstvue_feedback_sounds.dart';
-import '../services/messaging_service.dart';
 import '../services/story_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/vue_video_player.dart';
@@ -151,11 +151,11 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
       return;
     }
     try {
-      final threadId = await MessagingService.openThreadWithUser(
+      final conversationId = await FvMessagingService.openDirect(
         otherUserId: _story.ownerId,
       );
-      await MessagingService.sendMessage(
-        threadId: threadId,
+      await FvMessagingService.sendText(
+        conversationId: conversationId,
         body: 'Story reply: $text',
       );
       _reply.clear();

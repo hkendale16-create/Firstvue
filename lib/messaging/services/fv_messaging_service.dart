@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../../config/media_config.dart';
 import '../../services/messaging_service.dart';
 import '../../services/post_identity_service.dart';
+import '../../services/profile_cards.dart';
 import '../../services/things_to_do_service.dart';
 import '../../services/user_profile_service.dart';
 import '../crypto/device_keystore.dart';
@@ -589,14 +590,19 @@ class FvMessagingService {
     }
     if (conversationId.startsWith('legacy:')) {
       final legacyId = conversationId.substring(7);
-      await MessagingService.sendMessage(threadId: legacyId, body: trimmed);
-      return FvChatMessage(
-        id: _uuid.v4(),
-        conversationId: conversationId,
-        senderId: me,
-        isMine: true,
-        plaintext: trimmed,
-        createdAt: DateTime.now(),
+      await ensureReady();
+      if (!schemaReady) {
+        throw StateError('Encrypted messaging is required.');
+      }
+      final otherId = await MessagingService.otherParticipantId(legacyId);
+      if (otherId == null) {
+        throw StateError('Legacy thread is missing the other participant.');
+      }
+      final encryptedId = await openDirect(otherUserId: otherId);
+      return sendText(
+        conversationId: encryptedId,
+        body: trimmed,
+        asIdentity: asIdentity,
       );
     }
     await ensureReady();
@@ -820,11 +826,15 @@ class FvMessagingService {
     if (secret == null) return [];
     final rows = await _client
         .from('fv_msg_internal_notes')
-        .select('id, author_id, ciphertext, created_at, profiles(display_name)')
+        .select('id, author_id, ciphertext, created_at')
         .eq('conversation_id', conversationId)
         .order('created_at');
+    final notes = List<Map<String, dynamic>>.from(
+      (rows as List).map((row) => Map<String, dynamic>.from(row as Map)),
+    );
+    await ProfileCards.attachAsProfiles(notes, idKey: 'author_id');
     final out = <FvInternalNote>[];
-    for (final row in List<Map<String, dynamic>>.from(rows as List)) {
+    for (final row in notes) {
       String body = 'Encrypted note';
       try {
         final combined = _asBytes(row['ciphertext']);
@@ -855,12 +865,16 @@ class FvMessagingService {
     try {
       final rows = await _client
           .from('fv_msg_audit')
-          .select('id, action, created_at, profiles(display_name)')
+          .select('id, action, created_at, actor_id')
           .eq('conversation_id', conversationId)
           .order('created_at', ascending: false)
           .limit(40);
+      final list = List<Map<String, dynamic>>.from(
+        (rows as List).map((row) => Map<String, dynamic>.from(row as Map)),
+      );
+      await ProfileCards.attachAsProfiles(list, idKey: 'actor_id');
       return [
-        for (final row in List<Map<String, dynamic>>.from(rows as List))
+        for (final row in list)
           FvAuditEvent(
             id: row['id'] as String,
             action: row['action'] as String? ?? '',
@@ -882,11 +896,15 @@ class FvMessagingService {
     try {
       final rows = await _client
           .from('business_memberships')
-          .select('profile_id, role, profiles(display_name)')
+          .select('profile_id, role')
           .eq('business_id', entityId)
           .inFilter('role', ['owner', 'manager', 'moderator']);
+      final list = List<Map<String, dynamic>>.from(
+        (rows as List).map((row) => Map<String, dynamic>.from(row as Map)),
+      );
+      await ProfileCards.attachAsProfiles(list, idKey: 'profile_id');
       return [
-        for (final row in List<Map<String, dynamic>>.from(rows as List))
+        for (final row in list)
           FvTeamMember(
             profileId: row['profile_id'] as String,
             displayName:
@@ -1512,12 +1530,13 @@ class FvMessagingService {
     try {
       final row = await _client
           .from('fv_msg_assignments')
-          .select('assignee_id, profiles(display_name)')
+          .select('assignee_id')
           .eq('conversation_id', conversationId)
           .maybeSingle();
       if (row == null) return null;
       final name =
-          ((row['profiles'] as Map?)?['display_name'] as String?) ?? 'Assigned';
+          (await ProfileCards.displayName(row['assignee_id'] as String)) ??
+          'Assigned';
       return 'Assigned to $name';
     } catch (_) {
       return null;

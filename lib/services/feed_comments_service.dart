@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'activity_notifications_service.dart';
 import 'community_news_service.dart';
+import 'profile_cards.dart';
 
 class FeedComment {
   final String id;
@@ -188,15 +189,7 @@ class FeedCommentsService {
   ) async {
     if (authorIds.isEmpty) return {};
     try {
-      final rows = await _client
-          .from('profiles')
-          .select('id, display_name')
-          .inFilter('id', authorIds);
-      return {
-        for (final row in rows)
-          row['id'] as String:
-              (row['display_name'] as String?) ?? 'FirstVue member',
-      };
+      return await ProfileCards.displayNames(authorIds);
     } catch (_) {
       return {};
     }

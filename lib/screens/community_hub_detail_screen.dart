@@ -8,6 +8,7 @@ import '../services/community_editor_service.dart';
 import '../services/community_hub_service.dart';
 import '../services/community_news_service.dart';
 import '../services/community_service.dart';
+import '../services/profile_cards.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/community_news_post_card.dart';
 import '../widgets/community_news_post_detail_sheet.dart';
@@ -440,11 +441,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
     if (uuidPattern.hasMatch(input)) return input;
 
     try {
-      final row = await Supabase.instance.client
-          .from('profiles')
-          .select('id')
-          .ilike('username', input)
-          .maybeSingle();
+      final row = await ProfileCards.fetchByUsername(input);
       return row?['id'] as String?;
     } catch (_) {
       return null;

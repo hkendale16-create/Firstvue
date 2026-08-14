@@ -41,7 +41,7 @@ class MediaStorageService {
       }
     }
 
-    return _client.storage.from(bucket.id).createSignedUrl(path, 604800);
+    return _client.storage.from(bucket.id).createSignedUrl(path, 3600);
   }
 
   static Future<MediaUploadResult> uploadBytes({

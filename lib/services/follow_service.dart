@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'activity_notifications_service.dart';
+import 'profile_cards.dart';
 
 class FollowProfile {
   final String id;
@@ -72,11 +73,10 @@ class FollowService {
 
   static Future<bool> _isPrivateProfile(String profileId) async {
     try {
-      final row = await _client
-          .from('profiles')
-          .select('is_private')
-          .eq('id', profileId)
-          .maybeSingle();
+      final row = await ProfileCards.fetchById(
+        profileId,
+        select: 'is_private',
+      );
       return row?['is_private'] as bool? ?? false;
     } catch (_) {
       return false;
@@ -105,11 +105,10 @@ class FollowService {
 
   static Future<String> _actorLabel(String userId) async {
     try {
-      final row = await _client
-          .from('profiles')
-          .select('display_name, username')
-          .eq('id', userId)
-          .maybeSingle();
+      final row = await ProfileCards.fetchById(
+        userId,
+        select: 'display_name, username',
+      );
       final username = row?['username'] as String?;
       if (username != null && username.trim().isNotEmpty) {
         return '@${username.trim()}';
@@ -233,6 +232,13 @@ class FollowService {
   static Future<int> fetchFollowerCount(String profileId) async {
     if (profileId.trim().isEmpty) return 0;
     try {
+      final count = await _client.rpc(
+        'count_profile_followers',
+        params: {'p_profile_id': profileId},
+      );
+      if (count is num) return count.toInt();
+    } catch (_) {}
+    try {
       final rows = await _client
           .from('profile_follows')
           .select('follower_id')
@@ -245,6 +251,13 @@ class FollowService {
 
   static Future<int> fetchFollowingCount(String profileId) async {
     if (profileId.trim().isEmpty) return 0;
+    try {
+      final count = await _client.rpc(
+        'count_profile_following',
+        params: {'p_profile_id': profileId},
+      );
+      if (count is num) return count.toInt();
+    } catch (_) {}
     try {
       final rows = await _client
           .from('profile_follows')
@@ -382,21 +395,14 @@ class FollowService {
 
     List<dynamic> rows;
     try {
-      rows = await _client
-          .from('profiles')
-          .select('id, display_name, username')
-          .inFilter('id', ids);
+      rows = await ProfileCards.listByIds(
+        ids,
+        select: 'id, display_name, username',
+      );
     } catch (_) {
-      try {
-        rows = await _client
-            .from('profiles')
-            .select('id, display_name')
-            .inFilter('id', ids);
-      } catch (_) {
-        return ids
-            .map((id) => FollowProfile(id: id, displayName: 'FirstVue member'))
-            .toList();
-      }
+      return ids
+          .map((id) => FollowProfile(id: id, displayName: 'FirstVue member'))
+          .toList();
     }
 
     final byId = {
