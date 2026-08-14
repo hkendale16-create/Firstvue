@@ -48,15 +48,71 @@ void main() {
     await tester.pump(const Duration(milliseconds: 250));
 
     expect(find.text('Forgot password?'), findsNothing);
+    expect(find.byKey(const ValueKey('auth-username-field')), findsOneWidget);
     expect(
-      find.text('Use at least 8 characters. We’ll email a confirmation link.'),
+      find.byKey(const ValueKey('auth-confirm-password-field')),
       findsOneWidget,
     );
-    expect(find.widgetWithText(FvGoldButton, 'Create account'), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-legal-checkbox')), findsOneWidget);
+    expect(
+      find.text(
+        'Password: 8+ characters, uppercase, lowercase, and a number.',
+      ),
+      findsOneWidget,
+    );
+    final createButton = tester.widget<FvGoldButton>(
+      find.widgetWithText(FvGoldButton, 'Create account'),
+    );
+    expect(createButton.enabled, isFalse);
 
     await tester.tap(find.byKey(const ValueKey('auth-segment-Sign in')));
     await tester.pump(const Duration(milliseconds: 250));
     expect(find.widgetWithText(FvGoldButton, 'Sign in'), findsOneWidget);
+  });
+
+
+  testWidgets('switching auth tabs clears password values', (tester) async {
+    await tester.pumpWidget(_wrap(const AuthScreen()));
+    await tester.pump();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-email-field')),
+      'jordan@firstvue.app',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-password-field')),
+      'Password1',
+    );
+
+    await tester.tap(find.byKey(const ValueKey('auth-segment-Create account')));
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final password = tester.widget<TextField>(
+      find.descendant(
+        of: find.byKey(const ValueKey('auth-password-field')),
+        matching: find.byType(TextField),
+      ),
+    );
+    expect(password.controller?.text, isEmpty);
+
+    final email = tester.widget<TextField>(
+      find.descendant(
+        of: find.byKey(const ValueKey('auth-email-field')),
+        matching: find.byType(TextField),
+      ),
+    );
+    expect(email.controller?.text, 'jordan@firstvue.app');
+  });
+
+  testWidgets('registration exposes required legal pages', (tester) async {
+    await tester.pumpWidget(_wrap(const AuthScreen()));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-segment-Create account')));
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.text('Terms'), findsOneWidget);
+    expect(find.text('Privacy Policy'), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-legal-checkbox')), findsOneWidget);
   });
 
   testWidgets('password visibility toggle is accessible', (tester) async {
