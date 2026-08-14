@@ -76,7 +76,9 @@ class PortfolioAlbumItem {
     this.sortOrder = 0,
   });
 
-  bool get isVideo => mediaType == 'video';
+  bool get isVideo =>
+      mediaTypeFromMetadata(mediaType: mediaType, pathOrUrl: storagePath) ==
+      'video';
 }
 
 /// Facebook-style portfolio albums independent of the newsfeed.
@@ -335,7 +337,7 @@ class PortfolioAlbumService {
           'Each photo or video must be 50 MB or smaller.',
         );
       }
-      final mediaType = mediaTypeForFile(file);
+      final mediaType = mediaTypeForFile(file, bytes: bytes);
       final contentType = mimeTypeForFile(file, mediaType);
       final upload = await MediaStorageService.uploadBytes(
         bucket: ownerType.bucket,
@@ -465,7 +467,7 @@ class PortfolioAlbumService {
       );
     }
 
-    final mediaType = mediaTypeForFile(file);
+    final mediaType = mediaTypeForFile(file, bytes: bytes);
     final contentType = mimeTypeForFile(file, mediaType);
     final upload = await MediaStorageService.uploadBytes(
       bucket: ownerType.bucket,

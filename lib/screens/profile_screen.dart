@@ -397,6 +397,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
       }
+    } on StorageException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

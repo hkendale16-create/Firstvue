@@ -25,7 +25,9 @@ class BusinessMediaItem {
     this.mediaRole = 'gallery',
   });
 
-  bool get isVideo => mediaType == 'video';
+  bool get isVideo =>
+      mediaTypeFromMetadata(mediaType: mediaType, pathOrUrl: storagePath) ==
+      'video';
 }
 
 class BusinessImageSet {
@@ -229,6 +231,7 @@ class BusinessMediaService {
     final validated = await RoleMediaReplace.readValidatedBytes(
       file,
       maxBytes: _maxMediaBytes,
+      imagesOnly: true,
     );
     final upload = await MediaStorageService.uploadBytes(
       bucket: MediaBucket.business,
@@ -314,7 +317,7 @@ class BusinessMediaService {
       );
     }
 
-    final mediaType = mediaTypeForFile(file);
+    final mediaType = mediaTypeForFile(file, bytes: bytes);
     final contentType = mimeTypeForFile(file, mediaType);
     final upload = await MediaStorageService.uploadBytes(
       bucket: MediaBucket.business,

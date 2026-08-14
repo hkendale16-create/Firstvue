@@ -12,6 +12,7 @@ import 'entity_follow_button.dart';
 import 'explore_grid_video.dart';
 import 'facebook_style_profile_header.dart';
 import 'firstvue_inline_search_bar.dart';
+import 'signed_media_viewer.dart';
 
 const _goldOnWhite = Colors.white;
 const _searchHint = 'Search for people, places, or services.';
@@ -1479,12 +1480,17 @@ class SocialProfileHeader extends StatelessWidget {
         child: CircleAvatar(
           radius: 44,
           backgroundColor: fv.elevatedSurface,
-          backgroundImage: hasAvatar && !avatarIsVideo
-              ? NetworkImage(avatarImageUrl!)
-              : null,
-          child: hasAvatar
-              ? null
-              : Icon(avatarIcon, color: FirstVueColors.gold, size: 42),
+          child: !hasAvatar
+              ? Icon(avatarIcon, color: FirstVueColors.gold, size: 42)
+              : ClipOval(
+                  child: SignedMediaThumbnail(
+                    url: avatarImageUrl!,
+                    isVideo: avatarIsVideo,
+                    width: 88,
+                    height: 88,
+                    fit: BoxFit.cover,
+                  ),
+                ),
         ),
       ),
     );
@@ -1500,10 +1506,11 @@ class SocialProfileHeader extends StatelessWidget {
                 height: 168,
                 width: double.infinity,
                 child: hasCover
-                    ? Image.network(
-                        coverImageUrl!,
+                    ? SignedMediaThumbnail(
+                        url: coverImageUrl!,
+                        isVideo: coverIsVideo,
+                        height: 168,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => _coverFallback(),
                       )
                     : _coverFallback(),
               ),

@@ -1,9 +1,11 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:firstvue/services/community_creation_service.dart';
 import 'package:firstvue/services/community_editor_service.dart';
 import 'package:firstvue/services/media_type_helpers.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 
 void main() {
   group('CommunityCreationRequest.fromRow', () {
@@ -149,6 +151,75 @@ void main() {
         'image',
       );
       expect(mediaTypeFromMetadata(), 'image');
+    });
+  });
+
+  group('mediaTypeFromBytes', () {
+    List<int> padded(List<int> header, [int length = 16]) {
+      return [...header, ...List<int>.filled(length - header.length, 0)];
+    }
+
+    test('sniffs still-image headers', () {
+      expect(mediaTypeFromBytes(padded([0xFF, 0xD8, 0xFF, 0xE0])), 'image');
+      expect(
+        mediaTypeFromBytes(padded([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A])),
+        'image',
+      );
+      expect(mediaTypeFromBytes(padded([0x47, 0x49, 0x46, 0x38])), 'image');
+      expect(
+        mediaTypeFromBytes([
+          0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 0, 0, 0, 0,
+        ]),
+        'image',
+      );
+    });
+
+    test('sniffs mp4/mov even when the picker omitted a filename', () {
+      expect(
+        mediaTypeFromBytes([
+          0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6F, 0x6D,
+        ]),
+        'video',
+      );
+      expect(
+        mediaTypeFromBytes([
+          0, 0, 0, 0x14, 0x66, 0x74, 0x79, 0x70, 0x71, 0x74, 0x20, 0x20,
+        ]),
+        'video',
+      );
+    });
+
+    test('treats HEIC stills as images', () {
+      expect(
+        mediaTypeFromBytes([
+          0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63,
+        ]),
+        'image',
+      );
+    });
+
+    test('returns null for short or unknown buffers', () {
+      expect(mediaTypeFromBytes([1, 2, 3]), isNull);
+      expect(mediaTypeFromBytes(padded([0x00, 0x01, 0x02, 0x03])), isNull);
+    });
+
+    test('ignores a conflicting image MIME when bytes are a movie', () {
+      final mov = [
+        0, 0, 0, 0x14, 0x66, 0x74, 0x79, 0x70, 0x71, 0x74, 0x20, 0x20,
+      ];
+      final file = XFile.fromData(
+        Uint8List.fromList(mov),
+        mimeType: 'image/jpeg',
+        name: 'blob',
+      );
+      expect(mediaTypeForFile(file, bytes: mov), 'video');
+      expect(mimeTypeForFile(file, 'video'), 'video/mp4');
+    });
+
+    test('pathHasKnownImageExtension ignores query strings', () {
+      expect(pathHasKnownImageExtension('https://cdn.example/a.jpg?x=1'), isTrue);
+      expect(pathHasKnownImageExtension('https://cdn.example/a.MOV'), isFalse);
+      expect(pathHasKnownImageExtension('user/123_0_blob'), isFalse);
     });
   });
 

@@ -25,7 +25,9 @@ class ProfileMediaItem {
     this.mediaRole = 'gallery',
   });
 
-  bool get isVideo => mediaType == 'video';
+  bool get isVideo =>
+      mediaTypeFromMetadata(mediaType: mediaType, pathOrUrl: storagePath) ==
+      'video';
 }
 
 class ProfileImageSet {
@@ -243,6 +245,7 @@ class ProfileMediaService {
     final validated = await RoleMediaReplace.readValidatedBytes(
       file,
       maxBytes: _maxMediaBytes,
+      imagesOnly: true,
     );
     final upload = await MediaStorageService.uploadBytes(
       bucket: MediaBucket.profile,
@@ -342,7 +345,7 @@ class ProfileMediaService {
       );
     }
 
-    final mediaType = mediaTypeForFile(file);
+    final mediaType = mediaTypeForFile(file, bytes: bytes);
     final contentType = mimeTypeForFile(file, mediaType);
     final upload = await MediaStorageService.uploadBytes(
       bucket: MediaBucket.profile,
