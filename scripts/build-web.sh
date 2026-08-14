@@ -18,11 +18,11 @@ flutter config --enable-web
 flutter precache --web
 flutter pub get
 
-DART_DEFINE=""
+DART_DEFINE="--dart-define=FIRSTVUE_OAUTH_GOOGLE=true"
 if [ -n "${URL:-}" ]; then
-  DART_DEFINE="--dart-define=FIRSTVUE_WEB_URL=${URL}"
+  DART_DEFINE="$DART_DEFINE --dart-define=FIRSTVUE_WEB_URL=${URL}"
 elif [ -n "${DEPLOY_PRIME_URL:-}" ]; then
-  DART_DEFINE="--dart-define=FIRSTVUE_WEB_URL=${DEPLOY_PRIME_URL}"
+  DART_DEFINE="$DART_DEFINE --dart-define=FIRSTVUE_WEB_URL=${DEPLOY_PRIME_URL}"
 fi
 
 # shellcheck disable=SC2086

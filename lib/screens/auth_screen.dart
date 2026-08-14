@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -25,14 +27,21 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
   final _newPasswordController = TextEditingController();
 
+  Timer? _usernameDebounce;
   late AuthSheetMode _mode;
+  UsernameAvailability _usernameAvailability = UsernameAvailability.empty;
   bool _submitting = false;
+  bool _acceptedLegal = false;
+  bool _createTouched = false;
   String? _emailError;
+  String? _usernameError;
   String? _passwordError;
+  String? _confirmError;
   String? _formError;
   String? _infoMessage;
 
@@ -46,27 +55,124 @@ class _AuthScreenState extends State<AuthScreen> {
   void didUpdateWidget(covariant AuthScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialMode != widget.initialMode) {
-      _mode = widget.initialMode;
+      _setMode(widget.initialMode);
     }
   }
 
   @override
   void dispose() {
+    _usernameDebounce?.cancel();
     _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
     _newPasswordController.dispose();
     super.dispose();
   }
 
+  bool get _strongPassword {
+    final value = _passwordController.text;
+    return value.length >= 8 &&
+        RegExp(r'[a-z]').hasMatch(value) &&
+        RegExp(r'[A-Z]').hasMatch(value) &&
+        RegExp(r'[0-9]').hasMatch(value);
+  }
+
+  bool get _createReady {
+    return AuthIdentifier.parse(_emailController.text).email != null &&
+        UsernameService.normalize(_usernameController.text) != null &&
+        _usernameAvailability == UsernameAvailability.available &&
+        _strongPassword &&
+        _confirmController.text == _passwordController.text &&
+        _confirmController.text.isNotEmpty &&
+        _acceptedLegal;
+  }
+
   void _setMode(AuthSheetMode mode) {
     if (_submitting || mode == _mode) return;
+    _usernameDebounce?.cancel();
+    _passwordController.clear();
+    _confirmController.clear();
+    _newPasswordController.clear();
     setState(() {
       _mode = mode;
+      _createTouched = false;
       _emailError = null;
+      _usernameError = null;
       _passwordError = null;
+      _confirmError = null;
       _formError = null;
       _infoMessage = null;
+    });
+  }
+
+  void _onCreateValueChanged(String _) {
+    if (_createTouched) {
+      _setCreateErrors();
+    } else {
+      setState(() {});
+    }
+  }
+
+  void _onUsernameChanged(String _) {
+    _usernameDebounce?.cancel();
+    final normalized = UsernameService.normalize(_usernameController.text);
+    if (normalized == null) {
+      setState(() {
+        _usernameAvailability = _usernameController.text.trim().isEmpty
+            ? UsernameAvailability.empty
+            : UsernameAvailability.invalid;
+        if (_createTouched) {
+          _usernameError = UsernameService.validationMessage(
+            _usernameController.text,
+          );
+        }
+      });
+      return;
+    }
+    setState(() {
+      _usernameAvailability = UsernameAvailability.checking;
+      _usernameError = null;
+    });
+    _usernameDebounce = Timer(const Duration(milliseconds: 350), () async {
+      final result = await UsernameService.checkAvailability(normalized);
+      if (!mounted ||
+          UsernameService.normalize(_usernameController.text) != normalized) {
+        return;
+      }
+      setState(() {
+        _usernameAvailability = result;
+        _usernameError = switch (result) {
+          UsernameAvailability.taken => 'That username is already taken.',
+          UsernameAvailability.error =>
+            'Username availability is temporarily unavailable.',
+          _ => null,
+        };
+      });
+    });
+  }
+
+  void _setCreateErrors() {
+    final email = AuthIdentifier.parse(_emailController.text).email;
+    final normalized = UsernameService.normalize(_usernameController.text);
+    setState(() {
+      _emailError = email == null ? 'Enter a valid email address.' : null;
+      _usernameError = normalized == null
+          ? UsernameService.validationMessage(_usernameController.text)
+          : switch (_usernameAvailability) {
+              UsernameAvailability.taken => 'That username is already taken.',
+              UsernameAvailability.error =>
+                'Username availability is temporarily unavailable.',
+              _ => null,
+            };
+      _passwordError = _strongPassword
+          ? null
+          : 'Use 8+ characters with uppercase, lowercase, and a number.';
+      _confirmError =
+          _confirmController.text == _passwordController.text &&
+              _confirmController.text.isNotEmpty
+          ? null
+          : 'Passwords do not match.';
     });
   }
 
@@ -78,26 +184,32 @@ class _AuthScreenState extends State<AuthScreen> {
     if (identifier.email == null && identifier.username == null) {
       _emailError = 'Enter an email or username.';
     }
-    if (_passwordController.text.length < 8) {
-      _passwordError = 'Password must be at least 8 characters.';
+    if (_passwordController.text.isEmpty) {
+      _passwordError = 'Enter your password.';
     }
     setState(() {});
     return _emailError == null && _passwordError == null;
   }
 
   bool _validateCreate() {
-    final identifier = AuthIdentifier.parse(_emailController.text);
-    _emailError = null;
-    _passwordError = null;
-    _formError = null;
-    if (identifier.email == null) {
-      _emailError = 'Enter a valid email address.';
+    _createTouched = true;
+    _setCreateErrors();
+    if (!_acceptedLegal) {
+      setState(() {
+        _formError = 'Accept the Terms and Privacy Policy to continue.';
+      });
+      return false;
     }
-    if (_passwordController.text.length < 8) {
-      _passwordError = 'Password must be at least 8 characters.';
+    if (_usernameAvailability != UsernameAvailability.available) {
+      setState(() {
+        _formError = _usernameAvailability == UsernameAvailability.checking
+            ? 'Wait for the username check to finish.'
+            : 'Choose an available username.';
+      });
+      return false;
     }
-    setState(() {});
-    return _emailError == null && _passwordError == null;
+    setState(() => _formError = null);
+    return _createReady;
   }
 
   Future<void> _submit() async {
@@ -111,66 +223,99 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
     if (_mode == AuthSheetMode.createAccount) {
-      if (!_validateCreate()) return;
-      await _createAccount();
+      if (_validateCreate()) await _createAccount();
       return;
     }
-    if (!_validateSignIn()) return;
-    await _signIn();
+    if (_validateSignIn()) await _signIn();
   }
 
   Future<void> _signIn() async {
     final identifier = AuthIdentifier.parse(_emailController.text);
-    if (identifier.username != null && identifier.email == null) {
-      // Username → email resolution needs a security-definer RPC that never
-      // returns the email to the client. That backend is not in this project.
-      setState(() => _formError = kGenericAuthError);
-      return;
-    }
-    final email = identifier.email;
-    if (email == null) {
-      setState(() => _formError = kGenericAuthError);
-      return;
-    }
-
-    setState(() => _submitting = true);
+    setState(() {
+      _submitting = true;
+      _formError = null;
+      _infoMessage = null;
+    });
     try {
-      await Supabase.instance.client.auth.signInWithPassword(
-        email: email,
-        password: _passwordController.text,
-      );
+      if (identifier.email != null) {
+        await Supabase.instance.client.auth.signInWithPassword(
+          email: identifier.email!,
+          password: _passwordController.text,
+        );
+      } else {
+        final response = await Supabase.instance.client.functions.invoke(
+          'username-login',
+          body: {
+            'username': identifier.username,
+            'password': _passwordController.text,
+          },
+        );
+        final data = response.data;
+        if (response.status != 200 || data is! Map) {
+          throw const AuthException(kGenericAuthError);
+        }
+        final refreshToken = data['refresh_token'] as String?;
+        if (refreshToken == null || refreshToken.isEmpty) {
+          throw const AuthException(kGenericAuthError);
+        }
+        await Supabase.instance.client.auth.setSession(refreshToken);
+      }
       await _ensureProfile(Supabase.instance.client.auth.currentUser);
-      if (mounted) await UsernameService.fetchUsername();
+      if (mounted) {
+        setState(() => _infoMessage = 'Signed in successfully.');
+      }
     } on AuthException {
       if (mounted) setState(() => _formError = kGenericAuthError);
     } catch (_) {
       if (mounted) setState(() => _formError = kGenericAuthError);
     } finally {
+      _passwordController.clear();
       if (mounted) setState(() => _submitting = false);
     }
   }
 
   Future<void> _createAccount() async {
     final email = AuthIdentifier.parse(_emailController.text).email!;
-    setState(() => _submitting = true);
+    final username = UsernameService.normalize(_usernameController.text)!;
+    setState(() {
+      _submitting = true;
+      _formError = null;
+      _infoMessage = null;
+    });
     try {
       final response = await Supabase.instance.client.auth.signUp(
         email: email,
         password: _passwordController.text,
+        emailRedirectTo: approvedAuthCallbackUrl(path: '/auth/confirm'),
+        data: {
+          'username': username,
+          'terms_accepted': true,
+          'privacy_accepted': true,
+        },
       );
+      _passwordController.clear();
+      _confirmController.clear();
       if (!mounted) return;
       if (response.session == null) {
         setState(() {
           _mode = AuthSheetMode.signIn;
           _infoMessage =
-              'Account created. Check your email to confirm it, then sign in.';
+              'Account created. Check your email to verify it, then sign in.';
           _formError = null;
         });
       } else {
         await _ensureProfile(response.user);
+        if (mounted) {
+          setState(() => _infoMessage = 'Account created successfully.');
+        }
       }
     } on AuthException {
-      if (mounted) setState(() => _formError = kGenericAuthError);
+      if (mounted) {
+        setState(
+          () => _formError =
+              'Unable to create this account. Check the fields and try again.',
+        );
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _formError = 'Unable to create an account right now.');
@@ -194,7 +339,7 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       await Supabase.instance.client.auth.resetPasswordForEmail(
         email,
-        redirectTo: approvedAuthCallbackUrl(),
+        redirectTo: approvedAuthCallbackUrl(path: '/reset-password'),
       );
       if (mounted) {
         setState(() {
@@ -210,24 +355,34 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _updatePassword() async {
-    if (_newPasswordController.text.length < 8) {
+    final password = _newPasswordController.text;
+    final valid = password.length >= 8 &&
+        RegExp(r'[a-z]').hasMatch(password) &&
+        RegExp(r'[A-Z]').hasMatch(password) &&
+        RegExp(r'[0-9]').hasMatch(password);
+    if (!valid) {
       setState(
-        () => _passwordError = 'Password must be at least 8 characters.',
+        () => _passwordError =
+            'Use 8+ characters with uppercase, lowercase, and a number.',
       );
       return;
     }
-    if (_newPasswordController.text != _confirmController.text) {
-      setState(() => _passwordError = 'Passwords do not match.');
+    if (password != _confirmController.text) {
+      setState(() => _confirmError = 'Passwords do not match.');
       return;
     }
     setState(() {
       _submitting = true;
       _passwordError = null;
+      _confirmError = null;
+      _formError = null;
     });
     try {
       await Supabase.instance.client.auth.updateUser(
-        UserAttributes(password: _newPasswordController.text),
+        UserAttributes(password: password),
       );
+      _newPasswordController.clear();
+      _confirmController.clear();
       if (mounted) {
         setState(() {
           _mode = AuthSheetMode.signIn;
@@ -261,12 +416,18 @@ class _AuthScreenState extends State<AuthScreen> {
         'ensure_user_profile',
         params: {'display_name': displayName},
       );
-    } catch (_) {}
+      await UsernameService.fetchUsername();
+    } catch (_) {
+      // Profile bootstrap is retried by signed-in feature services.
+    }
   }
 
   Future<void> _oauth(OAuthProvider provider) async {
     if (_submitting) return;
-    setState(() => _submitting = true);
+    setState(() {
+      _submitting = true;
+      _formError = null;
+    });
     try {
       await Supabase.instance.client.auth.signInWithOAuth(
         provider,
@@ -281,10 +442,11 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.sizeOf(context).height;
-    final short = height < 720;
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final media = MediaQuery.of(context);
+    final height = media.size.height;
+    final short = height < 700;
+    final reduceMotion = media.disableAnimations;
+    final heroHeight = (height * (short ? .34 : .39)).clamp(220.0, 360.0);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -293,74 +455,74 @@ class _AuthScreenState extends State<AuthScreen> {
         child: PopScope(
           canPop: widget.allowBack,
           child: Scaffold(
-            backgroundColor: const Color(0xFF0B1020),
+            backgroundColor: const Color(0xFF080D1B),
+            resizeToAvoidBottomInset: true,
             body: SafeArea(
-              child: Column(
+              child: Stack(
                 children: [
                   SizedBox(
-                    height: short ? 132 : 220,
+                    height: heroHeight,
+                    width: double.infinity,
                     child: _HeroHeader(compact: short),
                   ),
-                  Expanded(
+                  Positioned(
+                    top: heroHeight - 34,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
                     child: DecoratedBox(
                       decoration: const BoxDecoration(
-                        color: Color(0xFF121826),
+                        color: Color(0xFF111726),
                         borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(28),
+                          top: Radius.circular(38),
+                        ),
+                        border: Border(
+                          top: BorderSide(color: Color(0xFF293148)),
                         ),
                       ),
                       child: Align(
                         alignment: Alignment.topCenter,
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 520),
-                          child: AutofillGroup(
-                            child: ListView(
-                              padding: EdgeInsets.fromLTRB(
-                                22,
-                                20,
-                                22,
-                                24 + bottomInset,
-                              ),
-                              children: [
-                                if (_mode != AuthSheetMode.forgotPassword &&
-                                    _mode != AuthSheetMode.recovery)
-                                  _SegmentedAuthToggle(
-                                    mode: _mode,
-                                    enabled: !_submitting,
-                                    onChanged: _setMode,
-                                  ),
-                                if (_mode == AuthSheetMode.forgotPassword)
-                                  Text(
-                                    'Reset password',
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(
-                                        alpha: .92,
+                          constraints: const BoxConstraints(maxWidth: 560),
+                          child: SizedBox.expand(
+                            child: AutofillGroup(
+                              child: SingleChildScrollView(
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
+                              padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (_mode != AuthSheetMode.forgotPassword &&
+                                      _mode != AuthSheetMode.recovery)
+                                    _SegmentedAuthToggle(
+                                      mode: _mode,
+                                      enabled: !_submitting,
+                                      onChanged: _setMode,
+                                    )
+                                  else
+                                    Text(
+                                      _mode == AuthSheetMode.recovery
+                                          ? 'Choose a new password'
+                                          : 'Reset password',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w700,
                                       ),
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
                                     ),
-                                  ),
-                                if (_mode == AuthSheetMode.recovery)
-                                  Text(
-                                    'Choose a new password',
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(
-                                        alpha: .92,
-                                      ),
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
+                                  const SizedBox(height: 20),
+                                  AnimatedSize(
+                                    duration: Duration(
+                                      milliseconds: reduceMotion ? 0 : 220,
                                     ),
+                                    curve: Curves.easeOutCubic,
+                                    alignment: Alignment.topCenter,
+                                    child: _formBody(),
                                   ),
-                                const SizedBox(height: 18),
-                                AnimatedSize(
-                                  duration: Duration(
-                                    milliseconds: reduceMotion ? 0 : 220,
-                                  ),
-                                  curve: Curves.easeOut,
-                                  alignment: Alignment.topCenter,
-                                  child: _formBody(),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
                           ),
                         ),
@@ -393,6 +555,8 @@ class _AuthScreenState extends State<AuthScreen> {
             label: signIn ? 'Email or username' : 'Email',
             controller: _emailController,
             enabled: !_submitting,
+            valid: AuthIdentifier.parse(_emailController.text).email != null,
+            prefixIcon: Icons.alternate_email_rounded,
             errorText: _emailError,
             keyboardType: TextInputType.emailAddress,
             textInputAction: forgot
@@ -401,9 +565,28 @@ class _AuthScreenState extends State<AuthScreen> {
             autofillHints: signIn
                 ? const [AutofillHints.username, AutofillHints.email]
                 : const [AutofillHints.email],
+            onChanged: create ? _onCreateValueChanged : (_) => setState(() {}),
             onSubmitted: forgot ? (_) => _submit() : null,
           ),
           const SizedBox(height: 14),
+        ],
+        if (create) ...[
+          FvAuthField(
+            key: const ValueKey('auth-username-field'),
+            label: 'Unique username',
+            controller: _usernameController,
+            enabled: !_submitting,
+            valid: _usernameAvailability == UsernameAvailability.available,
+            prefixIcon: Icons.person_outline_rounded,
+            errorText: _usernameError,
+            keyboardType: TextInputType.text,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.newUsername],
+            onChanged: _onUsernameChanged,
+          ),
+          const SizedBox(height: 6),
+          _UsernameStatus(availability: _usernameAvailability),
+          const SizedBox(height: 8),
         ],
         if (!forgot) ...[
           FvAuthField(
@@ -411,31 +594,42 @@ class _AuthScreenState extends State<AuthScreen> {
             label: recovery ? 'New password' : 'Password',
             controller: recovery ? _newPasswordController : _passwordController,
             enabled: !_submitting,
+            valid: create && _strongPassword,
+            prefixIcon: Icons.lock_outline_rounded,
             isPassword: true,
             obscureText: true,
             errorText: _passwordError,
-            textInputAction: recovery
-                ? TextInputAction.next
-                : TextInputAction.done,
-            autofillHints: create
+            textInputAction:
+                create || recovery ? TextInputAction.next : TextInputAction.done,
+            autofillHints: create || recovery
                 ? const [AutofillHints.newPassword]
                 : const [AutofillHints.password],
-            onSubmitted: recovery ? null : (_) => _submit(),
+            onChanged: create ? _onCreateValueChanged : (_) => setState(() {}),
+            onSubmitted: create || recovery ? null : (_) => _submit(),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
         ],
-        if (recovery) ...[
+        if (create || recovery) ...[
           FvAuthField(
+            key: const ValueKey('auth-confirm-password-field'),
             label: 'Confirm password',
             controller: _confirmController,
             enabled: !_submitting,
+            valid: _confirmController.text.isNotEmpty &&
+                _confirmController.text ==
+                    (recovery
+                        ? _newPasswordController.text
+                        : _passwordController.text),
+            prefixIcon: Icons.lock_reset_rounded,
             isPassword: true,
             obscureText: true,
+            errorText: _confirmError,
             textInputAction: TextInputAction.done,
             autofillHints: const [AutofillHints.newPassword],
+            onChanged: create ? _onCreateValueChanged : (_) => setState(() {}),
             onSubmitted: (_) => _submit(),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
         ],
         if (signIn)
           Align(
@@ -444,48 +638,96 @@ class _AuthScreenState extends State<AuthScreen> {
               onPressed: _submitting
                   ? null
                   : () => _setMode(AuthSheetMode.forgotPassword),
-              child: Text(
+              child: const Text(
                 'Forgot password?',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: .7),
+                  color: FirstVueColors.gold,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
           ),
-        if (create)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+        if (create) ...[
+          Text(
+            'Password: 8+ characters, uppercase, lowercase, and a number.',
+            style: TextStyle(
+              color: _strongPassword
+                  ? FirstVueColors.teal
+                  : Colors.white.withValues(alpha: .62),
+              fontSize: 12,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                key: const ValueKey('auth-legal-checkbox'),
+                value: _acceptedLegal,
+                onChanged: _submitting
+                    ? null
+                    : (value) {
+                        setState(() {
+                          _acceptedLegal = value ?? false;
+                          if (_acceptedLegal) _formError = null;
+                        });
+                      },
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 11),
+                  child: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        'I agree to the ',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: .72),
+                          fontSize: 13,
+                        ),
+                      ),
+                      _LegalLink(label: 'Terms', route: '/terms'),
+                      Text(
+                        ' and ',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: .72),
+                          fontSize: 13,
+                        ),
+                      ),
+                      _LegalLink(
+                        label: 'Privacy Policy',
+                        route: '/privacy',
+                      ),
+                      const Text(
+                        '.',
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+        if (_formError != null || _infoMessage != null) ...[
+          const SizedBox(height: 4),
+          Semantics(
+            liveRegion: true,
             child: Text(
-              'Use at least 8 characters. We’ll email a confirmation link.',
+              _formError ?? _infoMessage!,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: .62),
-                fontSize: 12,
+                color: _formError != null
+                    ? const Color(0xFFF2A4A4)
+                    : FirstVueColors.teal,
+                fontSize: 13,
                 height: 1.35,
               ),
             ),
           ),
-        SizedBox(
-          height: 22,
-          child: (_formError != null)
-              ? Text(
-                  _formError!,
-                  style: const TextStyle(
-                    color: Color(0xFFE39A9A),
-                    fontSize: 13,
-                  ),
-                )
-              : (_infoMessage != null)
-              ? Text(
-                  _infoMessage!,
-                  style: const TextStyle(
-                    color: FirstVueColors.teal,
-                    fontSize: 13,
-                  ),
-                )
-              : const SizedBox.shrink(),
-        ),
-        const SizedBox(height: 8),
+          const SizedBox(height: 8),
+        ] else
+          const SizedBox(height: 12),
         FvGoldButton(
           key: const ValueKey('auth-primary-button'),
           label: recovery
@@ -496,7 +738,7 @@ class _AuthScreenState extends State<AuthScreen> {
               ? 'Create account'
               : 'Sign in',
           loading: _submitting,
-          enabled: !_submitting,
+          enabled: !_submitting && (!create || _createReady),
           onPressed: _submit,
         ),
         if (forgot) ...[
@@ -509,20 +751,20 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         ],
         if (signIn && (showApple || showGoogle)) ...[
-          const SizedBox(height: 22),
+          const SizedBox(height: 24),
           Row(
             children: [
               Expanded(
                 child: Divider(color: Colors.white.withValues(alpha: .16)),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
                   'OR CONTINUE WITH',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: .45),
+                    color: Colors.white.withValues(alpha: .48),
                     fontSize: 11,
-                    letterSpacing: 1.1,
+                    letterSpacing: 1.2,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -532,7 +774,7 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 15),
           if (showApple)
             _SocialAuthButton(
               label: 'Continue with Apple',
@@ -543,41 +785,53 @@ class _AuthScreenState extends State<AuthScreen> {
           if (showGoogle)
             _SocialAuthButton(
               label: 'Continue with Google',
-              icon: Icons.g_mobiledata,
+              icon: Icons.g_mobiledata_rounded,
               onPressed: _submitting
                   ? null
                   : () => _oauth(OAuthProvider.google),
             ),
         ],
         if (signIn || create) ...[
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
           Center(
             child: Wrap(
-              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text(
                   create ? 'Already have an account? ' : 'New to FirstVue? ',
-                  style: TextStyle(color: Colors.white.withValues(alpha: .65)),
+                  style: TextStyle(color: Colors.white.withValues(alpha: .66)),
                 ),
-                GestureDetector(
-                  onTap: _submitting
+                TextButton(
+                  onPressed: _submitting
                       ? null
                       : () => _setMode(
                           create
                               ? AuthSheetMode.signIn
                               : AuthSheetMode.createAccount,
                         ),
-                  child: Text(
-                    create ? 'Sign in' : 'Create account',
-                    style: const TextStyle(
-                      color: FirstVueColors.gold,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    minimumSize: const Size(44, 44),
                   ),
+                  child: Text(create ? 'Sign in' : 'Create account'),
                 ),
               ],
             ),
           ),
+          if (signIn)
+            Center(
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: const [
+                  _LegalLink(label: 'Terms', route: '/terms'),
+                  Text('  •  ', style: TextStyle(color: Colors.white38)),
+                  _LegalLink(
+                    label: 'Privacy Policy',
+                    route: '/privacy',
+                  ),
+                ],
+              ),
+            ),
         ],
       ],
     );
@@ -594,45 +848,53 @@ class _HeroHeader extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        const ColoredBox(color: Color(0xFF0B1020)),
+        const ColoredBox(color: Color(0xFF080D1B)),
         Image.asset(
           'assets/images/auth_hero.jpg',
           fit: BoxFit.cover,
-          alignment: Alignment.topCenter,
-          errorBuilder: (_, _, _) => const ColoredBox(color: Color(0xFF0B1020)),
+          alignment: Alignment.center,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (_, _, _) => const ColoredBox(color: Color(0xFF080D1B)),
         ),
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0x660B1020), Color(0xCC0B1020), Color(0xFF0B1020)],
+              stops: [0, .55, 1],
+              colors: [
+                Color(0x66040A16),
+                Color(0x88070D1A),
+                Color(0xFF080D1B),
+              ],
             ),
           ),
         ),
         Padding(
-          padding: EdgeInsets.fromLTRB(20, compact ? 8 : 16, 20, 8),
+          padding: EdgeInsets.fromLTRB(20, compact ? 12 : 22, 20, 42),
           child: Column(
             children: [
-              FirstVueEmblem(size: compact ? 44 : 56),
-              SizedBox(height: compact ? 8 : 14),
-              const Text(
+              FirstVueEmblem(size: compact ? 54 : 66),
+              SizedBox(height: compact ? 10 : 16),
+              Text(
                 'Welcome to FirstVue',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w800,
-                  fontSize: 22,
-                  height: 1.15,
+                  fontSize: compact ? 23 : 28,
+                  height: 1.1,
+                  shadows: const [Shadow(color: Colors.black, blurRadius: 12)],
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
                 'Connect with what’s happening nearby.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: .82),
-                  fontSize: 14,
+                  color: Colors.white.withValues(alpha: .86),
+                  fontSize: compact ? 13 : 15,
+                  shadows: const [Shadow(color: Colors.black, blurRadius: 8)],
                 ),
               ),
             ],
@@ -657,28 +919,37 @@ class _SegmentedAuthToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
+
     Widget chip(String label, AuthSheetMode value) {
       final selected = mode == value;
       return Expanded(
-        child: GestureDetector(
-          onTap: enabled ? () => onChanged(value) : null,
-          child: AnimatedContainer(
-            duration: Duration(milliseconds: reduceMotion ? 0 : 180),
-            height: 42,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: selected ? FirstVueColors.gold : Colors.transparent,
-              borderRadius: BorderRadius.circular(22),
-            ),
-            child: Text(
-              label,
+        child: Semantics(
+          button: true,
+          selected: selected,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
               key: ValueKey('auth-segment-$label'),
-              style: TextStyle(
-                color: selected
-                    ? const Color(0xFF0B1020)
-                    : Colors.white.withValues(alpha: .7),
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
+              borderRadius: BorderRadius.circular(28),
+              onTap: enabled ? () => onChanged(value) : null,
+              child: AnimatedContainer(
+                duration: Duration(milliseconds: reduceMotion ? 0 : 190),
+                height: 48,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: selected ? FirstVueColors.gold : Colors.transparent,
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: selected
+                        ? const Color(0xFF080D1B)
+                        : Colors.white.withValues(alpha: .72),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
               ),
             ),
           ),
@@ -688,8 +959,9 @@ class _SegmentedAuthToggle extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF1A2230),
-        borderRadius: BorderRadius.circular(24),
+        color: const Color(0xFF141B2B),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: const Color(0xFF333B50)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(4),
@@ -704,7 +976,7 @@ class _SegmentedAuthToggle extends StatelessWidget {
   }
 }
 
-class _SocialAuthButton extends StatelessWidget {
+class _SocialAuthButton extends StatefulWidget {
   final String label;
   final IconData icon;
   final VoidCallback? onPressed;
@@ -716,15 +988,131 @@ class _SocialAuthButton extends StatelessWidget {
   });
 
   @override
+  State<_SocialAuthButton> createState() => _SocialAuthButtonState();
+}
+
+class _SocialAuthButtonState extends State<_SocialAuthButton> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, color: Colors.white),
-      label: Text(label, style: const TextStyle(color: Colors.white)),
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(48),
-        side: BorderSide(color: Colors.white.withValues(alpha: .35)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    final enabled = widget.onPressed != null;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: widget.label,
+      child: GestureDetector(
+        onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
+        onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
+        onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+        onTap: widget.onPressed,
+        child: AnimatedScale(
+          scale: _pressed ? .98 : 1,
+          duration: Duration(milliseconds: reduceMotion ? 0 : 80),
+          child: AnimatedContainer(
+            duration: Duration(milliseconds: reduceMotion ? 0 : 80),
+            height: 52,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFF101625),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: _pressed ? .48 : .22),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: _pressed ? .12 : .28),
+                  blurRadius: _pressed ? 3 : 8,
+                  offset: Offset(0, _pressed ? 1 : 3),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(widget.icon, color: Colors.white, size: 27),
+                const SizedBox(width: 12),
+                Text(
+                  widget.label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UsernameStatus extends StatelessWidget {
+  final UsernameAvailability availability;
+
+  const _UsernameStatus({required this.availability});
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (availability) {
+      UsernameAvailability.checking => const Row(
+          children: [
+            SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.5,
+                color: FirstVueColors.teal,
+              ),
+            ),
+            SizedBox(width: 7),
+            Text(
+              'Checking availability…',
+              style: TextStyle(color: Colors.white60, fontSize: 12),
+            ),
+          ],
+        ),
+      UsernameAvailability.available => const Row(
+          children: [
+            Icon(Icons.check_circle_outline, color: FirstVueColors.teal, size: 15),
+            SizedBox(width: 6),
+            Text(
+              'Username is available',
+              style: TextStyle(color: FirstVueColors.teal, fontSize: 12),
+            ),
+          ],
+        ),
+      _ => const SizedBox(height: 15),
+    };
+  }
+}
+
+class _LegalLink extends StatelessWidget {
+  final String label;
+  final String route;
+
+  const _LegalLink({required this.label, required this.route});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      link: true,
+      label: label,
+      child: GestureDetector(
+        onTap: () => Navigator.of(context).pushNamed(route),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: FirstVueColors.gold,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            decoration: TextDecoration.underline,
+            decorationColor: FirstVueColors.gold,
+          ),
+        ),
       ),
     );
   }

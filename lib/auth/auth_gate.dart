@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../main.dart';
 import '../screens/auth_screen.dart';
+import '../screens/legal_policy_screen.dart';
 import '../services/deep_link_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_emblem.dart';
@@ -140,6 +141,17 @@ Route<dynamic> generateAuthAwareRoute(
   final path = Uri.tryParse(name)?.path ?? name;
   final signedIn = auth.isSignedIn;
   final recovering = auth.lastEvent == AuthChangeEvent.passwordRecovery;
+
+  if (isLegalRoute(path)) {
+    return MaterialPageRoute<void>(
+      settings: settings,
+      builder: (_) => LegalPolicyScreen(
+        type: path == '/privacy'
+            ? LegalPolicyType.privacy
+            : LegalPolicyType.terms,
+      ),
+    );
+  }
 
   if (path == '/' || path.isEmpty) {
     return MaterialPageRoute<void>(

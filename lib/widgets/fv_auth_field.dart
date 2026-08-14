@@ -11,6 +11,8 @@ class FvAuthField extends StatefulWidget {
   final bool obscureText;
   final bool isPassword;
   final bool enabled;
+  final bool valid;
+  final IconData? prefixIcon;
   final String? errorText;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
@@ -26,6 +28,8 @@ class FvAuthField extends StatefulWidget {
     this.obscureText = false,
     this.isPassword = false,
     this.enabled = true,
+    this.valid = false,
+    this.prefixIcon,
     this.errorText,
     this.keyboardType,
     this.textInputAction,
@@ -98,6 +102,9 @@ class _FvAuthFieldState extends State<FvAuthField> {
           spreadRadius: 0.4,
         ),
       ];
+    } else if (filled && widget.valid) {
+      border = FirstVueColors.gold;
+      width = 1.2;
     } else if (filled) {
       border = dark ? const Color(0xFF5C6576) : const Color(0xFF7A7686);
     } else {
@@ -147,6 +154,12 @@ class _FvAuthFieldState extends State<FvAuthField> {
           errorStyle: TextStyle(color: fv.error, fontSize: 12),
           errorMaxLines: 2,
           contentPadding: const EdgeInsets.fromLTRB(16, 18, 12, 16),
+          prefixIcon: widget.prefixIcon == null
+              ? null
+              : Icon(
+                  widget.prefixIcon,
+                  color: focused ? FirstVueColors.teal : fv.mutedIcon,
+                ),
           suffixIcon: widget.isPassword
               ? IconButton(
                   tooltip: _obscured ? 'Show password' : 'Hide password',

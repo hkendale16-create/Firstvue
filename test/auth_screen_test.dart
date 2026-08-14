@@ -6,18 +6,17 @@ import 'package:firstvue/widgets/fv_gold_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Widget _wrap(
-  Widget child, {
-  ThemeData? theme,
-  Size size = const Size(390, 844),
-}) {
+Widget _wrap(Widget child, {ThemeData? theme}) {
   return MaterialApp(
     theme: theme ?? FirstVueTheme.elegantDark,
-    home: MediaQuery(
-      data: MediaQueryData(size: size),
-      child: child,
-    ),
+    home: child,
   );
+}
+
+Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
 }
 
 void main() {
@@ -44,19 +43,87 @@ void main() {
     expect(find.text('Email or username'), findsWidgets);
     expect(find.text('Forgot password?'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('auth-segment-Create account')));
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('auth-segment-Create account')),
+    );
     await tester.pump(const Duration(milliseconds: 250));
 
     expect(find.text('Forgot password?'), findsNothing);
+    expect(find.byKey(const ValueKey('auth-username-field')), findsOneWidget);
     expect(
-      find.text('Use at least 8 characters. We’ll email a confirmation link.'),
+      find.byKey(const ValueKey('auth-confirm-password-field')),
       findsOneWidget,
     );
-    expect(find.widgetWithText(FvGoldButton, 'Create account'), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-legal-checkbox')), findsOneWidget);
+    expect(
+      find.text(
+        'Password: 8+ characters, uppercase, lowercase, and a number.',
+      ),
+      findsOneWidget,
+    );
+    final createButton = tester.widget<FvGoldButton>(
+      find.widgetWithText(FvGoldButton, 'Create account'),
+    );
+    expect(createButton.enabled, isFalse);
 
-    await tester.tap(find.byKey(const ValueKey('auth-segment-Sign in')));
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('auth-segment-Sign in')),
+    );
     await tester.pump(const Duration(milliseconds: 250));
     expect(find.widgetWithText(FvGoldButton, 'Sign in'), findsOneWidget);
+  });
+
+
+  testWidgets('switching auth tabs clears password values', (tester) async {
+    await tester.pumpWidget(_wrap(const AuthScreen()));
+    await tester.pump();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-email-field')),
+      'jordan@firstvue.app',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-password-field')),
+      'Password1',
+    );
+
+    final createTab = tester.widget<InkWell>(
+      find.byKey(const ValueKey('auth-segment-Create account')),
+    );
+    createTab.onTap!();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final password = tester.widget<TextField>(
+      find.descendant(
+        of: find.byKey(const ValueKey('auth-password-field')),
+        matching: find.byType(TextField),
+      ),
+    );
+    expect(password.controller?.text, isEmpty);
+
+    final email = tester.widget<TextField>(
+      find.descendant(
+        of: find.byKey(const ValueKey('auth-email-field')),
+        matching: find.byType(TextField),
+      ),
+    );
+    expect(email.controller?.text, 'jordan@firstvue.app');
+  });
+
+  testWidgets('registration exposes required legal pages', (tester) async {
+    await tester.pumpWidget(_wrap(const AuthScreen()));
+    await tester.pump();
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('auth-segment-Create account')),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.text('Terms'), findsOneWidget);
+    expect(find.text('Privacy Policy'), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-legal-checkbox')), findsOneWidget);
   });
 
   testWidgets('password visibility toggle is accessible', (tester) async {
@@ -77,7 +144,7 @@ void main() {
     );
     expect(hidden.obscureText, isTrue);
 
-    await tester.tap(find.byTooltip('Show password'));
+    await _tapVisible(tester, find.byTooltip('Show password'));
     await tester.pump();
     expect(find.byTooltip('Hide password'), findsOneWidget);
     final shown = tester.widget<TextField>(
@@ -119,7 +186,10 @@ void main() {
       find.byKey(const ValueKey('auth-password-field')),
       'password1',
     );
-    await tester.tap(find.byKey(const ValueKey('auth-primary-button')));
+    final submitButton = tester.widget<FvGoldButton>(
+      find.byKey(const ValueKey('auth-primary-button')),
+    );
+    submitButton.onPressed!();
     await tester.pump();
 
     expect(find.text(kGenericAuthError), findsOneWidget);

@@ -4,3 +4,7 @@ verify_jwt = false
 
 [functions.send-email]
 verify_jwt = false
+
+# Signed-out endpoint; performs password auth and returns only a refresh token.
+[functions.username-login]
+verify_jwt = false
