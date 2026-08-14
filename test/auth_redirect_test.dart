@@ -9,6 +9,8 @@ void main() {
     expect(isPublicAuthRoute('/reset-password'), isTrue);
     expect(isPublicAuthRoute('/auth/callback'), isTrue);
     expect(isPublicAuthRoute('/auth/confirm'), isTrue);
+    expect(isPublicAuthRoute('/terms'), isTrue);
+    expect(isPublicAuthRoute('/privacy'), isTrue);
 
     expect(shouldRedirectSignedOutToSignIn('/settings'), isTrue);
     expect(shouldRedirectSignedOutToSignIn('/profile'), isTrue);
@@ -34,12 +36,18 @@ void main() {
     expect(sanitizeAuthRedirect('settings'), isNull);
     expect(sanitizeAuthRedirect('/settings'), '/settings');
     expect(sanitizeAuthRedirect('/signin'), '/signin');
+    expect(sanitizeAuthRedirect('/terms'), '/terms');
     expect(sanitizeAuthRedirect('/not-a-real-app-route'), isNull);
   });
 
   test('approved callback url is never an arbitrary host', () {
     final url = Uri.parse(approvedAuthCallbackUrl());
     expect(url.hasScheme, isTrue);
+    expect(url.path, '/auth/callback');
+    expect(
+      Uri.parse(approvedAuthCallbackUrl(path: '/reset-password')).path,
+      '/reset-password',
+    );
     expect(
       kAllowedAuthRedirectHosts.contains(url.host) ||
           url.host == 'firstvue.app',
