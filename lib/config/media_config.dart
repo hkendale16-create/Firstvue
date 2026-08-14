@@ -19,7 +19,8 @@ enum MediaBucket {
   professional('professional-media'),
   communityNews('community-news-media'),
   profile('profile-media'),
-  event('event-media');
+  event('event-media'),
+  messaging('fv-msg-media');
 
   final String id;
   const MediaBucket(this.id);

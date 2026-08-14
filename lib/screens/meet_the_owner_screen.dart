@@ -4,9 +4,10 @@ import '../navigation/firstvue_page_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/feed_comments_service.dart';
+import '../messaging/screens/messaging_shell_screen.dart';
+import '../messaging/services/fv_messaging_service.dart';
 import '../services/messaging_service.dart';
 import 'auth_screen.dart';
-import 'conversation_screen.dart';
 
 class MeetTheOwnerScreen extends StatefulWidget {
   final String businessId;
@@ -63,20 +64,19 @@ class _MeetTheOwnerScreenState extends State<MeetTheOwnerScreen> {
     }
     final ownerId = await MessagingService.fetchBusinessOwnerId(widget.businessId);
     if (!mounted || ownerId == null) return;
-    final threadId = await MessagingService.openThreadWithUser(
-      otherUserId: ownerId,
-      businessId: widget.businessId,
-    );
+    String threadId;
+    try {
+      threadId = await FvMessagingService.openEntityInbox(
+        entityId: widget.businessId,
+      );
+    } catch (_) {
+      threadId = await FvMessagingService.openDirect(otherUserId: ownerId);
+    }
     if (!mounted) return;
-    await Navigator.push(
+    await openMessaging(
       context,
-      FirstVuePageRoute(
-        builder: (_) => ConversationScreen(
-          threadId: threadId,
-          title: widget.ownerName,
-          subtitle: widget.businessName,
-        ),
-      ),
+      conversationId: threadId,
+      title: widget.ownerName,
     );
   }
 

@@ -329,7 +329,7 @@ class MessagingService {
       final rows = await query;
       return (rows as List).length;
     } catch (_) {
-      return 1;
+      return 0;
     }
   }
 

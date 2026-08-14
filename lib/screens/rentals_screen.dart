@@ -5,7 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_screen.dart';
-import 'conversation_screen.dart';
+import '../messaging/screens/messaging_shell_screen.dart';
+import '../messaging/services/fv_messaging_service.dart';
 import '../services/messaging_service.dart';
 import '../services/rentals_store.dart';
 
@@ -885,20 +886,17 @@ class _RentalCard extends StatelessWidget {
           ownerId != null &&
           ownerId.isNotEmpty &&
           ownerId != Supabase.instance.client.auth.currentUser?.id) {
-        final threadId = await MessagingService.openThreadWithUser(
-          otherUserId: ownerId,
-        );
+        String threadId;
+        try {
+          threadId = await FvMessagingService.openDirect(otherUserId: ownerId);
+        } catch (_) {
+          threadId = 'legacy:${await MessagingService.openThreadWithUser(otherUserId: ownerId)}';
+        }
         if (!context.mounted) return;
-        await Navigator.push(
+        await openMessaging(
           context,
-          FirstVuePageRoute(
-            builder: (_) => ConversationScreen(
-              threadId: threadId,
-              title: listing.title,
-              subtitle: 'Rental inquiry',
-              initialMessage: message,
-            ),
-          ),
+          conversationId: threadId,
+          title: listing.title,
         );
       }
     } catch (_) {

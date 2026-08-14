@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   audioplayers_windows
   file_selector_windows
+  flutter_webrtc
   geolocator_windows
   share_plus
   url_launcher_windows
