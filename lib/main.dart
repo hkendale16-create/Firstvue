@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -39,8 +41,8 @@ Future<void> main() async {
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.publishableKey,
   );
-  await NotificationService.initialize();
   runApp(const FirstVueApp());
+  unawaited(NotificationService.initialize());
 }
 
 class FirstVueApp extends StatelessWidget {
