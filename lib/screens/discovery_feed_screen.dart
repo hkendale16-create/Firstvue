@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../services/discovery_feed_service.dart';
 import '../services/vue_featured_rotation.dart';
+import '../services/vue_tab_preference.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/fv_ui.dart';
@@ -14,8 +15,6 @@ import 'full_screen_media_viewer.dart';
 import 'member_public_profile_screen.dart';
 import 'post_detail_screen.dart';
 
-enum _FeedMode { forYou, nearby, trending }
-
 class DiscoveryFeedScreen extends StatefulWidget {
   const DiscoveryFeedScreen({super.key});
 
@@ -26,7 +25,7 @@ class DiscoveryFeedScreen extends StatefulWidget {
 class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   late Future<List<DiscoveryFeedItem>> _feedFuture;
   List<DiscoveryFeedItem> _items = const [];
-  _FeedMode _mode = _FeedMode.forYou;
+  VueFeedMode _mode = VueTabPreference.current;
   String? _error;
   bool _loadingMore = false;
   bool _hasMore = true;
@@ -34,21 +33,25 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   @override
   void initState() {
     super.initState();
-    _feedFuture = _loadFeed(reset: true);
+    _mode = VueTabPreference.current;
+    _feedFuture = _bootstrap();
+  }
+
+  Future<List<DiscoveryFeedItem>> _bootstrap() async {
+    final stored = await VueTabPreference.load();
+    if (mounted && stored != _mode) {
+      setState(() => _mode = stored);
+    }
+    return _loadFeed(reset: true);
   }
 
   Future<List<DiscoveryFeedItem>> _loadFeed({
     bool reset = false,
     int limit = 30,
   }) async {
-    final mode = switch (_mode) {
-      _FeedMode.forYou => VueFeedMode.forYou,
-      _FeedMode.nearby => VueFeedMode.nearby,
-      _FeedMode.trending => VueFeedMode.trending,
-    };
     try {
       final items = await DiscoveryFeedService.fetchFeed(
-        mode: mode,
+        mode: _mode,
         limit: limit,
         offset: reset ? 0 : _items.length,
       ).timeout(const Duration(seconds: 20));
@@ -122,11 +125,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
     return arranged;
   }
 
-  VueFeedMode get _vueMode => switch (_mode) {
-    _FeedMode.forYou => VueFeedMode.forYou,
-    _FeedMode.nearby => VueFeedMode.nearby,
-    _FeedMode.trending => VueFeedMode.trending,
-  };
+  VueFeedMode get _vueMode => _mode;
 
   void _openMedia(DiscoveryFeedItem item) {
     if (item.newsPostId != null) {
@@ -244,9 +243,10 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                   labels: const ['For You', 'Nearby', 'Trending'],
                   selectedIndex: _mode.index,
                   onSelected: (index) {
-                    final next = _FeedMode.values[index];
+                    final next = VueFeedMode.values[index];
                     if (next == _mode) return;
                     setState(() => _mode = next);
+                    VueTabPreference.save(next);
                     _feedFuture = _loadFeed(reset: true);
                   },
                 ),

@@ -29,6 +29,12 @@ void main() {
     expect(shouldRedirectSignedInToHome('/settings'), isFalse);
   });
 
+  test('vue and explore are allowed post-auth destinations', () {
+    expect(sanitizeAuthRedirect('/vue'), '/vue');
+    expect(sanitizeAuthRedirect('/explore'), '/explore');
+    expect(sanitizeAuthRedirect('/home'), '/home');
+  });
+
   test('sanitizeAuthRedirect blocks open redirects', () {
     expect(sanitizeAuthRedirect('https://evil.example/phish'), isNull);
     expect(sanitizeAuthRedirect('//evil.example'), isNull);

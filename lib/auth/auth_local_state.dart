@@ -15,6 +15,7 @@ class AuthLocalState {
   static const _protectedKeys = {
     'firstvue_post_identity_key',
     'firstvue_show_email_on_profile',
+    'firstvue_vue_feed_tab',
   };
 
   static Future<void> clearProtected() async {

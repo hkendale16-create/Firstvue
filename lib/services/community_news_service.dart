@@ -38,8 +38,10 @@ class CommunityNewsPost {
   final String? communityId;
   final String? communityName;
   final String? communityImageUrl;
+  final String? rentalId;
   final DateTime createdAt;
   final bool isMine;
+  final bool viewerFollowsAuthor;
   final int sparkCount;
   final bool sparkedByMe;
   final bool savedByMe;
@@ -48,6 +50,13 @@ class CommunityNewsPost {
   final String? backgroundColor;
   final PublishDestination publishDestination;
   final List<CommunityNewsMediaItem> media;
+  final List<String> businessServices;
+  final String? industrySlug;
+  final List<String> secondaryIndustrySlugs;
+  final String? publishCategory;
+  final String? offeringType;
+  final String? eventType;
+  final String? originalSourceLabel;
 
   const CommunityNewsPost({
     required this.id,
@@ -65,8 +74,10 @@ class CommunityNewsPost {
     this.communityId,
     this.communityName,
     this.communityImageUrl,
+    this.rentalId,
     required this.createdAt,
     required this.isMine,
+    this.viewerFollowsAuthor = false,
     required this.sparkCount,
     required this.sparkedByMe,
     required this.savedByMe,
@@ -75,6 +86,13 @@ class CommunityNewsPost {
     this.backgroundColor,
     this.publishDestination = PublishDestination.feed,
     this.media = const [],
+    this.businessServices = const [],
+    this.industrySlug,
+    this.secondaryIndustrySlugs = const [],
+    this.publishCategory,
+    this.offeringType,
+    this.eventType,
+    this.originalSourceLabel,
   });
 
   String get commentsMediaId => 'news-post:$id';
@@ -157,8 +175,10 @@ class CommunityNewsPost {
     String? communityId,
     String? communityName,
     String? communityImageUrl,
+    String? rentalId,
     DateTime? createdAt,
     bool? isMine,
+    bool? viewerFollowsAuthor,
     int? sparkCount,
     bool? sparkedByMe,
     bool? savedByMe,
@@ -167,6 +187,13 @@ class CommunityNewsPost {
     String? backgroundColor,
     PublishDestination? publishDestination,
     List<CommunityNewsMediaItem>? media,
+    List<String>? businessServices,
+    String? industrySlug,
+    List<String>? secondaryIndustrySlugs,
+    String? publishCategory,
+    String? offeringType,
+    String? eventType,
+    String? originalSourceLabel,
   }) {
     return CommunityNewsPost(
       id: id ?? this.id,
@@ -185,8 +212,10 @@ class CommunityNewsPost {
       communityId: communityId ?? this.communityId,
       communityName: communityName ?? this.communityName,
       communityImageUrl: communityImageUrl ?? this.communityImageUrl,
+      rentalId: rentalId ?? this.rentalId,
       createdAt: createdAt ?? this.createdAt,
       isMine: isMine ?? this.isMine,
+      viewerFollowsAuthor: viewerFollowsAuthor ?? this.viewerFollowsAuthor,
       sparkCount: sparkCount ?? this.sparkCount,
       sparkedByMe: sparkedByMe ?? this.sparkedByMe,
       savedByMe: savedByMe ?? this.savedByMe,
@@ -195,6 +224,14 @@ class CommunityNewsPost {
       backgroundColor: backgroundColor ?? this.backgroundColor,
       publishDestination: publishDestination ?? this.publishDestination,
       media: media ?? this.media,
+      businessServices: businessServices ?? this.businessServices,
+      industrySlug: industrySlug ?? this.industrySlug,
+      secondaryIndustrySlugs:
+          secondaryIndustrySlugs ?? this.secondaryIndustrySlugs,
+      publishCategory: publishCategory ?? this.publishCategory,
+      offeringType: offeringType ?? this.offeringType,
+      eventType: eventType ?? this.eventType,
+      originalSourceLabel: originalSourceLabel ?? this.originalSourceLabel,
     );
   }
 }
@@ -341,11 +378,16 @@ class CommunityNewsService {
     int limit = 20,
     DateTime? beforeCreatedAt,
     String? beforeId,
+    dynamic Function(dynamic query)? configure,
   }) async {
     final me = _client.auth.currentUser?.id;
     // RLS returns approved posts plus the signed-in author's own posts.
     final rows = await _selectPosts((query) {
-      var q = query.order('created_at', ascending: false).limit(limit);
+      var q = query;
+      if (configure != null) {
+        q = configure(q);
+      }
+      q = q.order('created_at', ascending: false).limit(limit);
       if (beforeCreatedAt != null) {
         q = q.lt('created_at', beforeCreatedAt.toUtc().toIso8601String());
       }
@@ -362,22 +404,26 @@ class CommunityNewsService {
     );
   }
 
-  /// Explore grid posts (media-first) with cursor pagination.
+  /// Explore grid posts with a per-section identity filter (never a shared
+  /// unfiltered list reused across tabs).
   static Future<List<CommunityNewsPost>> fetchExplorePosts({
     int limit = 24,
     DateTime? beforeCreatedAt,
     String? beforeId,
     String? profileType,
     String? businessType,
+    dynamic Function(dynamic query)? configure,
   }) async {
-    // Over-fetch slightly so client filters still fill a page.
-    final fetchLimit = (profileType != null || businessType != null)
+    final fetchLimit = (profileType != null ||
+            businessType != null ||
+            configure != null)
         ? limit * 3
         : limit;
     final posts = await fetchPosts(
       limit: fetchLimit,
       beforeCreatedAt: beforeCreatedAt,
       beforeId: beforeId,
+      configure: configure,
     );
     final withMedia = posts.where((post) => post.media.isNotEmpty);
     final filtered = withMedia.where((post) {
@@ -388,10 +434,8 @@ class CommunityNewsService {
       }
       if (businessType != null && businessType.isNotEmpty) {
         final bt = (post.businessType ?? '').toLowerCase();
-        final services = bt;
         final needle = businessType.toLowerCase();
-        if (!bt.contains(needle) && !services.contains(needle)) {
-          // Also match common aliases from post context name.
+        if (!bt.contains(needle)) {
           final name = (post.businessName ?? '').toLowerCase();
           if (!name.contains(needle)) return false;
         }
@@ -820,6 +864,12 @@ class CommunityNewsService {
             businessType: businessId == null
                 ? null
                 : businessInfo[businessId]?.type,
+            businessServices: businessId == null
+                ? const []
+                : businessInfo[businessId]?.services ?? const [],
+            industrySlug: businessId == null
+                ? null
+                : businessInfo[businessId]?.industrySlug,
             professionalProfileId: professionalProfileId,
             eventId: eventId,
             communityId: communityId,
@@ -831,6 +881,7 @@ class CommunityNewsService {
                 : communityImages[communityId],
             createdAt: createdAt,
             isMine: isMine,
+            viewerFollowsAuthor: followsAuthor,
             sparkCount: sparkCounts[id] ?? 0,
             sparkedByMe: mySparks.contains(id),
             savedByMe: mySaves.contains(id),
@@ -933,39 +984,131 @@ class CommunityNewsService {
     return {for (final entry in info.entries) entry.key: entry.value.name};
   }
 
-  static Future<Map<String, ({String name, String? type})>> _fetchBusinessInfo(
-    List<String> businessIds,
-  ) async {
+  static ({
+    String name,
+    String? type,
+    List<String> services,
+    String? industrySlug,
+    List<String> secondarySlugs,
+    String? categorySlug,
+  })
+  _emptyBusinessInfo(String? name) {
+    return (
+      name: name ?? 'Business',
+      type: null,
+      services: const <String>[],
+      industrySlug: null,
+      secondarySlugs: const <String>[],
+      categorySlug: null,
+    );
+  }
+
+  static List<String> _stringList(dynamic raw) {
+    if (raw is! List) return const [];
+    return [
+      for (final item in raw)
+        if (item != null && item.toString().trim().isNotEmpty)
+          item.toString().trim(),
+    ];
+  }
+
+  static Future<
+    Map<
+      String,
+      ({
+        String name,
+        String? type,
+        List<String> services,
+        String? industrySlug,
+        List<String> secondarySlugs,
+        String? categorySlug,
+      })
+    >
+  >
+  _fetchBusinessInfo(List<String> businessIds) async {
     if (businessIds.isEmpty) return {};
-    try {
+
+    Future<
+      Map<
+        String,
+        ({
+          String name,
+          String? type,
+          List<String> services,
+          String? industrySlug,
+          List<String> secondarySlugs,
+          String? categorySlug,
+        })
+      >
+    >
+    run(String columns) async {
       final rows = await _client
           .from('businesses')
-          .select('id, name, business_type')
+          .select(columns)
           .inFilter('id', businessIds);
       return {
         for (final row in rows)
           row['id'] as String: (
             name: row['name'] as String? ?? 'Business',
             type: row['business_type'] as String?,
+            services: _stringList(row['services']),
+            industrySlug: _industrySlugFromRow(row),
+            secondarySlugs: const <String>[],
+            categorySlug: row['category_id'] == null
+                ? null
+                : row['category_id'] as String?,
           ),
       };
+    }
+
+    try {
+      return await run(
+        'id, name, business_type, services, status, primary_industry_id',
+      );
     } catch (_) {
       try {
-        final rows = await _client
-            .from('businesses')
-            .select('id, name')
-            .inFilter('id', businessIds);
-        return {
-          for (final row in rows)
-            row['id'] as String: (
-              name: row['name'] as String? ?? 'Business',
-              type: null,
-            ),
-        };
+        return await run('id, name, business_type, services');
       } catch (_) {
-        return {};
+        try {
+          final rows = await _client
+              .from('businesses')
+              .select('id, name, business_type')
+              .inFilter('id', businessIds);
+          return {
+            for (final row in rows)
+              row['id'] as String: (
+                name: row['name'] as String? ?? 'Business',
+                type: row['business_type'] as String?,
+                services: const <String>[],
+                industrySlug: null,
+                secondarySlugs: const <String>[],
+                categorySlug: null,
+              ),
+          };
+        } catch (_) {
+          try {
+            final rows = await _client
+                .from('businesses')
+                .select('id, name')
+                .inFilter('id', businessIds);
+            return {
+              for (final row in rows)
+                row['id'] as String: _emptyBusinessInfo(row['name'] as String?),
+            };
+          } catch (_) {
+            return {};
+          }
+        }
       }
     }
+  }
+
+  static String? _industrySlugFromRow(Map<String, dynamic> row) {
+    final nested = row['industries'];
+    if (nested is Map && nested['slug'] is String) {
+      return nested['slug'] as String;
+    }
+    return null;
   }
 
   static Future<Map<String, String>> _fetchCommunityNames(

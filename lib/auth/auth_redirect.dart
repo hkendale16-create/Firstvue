@@ -45,6 +45,8 @@ const kAllowedPostAuthRoutes = {
   '/profile',
   '/feeds',
   '/explore',
+  '/vue',
+  '/home',
   '/messages',
   '/notifications',
 };
