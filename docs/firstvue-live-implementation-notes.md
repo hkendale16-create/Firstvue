@@ -19,10 +19,14 @@ Last updated: 2026-08-15 (Phases 1–10 complete in code)
 | 10 | LIVE Realtime refresh (open sessions + engagement) |
 
 ## Deferred operator work (not more product phases)
-- Apply SQL migrations `20261005`–`20261008` (and any unfinished earlier LIVE SQL)
+- **Preferred:** paste `supabase/LIVE_APPLY_ONCE.sql` once in the SQL Editor
+- Or apply `20261005`–`20261008` individually
 - Add `MAPBOX_ACCESS_TOKEN` and run `./scripts/run-with-mapbox.sh`
 
 I cannot apply SQL from this cloud agent until Supabase MCP is authenticated in Cursor.
+
+## After LIVE — next track
+Approval Center hardening (organizer atomic review RPC `20261009`, correct Community approve copy).
 
 ## Phase 9
 - Edit Event: **Use current location** / Clear map pin

@@ -60,6 +60,19 @@ class AdminApprovalsHubScreen extends StatelessWidget {
 String _approvalErrorMessage(Object error) {
   if (error is PostgrestException) {
     final message = error.message.trim();
+    final details = (error.details ?? '').toString();
+    final code = error.code ?? '';
+    if (code == '42P01' ||
+        message.contains('community_organizer_applications') ||
+        details.contains('community_organizer_applications')) {
+      return 'Organizer applications table is missing. Apply '
+          'supabase/migrations/20261009_review_organizer_application.sql '
+          '(or 20260813) in the SQL Editor.';
+    }
+    if (message.contains('review_community_creation_request') ||
+        message.contains('Only FirstVue admins')) {
+      return message;
+    }
     if (message.isNotEmpty) return message;
   }
   return error.toString();
@@ -455,8 +468,8 @@ class _CommunityCreationApprovalsTabState
               submittedAtLabel: _formatDate(item.createdAt),
               status: item.status,
               notes:
-                  'Approving publishes the Community. Leadership stays pending '
-                  'until the separate Community Leader request is approved.\n'
+                  'Approving publishes the Community and activates the requester '
+                  'as creator/leader immediately (no separate self-approval).\n'
                   '${item.reason ?? ''}',
               onApprove: () async {
                 await CommunityCreationService.review(
