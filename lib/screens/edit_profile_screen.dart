@@ -43,6 +43,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _error;
   String? _usernameError;
   String? _displayNameError;
+  String? _loadedUsername;
   UsernameAvailability _usernameAvailability = UsernameAvailability.empty;
 
   @override
@@ -87,6 +88,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           user.email?.split('@').first ??
           '';
       _usernameController.text = profile?.username ?? '';
+      _loadedUsername = UsernameService.normalize(profile?.username ?? '');
       _bioController.text = profile?.bio ?? '';
       _websiteController.text = profile?.website ?? '';
       _cityController.text = profile?.city ?? '';
@@ -136,26 +138,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         return;
       }
 
-      if (_usernameAvailability == UsernameAvailability.empty ||
-          _usernameAvailability == UsernameAvailability.checking) {
-        final availability =
-            await UsernameService.checkAvailability(usernameRaw);
-        if (availability != UsernameAvailability.available) {
-          setState(() {
-            _saving = false;
-            _usernameAvailability = availability;
-            _usernameError = availability == UsernameAvailability.taken
-                ? 'That @handle is already taken. Choose another one.'
-                : availability == UsernameAvailability.invalid
-                    ? 'Use 3–30 lowercase letters, numbers, or underscores.'
-                    : 'Could not verify @handle availability.';
-          });
-          return;
+      final normalizedHandle = UsernameService.normalize(usernameRaw)!;
+      final usernameUnchanged = normalizedHandle == _loadedUsername;
+
+      if (!usernameUnchanged) {
+        if (_usernameAvailability == UsernameAvailability.empty ||
+            _usernameAvailability == UsernameAvailability.checking ||
+            _usernameAvailability == UsernameAvailability.error ||
+            _usernameAvailability == UsernameAvailability.taken) {
+          final availability =
+              await UsernameService.checkAvailability(usernameRaw);
+          if (availability != UsernameAvailability.available) {
+            setState(() {
+              _saving = false;
+              _usernameAvailability = availability;
+              _usernameError = availability == UsernameAvailability.taken
+                  ? 'That @handle is already taken. Choose another one.'
+                  : availability == UsernameAvailability.invalid
+                      ? 'Use 3–30 lowercase letters, numbers, or underscores.'
+                      : 'Could not verify @handle availability.';
+            });
+            return;
+          }
+          _usernameAvailability = UsernameAvailability.available;
         }
-        _usernameAvailability = UsernameAvailability.available;
       }
 
-      final savedHandle = await UsernameService.updateUsername(usernameRaw);
+      final savedHandle = usernameUnchanged
+          ? normalizedHandle
+          : await UsernameService.updateUsername(usernameRaw);
 
       await UserProfileService.updateExtendedProfile(
         displayName: displayNameRaw,
@@ -181,13 +192,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _error = error is ArgumentError
-            ? error.message?.toString() ?? 'Unable to save profile.'
-            : 'Unable to save your profile right now.';
+        _error = _friendlySaveError(error);
       });
     } finally {
       if (mounted && _saving) setState(() => _saving = false);
     }
+  }
+
+  static String _friendlySaveError(Object error) {
+    if (error is ArgumentError) {
+      return error.message?.toString() ?? 'Unable to save profile.';
+    }
+    if (error is AuthException) {
+      final message = error.message.trim();
+      if (message.isNotEmpty) return message;
+    }
+    if (error is PostgrestException) {
+      final message = error.message.trim();
+      if (message.isNotEmpty) return message;
+    }
+    if (error is StateError) {
+      final message = error.message.trim();
+      if (message.isNotEmpty) return message;
+    }
+    return 'Unable to save your profile right now.';
   }
 
   @override

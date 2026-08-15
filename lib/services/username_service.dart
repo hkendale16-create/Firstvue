@@ -137,9 +137,7 @@ class UsernameService {
       if (error.code == 'PGRST202' ||
           message.contains('set_profile_username') ||
           message.contains('could not find the function')) {
-        throw StateError(
-          'Secure username updates are not available. Apply the auth migration.',
-        );
+        return _updateUsernameFallback(user.id, normalized);
       }
       if (message.contains('already taken') || error.code == '23505') {
         throw ArgumentError('That @handle is already taken. Choose another one.');
@@ -149,5 +147,23 @@ class UsernameService {
       }
       rethrow;
     }
+  }
+
+  /// Direct profiles write when set_profile_username is not deployed yet.
+  static Future<String> _updateUsernameFallback(
+    String userId,
+    String normalized,
+  ) async {
+    final available = await isAvailable(normalized);
+    if (!available) {
+      throw ArgumentError('That @handle is already taken. Choose another one.');
+    }
+
+    await _client.from('profiles').upsert({
+      'id': userId,
+      'username': normalized,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    });
+    return normalized;
   }
 }
