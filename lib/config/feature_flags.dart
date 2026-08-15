@@ -31,13 +31,13 @@ class FeatureFlags {
   /// I'm Here / Here Now presence (Phase 3).
   static const liveEventPresenceEnabled = bool.fromEnvironment(
     'FIRSTVUE_LIVE_EVENT_PRESENCE',
-    defaultValue: false,
+    defaultValue: true,
   );
 
   /// Event conversation entry from LIVE detail (Phase 3).
   static const liveEventChatEnabled = bool.fromEnvironment(
     'FIRSTVUE_LIVE_EVENT_CHAT',
-    defaultValue: false,
+    defaultValue: true,
   );
 
   /// Food Truck LIVE cards / map pins (later phases).

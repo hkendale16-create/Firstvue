@@ -11,7 +11,7 @@ import '../services/discovery_feed_service.dart';
 import '../services/live_home_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../theme/live_tokens.dart';
-import '../widgets/event_profile_sheet.dart';
+import '../screens/live_event_detail_screen.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/live/live_category_row.dart';
 import '../widgets/live/live_right_now_card.dart';
@@ -66,7 +66,7 @@ class _LiveHomeShellScreenState extends State<LiveHomeShellScreen> {
   Future<void> _openEvent(LiveRightNowItem item) async {
     final event = item.event;
     if (event == null) return;
-    await EventProfileSheet.show(context, event: event);
+    await LiveEventDetailScreen.open(context, event);
   }
 
   void _openMapStub() {
