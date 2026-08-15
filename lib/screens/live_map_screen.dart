@@ -208,7 +208,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
                     child: Text(
-                      'Add MAPBOX_ACCESS_TOKEN on iOS/Android for pitched 3D buildings. Showing dark fallback map.',
+                      MapboxConfig.fallbackBanner,
                       textAlign: TextAlign.center,
                       style: TextStyle(color: fv.tertiaryText, fontSize: 11),
                     ),
