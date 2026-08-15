@@ -106,7 +106,11 @@ class _FullScreenImageViewerPageState extends State<FullScreenImageViewerPage> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: Text(widget.title ?? 'PHOTO'),
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(
+          widget.title ?? 'PHOTO',
+          style: const TextStyle(color: Colors.white),
+        ),
         actions: [
           if (widget.items.length > 1)
             Center(
@@ -136,6 +140,7 @@ class _FullScreenImageViewerPageState extends State<FullScreenImageViewerPage> {
                     child: NetworkPhoto(
                       url: item.url,
                       fit: BoxFit.contain,
+                      eager: true,
                       errorBuilder: (_, _, _) => const Icon(
                         Icons.broken_image_outlined,
                         color: Colors.white38,

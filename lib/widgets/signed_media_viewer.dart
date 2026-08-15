@@ -327,6 +327,7 @@ class _SignedMediaViewerDialogState extends State<_SignedMediaViewerDialog> {
       child: NetworkPhoto(
         url: widget.url,
         fit: BoxFit.contain,
+        eager: true,
         errorBuilder: (_, _, _) => const Padding(
           padding: EdgeInsets.all(32),
           child: Column(

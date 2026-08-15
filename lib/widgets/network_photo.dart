@@ -12,14 +12,18 @@ import '../theme/firstvue_theme.dart';
 /// cookies while the host replies `Access-Control-Allow-Origin: *`, which
 /// browsers block. An `<img>` still displays the file.
 ///
-/// On web, the HTML element is only mounted while mostly visible so Offstage
-/// tabs and long feeds do not accumulate platform views until Safari OOMs.
+/// On web, HTML elements unload when scrolled/offstaged away so Safari does
+/// not accumulate platform views. Pass [eager] for full-screen viewers that
+/// must paint immediately and stay mounted.
 class NetworkPhoto extends StatelessWidget {
   final String url;
   final double? width;
   final double? height;
   final BoxFit fit;
   final Widget Function(BuildContext, Object, StackTrace?)? errorBuilder;
+
+  /// When true on web, skip visibility unloading (full-screen / hero media).
+  final bool eager;
 
   const NetworkPhoto({
     super.key,
@@ -28,6 +32,7 @@ class NetworkPhoto extends StatelessWidget {
     this.height,
     this.fit = BoxFit.cover,
     this.errorBuilder,
+    this.eager = false,
   });
 
   @override
@@ -41,7 +46,7 @@ class NetworkPhoto extends StatelessWidget {
           _broken();
     }
 
-    if (kIsWeb) {
+    if (kIsWeb && !eager) {
       return _VisibilityGatedNetworkPhoto(
         url: url,
         width: width,
@@ -57,7 +62,7 @@ class NetworkPhoto extends StatelessWidget {
       height: height,
       fit: fit,
       errorBuilder: errorBuilder,
-      useHtmlElement: false,
+      useHtmlElement: kIsWeb,
     );
   }
 
@@ -127,7 +132,10 @@ class _VisibilityGatedNetworkPhoto extends StatefulWidget {
 
 class _VisibilityGatedNetworkPhotoState
     extends State<_VisibilityGatedNetworkPhoto> {
-  bool _mountImage = false;
+  // Start mounted so full-screen viewers / first paint are not blank black.
+  // VisibilityDetector unloads HTML platform views once they leave the
+  // viewport (and for Offstage tabs that never paint).
+  bool _mountImage = true;
   Timer? _releaseTimer;
 
   @override
