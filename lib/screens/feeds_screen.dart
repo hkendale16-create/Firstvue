@@ -6,6 +6,7 @@ import '../config/feed_ranking_config.dart';
 import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../auth/ensure_signed_in.dart';
+import '../screens/boost_post_sheet.dart';
 import '../screens/communities_screen.dart';
 import '../screens/community_detail_screen.dart';
 import '../screens/community_hub_detail_screen.dart';
@@ -15,6 +16,7 @@ import '../services/community_hub_service.dart';
 import '../services/community_news_service.dart';
 import '../services/community_service.dart';
 import '../services/feed_interaction_service.dart';
+import '../services/post_boost_service.dart';
 import '../services/repost_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../utils/web_safari_media.dart';
@@ -302,6 +304,7 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
   final List<CommunityNewsPost> _posts = [];
   final Set<String> _seenIds = {};
   Set<String> _reposted = {};
+  Set<String> _boostedIds = {};
   bool _loading = true;
   bool _loadingMore = false;
   bool _hasMore = true;
@@ -335,6 +338,7 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
       final ids = posts.map((p) => p.id).toList();
       final reposted = await RepostService.fetchMyRepostedIds(ids);
       final counts = await RepostService.fetchRepostCounts(ids);
+      final boosted = await PostBoostService.fetchActiveBoostedPostIds();
       if (!mounted) return;
       setState(() {
         _posts
@@ -347,6 +351,7 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
           ..clear()
           ..addAll(posts.map((p) => p.id));
         _reposted = reposted;
+        _boostedIds = boosted;
         _loading = false;
         _hasMore = posts.length >= FeedRankingConfig.defaultPageSize;
       });
@@ -618,6 +623,18 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
                   },
                   onRepost: () => _repost(i),
                   onShare: () => _share(_posts[i]),
+                  onDelete: _posts[i].isMine
+                      ? () async {
+                          final deleted =
+                              await confirmDeleteNewsPost(context, _posts[i]);
+                          if (!deleted || !mounted) return;
+                          setState(() => _posts.removeAt(i));
+                        }
+                      : null,
+                  onBoost: _posts[i].isMine
+                      ? () => openBoostPostFlow(context, _posts[i])
+                      : null,
+                  isPromoted: _boostedIds.contains(_posts[i].id),
                   repostedByMe: _reposted.contains(_posts[i].id),
                 ),
               ),

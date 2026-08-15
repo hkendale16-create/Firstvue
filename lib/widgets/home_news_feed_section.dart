@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../navigation/entity_navigation.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../auth/ensure_signed_in.dart';
+import '../screens/boost_post_sheet.dart';
 import '../screens/create_post_screen.dart';
 import '../models/post_identity.dart';
 import '../services/community_news_service.dart';
@@ -557,6 +558,9 @@ class _HomeNewsFeedSectionState extends State<HomeNewsFeedSection> {
                   onSave: () => _savePost(index),
                   onDelete: _posts[index].isMine
                       ? () => _showPostMenu(index)
+                      : null,
+                  onBoost: _posts[index].isMine
+                      ? () => openBoostPostFlow(context, _posts[index])
                       : null,
                   onComment: () => FeedCommentsSheet.show(
                     context,

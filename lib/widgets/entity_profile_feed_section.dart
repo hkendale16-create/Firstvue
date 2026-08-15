@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../auth/ensure_signed_in.dart';
 import '../models/publish_destination.dart';
+import '../screens/boost_post_sheet.dart';
 import '../screens/create_post_screen.dart';
 import '../services/community_news_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -309,6 +310,11 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
                       businessName: posts[index].authorName,
                     ),
                     onDelete: posts[index].isMine ? () => _deletePost(index) : null,
+                    onBoost: posts[index].isMine ||
+                            (widget.canPost &&
+                                widget.scope == EntityFeedScope.business)
+                        ? () => openBoostPostFlow(context, posts[index])
+                        : null,
                   ),
                 ),
             ],

@@ -16,6 +16,7 @@ import 'feed_autoplay_video.dart';
 import 'spark_reaction_button.dart';
 import 'signed_media_viewer.dart';
 import 'entity_follow_button.dart';
+import 'sponsored_disclosure_badge.dart';
 
 enum CommunityNewsPostCardStyle { compact, timeline }
 
@@ -30,8 +31,10 @@ class CommunityNewsPostCard extends StatefulWidget {
   final VoidCallback? onRepost;
   final VoidCallback? onShare;
   final VoidCallback? onDelete;
+  final VoidCallback? onBoost;
   final bool repostedByMe;
   final bool compact;
+  final bool isPromoted;
   final CommunityNewsPostCardStyle style;
 
   const CommunityNewsPostCard({
@@ -46,8 +49,10 @@ class CommunityNewsPostCard extends StatefulWidget {
     this.onRepost,
     this.onShare,
     this.onDelete,
+    this.onBoost,
     this.repostedByMe = false,
     this.compact = false,
+    this.isPromoted = false,
     this.style = CommunityNewsPostCardStyle.compact,
   });
 
@@ -257,13 +262,30 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
             ],
           ),
         ),
-        if (widget.onDelete != null)
-          IconButton(
-            onPressed: widget.onDelete,
+        if (widget.onDelete != null || widget.onBoost != null)
+          PopupMenuButton<String>(
+            tooltip: 'Post options',
             icon: Icon(Icons.more_horiz, color: context.fv.secondaryText),
-            visualDensity: VisualDensity.compact,
             padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            onSelected: (value) {
+              if (value == 'boost') {
+                widget.onBoost?.call();
+              } else if (value == 'delete') {
+                widget.onDelete?.call();
+              }
+            },
+            itemBuilder: (context) => [
+              if (widget.onBoost != null)
+                const PopupMenuItem(
+                  value: 'boost',
+                  child: Text('Boost Post'),
+                ),
+              if (widget.onDelete != null)
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Delete'),
+                ),
+            ],
           ),
       ],
     );
@@ -275,7 +297,16 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
         horizontalPadding,
         0,
       ),
-      child: row,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (widget.isPromoted) ...[
+            const SponsoredDisclosureBadge(label: 'Promoted', compact: true),
+            const SizedBox(height: 8),
+          ],
+          row,
+        ],
+      ),
     );
 
     if (widget.onAuthorTap == null) return header;

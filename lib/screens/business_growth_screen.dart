@@ -10,6 +10,7 @@ import '../services/monetization_products_service.dart';
 import '../services/stripe_billing_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'business_campaign_dashboard_screen.dart';
+import 'my_businesses_screen.dart';
 
 class BusinessGrowthScreen extends StatefulWidget {
   const BusinessGrowthScreen({super.key});
@@ -115,7 +116,7 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('FIRSTVUE FOR BUSINESS'),
+        title: const Text('Monetization & Plans'),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         actions: [
           IconButton(
@@ -161,11 +162,13 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
           final businesses = data.businesses;
 
           if (businesses.isEmpty) {
+            final verifiedPrice = data.verifiedProduct.priceLabel;
+            final proPrice = data.proProduct.priceLabel;
             return ListView(
               padding: const EdgeInsets.all(20),
               children: [
                 Text(
-                  'Turn attention into customers',
+                  'Monetization & Plans',
                   style: TextStyle(
                     color: fv.primaryText,
                     fontSize: 23,
@@ -174,9 +177,104 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Create or claim a business profile to activate subscriptions and growth tools.',
+                  'You don’t have a business profile yet — that’s why plan tools '
+                  'looked missing. Preview plans below, then create or claim a '
+                  'business to manage upgrades. Personal creators can still use '
+                  'Boost Post on their own posts.',
                   style: TextStyle(color: fv.secondaryText, height: 1.45),
                 ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: fv.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: FirstVueColors.gold.withValues(alpha: .35),
+                    ),
+                  ),
+                  child: Text(
+                    'Payments coming soon — plan previews are available, but '
+                    'Stripe checkout stays disabled during Early Access.',
+                    style: TextStyle(color: fv.secondaryText, height: 1.45),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        FirstVuePageRoute(
+                          builder: (_) => const MyBusinessesScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.storefront_outlined),
+                    label: const Text('Create or manage a business'),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                Text(
+                  'PLAN PREVIEWS',
+                  style: TextStyle(
+                    color: FirstVueColors.gold,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _PlanCard(
+                  name: 'BASIC',
+                  price: 'FREE',
+                  features: 'Business listing • Services • Photos • Reviews',
+                  isCurrent: true,
+                  isLoading: false,
+                  actionLabel: null,
+                  onAction: null,
+                  onTap: () => _showMessage(
+                    'Basic is your free listing plan — always available.',
+                  ),
+                ),
+                _PlanCard(
+                  name: 'VERIFIED',
+                  price: verifiedPrice,
+                  features: 'Verified badge • Trust tools • Owner identity',
+                  isCurrent: false,
+                  isLoading: false,
+                  actionLabel: 'COMING SOON',
+                  onAction: () => _showComingSoon('Verified'),
+                  onTap: () => _showComingSoon('Verified'),
+                ),
+                _PlanCard(
+                  name: 'FIRSTVUE PRO',
+                  price: proPrice,
+                  features: 'Analytics • Lead insights • Campaign tools',
+                  isCurrent: false,
+                  isLoading: false,
+                  actionLabel: 'COMING SOON',
+                  onAction: () => _showComingSoon('FirstVue Pro'),
+                  onTap: () => _showComingSoon('FirstVue Pro'),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'BOOST POST TIERS',
+                  style: TextStyle(
+                    color: FirstVueColors.gold,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                for (final tier in MonetizationProductCatalog.postBoostTiers())
+                  _Tool(
+                    icon: Icons.rocket_launch_outlined,
+                    title: '${tier.displayName} · ${tier.priceLabel}',
+                    subtitle:
+                        'Draft from your post menu (•••). Payments not active yet.',
+                    onTap: () => _showComingSoon(tier.displayName),
+                  ),
               ],
             );
           }
@@ -380,6 +478,14 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                 ),
               ),
               const SizedBox(height: 10),
+              for (final tier in MonetizationProductCatalog.postBoostTiers())
+                _Tool(
+                  icon: Icons.rocket_launch_outlined,
+                  title: '${tier.displayName} · ${tier.priceLabel}',
+                  subtitle:
+                      'Boost your posts from ••• → Boost Post (draft only for now)',
+                  onTap: () => _showComingSoon(tier.displayName),
+                ),
               _Tool(
                 icon: Icons.push_pin_outlined,
                 title: 'Featured placement',

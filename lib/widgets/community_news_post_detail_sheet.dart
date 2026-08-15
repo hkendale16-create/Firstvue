@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../navigation/firstvue_page_route.dart';
 import '../auth/ensure_signed_in.dart';
+import '../screens/boost_post_sheet.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../screens/post_detail_screen.dart';
 import '../config/app_config.dart';
@@ -250,6 +251,9 @@ class _CommunityNewsPostDetailSheetState
                           onSpark: _toggleSpark,
                           onSave: _toggleSave,
                           onDelete: _post!.isMine ? _deletePost : null,
+                          onBoost: _post!.isMine
+                              ? () => openBoostPostFlow(context, _post!)
+                              : null,
                           onComment: () => FeedCommentsSheet.show(
                             context,
                             mediaId: _post!.commentsMediaId,

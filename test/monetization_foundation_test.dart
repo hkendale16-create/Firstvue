@@ -48,6 +48,11 @@ void main() {
     );
     expect(plus.priceCents, isNull);
     expect(plus.isActive, isFalse);
+    final boost = MonetizationProductCatalog.fallbackById(
+      MonetizationProductIds.postBoostLocalSmall,
+    );
+    expect(boost.priceCents, 500);
+    expect(boost.isActive, isFalse);
   });
 
   test('monetization migration and UI foundation files exist', () {
