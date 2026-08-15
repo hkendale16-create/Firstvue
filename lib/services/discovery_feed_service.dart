@@ -94,15 +94,15 @@ class DiscoveryFeedService {
     final already = excludeMediaIds.length;
     final window = (limit + already + 12).clamp(limit, 180);
     // Oversample business media: many DB rows point at missing storage objects.
-    final businessItems = await safe(
-      () => _fetchBusinessMedia(limit: window * 2, offset: 0),
-    );
-    final memberItems = await safe(
-      () => _fetchMemberProfileMedia(limit: window, offset: 0),
-    );
-    final vueNews = await safe(
-      () => _fetchVueNewsPosts(limit: window, offset: 0),
-    );
+    // Fetch sources in parallel — sequential tripled VUE load latency/usage.
+    final sourced = await Future.wait([
+      safe(() => _fetchBusinessMedia(limit: window * 2, offset: 0)),
+      safe(() => _fetchMemberProfileMedia(limit: window, offset: 0)),
+      safe(() => _fetchVueNewsPosts(limit: window, offset: 0)),
+    ]);
+    final businessItems = sourced[0];
+    final memberItems = sourced[1];
+    final vueNews = sourced[2];
 
     final combined = _dedupeByMediaId([
       ...vueNews,
@@ -151,10 +151,12 @@ class DiscoveryFeedService {
     int offset = 0,
   }) async {
     try {
+      // Drop popularity/demand from the mosaic select — ranking uses rating /
+      // verified / sponsored only; unused columns inflate every VUE page.
       const fullSelect =
-          'id, storage_path, storage_provider, thumbnail_path, media_type, caption, duration_seconds, businesses!inner(id, name, business_type, created_by, verification_status, average_rating, services, status, popularity_score, demand_score, business_locations(city, state))';
+          'id, storage_path, storage_provider, thumbnail_path, media_type, caption, duration_seconds, businesses!inner(id, name, business_type, created_by, verification_status, average_rating, services, status, business_locations(city, state))';
       const fallbackSelect =
-          'id, storage_path, storage_provider, thumbnail_path, media_type, caption, businesses!inner(id, name, business_type, created_by, verification_status, average_rating, services, status, popularity_score, demand_score)';
+          'id, storage_path, storage_provider, thumbnail_path, media_type, caption, businesses!inner(id, name, business_type, created_by, verification_status, average_rating, services, status)';
       List<dynamic> rows;
       final rangeEnd = offset + limit - 1;
       try {

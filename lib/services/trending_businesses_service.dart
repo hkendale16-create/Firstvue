@@ -208,15 +208,90 @@ class TrendingBusinessesService {
 
     scored.sort((a, b) => b.score.compareTo(a.score));
     final topRows = scored.take(limit).map((entry) => entry.row).toList();
+    return _mapRowsToTrendingBusinesses(topRows, position);
+  }
+
+  /// Batch review counts + featured media for the ranked page (avoids N+1).
+  static Future<List<TrendingBusiness>> _mapRowsToTrendingBusinesses(
+    List<Map<String, dynamic>> topRows,
+    Position? position,
+  ) async {
+    if (topRows.isEmpty) return const [];
+
+    final businessIds = topRows
+        .map((row) => row['id'] as String?)
+        .whereType<String>()
+        .toList(growable: false);
+    if (businessIds.isEmpty) return const [];
+
+    final reviewCountsFuture = _fetchReviewCounts(businessIds);
+    final mediaByBusinessFuture = _fetchFeaturedMediaByBusiness(businessIds);
+    final reviewCounts = await reviewCountsFuture;
+    final mediaByBusiness = await mediaByBusinessFuture;
 
     final businesses = <TrendingBusiness>[];
     for (final row in topRows) {
       try {
-        final business = await _mapRowToTrendingBusiness(row, position);
+        final business = await _mapRowToTrendingBusiness(
+          row,
+          position,
+          reviewCount: reviewCounts[row['id'] as String] ?? 0,
+          mediaRow: mediaByBusiness[row['id'] as String],
+        );
         if (business != null) businesses.add(business);
       } catch (_) {}
     }
     return businesses;
+  }
+
+  static Future<Map<String, int>> _fetchReviewCounts(
+    List<String> businessIds,
+  ) async {
+    if (businessIds.isEmpty) return const {};
+    try {
+      final rows = await _client
+          .from('business_reviews')
+          .select('business_id')
+          .inFilter('business_id', businessIds)
+          .eq('status', 'approved');
+      final counts = <String, int>{};
+      for (final row in rows) {
+        final id = row['business_id'] as String?;
+        if (id == null) continue;
+        counts[id] = (counts[id] ?? 0) + 1;
+      }
+      return counts;
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  static Future<Map<String, Map<String, dynamic>>> _fetchFeaturedMediaByBusiness(
+    List<String> businessIds,
+  ) async {
+    if (businessIds.isEmpty) return const {};
+    try {
+      final rows = await _client
+          .from('business_media')
+          .select(
+            'business_id, storage_path, thumbnail_path, storage_provider, '
+            'media_type, featured_for_trending, created_at',
+          )
+          .inFilter('business_id', businessIds)
+          .order('featured_for_trending', ascending: false)
+          .order('created_at', ascending: false);
+
+      final byBusiness = <String, Map<String, dynamic>>{};
+      for (final row in rows) {
+        final map = Map<String, dynamic>.from(row as Map);
+        final id = map['business_id'] as String?;
+        if (id == null || byBusiness.containsKey(id)) continue;
+        byBusiness[id] = map;
+      }
+      return byBusiness;
+    } catch (_) {
+      return const {};
+    }
   }
 
   static List<dynamic> _filterRowsByPreferredLocation(
@@ -255,38 +330,12 @@ class TrendingBusinessesService {
 
   static Future<TrendingBusiness?> _mapRowToTrendingBusiness(
     Map<String, dynamic> row,
-    Position? position,
-  ) async {
+    Position? position, {
+    required int reviewCount,
+    Map<String, dynamic>? mediaRow,
+  }) async {
     final businessId = row['id'] as String;
-
-    final reviewRows = await _client
-        .from('business_reviews')
-        .select('id')
-        .eq('business_id', businessId)
-        .eq('status', 'approved');
-
-    Map<String, dynamic>? fallbackMediaRow;
-    try {
-      final mediaRow = await _client
-          .from('business_media')
-          .select('storage_path, thumbnail_path, storage_provider, media_type')
-          .eq('business_id', businessId)
-          .eq('featured_for_trending', true)
-          .maybeSingle();
-
-      fallbackMediaRow = mediaRow ??
-          await _client
-              .from('business_media')
-              .select(
-                'storage_path, thumbnail_path, storage_provider, media_type',
-              )
-              .eq('business_id', businessId)
-              .order('created_at', ascending: false)
-              .limit(1)
-              .maybeSingle();
-    } catch (_) {
-      fallbackMediaRow = null;
-    }
+    final fallbackMediaRow = mediaRow;
 
     String? imageUrl;
     var featuredIsVideo = false;
@@ -330,7 +379,7 @@ class TrendingBusinessesService {
       id: businessId,
       name: row['name'] as String,
       rating: (row['average_rating'] as num?)?.toDouble() ?? 0,
-      reviewCount: reviewRows.length,
+      reviewCount: reviewCount,
       distanceMiles: distanceMiles,
       services: List<String>.from((row['services'] as List?) ?? const []),
       verified: row['verification_status'] == 'verified',

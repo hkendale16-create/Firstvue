@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 
@@ -30,6 +32,10 @@ class _SearchScreenState extends State<SearchScreen> {
   DiscoveryCategory _category = DiscoveryCategory.barbers;
   List<SearchAutocompleteResult> _suggestions = const [];
   bool _searching = false;
+  Timer? _debounce;
+  int _searchGeneration = 0;
+
+  static const _searchDebounce = Duration(milliseconds: 350);
 
   @override
   void initState() {
@@ -44,17 +50,27 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  Future<void> _onQueryChanged() async {
+  void _onQueryChanged() {
     final query = _searchController.text;
+    _debounce?.cancel();
     if (!SearchAutocompleteService.shouldSearch(query)) {
-      if (_suggestions.isNotEmpty && mounted) {
-        setState(() => _suggestions = const []);
+      _searchGeneration++;
+      if ((_suggestions.isNotEmpty || _searching) && mounted) {
+        setState(() {
+          _suggestions = const [];
+          _searching = false;
+        });
       }
       return;
     }
-    setState(() => _searching = true);
+    _debounce = Timer(_searchDebounce, () => _runSearch(query));
+  }
+
+  Future<void> _runSearch(String query) async {
+    final generation = ++_searchGeneration;
+    if (mounted) setState(() => _searching = true);
     final results = await SearchAutocompleteService.search(query);
-    if (!mounted) return;
+    if (!mounted || generation != _searchGeneration) return;
     setState(() {
       _suggestions = results;
       _searching = false;
@@ -105,6 +121,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
+    _searchController.removeListener(_onQueryChanged);
     _searchController.dispose();
     super.dispose();
   }

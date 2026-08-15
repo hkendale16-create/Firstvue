@@ -206,34 +206,68 @@ class LiveMapService {
     required int limit,
     LiveMapBounds? bounds,
   }) async {
-    final pins = <LiveMapPin>[];
-    final seen = <String>{};
+    final eventPins = <LiveMapPin>[];
+    final businessEventPins = <LiveMapPin>[];
+    final directoryPins = <LiveMapPin>[];
+    final openPins = <LiveMapPin>[];
+    final eventSeen = <String>{};
+    final businessEventSeen = <String>{};
+    final directorySeen = <String>{};
+    final openSeen = <String>{};
 
-    await _addEventOwnCoords(
-      pins: pins,
-      seen: seen,
-      bounds: bounds,
-      limit: limit,
-    );
-    await _addEventsFromBusinessLocations(
-      pins: pins,
-      seen: seen,
-      bounds: bounds,
-      limit: limit,
-    );
-    await _addDirectoryBusinesses(
-      pins: pins,
-      seen: seen,
-      bounds: bounds,
-      limit: limit,
-    );
-    if (FeatureFlags.liveFoodTrucksEnabled) {
-      await _addOpenSessions(
-        pins: pins,
-        seen: seen,
+    // Run collectors in parallel — sequential was 4 round-trips per pan settle.
+    final tasks = <Future<void>>[
+      _addEventOwnCoords(
+        pins: eventPins,
+        seen: eventSeen,
         bounds: bounds,
         limit: limit,
+      ),
+      _addEventsFromBusinessLocations(
+        pins: businessEventPins,
+        seen: businessEventSeen,
+        bounds: bounds,
+        limit: limit,
+      ),
+      _addDirectoryBusinesses(
+        pins: directoryPins,
+        seen: directorySeen,
+        bounds: bounds,
+        limit: limit,
+      ),
+    ];
+    if (FeatureFlags.liveFoodTrucksEnabled) {
+      tasks.add(
+        _addOpenSessions(
+          pins: openPins,
+          seen: openSeen,
+          bounds: bounds,
+          limit: limit,
+        ),
       );
+    }
+    await Future.wait(tasks);
+
+    final pins = <LiveMapPin>[];
+    final seen = <String>{};
+    void merge(List<LiveMapPin> source) {
+      for (final pin in source) {
+        if (seen.add(pin.id)) pins.add(pin);
+      }
+    }
+
+    merge(eventPins);
+    merge(businessEventPins);
+    merge(directoryPins);
+    // Live open sessions replace static directory pins for the same business.
+    for (final pin in openPins) {
+      final businessId = pin.businessId;
+      if (businessId != null) {
+        final bizId = 'biz:$businessId';
+        seen.remove(bizId);
+        pins.removeWhere((p) => p.id == bizId);
+      }
+      if (seen.add(pin.id)) pins.add(pin);
     }
     return pins;
   }
@@ -285,7 +319,7 @@ class LiveMapService {
     required int limit,
   }) async {
     try {
-      final rows = await _client
+      var query = _client
           .from('community_events')
           .select(
             'id, title, description, event_at, ends_at, location_label, organizer_id, '
@@ -294,8 +328,19 @@ class LiveMapService {
             'businesses!inner(name, business_type, '
             'business_locations!inner(latitude, longitude, city, state))',
           )
-          .eq('status', 'approved')
-          .limit(limit * 2);
+          .eq('status', 'approved');
+
+      // Push viewport into the nested location join so PostgREST does not
+      // return a global limit*2 then discard off-screen rows client-side.
+      if (bounds != null) {
+        query = query
+            .gte('businesses.business_locations.latitude', bounds.minLat)
+            .lte('businesses.business_locations.latitude', bounds.maxLat)
+            .gte('businesses.business_locations.longitude', bounds.minLng)
+            .lte('businesses.business_locations.longitude', bounds.maxLng);
+      }
+
+      final rows = await query.limit(limit * 2);
 
       for (final row in rows) {
         // Prefer explicit event coords already added.
@@ -310,7 +355,38 @@ class LiveMapService {
         );
         if (seen.add(pin.id)) pins.add(pin);
       }
-    } catch (_) {}
+    } catch (_) {
+      // Nested geo filters can fail on older schemas — fall back unscoped.
+      if (bounds == null) return;
+      try {
+        final rows = await _client
+            .from('community_events')
+            .select(
+              'id, title, description, event_at, ends_at, location_label, organizer_id, '
+              'business_id, status, cover_storage_path, cover_storage_provider, '
+              'latitude, longitude, '
+              'businesses!inner(name, business_type, '
+              'business_locations!inner(latitude, longitude, city, state))',
+            )
+            .eq('status', 'approved')
+            .limit(limit * 2);
+        for (final row in rows) {
+          if (row['latitude'] != null && row['longitude'] != null) continue;
+          final event = _mapEventRow(row);
+          final point = _pointFromBusinessJoin(row);
+          if (point == null) continue;
+          if (!bounds.contains(point)) continue;
+          final pin = _pinFromEvent(
+            event.copyWith(
+              latitude: point.latitude,
+              longitude: point.longitude,
+            ),
+            point,
+          );
+          if (seen.add(pin.id)) pins.add(pin);
+        }
+      } catch (_) {}
+    }
   }
 
   static Future<void> _addDirectoryBusinesses({
@@ -320,14 +396,23 @@ class LiveMapService {
     required int limit,
   }) async {
     try {
-      final rows = await _client
+      var query = _client
           .from('businesses')
           .select(
             'id, name, business_type, '
             'business_locations!inner(latitude, longitude, city, state, address_line_1)',
           )
-          .eq('status', 'approved')
-          .limit(limit * 3);
+          .eq('status', 'approved');
+
+      if (bounds != null) {
+        query = query
+            .gte('business_locations.latitude', bounds.minLat)
+            .lte('business_locations.latitude', bounds.maxLat)
+            .gte('business_locations.longitude', bounds.minLng)
+            .lte('business_locations.longitude', bounds.maxLng);
+      }
+
+      final rows = await query.limit(limit * 3);
 
       for (final row in rows) {
         final type = row['business_type'] as String?;
@@ -360,7 +445,47 @@ class LiveMapService {
           ),
         );
       }
-    } catch (_) {}
+    } catch (_) {
+      if (bounds == null) return;
+      try {
+        final rows = await _client
+            .from('businesses')
+            .select(
+              'id, name, business_type, '
+              'business_locations!inner(latitude, longitude, city, state, address_line_1)',
+            )
+            .eq('status', 'approved')
+            .limit(limit * 3);
+        for (final row in rows) {
+          final type = row['business_type'] as String?;
+          final kind = kindForBusinessType(type);
+          if (kind == null) continue;
+          if (!FeatureFlags.liveFoodTrucksEnabled &&
+              kind == LiveMapPinKind.foodTruck) {
+            continue;
+          }
+          final point = _pointFromLocationList(row['business_locations']);
+          if (point == null || !bounds.contains(point)) continue;
+          final id = row['id'] as String?;
+          final name = row['name'] as String?;
+          if (id == null || name == null || name.isEmpty) continue;
+          final pinId = 'biz:$id';
+          if (!seen.add(pinId)) continue;
+          final city = _firstLocationCity(row['business_locations']);
+          pins.add(
+            LiveMapPin(
+              id: pinId,
+              kind: kind,
+              title: name,
+              subtitle: city ?? type,
+              point: point,
+              lifecycle: LiveLifecycleStatus.upcoming,
+              businessId: id,
+            ),
+          );
+        }
+      } catch (_) {}
+    }
   }
 
   static Future<void> _addOpenSessions({
@@ -370,7 +495,15 @@ class LiveMapService {
     required int limit,
   }) async {
     try {
-      final sessions = await LiveBusinessOpenService.listActive(limit: limit);
+      final sessions = bounds == null
+          ? await LiveBusinessOpenService.listActive(limit: limit)
+          : await LiveBusinessOpenService.listActiveInBounds(
+              minLat: bounds.minLat,
+              maxLat: bounds.maxLat,
+              minLng: bounds.minLng,
+              maxLng: bounds.maxLng,
+              limit: limit,
+            );
       for (final session in sessions) {
         final lat = session.latitude;
         final lng = session.longitude;
@@ -378,10 +511,6 @@ class LiveMapService {
         final point = LatLng(lat, lng);
         if (bounds != null && !bounds.contains(point)) continue;
         final pinId = 'open:${session.sessionId}';
-        // Prefer live open pin over static directory pin for same business.
-        final bizId = 'biz:${session.businessId}';
-        seen.remove(bizId);
-        pins.removeWhere((p) => p.id == bizId);
         if (!seen.add(pinId)) continue;
         pins.add(
           LiveMapPin(

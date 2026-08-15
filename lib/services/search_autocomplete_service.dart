@@ -59,17 +59,20 @@ class SearchAutocompleteService {
       return _searchUsernames(handlePrefix);
     }
 
-    final results = <SearchAutocompleteResult>[];
     final lower = trimmed.toLowerCase();
 
-    results.addAll(await _searchProfiles(lower));
-    results.addAll(await _searchBusinesses(lower));
-    results.addAll(await _searchCommunities(lower));
-    results.addAll(await _searchCommunityHubs(lower));
-    results.addAll(await _searchHashtags(lower));
-    results.addAll(await _searchEntityHandles(lower));
+    // Fan-out in parallel so one keystroke is one round-trip wave, not six
+    // sequential PostgREST calls.
+    final batches = await Future.wait([
+      _searchProfiles(lower),
+      _searchBusinesses(lower),
+      _searchCommunities(lower),
+      _searchCommunityHubs(lower),
+      _searchHashtags(lower),
+      _searchEntityHandles(lower),
+    ]);
 
-    return results;
+    return [for (final batch in batches) ...batch];
   }
 
   static Future<List<SearchAutocompleteResult>> _searchUsernames(

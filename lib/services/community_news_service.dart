@@ -865,32 +865,62 @@ class CommunityNewsService {
 
     if (safeRows.isEmpty) return const [];
 
-    final authorNames = await _fetchProfileNames(authorIds.toList());
-    final authorUsernames = await _fetchProfileUsernames(authorIds.toList());
-    final businessInfo = await _fetchBusinessInfo(businessIds.toList());
-    final communityNames = await _fetchCommunityNames(communityIds.toList());
-    final communityImages = await _fetchCommunityImages(communityIds.toList());
-    final professionalNames =
-        await _fetchProfessionalNames(professionalIds.toList());
-    final eventTitles = await _fetchEventTitles(eventIds.toList());
-    final sparkCounts = await _fetchSparkCounts(postIds);
-    final myReactions = currentUserId == null
-        ? const <String, String>{}
-        : await _fetchMyReactions(postIds, currentUserId);
-    final mySaves = currentUserId == null
-        ? const <String>{}
-        : await SavedItemsService.fetchSavedIds(
+    final authorIdList = authorIds.toList();
+    final communityIdList = communityIds.toList();
+
+    // One profile round-trip for names + usernames; hydrate the rest in parallel.
+    final profilesFuture = ProfileCards.listByIds(
+      authorIdList,
+      select: 'id, display_name, username',
+    );
+    final businessInfoFuture = _fetchBusinessInfo(businessIds.toList());
+    final communitiesFuture = _fetchCommunityCards(communityIdList);
+    final professionalNamesFuture =
+        _fetchProfessionalNames(professionalIds.toList());
+    final eventTitlesFuture = _fetchEventTitles(eventIds.toList());
+    final sparkCountsFuture = _fetchSparkCounts(postIds);
+    final myReactionsFuture = currentUserId == null
+        ? Future.value(const <String, String>{})
+        : _fetchMyReactions(postIds, currentUserId);
+    final mySavesFuture = currentUserId == null
+        ? Future.value(const <String>{})
+        : SavedItemsService.fetchSavedIds(
             contentType: SavedContentType.newsPost,
             contentIds: postIds,
           );
-    final mediaByPost = await CommunityNewsMediaService.fetchMediaByPostIds(
-      postIds,
-    );
-    final followingAuthors = await _followingAuthorIds(
-      authorIds.toList(),
+    final mediaByPostFuture =
+        CommunityNewsMediaService.fetchMediaByPostIds(postIds);
+    final followingAuthorsFuture = _followingAuthorIds(
+      authorIdList,
       currentUserId: currentUserId,
     );
-    final entityHandles = await _fetchEntityHandlesForPosts(safeRows);
+    final entityHandlesFuture = _fetchEntityHandlesForPosts(safeRows);
+
+    final profiles = await profilesFuture;
+    final authorNames = <String, String>{
+      for (final row in profiles)
+        row['id'] as String:
+            (row['display_name'] as String?) ?? 'FirstVue member',
+    };
+    final authorUsernames = <String, String>{
+      for (final row in profiles)
+        if ((row['username'] as String?)?.trim().isNotEmpty == true)
+          row['id'] as String: (row['username'] as String).trim(),
+    };
+
+    // Futures already running — await individually (typed, no cast).
+    final businessInfo = await businessInfoFuture;
+    final communityCards = await communitiesFuture;
+    final communityNames = communityCards.names;
+    final communityImages = communityCards.images;
+    final professionalNames = await professionalNamesFuture;
+    final eventTitles = await eventTitlesFuture;
+    final sparkCounts = await sparkCountsFuture;
+    final myReactions = await myReactionsFuture;
+    final mySaves = await mySavesFuture;
+    final mediaByPost = await mediaByPostFuture;
+    final followingAuthors = await followingAuthorsFuture;
+    final entityHandles = await entityHandlesFuture;
 
     final posts = <CommunityNewsPost>[];
     for (final row in safeRows) {
@@ -1045,6 +1075,37 @@ class CommunityNewsService {
       };
     } catch (_) {
       return const {};
+    }
+  }
+
+  /// Single communities round-trip for feed hydration (name + image).
+  static Future<({Map<String, String> names, Map<String, String> images})>
+  _fetchCommunityCards(List<String> communityIds) async {
+    if (communityIds.isEmpty) {
+      return (names: <String, String>{}, images: <String, String>{});
+    }
+    try {
+      final rows = await _client
+          .from('communities')
+          .select('id, name, image_url')
+          .inFilter('id', communityIds);
+      final names = <String, String>{};
+      final images = <String, String>{};
+      for (final row in rows) {
+        final id = row['id'] as String?;
+        if (id == null) continue;
+        final name = row['name'] as String?;
+        if (name != null) names[id] = name;
+        final imageUrl = row['image_url'] as String?;
+        if (imageUrl != null && imageUrl.trim().isNotEmpty) {
+          images[id] = imageUrl;
+        }
+      }
+      return (names: names, images: images);
+    } catch (_) {
+      final names = await _fetchCommunityNames(communityIds);
+      final images = await _fetchCommunityImages(communityIds);
+      return (names: names, images: images);
     }
   }
 
@@ -1832,32 +1893,7 @@ class CommunityNewsService {
     if (me == null) {
       return const ProfileEngagementStats(postCount: 0, sparksReceived: 0);
     }
-
-    try {
-      final posts = await _client
-          .from('community_news_posts')
-          .select('id')
-          .eq('author_id', me.id);
-      final postIds = posts
-          .map((row) => row['id'] as String)
-          .toList(growable: false);
-      final postCount = postIds.length;
-
-      if (postIds.isEmpty) {
-        return ProfileEngagementStats(postCount: postCount, sparksReceived: 0);
-      }
-
-      final sparkRows = await _client
-          .from('community_news_post_sparks')
-          .select('post_id')
-          .inFilter('post_id', postIds);
-      return ProfileEngagementStats(
-        postCount: postCount,
-        sparksReceived: sparkRows.length,
-      );
-    } catch (_) {
-      return const ProfileEngagementStats(postCount: 0, sparksReceived: 0);
-    }
+    return fetchEngagementStatsForAuthor(me.id);
   }
 
   /// Post count and sparks received for any member's posts.
@@ -1869,6 +1905,7 @@ class CommunityNewsService {
     }
 
     try {
+      // Only need ids for the spark filter — not full post rows.
       final posts = await _client
           .from('community_news_posts')
           .select('id')
@@ -1882,14 +1919,27 @@ class CommunityNewsService {
         return ProfileEngagementStats(postCount: postCount, sparksReceived: 0);
       }
 
-      final sparkRows = await _client
-          .from('community_news_post_sparks')
-          .select('post_id')
-          .inFilter('post_id', postIds);
-      return ProfileEngagementStats(
-        postCount: postCount,
-        sparksReceived: sparkRows.length,
-      );
+      // Prefer head count so we do not download every spark row.
+      try {
+        final counted = await _client
+            .from('community_news_post_sparks')
+            .select('id')
+            .inFilter('post_id', postIds)
+            .count(CountOption.exact);
+        return ProfileEngagementStats(
+          postCount: postCount,
+          sparksReceived: counted.count,
+        );
+      } catch (_) {
+        final sparkRows = await _client
+            .from('community_news_post_sparks')
+            .select('post_id')
+            .inFilter('post_id', postIds);
+        return ProfileEngagementStats(
+          postCount: postCount,
+          sparksReceived: sparkRows.length,
+        );
+      }
     } catch (_) {
       return const ProfileEngagementStats(postCount: 0, sparksReceived: 0);
     }
