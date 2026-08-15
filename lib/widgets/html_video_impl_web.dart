@@ -18,7 +18,8 @@ Widget buildHtmlVideo({
       video.loop = looping;
       video.muted = muted;
       video.playsInline = true;
-      video.preload = autoplay ? 'auto' : 'metadata';
+      // Avoid metadata decode storms from many thumbs; full-screen sets autoplay.
+      video.preload = autoplay ? 'auto' : 'none';
       video.setAttribute('webkit-playsinline', 'true');
       video.style.width = '100%';
       video.style.height = '100%';

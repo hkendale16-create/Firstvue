@@ -6,6 +6,7 @@ import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import '../theme/firstvue_theme.dart';
+import '../utils/web_safari_media.dart';
 
 /// Caps how many feed videos may hold a live [VideoPlayerController] at once.
 /// iOS Safari repeatedly kills the tab when many CanvasKit video textures stay
@@ -13,7 +14,8 @@ import '../theme/firstvue_theme.dart';
 class _FeedVideoBudget {
   _FeedVideoBudget._();
 
-  static const int maxActiveWeb = 1;
+  /// Web feed previews are poster-only ([webAvoidInlineVideoPreview]).
+  static const int maxActiveWeb = 0;
   static const int maxActiveNative = 3;
 
   static final List<_FeedAutoplayVideoState> _active = [];
@@ -38,8 +40,9 @@ class _FeedVideoBudget {
 
 /// Feed video that autoplays muted when mostly on screen.
 ///
-/// Controllers are created lazily when visible and released when scrolled away
-/// (especially on web) so Safari does not OOM mid-scroll.
+/// Controllers are created lazily when visible and released when scrolled away.
+/// On Flutter web, controllers are never created — tap opens fullscreen so
+/// Safari does not OOM from CanvasKit video textures + HTML platform views.
 class FeedAutoplayVideo extends StatefulWidget {
   final String url;
   final double? width;
@@ -109,6 +112,9 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
   }
 
   Future<void> _ensureController() async {
+    // iOS Safari: even one CanvasKit video texture + HTML img platform views
+    // crashes on tap/scroll. Feeds show a play affordance; tap opens fullscreen.
+    if (webAvoidInlineVideoPreview) return;
     if (_controller != null || _initializing || _failed) return;
     _initializing = true;
     _FeedVideoBudget.claim(this);
@@ -296,11 +302,18 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
       );
     }
 
-    if (!_ready || _controller == null) {
+    // Web: never allocate a decoder — static play chrome only.
+    if (webAvoidInlineVideoPreview || !_ready || _controller == null) {
       return ColoredBox(
         color: FirstVueColors.elevatedSurface,
         child: Center(
-          child: _initializing || _isMostlyVisible
+          child: webAvoidInlineVideoPreview
+              ? const Icon(
+                  Icons.play_circle_outline,
+                  color: Colors.white38,
+                  size: 40,
+                )
+              : _initializing || _isMostlyVisible
               ? const SizedBox(
                   width: 24,
                   height: 24,

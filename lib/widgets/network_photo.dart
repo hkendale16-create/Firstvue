@@ -1,4 +1,8 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 
 import '../theme/firstvue_theme.dart';
 
@@ -7,6 +11,9 @@ import '../theme/firstvue_theme.dart';
 /// CanvasKit fetches bytes with CORS. Signed Supabase URLs often send
 /// cookies while the host replies `Access-Control-Allow-Origin: *`, which
 /// browsers block. An `<img>` still displays the file.
+///
+/// On web, the HTML element is only mounted while mostly visible so Offstage
+/// tabs and long feeds do not accumulate platform views until Safari OOMs.
 class NetworkPhoto extends StatelessWidget {
   final String url;
   final double? width;
@@ -34,12 +41,42 @@ class NetworkPhoto extends StatelessWidget {
           _broken();
     }
 
+    if (kIsWeb) {
+      return _VisibilityGatedNetworkPhoto(
+        url: url,
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: errorBuilder,
+      );
+    }
+
+    return _networkImage(
+      url: url,
+      width: width,
+      height: height,
+      fit: fit,
+      errorBuilder: errorBuilder,
+      useHtmlElement: false,
+    );
+  }
+
+  static Widget _networkImage({
+    required String url,
+    double? width,
+    double? height,
+    required BoxFit fit,
+    Widget Function(BuildContext, Object, StackTrace?)? errorBuilder,
+    required bool useHtmlElement,
+  }) {
     return Image.network(
       url,
       width: width,
       height: height,
       fit: fit,
-      webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+      webHtmlElementStrategy: useHtmlElement
+          ? WebHtmlElementStrategy.prefer
+          : WebHtmlElementStrategy.never,
       loadingBuilder: (context, child, progress) {
         if (progress == null) return child;
         return ColoredBox(
@@ -60,10 +97,81 @@ class NetworkPhoto extends StatelessWidget {
     );
   }
 
-  Widget _broken() {
+  static Widget _broken() {
     return const ColoredBox(
       color: FirstVueColors.elevatedSurface,
       child: Icon(Icons.broken_image_outlined, color: Colors.white38),
+    );
+  }
+}
+
+class _VisibilityGatedNetworkPhoto extends StatefulWidget {
+  final String url;
+  final double? width;
+  final double? height;
+  final BoxFit fit;
+  final Widget Function(BuildContext, Object, StackTrace?)? errorBuilder;
+
+  const _VisibilityGatedNetworkPhoto({
+    required this.url,
+    this.width,
+    this.height,
+    required this.fit,
+    this.errorBuilder,
+  });
+
+  @override
+  State<_VisibilityGatedNetworkPhoto> createState() =>
+      _VisibilityGatedNetworkPhotoState();
+}
+
+class _VisibilityGatedNetworkPhotoState
+    extends State<_VisibilityGatedNetworkPhoto> {
+  bool _mountImage = false;
+  Timer? _releaseTimer;
+
+  @override
+  void dispose() {
+    _releaseTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onVisibilityChanged(VisibilityInfo info) {
+    final visible = info.visibleFraction >= 0.12;
+    if (visible) {
+      _releaseTimer?.cancel();
+      if (!_mountImage && mounted) {
+        setState(() => _mountImage = true);
+      }
+      return;
+    }
+    if (!_mountImage) return;
+    _releaseTimer?.cancel();
+    // Free the HTML platform view quickly once scrolled/offstaged away.
+    _releaseTimer = Timer(const Duration(milliseconds: 160), () {
+      if (!mounted) return;
+      setState(() => _mountImage = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return VisibilityDetector(
+      key: Key('net-photo-${widget.url.hashCode}'),
+      onVisibilityChanged: _onVisibilityChanged,
+      child: _mountImage
+          ? NetworkPhoto._networkImage(
+              url: widget.url,
+              width: widget.width,
+              height: widget.height,
+              fit: widget.fit,
+              errorBuilder: widget.errorBuilder,
+              useHtmlElement: true,
+            )
+          : ColoredBox(
+              color: FirstVueColors.elevatedSurface,
+              child: SizedBox(width: widget.width, height: widget.height),
+            ),
     );
   }
 }

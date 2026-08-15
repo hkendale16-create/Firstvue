@@ -17,6 +17,7 @@ import '../services/community_service.dart';
 import '../services/feed_interaction_service.dart';
 import '../services/repost_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../utils/web_safari_media.dart';
 import '../widgets/community_news_post_card.dart';
 import '../widgets/community_news_post_detail_sheet.dart';
 import '../widgets/feed_comments_sheet.dart';
@@ -145,7 +146,8 @@ class _FeedsScreenState extends State<FeedsScreen>
             child: PageView.builder(
               controller: _pageController,
               itemCount: _tabs.length,
-              allowImplicitScrolling: true,
+              // Adjacent-page prebuild keeps extra HTML media alive on Safari.
+              allowImplicitScrolling: !webAvoidStackedMediaTabs,
               onPageChanged: (index) {
                 if (_tabController.index != index) {
                   _syncing = true;
@@ -177,6 +179,8 @@ class _FeedsScreenState extends State<FeedsScreen>
 }
 
 /// Keeps off-screen Feeds pages alive so fast swipes do not blank/reload.
+/// Disabled on web — keeping every Feeds section mounted stacks platform views
+/// until iOS Safari reports "A problem repeatedly occurred".
 class _KeepAliveTab extends StatefulWidget {
   final Widget child;
 
@@ -189,7 +193,7 @@ class _KeepAliveTab extends StatefulWidget {
 class _KeepAliveTabState extends State<_KeepAliveTab>
     with AutomaticKeepAliveClientMixin {
   @override
-  bool get wantKeepAlive => true;
+  bool get wantKeepAlive => !webAvoidStackedMediaTabs;
 
   @override
   Widget build(BuildContext context) {

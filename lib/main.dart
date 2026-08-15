@@ -27,6 +27,7 @@ import 'services/deep_link_service.dart';
 import 'services/notification_service.dart';
 import 'theme/app_theme_controller.dart';
 import 'theme/firstvue_theme.dart';
+import 'utils/web_safari_media.dart';
 import 'widgets/firstvue_bottom_nav.dart';
 import 'widgets/firstvue_onboarding.dart';
 import 'widgets/firstvue_refresh_scaffold.dart';
@@ -333,6 +334,138 @@ class _FirstVueHomeState extends State<FirstVueHome> {
     if (mounted) setState(() => _homeRefreshToken++);
   }
 
+  Widget _buildHomeTab() {
+    return SafeArea(
+      child: FirstVueRefreshScaffold(
+        onRefresh: _refreshHomeTab,
+        child: ListView(
+          scrollCacheExtent: webScrollCacheExtent,
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: ClampingScrollPhysics(),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+          children: [
+            Row(
+              children: [
+                _HomeProfileAvatar(
+                  key: _homeAvatarKey,
+                  refreshToken: _homeRefreshToken,
+                  onTap: _openProfile,
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _goHome,
+                    behavior: HitTestBehavior.opaque,
+                    child: const FirstVueAnimatedHeaderTitle(),
+                  ),
+                ),
+                HomeCityChip(
+                  key: _cityChipKey,
+                  compact: true,
+                  pinOnly: true,
+                  onLocationChanged: _refreshHomeTab,
+                ),
+                IconButton(
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      FirstVuePageRoute(
+                        builder: (_) => const NotificationsScreen(),
+                      ),
+                    );
+                    await _refreshNotificationBadge();
+                  },
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
+                  icon: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      const Icon(
+                        Icons.notifications_none_rounded,
+                        color: FirstVueColors.gold,
+                        size: 26,
+                      ),
+                      Positioned(
+                        right: -1,
+                        top: -1,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: _notificationBadge > 0
+                                ? FirstVueColors.coral
+                                : Colors.transparent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            const SocialSearchBar(iconOnly: true),
+            const SizedBox(height: 16),
+            HomeDiscoverySection(refreshToken: _homeRefreshToken),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Native: keep visited tabs Offstage so swipe-back does not blank.
+  /// Web: mount only the active tab — stacked Offstage feeds leave dozens of
+  /// HTML `<img>` / video platform views alive and Safari kills the tab on tap.
+  Widget _buildTabBody() {
+    if (webAvoidStackedMediaTabs) {
+      return switch (selectedIndex) {
+        FirstVueBottomNav.vueIndex => _vueTab ?? const SizedBox.shrink(),
+        FirstVueBottomNav.exploreIndex =>
+          _exploreTab ?? const SizedBox.shrink(),
+        FirstVueBottomNav.feedsIndex =>
+          FeedsScreen(refreshToken: _homeRefreshToken),
+        FirstVueBottomNav.profileIndex =>
+          ProfileScreen(refreshToken: _profileRefreshToken),
+        FirstVueBottomNav.homeIndex => _buildHomeTab(),
+        _ => _vueTab ?? const SizedBox.shrink(),
+      };
+    }
+
+    return Stack(
+      children: [
+        Offstage(
+          offstage: selectedIndex != FirstVueBottomNav.vueIndex,
+          child: _vueTab ?? const SizedBox.shrink(),
+        ),
+        if (_exploreTab != null)
+          Offstage(
+            offstage: selectedIndex != FirstVueBottomNav.exploreIndex,
+            child: _exploreTab!,
+          ),
+        if (_feedsMounted)
+          Offstage(
+            offstage: selectedIndex != FirstVueBottomNav.feedsIndex,
+            child: FeedsScreen(refreshToken: _homeRefreshToken),
+          ),
+        if (_profileMounted)
+          Offstage(
+            offstage: selectedIndex != FirstVueBottomNav.profileIndex,
+            child: ProfileScreen(refreshToken: _profileRefreshToken),
+          ),
+        if (_homeMounted)
+          Offstage(
+            offstage: selectedIndex != FirstVueBottomNav.homeIndex,
+            child: _buildHomeTab(),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -340,114 +473,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
-          Offstage(
-            offstage: selectedIndex != FirstVueBottomNav.vueIndex,
-            child: _vueTab ?? const SizedBox.shrink(),
-          ),
-          if (_exploreTab != null)
-            Offstage(
-              offstage: selectedIndex != FirstVueBottomNav.exploreIndex,
-              child: _exploreTab!,
-            ),
-          if (_feedsMounted)
-            Offstage(
-              offstage: selectedIndex != FirstVueBottomNav.feedsIndex,
-              child: FeedsScreen(refreshToken: _homeRefreshToken),
-            ),
-          if (_profileMounted)
-            Offstage(
-              offstage: selectedIndex != FirstVueBottomNav.profileIndex,
-              child: ProfileScreen(refreshToken: _profileRefreshToken),
-            ),
-          if (_homeMounted)
-            Offstage(
-              offstage: selectedIndex != FirstVueBottomNav.homeIndex,
-              child: SafeArea(
-                child: FirstVueRefreshScaffold(
-                  onRefresh: _refreshHomeTab,
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(
-                      parent: ClampingScrollPhysics(),
-                    ),
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                    children: [
-                      Row(
-                        children: [
-                          _HomeProfileAvatar(
-                            key: _homeAvatarKey,
-                            refreshToken: _homeRefreshToken,
-                            onTap: _openProfile,
-                          ),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: _goHome,
-                              behavior: HitTestBehavior.opaque,
-                              child: const FirstVueAnimatedHeaderTitle(),
-                            ),
-                          ),
-                          HomeCityChip(
-                            key: _cityChipKey,
-                            compact: true,
-                            pinOnly: true,
-                            onLocationChanged: _refreshHomeTab,
-                          ),
-                          IconButton(
-                            onPressed: () async {
-                              await Navigator.push(
-                                context,
-                                FirstVuePageRoute(
-                                  builder: (_) => const NotificationsScreen(),
-                                ),
-                              );
-                              await _refreshNotificationBadge();
-                            },
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(
-                              minWidth: 40,
-                              minHeight: 40,
-                            ),
-                            icon: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                const Icon(
-                                  Icons.notifications_none_rounded,
-                                  color: FirstVueColors.gold,
-                                  size: 26,
-                                ),
-                                Positioned(
-                                  right: -1,
-                                  top: -1,
-                                  child: Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: _notificationBadge > 0
-                                          ? FirstVueColors.coral
-                                          : Colors.transparent,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 14),
-
-                      const SocialSearchBar(iconOnly: true),
-
-                      const SizedBox(height: 16),
-
-                      HomeDiscoverySection(refreshToken: _homeRefreshToken),
-
-                      const SizedBox(height: 12),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+          _buildTabBody(),
           if (selectedIndex == FirstVueBottomNav.homeIndex)
             FloatingMessagesBubble(key: _messagesBubbleKey),
         ],

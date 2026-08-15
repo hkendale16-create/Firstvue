@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/discovery_feed_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../utils/web_safari_media.dart';
 import 'vue_mosaic_layout.dart';
 import 'vue_mosaic_tile.dart';
 
@@ -37,6 +38,7 @@ class VueMosaicView extends StatelessWidget {
     final bands = groupVueMosaicBands(cells);
     return ListView.builder(
       padding: padding,
+      scrollCacheExtent: webScrollCacheExtent,
       physics: const AlwaysScrollableScrollPhysics(
         parent: ClampingScrollPhysics(),
       ),
