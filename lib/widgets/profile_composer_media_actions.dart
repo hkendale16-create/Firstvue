@@ -12,12 +12,15 @@ class ProfileComposerMediaActions extends StatelessWidget {
   final bool enabled;
   final ValueChanged<List<XFile>> onMediaPicked;
   final VoidCallback? onGoLive;
+  /// Icon-first row for Option 4 Create Post (light surfaces).
+  final bool compact;
 
   const ProfileComposerMediaActions({
     super.key,
     required this.enabled,
     required this.onMediaPicked,
     this.onGoLive,
+    this.compact = false,
   });
 
   Future<void> _pickPhotos(BuildContext context) async {
@@ -53,25 +56,34 @@ class ProfileComposerMediaActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
+    final labelColor = compact ? fv.secondaryText : Colors.white.withValues(alpha: .85);
+
     return Row(
       children: [
         _ActionChip(
           icon: Icons.photo_outlined,
           label: 'Photo',
+          compact: compact,
+          labelColor: labelColor,
           onTap: enabled ? () => _pickPhotos(context) : null,
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: compact ? 4 : 8),
         _ActionChip(
           icon: Icons.videocam_outlined,
           label: 'Video',
+          compact: compact,
+          labelColor: labelColor,
           onTap: enabled ? () => _pickVideos(context) : null,
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: compact ? 4 : 8),
         if (FeatureFlags.liveStreamingEnabled)
           _ActionChip(
             icon: Icons.sensors,
             label: 'Go Live',
             accent: FirstVueColors.coral,
+            compact: compact,
+            labelColor: labelColor,
             onTap: enabled ? () => _goLive(context) : null,
           ),
       ],
@@ -84,12 +96,16 @@ class _ActionChip extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
   final Color? accent;
+  final bool compact;
+  final Color labelColor;
 
   const _ActionChip({
     required this.icon,
     required this.label,
+    required this.labelColor,
     this.onTap,
     this.accent,
+    this.compact = false,
   });
 
   @override
@@ -97,22 +113,37 @@ class _ActionChip extends StatelessWidget {
     final color = accent ?? FirstVueColors.teal;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(compact ? 10 : 12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 6 : 8,
+          vertical: compact ? 6 : 8,
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18, color: color),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: .85),
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
+            Icon(icon, size: compact ? 20 : 18, color: color),
+            if (!compact) ...[
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: labelColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
               ),
-            ),
+            ] else ...[
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: labelColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ],
         ),
       ),

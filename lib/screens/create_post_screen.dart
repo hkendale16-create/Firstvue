@@ -2,19 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../auth/ensure_signed_in.dart';
 import '../models/post_identity.dart';
 import '../models/publish_destination.dart';
 import '../services/community_news_service.dart';
 import '../services/post_identity_service.dart';
 import '../services/post_identity_store.dart';
 import '../theme/firstvue_theme.dart';
+import '../widgets/create_post_settings_bar.dart';
 import '../widgets/local_media_thumbnail.dart';
 import '../widgets/mention_autocomplete_field.dart';
-import '../widgets/post_identity_selector.dart';
 import '../widgets/profile_composer_media_actions.dart';
-import '../auth/ensure_signed_in.dart';
 
-/// Full-screen news post composer with mentions, media, identity, and background.
+/// Universal feed post composer (Option 4): compact settings, large writing area.
+///
+/// Used by Home/Feeds, VUE, Community, Group, Business/Professional/Event feeds.
+/// Publishing, permissions, media upload, mentions, and hashtags are unchanged.
 class CreatePostScreen extends StatefulWidget {
   final String? initialBody;
   final String? businessId;
@@ -22,6 +25,7 @@ class CreatePostScreen extends StatefulWidget {
   final String? communityId;
   final String? eventId;
   final bool lockIdentity;
+  final PublishDestination? initialDestination;
 
   const CreatePostScreen({
     super.key,
@@ -31,6 +35,7 @@ class CreatePostScreen extends StatefulWidget {
     this.communityId,
     this.eventId,
     this.lockIdentity = false,
+    this.initialDestination,
   });
 
   @override
@@ -49,14 +54,23 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     'midnight',
   ];
 
+  static const _templates = <(IconData, String)>[
+    (Icons.storefront_outlined, 'Now available'),
+    (Icons.tips_and_updates_outlined, 'Looking for recommendations'),
+    (Icons.local_offer_outlined, "Today's special"),
+    (Icons.work_outline, 'Hiring'),
+    (Icons.event_outlined, 'Event reminder'),
+  ];
+
   final _body = TextEditingController();
   List<XFile> _attachedMedia = const [];
   List<PostIdentityOption> _identityOptions = const [];
   PostIdentityOption? _selectedIdentity;
   String _visibility = 'public';
   String _backgroundColor = 'none';
-  PublishDestination _destination = PublishDestination.feed;
+  late PublishDestination _destination;
   bool _publishing = false;
+  bool _toolsExpanded = false;
   String? _error;
 
   @override
@@ -65,7 +79,23 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     if (widget.initialBody != null) {
       _body.text = widget.initialBody!;
     }
+    _destination = widget.initialDestination ??
+        (_hasLockedEntityScope
+            ? PublishDestination.entityOnly
+            : PublishDestination.feed);
     _loadIdentities();
+  }
+
+  bool get _hasLockedEntityScope =>
+      widget.lockIdentity &&
+      (widget.businessId != null ||
+          widget.professionalProfileId != null ||
+          widget.communityId != null ||
+          widget.eventId != null);
+
+  bool get _canPublish {
+    final text = _body.text.trim();
+    return !_publishing && (text.isNotEmpty || _attachedMedia.isNotEmpty);
   }
 
   @override
@@ -116,6 +146,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           _selectedIdentity?.isPersonal == true &&
           options.any((o) => !o.isPersonal)) {
         _selectedIdentity = options.firstWhere((o) => !o.isPersonal);
+      }
+      // Entity-only destination is only valid for non-personal identities.
+      if (_destination == PublishDestination.entityOnly &&
+          (_selectedIdentity == null || _selectedIdentity!.isPersonal)) {
+        _destination = PublishDestination.feed;
       }
     });
   }
@@ -182,317 +217,393 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
   }
 
+  void _applyTemplate(String template) {
+    final current = _body.text.trim();
+    _body.text = current.isEmpty ? template : '$current\n$template';
+    _body.selection = TextSelection.collapsed(offset: _body.text.length);
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final fv = context.fv;
     final preview = _previewColor(_backgroundColor);
+    final showIdentity = !widget.lockIdentity &&
+        _identityOptions.isNotEmpty &&
+        _selectedIdentity != null;
 
     return Scaffold(
       backgroundColor: fv.background,
       appBar: AppBar(
         backgroundColor: fv.background,
         foregroundColor: fv.primaryText,
-        title: const Text('Create post'),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: true,
+        title: Text(
+          'Create post',
+          style: TextStyle(
+            fontFamily: 'CormorantGaramond',
+            color: fv.primaryText,
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         actions: [
           TextButton(
-            onPressed: _publishing ? null : _publish,
+            onPressed: _canPublish ? _publish : null,
             child: Text(
               _publishing ? 'Posting…' : 'Post',
               style: TextStyle(
-                color: _publishing ? fv.tertiaryText : FirstVueColors.coral,
+                color: _canPublish ? FirstVueColors.coral : fv.tertiaryText,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+      body: Column(
         children: [
-          if (_error != null) ...[
-            Text(_error!, style: TextStyle(color: fv.error)),
-            const SizedBox(height: 12),
-          ],
-          if (!widget.lockIdentity &&
-              _identityOptions.isNotEmpty &&
-              _selectedIdentity != null)
-            PostIdentitySelector(
-              options: _identityOptions,
-              selected: _selectedIdentity!,
-              onChanged: (value) {
-                setState(() => _selectedIdentity = value);
-                PostIdentityStore.saveSelected(value);
-              },
-            ),
-          InputDecorator(
-            decoration: InputDecoration(
-              labelText: 'Visibility',
-              labelStyle: TextStyle(color: fv.secondaryText, fontSize: 12),
-              filled: true,
-              fillColor: fv.elevatedSurface,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 4,
-              ),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _visibility,
-                isExpanded: true,
-                dropdownColor: fv.elevatedSurface,
-                style: TextStyle(color: fv.primaryText, fontSize: 13),
-                items: [
-                  DropdownMenuItem(
-                    value: 'public',
-                    child: Text(
-                      'Public',
-                      style: TextStyle(color: fv.primaryText),
-                    ),
-                  ),
-                  DropdownMenuItem(
-                    value: 'followers',
-                    child: Text(
-                      'Followers',
-                      style: TextStyle(color: fv.primaryText),
-                    ),
-                  ),
+          CreatePostSettingsBar(
+            selectedIdentity: _selectedIdentity,
+            identityOptions: _identityOptions,
+            showIdentity: showIdentity ||
+                (widget.lockIdentity && _selectedIdentity != null),
+            lockIdentity: widget.lockIdentity,
+            visibility: _visibility,
+            destination: _destination,
+            onIdentityChanged: (value) {
+              setState(() {
+                _selectedIdentity = value;
+                if (value.isPersonal &&
+                    _destination == PublishDestination.entityOnly) {
+                  _destination = PublishDestination.feed;
+                }
+              });
+              PostIdentityStore.saveSelected(value);
+            },
+            onVisibilityChanged: (value) => setState(() => _visibility = value),
+            onDestinationChanged: (value) =>
+                setState(() => _destination = value),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              children: [
+                if (_error != null) ...[
+                  Text(_error!, style: TextStyle(color: fv.error)),
+                  const SizedBox(height: 10),
                 ],
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() => _visibility = value);
-                },
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          InputDecorator(
-            decoration: InputDecoration(
-              labelText: 'Publish to',
-              labelStyle: TextStyle(color: fv.secondaryText, fontSize: 12),
-              filled: true,
-              fillColor: fv.elevatedSurface,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 4,
-              ),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<PublishDestination>(
-                value: _destination,
-                isExpanded: true,
-                dropdownColor: fv.elevatedSurface,
-                style: TextStyle(color: fv.primaryText, fontSize: 13),
-                items: [
-                  DropdownMenuItem(
-                    value: PublishDestination.feed,
-                    child: Text(
-                      'Home Newsfeed',
-                      style: TextStyle(color: fv.primaryText),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  constraints: const BoxConstraints(minHeight: 220),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                  decoration: BoxDecoration(
+                    color: preview ?? fv.elevatedSurface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: fv.borderSubtle.withValues(alpha: 0.55)),
+                  ),
+                  child: MentionAutocompleteField(
+                    controller: _body,
+                    minLines: 8,
+                    maxLines: null,
+                    hintText: 'Share news… Use #hashtags and @handles.',
+                    style: TextStyle(
+                      color: fv.primaryText,
+                      fontSize: 16,
+                      height: 1.35,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Share news… Use #hashtags and @handles.',
+                      hintStyle: TextStyle(color: fv.tertiaryText, fontSize: 16),
+                      filled: true,
+                      fillColor: Colors.transparent,
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                if (_attachedMedia.isNotEmpty) ...[
+                  SizedBox(
+                    height: 72,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _attachedMedia.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) {
+                        final file = _attachedMedia[index];
+                        return Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            LocalMediaThumbnail(
+                              file: file,
+                              size: 72,
+                              onTap: () => LocalMediaThumbnail.previewLocalFile(
+                                context,
+                                file,
+                              ),
+                            ),
+                            Positioned(
+                              top: -6,
+                              right: -6,
+                              child: IconButton.filledTonal(
+                                visualDensity: VisualDensity.compact,
+                                style: IconButton.styleFrom(
+                                  backgroundColor: fv.surface,
+                                  foregroundColor: fv.secondaryText,
+                                  minimumSize: const Size(24, 24),
+                                  padding: EdgeInsets.zero,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _attachedMedia = [
+                                      for (var i = 0;
+                                          i < _attachedMedia.length;
+                                          i++)
+                                        if (i != index) _attachedMedia[i],
+                                    ];
+                                  });
+                                },
+                                icon: const Icon(Icons.close, size: 14),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
-                  if (_selectedIdentity != null &&
-                      !_selectedIdentity!.isPersonal)
-                    DropdownMenuItem(
-                      value: PublishDestination.entityOnly,
-                      child: Text(
-                        'Entity feed only',
-                        style: TextStyle(color: fv.primaryText),
-                      ),
-                    ),
-                  DropdownMenuItem(
-                    value: PublishDestination.vue,
-                    child: Text(
-                      'VUE only',
-                      style: TextStyle(color: fv.primaryText),
-                    ),
-                  ),
-                  DropdownMenuItem(
-                    value: PublishDestination.feedAndVue,
-                    child: Text(
-                      'Home + VUE',
-                      style: TextStyle(color: fv.primaryText),
-                    ),
-                  ),
+                  const SizedBox(height: 8),
                 ],
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() => _destination = value);
-                },
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'TEMPLATES',
-            style: TextStyle(
-              color: FirstVueColors.gold,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.1,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final template in const [
-                'Now available',
-                'Looking for recommendations',
-                'Today’s special',
-                'Hiring',
-                'Event reminder',
-              ])
-                ActionChip(
-                  label: Text(template),
-                  onPressed: () {
-                    final current = _body.text.trim();
-                    _body.text = current.isEmpty
-                        ? template
-                        : '$current\n$template';
-                    setState(() {});
+                ProfileComposerMediaActions(
+                  enabled: !_publishing,
+                  compact: true,
+                  onMediaPicked: (files) {
+                    setState(
+                      () => _attachedMedia = [..._attachedMedia, ...files],
+                    );
                   },
                 ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'BACKGROUND',
-            style: TextStyle(
-              color: FirstVueColors.gold,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.1,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 40,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _backgroundKeys.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final key = _backgroundKeys[index];
-                final selected = key == _backgroundColor;
-                final fill = _previewColor(key) ?? fv.elevatedSurface;
-                return GestureDetector(
-                  onTap: () => setState(() => _backgroundColor = key),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: fill,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: selected ? FirstVueColors.gold : fv.borderSubtle,
-                        width: selected ? 2 : 1,
-                      ),
-                    ),
-                    child: key == 'none'
-                        ? Icon(Icons.block, size: 16, color: fv.mutedIcon)
-                        : null,
+                const SizedBox(height: 8),
+                _ToolsToggle(
+                  expanded: _toolsExpanded,
+                  onTap: () =>
+                      setState(() => _toolsExpanded = !_toolsExpanded),
+                ),
+                AnimatedCrossFade(
+                  firstChild: const SizedBox.shrink(),
+                  secondChild: _ToolsPanel(
+                    templates: _templates,
+                    backgroundKeys: _backgroundKeys,
+                    selectedBackground: _backgroundColor,
+                    previewColor: _previewColor,
+                    onTemplate: _applyTemplate,
+                    onBackground: (key) =>
+                        setState(() => _backgroundColor = key),
                   ),
-                );
-              },
+                  crossFadeState: _toolsExpanded
+                      ? CrossFadeState.showSecond
+                      : CrossFadeState.showFirst,
+                  duration: const Duration(milliseconds: 180),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: preview ?? fv.elevatedSurface,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: MentionAutocompleteField(
-              controller: _body,
-              hintText: 'Share news… Use #hashtags and @handles.',
-              decoration: InputDecoration(
-                hintText: 'Share news… Use #hashtags and @handles.',
-                hintStyle: TextStyle(color: fv.tertiaryText),
-                filled: true,
-                fillColor: Colors.transparent,
-                border: InputBorder.none,
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (_attachedMedia.isNotEmpty) ...[
-            SizedBox(
-              height: 72,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _attachedMedia.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final file = _attachedMedia[index];
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      LocalMediaThumbnail(
-                        file: file,
-                        size: 72,
-                        onTap: () =>
-                            LocalMediaThumbnail.previewLocalFile(context, file),
-                      ),
-                      Positioned(
-                        top: -6,
-                        right: -6,
-                        child: IconButton.filledTonal(
-                          visualDensity: VisualDensity.compact,
-                          style: IconButton.styleFrom(
-                            backgroundColor: fv.surface,
-                            foregroundColor: fv.secondaryText,
-                            minimumSize: const Size(24, 24),
-                            padding: EdgeInsets.zero,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _attachedMedia = [
-                                for (var i = 0; i < _attachedMedia.length; i++)
-                                  if (i != index) _attachedMedia[i],
-                              ];
-                            });
-                          },
-                          icon: const Icon(Icons.close, size: 14),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: FilledButton(
+                onPressed: _canPublish ? _publish : null,
+                style: FilledButton.styleFrom(
+                  backgroundColor: FirstVueColors.coral,
+                  disabledBackgroundColor:
+                      FirstVueColors.coral.withValues(alpha: 0.35),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(44),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: Text(_publishing ? 'Publishing…' : 'Publish post'),
               ),
             ),
-            const SizedBox(height: 12),
-          ],
-          ProfileComposerMediaActions(
-            enabled: !_publishing,
-            onMediaPicked: (files) {
-              setState(() => _attachedMedia = [..._attachedMedia, ...files]);
-            },
-          ),
-          const SizedBox(height: 24),
-          FilledButton(
-            onPressed: _publishing ? null : _publish,
-            style: FilledButton.styleFrom(
-              backgroundColor: FirstVueColors.coral,
-              foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(48),
-            ),
-            child: Text(_publishing ? 'Publishing…' : 'Publish post'),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ToolsToggle extends StatelessWidget {
+  final bool expanded;
+  final VoidCallback onTap;
+
+  const _ToolsToggle({required this.expanded, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final fv = context.fv;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+        child: Row(
+          children: [
+            Icon(
+              expanded
+                  ? Icons.keyboard_arrow_up_rounded
+                  : Icons.keyboard_arrow_down_rounded,
+              size: 18,
+              color: fv.secondaryText,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              expanded ? 'Hide templates & backgrounds' : 'Templates & backgrounds',
+              style: TextStyle(
+                color: fv.secondaryText,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ToolsPanel extends StatelessWidget {
+  final List<(IconData, String)> templates;
+  final List<String> backgroundKeys;
+  final String selectedBackground;
+  final Color? Function(String key) previewColor;
+  final ValueChanged<String> onTemplate;
+  final ValueChanged<String> onBackground;
+
+  const _ToolsPanel({
+    required this.templates,
+    required this.backgroundKeys,
+    required this.selectedBackground,
+    required this.previewColor,
+    required this.onTemplate,
+    required this.onBackground,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fv = context.fv;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'TEMPLATES',
+          style: TextStyle(
+            color: FirstVueColors.gold,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.1,
+            fontSize: 11,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 64,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: templates.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final (icon, label) = templates[index];
+              return Material(
+                color: fv.elevatedSurface,
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  onTap: () => onTemplate(label),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: 118,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: fv.borderSubtle.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(icon, size: 16, color: FirstVueColors.teal),
+                        const Spacer(),
+                        Text(
+                          label,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: fv.primaryText,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            height: 1.15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          'BACKGROUNDS',
+          style: TextStyle(
+            color: FirstVueColors.gold,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.1,
+            fontSize: 11,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 34,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: backgroundKeys.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final key = backgroundKeys[index];
+              final selected = key == selectedBackground;
+              final fill = previewColor(key) ?? fv.elevatedSurface;
+              return GestureDetector(
+                onTap: () => onBackground(key),
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: fill,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: selected ? FirstVueColors.gold : fv.borderSubtle,
+                      width: selected ? 2 : 1,
+                    ),
+                  ),
+                  child: key == 'none'
+                      ? Icon(Icons.block, size: 14, color: fv.mutedIcon)
+                      : null,
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/ensure_signed_in.dart';
 import '../config/app_config.dart';
+import '../models/publish_destination.dart';
 import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../services/discovery_feed_service.dart';
@@ -404,7 +405,9 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                     Navigator.push(
                       context,
                       FirstVuePageRoute(
-                        builder: (_) => const CreatePostScreen(),
+                        builder: (_) => const CreatePostScreen(
+                          initialDestination: PublishDestination.vue,
+                        ),
                       ),
                     );
                   },
