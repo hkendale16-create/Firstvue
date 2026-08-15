@@ -72,8 +72,10 @@ class _LiveEventDetailScreenState extends State<LiveEventDetailScreen> {
     });
   }
 
-  LiveLifecycleStatus get _lifecycle =>
-      LiveHomeService.lifecycleFor(event.eventAt);
+  LiveLifecycleStatus get _lifecycle => LiveHomeService.lifecycleFor(
+        event.eventAt,
+        endsAt: event.endsAt,
+      );
 
   Future<void> _toggleGoing() async {
     if (_busy) return;
@@ -525,6 +527,14 @@ class _LiveEventDetailScreenState extends State<LiveEventDetailScreen> {
                           title: EventDateTimeFields.formatLabel(event.eventAt),
                           subtitle: LiveHomeService.lifecycleLabel(lifecycle),
                         ),
+                      if (event.endsAt != null) ...[
+                        const SizedBox(height: 10),
+                        _InfoRow(
+                          icon: Icons.flag_outlined,
+                          title: EventDateTimeFields.formatLabel(event.endsAt),
+                          subtitle: 'Ends',
+                        ),
+                      ],
                       if (event.locationLabel != null) ...[
                         const SizedBox(height: 10),
                         _InfoRow(

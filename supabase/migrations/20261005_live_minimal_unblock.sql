@@ -117,8 +117,9 @@ returns table (
 language sql stable security definer set search_path = public as $$
   with ids as (
     select distinct x.event_id
-    from unnest(coalesce(p_event_ids, array[]::uuid[])[1:100]) as x(event_id)
+    from unnest(coalesce(p_event_ids, '{}'::uuid[])) as x(event_id)
     where x.event_id is not null
+    limit 100
   ),
   scored as (
     select

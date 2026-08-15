@@ -40,10 +40,11 @@ class FeatureFlags {
     defaultValue: true,
   );
 
-  /// Food Truck LIVE cards / map pins (later phases).
+  /// Food Truck / business LIVE open sessions (Phase 8).
+  /// Disable with `--dart-define=FIRSTVUE_LIVE_FOOD_TRUCKS=false`.
   static const liveFoodTrucksEnabled = bool.fromEnvironment(
     'FIRSTVUE_LIVE_FOOD_TRUCKS',
-    defaultValue: false,
+    defaultValue: true,
   );
 
   /// Heating Up / activity scores (Phase 5).

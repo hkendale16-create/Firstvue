@@ -65,6 +65,18 @@ class _LiveHomeShellScreenState extends State<LiveHomeShellScreen> {
   }
 
   Future<void> _openEvent(LiveRightNowItem item) async {
+    if (item.kind == LiveRightNowKind.business &&
+        item.businessId != null &&
+        item.businessId!.isNotEmpty) {
+      await Navigator.push(
+        context,
+        FirstVuePageRoute(
+          builder: (_) =>
+              FirstVueBusinessProfileScreen(businessId: item.businessId!),
+        ),
+      );
+      return;
+    }
     final event = item.event;
     if (event == null) return;
     await LiveEventDetailScreen.open(context, event);
@@ -130,17 +142,40 @@ class _LiveHomeShellScreenState extends State<LiveHomeShellScreen> {
   }
 
   List<LiveRightNowItem> _visibleRightNow(LiveHomeSnapshot snap) {
-    if (_category == LiveDiscoveryCategory.events ||
-        _category == LiveDiscoveryCategory.nightlife) {
-      return snap.rightNow;
-    }
-    // Food / Businesses: no fabricated truck LIVE cards — keep event list empty
-    // for those filters until business LIVE data exists.
     if (_category == LiveDiscoveryCategory.food ||
         _category == LiveDiscoveryCategory.businesses) {
-      return const [];
+      if (!FeatureFlags.liveFoodTrucksEnabled) return const [];
+      if (_category == LiveDiscoveryCategory.food) {
+        return snap.openBusinesses
+            .where((i) {
+              final sub = (i.subtitle ?? '').toLowerCase();
+              return sub.contains('food') || sub.contains('truck');
+            })
+            .toList();
+      }
+      return snap.openBusinesses;
     }
-    return snap.rightNow;
+    if (_category == LiveDiscoveryCategory.nightlife) {
+      return snap.rightNow.where((i) {
+        if (i.kind != LiveRightNowKind.event) return false;
+        final t = i.title.toLowerCase();
+        final l = (i.locationLabel ?? '').toLowerCase();
+        return t.contains('night') ||
+            t.contains('club') ||
+            t.contains('bar') ||
+            l.contains('night');
+      }).toList();
+    }
+    // Events (default): event cards + live open businesses mixed in snapshot.
+    return snap.rightNow
+        .where(
+          (i) =>
+              i.kind == LiveRightNowKind.event ||
+              (FeatureFlags.liveFoodTrucksEnabled &&
+                  i.kind == LiveRightNowKind.business &&
+                  i.isLive),
+        )
+        .toList();
   }
 
   @override
@@ -304,15 +339,17 @@ class _RightNowSection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (category == LiveDiscoveryCategory.food ||
         category == LiveDiscoveryCategory.businesses) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-        child: _EmptyCard(
-          title: 'No LIVE ${category.label.toLowerCase()} yet',
-          body:
-              'Open locations for food trucks and businesses will show here '
-              'when they go live nearby.',
-        ),
-      );
+      if (items.isEmpty) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: _EmptyCard(
+            title: 'No LIVE ${category.label.toLowerCase()} yet',
+            body: FeatureFlags.liveFoodTrucksEnabled
+                ? 'Open locations appear here when operators check in nearby.'
+                : 'Food Truck / business LIVE check-ins are turned off in this build.',
+          ),
+        );
+      }
     }
 
     if (items.isEmpty) {

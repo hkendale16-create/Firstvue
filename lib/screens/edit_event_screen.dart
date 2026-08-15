@@ -43,6 +43,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
   late final TextEditingController _description;
   late final TextEditingController _location;
   DateTime? _eventAt;
+  DateTime? _endsAt;
   String? _businessId;
   XFile? _coverPhoto;
   bool _clearCover = false;
@@ -60,6 +61,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
     _description = TextEditingController(text: seed?.description ?? '');
     _location = TextEditingController(text: seed?.locationLabel ?? '');
     _eventAt = seed?.eventAt;
+    _endsAt = seed?.endsAt;
     _businessId = seed?.businessId;
     _businessesFuture = BusinessSubmissionService.fetchMyBusinesses();
   }
@@ -94,6 +96,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
           title: _title.text,
           description: _description.text,
           eventAt: _eventAt,
+          endsAt: _endsAt,
           locationLabel: _location.text,
           businessId: _businessId,
           coverPhoto: _coverPhoto,
@@ -112,6 +115,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
             title: _title.text,
             description: _description.text,
             eventAt: _eventAt,
+            endsAt: _endsAt,
             locationLabel: _location.text,
             businessId: _businessId,
             coverPhoto: _coverPhoto,
@@ -121,6 +125,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
             title: _title.text,
             description: _description.text,
             eventAt: _eventAt,
+            endsAt: _endsAt,
             locationLabel: _location.text,
             businessId: _businessId,
             coverPhoto: _coverPhoto,
@@ -227,6 +232,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
           EventDateTimeFields(
             value: _eventAt,
             onChanged: (next) => setState(() => _eventAt = next),
+          ),
+          const SizedBox(height: 18),
+          EventDateTimeFields(
+            sectionLabel: 'ENDS AT (OPTIONAL)',
+            allowClear: true,
+            value: _endsAt,
+            onChanged: (next) => setState(() => _endsAt = next),
           ),
           const SizedBox(height: 18),
           FutureBuilder<List<OwnedBusiness>>(

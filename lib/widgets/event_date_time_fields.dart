@@ -6,11 +6,15 @@ import '../theme/firstvue_theme.dart';
 class EventDateTimeFields extends StatelessWidget {
   final DateTime? value;
   final ValueChanged<DateTime?> onChanged;
+  final String sectionLabel;
+  final bool allowClear;
 
   const EventDateTimeFields({
     super.key,
     required this.value,
     required this.onChanged,
+    this.sectionLabel = 'DATE & TIME',
+    this.allowClear = false,
   });
 
   static String formatLabel(DateTime? dateTime) {
@@ -95,7 +99,7 @@ class EventDateTimeFields extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'DATE & TIME',
+          sectionLabel,
           style: TextStyle(
             color: fv.tertiaryText,
             fontSize: 11,
@@ -143,9 +147,20 @@ class EventDateTimeFields extends StatelessWidget {
         ),
         if (value != null) ...[
           const SizedBox(height: 6),
-          Text(
-            formatLabel(value),
-            style: TextStyle(color: fv.secondaryText, fontSize: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  formatLabel(value),
+                  style: TextStyle(color: fv.secondaryText, fontSize: 12),
+                ),
+              ),
+              if (allowClear)
+                TextButton(
+                  onPressed: () => onChanged(null),
+                  child: const Text('Clear'),
+                ),
+            ],
           ),
         ],
       ],

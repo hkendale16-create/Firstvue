@@ -2,8 +2,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/feature_flags.dart';
-import 'location_service.dart';
+import 'live_business_open_service.dart';
 import 'live_home_service.dart';
+import 'location_service.dart';
 import 'things_to_do_service.dart';
 
 enum LiveMapPinKind { event, foodTruck, nightlife, market }
@@ -138,7 +139,7 @@ class LiveMapService {
       final rows = await _client
           .from('community_events')
           .select(
-            'id, title, description, event_at, location_label, organizer_id, '
+            'id, title, description, event_at, ends_at, location_label, organizer_id, '
             'business_id, status, cover_storage_path, cover_storage_provider, '
             'latitude, longitude, businesses(name)',
           )
@@ -166,7 +167,7 @@ class LiveMapService {
       final rows = await _client
           .from('community_events')
           .select(
-            'id, title, description, event_at, location_label, organizer_id, '
+            'id, title, description, event_at, ends_at, location_label, organizer_id, '
             'business_id, status, cover_storage_path, cover_storage_provider, '
             'latitude, longitude, '
             'businesses!inner(name, business_type, '
@@ -192,47 +193,29 @@ class LiveMapService {
       // Fallback: client-side from ThingsToDo + no geo (skip).
     }
 
-    // 3) Food truck businesses in viewport (real locations only; no fake LIVE).
+    // 3) Active food truck / business open sessions (Phase 8) — real check-ins only.
     if (FeatureFlags.liveFoodTrucksEnabled) {
       try {
-        final rows = await _client
-            .from('businesses')
-            .select(
-              'id, name, business_type, status, '
-              'business_locations!inner(latitude, longitude, city, state)',
-            )
-            .eq('status', 'approved')
-            .ilike('business_type', '%Food Truck%')
-            .limit(40);
-
-        for (final row in rows) {
-          final id = row['id'] as String?;
-          final name = row['name'] as String?;
-          if (id == null || name == null) continue;
-          final locs = row['business_locations'];
-          Map<String, dynamic>? loc;
-          if (locs is List && locs.isNotEmpty) {
-            loc = locs.first as Map<String, dynamic>;
-          } else if (locs is Map<String, dynamic>) {
-            loc = locs;
-          }
-          final lat = (loc?['latitude'] as num?)?.toDouble();
-          final lng = (loc?['longitude'] as num?)?.toDouble();
+        final sessions = await LiveBusinessOpenService.listActive(limit: 40);
+        for (final session in sessions) {
+          final lat = session.latitude;
+          final lng = session.longitude;
           if (lat == null || lng == null) continue;
           final point = LatLng(lat, lng);
           if (!padded.contains(point)) continue;
-          final city = loc?['city'] as String?;
-          final pinId = 'biz:$id';
+          final pinId = 'open:${session.sessionId}';
           if (!seen.add(pinId)) continue;
           pins.add(
             LiveMapPin(
               id: pinId,
-              kind: LiveMapPinKind.foodTruck,
-              title: name,
-              subtitle: city,
+              kind: session.isFoodTruck
+                  ? LiveMapPinKind.foodTruck
+                  : LiveMapPinKind.event,
+              title: session.businessName,
+              subtitle: session.note ?? session.businessType,
               point: point,
-              lifecycle: LiveLifecycleStatus.upcoming,
-              businessId: id,
+              lifecycle: session.lifecycle(),
+              businessId: session.businessId,
             ),
           );
         }
@@ -265,7 +248,10 @@ class LiveMapService {
   }
 
   static LiveMapPin _pinFromEvent(CommunityEvent event, LatLng point) {
-    final lifecycle = LiveHomeService.lifecycleFor(event.eventAt);
+    final lifecycle = LiveHomeService.lifecycleFor(
+      event.eventAt,
+      endsAt: event.endsAt,
+    );
     final titleLower = event.title.toLowerCase();
     final labelLower = (event.locationLabel ?? '').toLowerCase();
     final kind = (titleLower.contains('market') || labelLower.contains('market'))
@@ -327,6 +313,9 @@ class LiveMapService {
       coverImageUrl: null,
       latitude: (row['latitude'] as num?)?.toDouble(),
       longitude: (row['longitude'] as num?)?.toDouble(),
+      endsAt: row['ends_at'] == null
+          ? null
+          : DateTime.tryParse(row['ends_at'] as String),
     );
   }
 }

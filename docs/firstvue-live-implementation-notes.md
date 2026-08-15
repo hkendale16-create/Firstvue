@@ -1,42 +1,31 @@
 # FirstVue LIVE — Implementation Notes
 
-Last updated: 2026-08-15 (SQL unblock + Mapbox run path)
+Last updated: 2026-08-15 (Phases 7–8 — ends_at + business open sessions)
 
 ## Status
-LIVE Mode Phases 1–6 are in code. Operator SQL: use the **minimal unblock** (or the short heat-only fix) and move on — do not re-run the old #1–#4 scripts that had `now()` index / `[1:100]` syntax issues.
+Phases 1–8 are in code. Mapbox token + applying SQL remain operator-deferred.
 
-## Map provider
-- **Mapbox** on iOS/Android when `MAPBOX_ACCESS_TOKEN` is set (`mapbox_maps_flutter`)
-  - Dark style default: `mapbox://styles/mapbox/dark-v11`
-  - Pitch ~55°; buildings enabled on style load
-  - Optional `MAPBOX_STYLE_URI` for custom neon Studio style
-- **Fallback**: Carto dark `flutter_map` (web / no token / desktop)
-- Gate: `MapboxConfig.canUseNativeMap`
+## Phase 7 — Event ends_at
+- Column `community_events.ends_at` (migration `20261006`)
+- Honest LIVE / ENDING SOON when end is set; start-only heuristic otherwise
+- Edit Event: optional Ends At picker
+- Detail + map/home lifecycle wired
 
-## Run with Mapbox (next step)
-```bash
-export MAPBOX_ACCESS_TOKEN=pk.YOUR_PUBLIC_TOKEN
-# optional:
-# export MAPBOX_STYLE_URI=mapbox://styles/you/your-neon-style
-./scripts/run-with-mapbox.sh ios      # or android
-```
-Or:
-```bash
-flutter run --dart-define=MAPBOX_ACCESS_TOKEN=pk....
-```
+## Phase 8 — Food Truck / business open sessions
+- Table `business_open_sessions` + RPCs (migration `20261007`)
+- Flag `FIRSTVUE_LIVE_FOOD_TRUCKS` default **true**
+- LIVE Home Food/Businesses + Right Now from **active** sessions only
+- Map Food Trucks = open session pins with coords (not static directory pins)
+- Owner preview: **We’re open — go LIVE** / End session (4h default, max 12h)
 
-## SQL (done / finishing)
-Preferred one-shot: `supabase/migrations/20261005_live_minimal_unblock.sql`  
-If that failed only on heat scores, run the fixed `live_event_heat_scores` from the same file (uses `limit 100`, not `[1:100]`).
+## Mapbox (deferred)
+- `./scripts/run-with-mapbox.sh` + `MAPBOX_ACCESS_TOKEN`
 
-Older files (`20261001`–`20261004`) are kept for history; prefer `20261005` + heat fix.
+## SQL to apply later (operator)
+1. `20261005_live_minimal_unblock.sql` (or heat-only fix if already partial)
+2. `20261006_live_event_ends_at.sql`
+3. `20261007_live_business_open_sessions.sql`
 
 ## Secrets
-- `MAPBOX_ACCESS_TOKEN` (required for 3D on device)
+- `MAPBOX_ACCESS_TOKEN` (optional until 3D map needed)
 - `MAPBOX_STYLE_URI` (optional)
-
-## App checklist after SQL + token
-1. VUE tab → switch to LIVE
-2. Right Now cards open event detail (Going / Hot / I’m Here)
-3. Explore Live Map → pitched Mapbox (3D icon) on iOS/Android with token
-4. Heat badges only when real activity meets thresholds

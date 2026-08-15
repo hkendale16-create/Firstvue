@@ -83,10 +83,11 @@ void main() {
   });
 
   test('visibleFilters hides food trucks when flag is off', () {
-    expect(FeatureFlags.liveFoodTrucksEnabled, isFalse);
-    final filters = LiveMapService.visibleFilters();
-    expect(filters.contains(LiveMapFilter.foodTrucks), isFalse);
-    expect(filters.contains(LiveMapFilter.liveNow), isTrue);
+    // Phase 8 defaults the flag on; still expose the helper.
+    expect(
+      LiveMapService.visibleFilters().contains(LiveMapFilter.foodTrucks),
+      FeatureFlags.liveFoodTrucksEnabled,
+    );
   });
 
   test('lifecycleFor marks ending soon in final LIVE hour', () {

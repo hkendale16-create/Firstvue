@@ -1,6 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/feature_flags.dart';
 import 'discovery_feed_service.dart';
+import 'live_business_open_service.dart';
 import 'live_heat_service.dart';
 import 'things_to_do_service.dart';
 import 'user_preferences_service.dart';
@@ -26,6 +28,7 @@ class LiveRightNowItem {
   final String? locationLabel;
   final CommunityEvent? event;
   final LiveHeatStatus? heatStatus;
+  final String? businessId;
 
   const LiveRightNowItem({
     required this.id,
@@ -38,6 +41,7 @@ class LiveRightNowItem {
     this.locationLabel,
     this.event,
     this.heatStatus,
+    this.businessId,
   });
 
   bool get isLive =>
@@ -49,6 +53,7 @@ class LiveHomeSnapshot {
   final String rightNowTitle;
   final String? cityName;
   final List<LiveRightNowItem> rightNow;
+  final List<LiveRightNowItem> openBusinesses;
   final List<DiscoveryFeedItem> vueItems;
   final String? foodTruckGapNote;
 
@@ -56,6 +61,7 @@ class LiveHomeSnapshot {
     required this.rightNowTitle,
     required this.cityName,
     required this.rightNow,
+    this.openBusinesses = const [],
     required this.vueItems,
     this.foodTruckGapNote,
   });
@@ -75,10 +81,11 @@ class LiveHomeService {
     return '🔥 ${city.toUpperCase()} RIGHT NOW';
   }
 
-  /// Lifecycle from start time only until ends_at is modeled.
-  /// Last hour of the LIVE window surfaces as ending soon.
+  /// Lifecycle from start + optional ends_at.
+  /// When ends_at is missing, keeps the start-only heuristic.
   static LiveLifecycleStatus lifecycleFor(
     DateTime? eventAt, {
+    DateTime? endsAt,
     DateTime? now,
   }) {
     if (eventAt == null) return LiveLifecycleStatus.upcoming;
@@ -86,8 +93,15 @@ class LiveHomeService {
     final minutesUntil = eventAt.difference(n).inMinutes;
     if (minutesUntil > 60) return LiveLifecycleStatus.upcoming;
     if (minutesUntil > 0) return LiveLifecycleStatus.startingSoon;
-    // Without ends_at, treat the first 5 hours after start as LIVE,
-    // then the 6th hour as ending soon.
+
+    if (endsAt != null) {
+      if (!endsAt.isAfter(n)) return LiveLifecycleStatus.ended;
+      final minutesToEnd = endsAt.difference(n).inMinutes;
+      if (minutesToEnd <= 60) return LiveLifecycleStatus.endingSoon;
+      return LiveLifecycleStatus.live;
+    }
+
+    // Without ends_at: first 5 hours LIVE, 6th hour ending soon.
     if (minutesUntil > -5 * 60) return LiveLifecycleStatus.live;
     if (minutesUntil > -6 * 60) return LiveLifecycleStatus.endingSoon;
     return LiveLifecycleStatus.ended;
@@ -127,7 +141,7 @@ class LiveHomeService {
 
     final rightNow = <LiveRightNowItem>[];
     for (final event in ranked) {
-      final lifecycle = lifecycleFor(event.eventAt);
+      final lifecycle = lifecycleFor(event.eventAt, endsAt: event.endsAt);
       if (lifecycle == LiveLifecycleStatus.ended) continue;
       rightNow.add(
         LiveRightNowItem(
@@ -144,6 +158,21 @@ class LiveHomeService {
         ),
       );
     }
+
+    final openSessions = FeatureFlags.liveFoodTrucksEnabled
+        ? await LiveBusinessOpenService.listActive(limit: rightNowLimit)
+        : const <LiveBusinessOpenSession>[];
+    final openItems = openSessions
+        .map((s) => s.toRightNowItem())
+        .where((i) => i.lifecycle != LiveLifecycleStatus.ended)
+        .toList();
+
+    // Prefer live open businesses near the top of Right Now without inventing counts.
+    final mergedRightNow = <LiveRightNowItem>[
+      ...openItems.where((i) => i.isLive),
+      ...rightNow,
+      ...openItems.where((i) => !i.isLive),
+    ].take(rightNowLimit).toList();
 
     List<DiscoveryFeedItem> vueItems = const [];
     try {
@@ -165,10 +194,12 @@ class LiveHomeService {
     return LiveHomeSnapshot(
       rightNowTitle: heading,
       cityName: city,
-      rightNow: rightNow,
+      rightNow: mergedRightNow,
+      openBusinesses: openItems,
       vueItems: vueItems,
-      foodTruckGapNote:
-          'Food Truck LIVE check-ins will appear here when operators share open locations.',
+      foodTruckGapNote: openItems.isEmpty
+          ? 'No food trucks or businesses have shared an open location right now.'
+          : null,
     );
   }
 
@@ -192,7 +223,7 @@ class LiveHomeService {
   static List<CommunityEvent> _rankForRightNow(List<CommunityEvent> events) {
     final now = DateTime.now();
     int score(CommunityEvent e) {
-      final status = lifecycleFor(e.eventAt, now: now);
+      final status = lifecycleFor(e.eventAt, endsAt: e.endsAt, now: now);
       return switch (status) {
         LiveLifecycleStatus.live => 400,
         LiveLifecycleStatus.endingSoon => 350,

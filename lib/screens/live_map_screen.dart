@@ -307,7 +307,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                 ),
                 child: Text(
                   _filter == LiveMapFilter.foodTrucks
-                      ? 'No Food Truck locations with coordinates in this area.'
+                      ? 'No open Food Trucks checked in nearby right now.'
                       : 'No LIVE pins with coordinates in this area yet.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: fv.secondaryText, fontSize: 13),

@@ -37,6 +37,7 @@ class CommunityEvent {
   final String? status;
   final double? latitude;
   final double? longitude;
+  final DateTime? endsAt;
 
   const CommunityEvent({
     required this.id,
@@ -52,6 +53,7 @@ class CommunityEvent {
     this.status,
     this.latitude,
     this.longitude,
+    this.endsAt,
   });
 
   bool get isDraft =>
@@ -96,6 +98,7 @@ class CommunityEvent {
     String? status,
     double? latitude,
     double? longitude,
+    DateTime? endsAt,
   }) {
     return CommunityEvent(
       id: id ?? this.id,
@@ -111,6 +114,7 @@ class CommunityEvent {
       status: status ?? this.status,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
+      endsAt: endsAt ?? this.endsAt,
     );
   }
 
@@ -123,7 +127,7 @@ class ThingsToDoService {
   static final _client = Supabase.instance.client;
 
   static const _eventSelect =
-      'id, title, description, event_at, created_at, location_label, organizer_id, business_id, status, cover_storage_path, cover_storage_provider, businesses(name)';
+      'id, title, description, event_at, ends_at, created_at, location_label, organizer_id, business_id, status, cover_storage_path, cover_storage_provider, latitude, longitude, businesses(name)';
 
   static Future<List<CommunityEvent>> fetchApprovedEvents() async {
     try {
@@ -216,6 +220,7 @@ class ThingsToDoService {
     required String title,
     required String description,
     DateTime? eventAt,
+    DateTime? endsAt,
     String? locationLabel,
     String? businessId,
     XFile? coverPhoto,
@@ -229,6 +234,7 @@ class ThingsToDoService {
       title: title,
       description: description,
       eventAt: eventAt,
+      endsAt: endsAt,
       locationLabel: locationLabel,
       businessId: businessId,
       status: status,
@@ -243,6 +249,7 @@ class ThingsToDoService {
     required String title,
     String description = '',
     DateTime? eventAt,
+    DateTime? endsAt,
     String? locationLabel,
     String? businessId,
     XFile? coverPhoto,
@@ -251,6 +258,7 @@ class ThingsToDoService {
       title: title,
       description: description,
       eventAt: eventAt,
+      endsAt: endsAt,
       locationLabel: locationLabel,
       businessId: businessId,
       coverPhoto: coverPhoto,
@@ -263,6 +271,7 @@ class ThingsToDoService {
     required String title,
     String description = '',
     DateTime? eventAt,
+    DateTime? endsAt,
     String? locationLabel,
     String? businessId,
     XFile? coverPhoto,
@@ -271,6 +280,7 @@ class ThingsToDoService {
       title: title,
       description: description,
       eventAt: eventAt,
+      endsAt: endsAt,
       locationLabel: locationLabel,
       businessId: businessId,
       coverPhoto: coverPhoto,
@@ -284,6 +294,7 @@ class ThingsToDoService {
     required String title,
     required String description,
     DateTime? eventAt,
+    DateTime? endsAt,
     String? locationLabel,
     String? businessId,
     XFile? coverPhoto,
@@ -297,6 +308,7 @@ class ThingsToDoService {
       'title': title.trim(),
       'description': description.trim(),
       'event_at': eventAt?.toIso8601String(),
+      'ends_at': endsAt?.toIso8601String(),
       'location_label': locationLabel?.trim(),
       'business_id': businessId,
       'status': ?status,
@@ -393,6 +405,7 @@ class ThingsToDoService {
     required String title,
     String description = '',
     DateTime? eventAt,
+    DateTime? endsAt,
     String? locationLabel,
     String? businessId,
     XFile? coverPhoto,
@@ -407,6 +420,7 @@ class ThingsToDoService {
       title: title,
       description: description,
       eventAt: eventAt,
+      endsAt: endsAt,
       locationLabel: locationLabel,
       businessId: businessId,
       status: preferredStatus,
@@ -424,6 +438,7 @@ class ThingsToDoService {
     required String title,
     required String description,
     DateTime? eventAt,
+    DateTime? endsAt,
     String? locationLabel,
     String? businessId,
     required String status,
@@ -435,6 +450,7 @@ class ThingsToDoService {
       'title': title.trim(),
       'description': description.trim(),
       'event_at': eventAt?.toIso8601String(),
+      'ends_at': endsAt?.toIso8601String(),
       'location_label': locationLabel?.trim(),
       'status': status,
     };
@@ -490,6 +506,9 @@ class ThingsToDoService {
       status: row['status'] as String?,
       latitude: (row['latitude'] as num?)?.toDouble(),
       longitude: (row['longitude'] as num?)?.toDouble(),
+      endsAt: row['ends_at'] == null
+          ? null
+          : DateTime.tryParse(row['ends_at'] as String),
     );
   }
 
