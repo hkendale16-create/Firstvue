@@ -25,6 +25,20 @@ extension LiveMapFilterX on LiveMapFilter {
         LiveMapFilter.nightlife => 'Nightlife',
         LiveMapFilter.markets => 'Markets',
       };
+
+  /// Empty-state copy for the active tab.
+  String get emptyNearbyMessage => switch (this) {
+        LiveMapFilter.liveNow =>
+          'Nothing live with a map pin nearby. Open check-ins and live events show here.',
+        LiveMapFilter.events =>
+          'No events with map pins in this area yet.',
+        LiveMapFilter.foodTrucks =>
+          'No food trucks with map locations nearby yet.',
+        LiveMapFilter.nightlife =>
+          'No nightlife spots with map locations nearby yet.',
+        LiveMapFilter.markets =>
+          'No markets with map locations nearby yet.',
+      };
 }
 
 class LiveMapPin {
@@ -125,18 +139,113 @@ class LiveMapService {
     }
   }
 
+  /// Classify business_type into a map pin kind. Null = not map-category relevant.
+  static LiveMapPinKind? kindForBusinessType(String? businessType) {
+    final t = (businessType ?? '').toLowerCase().trim();
+    if (t.isEmpty) return null;
+    if (t.contains('food truck') || t.contains('foodtruck')) {
+      return LiveMapPinKind.foodTruck;
+    }
+    if (t.contains('market') || t.contains('farmers')) {
+      return LiveMapPinKind.market;
+    }
+    // Bars / nightlife — never treat "barber" as nightlife.
+    if (t.contains('barber')) return null;
+    if (t.contains('nightlife') ||
+        t == 'bar' ||
+        t.contains('lounge') ||
+        t.contains('sports bar') ||
+        t.contains('club') ||
+        t.contains('pub') ||
+        t.contains('brewery')) {
+      return LiveMapPinKind.nightlife;
+    }
+    return null;
+  }
+
+  static LiveMapPinKind kindForEvent(CommunityEvent event) {
+    final titleLower = event.title.toLowerCase();
+    final labelLower = (event.locationLabel ?? '').toLowerCase();
+    final blob = '$titleLower $labelLower';
+    if (blob.contains('market') || blob.contains('farmers')) {
+      return LiveMapPinKind.market;
+    }
+    if (!blob.contains('barber') &&
+        (blob.contains('night') ||
+            blob.contains('club') ||
+            blob.contains('lounge') ||
+            RegExp(r'\bbar\b').hasMatch(blob) ||
+            blob.contains('happy hour'))) {
+      return LiveMapPinKind.nightlife;
+    }
+    if (blob.contains('food truck') || blob.contains('foodtruck')) {
+      return LiveMapPinKind.foodTruck;
+    }
+    return LiveMapPinKind.event;
+  }
+
   /// Viewport load — call only after pan/zoom settles (debounced by UI).
+  ///
+  /// Sources per tab:
+  /// - Events / Live Now: community_events with coords (+ business-linked geo)
+  /// - Food Trucks / Nightlife / Markets: matching businesses with locations
+  /// - Live Now also: active open sessions
   static Future<List<LiveMapPin>> fetchPinsInBounds(
     LiveMapBounds bounds, {
-    int limit = 60,
+    int limit = 80,
+  }) {
+    return _collectPins(limit: limit, bounds: bounds.padded());
+  }
+
+  /// Unscoped fetch used to recenter the camera onto real pins.
+  static Future<List<LiveMapPin>> fetchAllMappedPins({int limit = 80}) {
+    return _collectPins(limit: limit, bounds: null);
+  }
+
+  static Future<List<LiveMapPin>> _collectPins({
+    required int limit,
+    LiveMapBounds? bounds,
   }) async {
-    final padded = bounds.padded();
     final pins = <LiveMapPin>[];
     final seen = <String>{};
 
-    // 1) Events with own coordinates.
+    await _addEventOwnCoords(
+      pins: pins,
+      seen: seen,
+      bounds: bounds,
+      limit: limit,
+    );
+    await _addEventsFromBusinessLocations(
+      pins: pins,
+      seen: seen,
+      bounds: bounds,
+      limit: limit,
+    );
+    await _addDirectoryBusinesses(
+      pins: pins,
+      seen: seen,
+      bounds: bounds,
+      limit: limit,
+    );
+    if (FeatureFlags.liveFoodTrucksEnabled) {
+      await _addOpenSessions(
+        pins: pins,
+        seen: seen,
+        bounds: bounds,
+        limit: limit,
+      );
+    }
+    return pins;
+  }
+
+  static Future<void> _addEventOwnCoords({
+    required List<LiveMapPin> pins,
+    required Set<String> seen,
+    required LiveMapBounds? bounds,
+    required int limit,
+  }) async {
     try {
-      final rows = await _client
+      var query = _client
           .from('community_events')
           .select(
             'id, title, description, event_at, ends_at, location_label, organizer_id, '
@@ -145,24 +254,36 @@ class LiveMapService {
           )
           .eq('status', 'approved')
           .not('latitude', 'is', null)
-          .not('longitude', 'is', null)
-          .gte('latitude', padded.minLat)
-          .lte('latitude', padded.maxLat)
-          .gte('longitude', padded.minLng)
-          .lte('longitude', padded.maxLng)
-          .limit(limit);
+          .not('longitude', 'is', null);
 
+      if (bounds != null) {
+        query = query
+            .gte('latitude', bounds.minLat)
+            .lte('latitude', bounds.maxLat)
+            .gte('longitude', bounds.minLng)
+            .lte('longitude', bounds.maxLng);
+      }
+
+      final rows = await query.limit(limit);
       for (final row in rows) {
         final event = _mapEventRow(row);
         final lat = (row['latitude'] as num?)?.toDouble();
         final lng = (row['longitude'] as num?)?.toDouble();
         if (lat == null || lng == null) continue;
-        final pin = _pinFromEvent(event, LatLng(lat, lng));
+        final point = LatLng(lat, lng);
+        if (bounds != null && !bounds.contains(point)) continue;
+        final pin = _pinFromEvent(event, point);
         if (seen.add(pin.id)) pins.add(pin);
       }
     } catch (_) {}
+  }
 
-    // 2) Events linked to businesses with locations (reuse business geo).
+  static Future<void> _addEventsFromBusinessLocations({
+    required List<LiveMapPin> pins,
+    required Set<String> seen,
+    required LiveMapBounds? bounds,
+    required int limit,
+  }) async {
     try {
       final rows = await _client
           .from('community_events')
@@ -177,52 +298,107 @@ class LiveMapService {
           .limit(limit * 2);
 
       for (final row in rows) {
+        // Prefer explicit event coords already added.
+        if (row['latitude'] != null && row['longitude'] != null) continue;
         final event = _mapEventRow(row);
         final point = _pointFromBusinessJoin(row);
         if (point == null) continue;
-        if (!padded.contains(point)) continue;
-        // Prefer explicit event coords already added.
-        if (row['latitude'] != null && row['longitude'] != null) continue;
+        if (bounds != null && !bounds.contains(point)) continue;
         final pin = _pinFromEvent(
           event.copyWith(latitude: point.latitude, longitude: point.longitude),
           point,
         );
         if (seen.add(pin.id)) pins.add(pin);
       }
-    } catch (_) {
-      // Fallback: client-side from ThingsToDo + no geo (skip).
-    }
+    } catch (_) {}
+  }
 
-    // 3) Active food truck / business open sessions (Phase 8) — real check-ins only.
-    if (FeatureFlags.liveFoodTrucksEnabled) {
-      try {
-        final sessions = await LiveBusinessOpenService.listActive(limit: 40);
-        for (final session in sessions) {
-          final lat = session.latitude;
-          final lng = session.longitude;
-          if (lat == null || lng == null) continue;
-          final point = LatLng(lat, lng);
-          if (!padded.contains(point)) continue;
-          final pinId = 'open:${session.sessionId}';
-          if (!seen.add(pinId)) continue;
-          pins.add(
-            LiveMapPin(
-              id: pinId,
-              kind: session.isFoodTruck
-                  ? LiveMapPinKind.foodTruck
-                  : LiveMapPinKind.event,
-              title: session.businessName,
-              subtitle: session.note ?? session.businessType,
-              point: point,
-              lifecycle: session.lifecycle(),
-              businessId: session.businessId,
-            ),
-          );
+  static Future<void> _addDirectoryBusinesses({
+    required List<LiveMapPin> pins,
+    required Set<String> seen,
+    required LiveMapBounds? bounds,
+    required int limit,
+  }) async {
+    try {
+      final rows = await _client
+          .from('businesses')
+          .select(
+            'id, name, business_type, '
+            'business_locations!inner(latitude, longitude, city, state, address_line_1)',
+          )
+          .eq('status', 'approved')
+          .limit(limit * 3);
+
+      for (final row in rows) {
+        final type = row['business_type'] as String?;
+        final kind = kindForBusinessType(type);
+        if (kind == null) continue;
+        if (!FeatureFlags.liveFoodTrucksEnabled &&
+            kind == LiveMapPinKind.foodTruck) {
+          continue;
         }
-      } catch (_) {}
-    }
+        final point = _pointFromLocationList(row['business_locations']);
+        if (point == null) continue;
+        if (bounds != null && !bounds.contains(point)) continue;
+        final id = row['id'] as String?;
+        final name = row['name'] as String?;
+        if (id == null || name == null || name.isEmpty) continue;
+        final pinId = 'biz:$id';
+        if (!seen.add(pinId)) continue;
+        final city = _firstLocationCity(row['business_locations']);
+        pins.add(
+          LiveMapPin(
+            id: pinId,
+            kind: kind,
+            title: name,
+            subtitle: city ?? type,
+            point: point,
+            // Directory places are discoverable on category tabs, not Live Now,
+            // until an operator opens a LIVE session.
+            lifecycle: LiveLifecycleStatus.upcoming,
+            businessId: id,
+          ),
+        );
+      }
+    } catch (_) {}
+  }
 
-    return pins;
+  static Future<void> _addOpenSessions({
+    required List<LiveMapPin> pins,
+    required Set<String> seen,
+    required LiveMapBounds? bounds,
+    required int limit,
+  }) async {
+    try {
+      final sessions = await LiveBusinessOpenService.listActive(limit: limit);
+      for (final session in sessions) {
+        final lat = session.latitude;
+        final lng = session.longitude;
+        if (lat == null || lng == null) continue;
+        final point = LatLng(lat, lng);
+        if (bounds != null && !bounds.contains(point)) continue;
+        final pinId = 'open:${session.sessionId}';
+        // Prefer live open pin over static directory pin for same business.
+        final bizId = 'biz:${session.businessId}';
+        seen.remove(bizId);
+        pins.removeWhere((p) => p.id == bizId);
+        if (!seen.add(pinId)) continue;
+        pins.add(
+          LiveMapPin(
+            id: pinId,
+            kind: session.isFoodTruck
+                ? LiveMapPinKind.foodTruck
+                : (kindForBusinessType(session.businessType) ??
+                    LiveMapPinKind.event),
+            title: session.businessName,
+            subtitle: session.note ?? session.businessType,
+            point: point,
+            lifecycle: session.lifecycle(),
+            businessId: session.businessId,
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   static List<LiveMapPin> applyFilter(
@@ -231,20 +407,30 @@ class LiveMapService {
   ) {
     return switch (filter) {
       LiveMapFilter.liveNow => pins.where((p) => p.isLive).toList(),
-      LiveMapFilter.events =>
-        pins.where((p) => p.kind == LiveMapPinKind.event).toList(),
+      // Community events + live open venues typed as events.
+      LiveMapFilter.events => pins.where((p) {
+          if (p.lifecycle == LiveLifecycleStatus.ended) return false;
+          return p.event != null || p.kind == LiveMapPinKind.event;
+        }).toList(),
       LiveMapFilter.foodTrucks =>
         pins.where((p) => p.kind == LiveMapPinKind.foodTruck).toList(),
-      LiveMapFilter.nightlife => pins
-          .where(
-            (p) =>
-                p.kind == LiveMapPinKind.nightlife ||
-                p.kind == LiveMapPinKind.event,
-          )
-          .toList(),
+      LiveMapFilter.nightlife =>
+        pins.where((p) => p.kind == LiveMapPinKind.nightlife).toList(),
       LiveMapFilter.markets =>
         pins.where((p) => p.kind == LiveMapPinKind.market).toList(),
     };
+  }
+
+  /// Center of a pin set (for camera jump when local viewport is empty).
+  static LatLng? centroidOf(List<LiveMapPin> pins) {
+    if (pins.isEmpty) return null;
+    var lat = 0.0;
+    var lng = 0.0;
+    for (final p in pins) {
+      lat += p.point.latitude;
+      lng += p.point.longitude;
+    }
+    return LatLng(lat / pins.length, lng / pins.length);
   }
 
   static LiveMapPin _pinFromEvent(CommunityEvent event, LatLng point) {
@@ -252,17 +438,9 @@ class LiveMapService {
       event.eventAt,
       endsAt: event.endsAt,
     );
-    final titleLower = event.title.toLowerCase();
-    final labelLower = (event.locationLabel ?? '').toLowerCase();
-    final kind = (titleLower.contains('market') || labelLower.contains('market'))
-        ? LiveMapPinKind.market
-        : (titleLower.contains('night') || titleLower.contains('club'))
-            ? LiveMapPinKind.nightlife
-            : LiveMapPinKind.event;
-
     return LiveMapPin(
       id: 'event:${event.id}',
-      kind: kind,
+      kind: kindForEvent(event),
       title: event.title,
       subtitle: event.locationLabel,
       point: point,
@@ -276,7 +454,10 @@ class LiveMapService {
   static LatLng? _pointFromBusinessJoin(Map<String, dynamic> row) {
     final business = row['businesses'];
     if (business is! Map) return null;
-    final locs = business['business_locations'];
+    return _pointFromLocationList(business['business_locations']);
+  }
+
+  static LatLng? _pointFromLocationList(dynamic locs) {
     Map<String, dynamic>? loc;
     if (locs is List && locs.isNotEmpty) {
       loc = Map<String, dynamic>.from(locs.first as Map);
@@ -287,6 +468,20 @@ class LiveMapService {
     final lng = (loc?['longitude'] as num?)?.toDouble();
     if (lat == null || lng == null) return null;
     return LatLng(lat, lng);
+  }
+
+  static String? _firstLocationCity(dynamic locs) {
+    Map<String, dynamic>? loc;
+    if (locs is List && locs.isNotEmpty) {
+      loc = Map<String, dynamic>.from(locs.first as Map);
+    } else if (locs is Map) {
+      loc = Map<String, dynamic>.from(locs);
+    }
+    final city = (loc?['city'] as String?)?.trim();
+    final state = (loc?['state'] as String?)?.trim();
+    if (city == null || city.isEmpty) return null;
+    if (state == null || state.isEmpty) return city;
+    return '$city, $state';
   }
 
   static CommunityEvent _mapEventRow(Map<String, dynamic> row) {

@@ -55,6 +55,22 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
     setState(() => _center = center);
     await _controller?.moveTo(center, zoom: 12.2, pitch: 55);
     await _loadForCenter(center);
+    if (!mounted) return;
+    // GPS may be far from mapped directory / event pins — jump to them.
+    if (_pins.isEmpty) {
+      final all = await LiveMapService.fetchAllMappedPins();
+      if (!mounted || all.isEmpty) return;
+      final jump = LiveMapService.centroidOf(all);
+      if (jump == null) return;
+      _cacheKey = null;
+      setState(() {
+        _center = jump;
+        _pins = all;
+        _visible = LiveMapService.applyFilter(all, _filter);
+        _loading = false;
+      });
+      await _controller?.moveTo(jump, zoom: 11.5, pitch: 55);
+    }
   }
 
   void _onMapReady(LiveMapSurfaceController controller) {
@@ -306,9 +322,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                   border: Border.all(color: fv.borderSubtle),
                 ),
                 child: Text(
-                  _filter == LiveMapFilter.foodTrucks
-                      ? 'No open Food Trucks checked in nearby right now.'
-                      : 'No LIVE pins with coordinates in this area yet.',
+                  _filter.emptyNearbyMessage,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: fv.secondaryText, fontSize: 13),
                 ),
