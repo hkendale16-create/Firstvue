@@ -3,10 +3,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/ensure_signed_in.dart';
 import '../config/app_config.dart';
+import '../config/feature_flags.dart';
 import '../models/publish_destination.dart';
 import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../services/discovery_feed_service.dart';
+import '../services/live_mode_preference.dart';
 import '../services/saved_items_service.dart';
 import '../services/vue_featured_rotation.dart';
 import '../services/vue_tab_preference.dart';
@@ -16,11 +18,13 @@ import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/fv_ui.dart';
 import '../widgets/social_rich_text.dart';
+import '../widgets/vue_live_mode_switch.dart';
 import '../widgets/vue_mosaic_layout.dart';
 import '../widgets/vue_mosaic_view.dart';
 import 'create_post_screen.dart';
 import 'firstvue_business_profile_screen.dart';
 import 'full_screen_media_viewer.dart';
+import 'live_home_shell_screen.dart';
 import 'member_public_profile_screen.dart';
 import 'post_detail_screen.dart';
 
@@ -45,6 +49,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   late Future<List<DiscoveryFeedItem>> _feedFuture;
   List<DiscoveryFeedItem> _items = const [];
   VueFeedMode _mode = VueTabPreference.current;
+  FirstVueExperienceMode _experienceMode = LiveModePreference.current;
   String? _error;
   bool _loadingMore = false;
   bool _refreshing = false;
@@ -54,19 +59,51 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   final _loadMoreGate = ScrollLoadMoreGate(thresholdPx: 480);
   static const _maxLoadMoreFailures = 3;
 
+  bool get _liveModeActive =>
+      FeatureFlags.liveModeEnabled &&
+      _experienceMode == FirstVueExperienceMode.live;
+
   @override
   void initState() {
     super.initState();
     _mode = VueTabPreference.current;
+    _experienceMode = LiveModePreference.current;
     _feedFuture = _bootstrap();
   }
 
   Future<List<DiscoveryFeedItem>> _bootstrap() async {
-    final stored = await VueTabPreference.load();
-    if (mounted && stored != _mode) {
-      setState(() => _mode = stored);
+    final storedTab = await VueTabPreference.load();
+    final storedExperience = FeatureFlags.liveModeEnabled
+        ? await LiveModePreference.load()
+        : FirstVueExperienceMode.vue;
+    if (!mounted) return _loadFeed(reset: true);
+    if (storedTab != _mode || storedExperience != _experienceMode) {
+      setState(() {
+        _mode = storedTab;
+        _experienceMode = storedExperience;
+      });
     }
+    // Avoid feed work while sitting on the LIVE shell.
+    if (_liveModeActive) return _items;
     return _loadFeed(reset: true);
+  }
+
+  Future<void> _setExperienceMode(FirstVueExperienceMode next) async {
+    if (next == _experienceMode) return;
+    setState(() => _experienceMode = next);
+    await LiveModePreference.save(next);
+    if (!mounted) return;
+    if (next == FirstVueExperienceMode.vue && _items.isEmpty) {
+      setState(() {
+        _refreshing = true;
+        _error = null;
+        _hasMore = true;
+        _loadMoreFailures = 0;
+      });
+      _feedFuture = _loadFeed(reset: true).whenComplete(() {
+        if (mounted) setState(() => _refreshing = false);
+      });
+    }
   }
 
   Future<List<DiscoveryFeedItem>> _loadFeed({
@@ -290,6 +327,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
     final width = MediaQuery.sizeOf(context).width;
     final columns = _crossAxisCount(width);
     final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final showLiveSwitch = FeatureFlags.liveModeEnabled;
 
     return ColoredBox(
       color: fv.background,
@@ -306,34 +344,49 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        Text(
-                          'VUE',
-                          style: TextStyle(
-                            fontFamily: 'CormorantGaramond',
-                            color: FirstVueColors.gold,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 2,
+                        if (showLiveSwitch)
+                          VueLiveModeSwitch(
+                            mode: _experienceMode,
+                            onChanged: _setExperienceMode,
+                          )
+                        else
+                          Text(
+                            'VUE',
+                            style: TextStyle(
+                              fontFamily: 'CormorantGaramond',
+                              color: FirstVueColors.gold,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 2,
+                            ),
                           ),
-                        ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: IconButton(
-                            tooltip: 'Search',
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Search coming soon.'),
-                                ),
-                              );
-                            },
-                            icon: Icon(Icons.search, color: fv.primaryText),
+                        if (!_liveModeActive)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: IconButton(
+                              tooltip: 'Search',
+                              onPressed: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Search coming soon.'),
+                                  ),
+                                );
+                              },
+                              icon: Icon(Icons.search, color: fv.primaryText),
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
                 ),
+                if (_liveModeActive)
+                  Expanded(
+                    child: LiveHomeShellScreen(
+                      onReturnToVue: () =>
+                          _setExperienceMode(FirstVueExperienceMode.vue),
+                    ),
+                  )
+                else ...[
                 FvUnderlineTabs(
                   labels: const ['For You', 'Nearby', 'Trending'],
                   selectedIndex: _mode.index,
@@ -422,9 +475,11 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                     },
                   ),
                 ),
+                ],
               ],
             ),
-            Positioned(
+            if (!_liveModeActive)
+              Positioned(
               right: 16,
               bottom: 16 + bottomInset,
               child: Semantics(
