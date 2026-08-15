@@ -25,7 +25,7 @@ class FeatureFlags {
   /// LIVE map (Phase 4). Independent of [liveModeEnabled].
   static const liveMapEnabled = bool.fromEnvironment(
     'FIRSTVUE_LIVE_MAP',
-    defaultValue: false,
+    defaultValue: true,
   );
 
   /// I'm Here / Here Now presence (Phase 3).

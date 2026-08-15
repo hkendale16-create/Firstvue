@@ -27,10 +27,10 @@ void main() {
     );
   });
 
-  test('Phase 3 flags enable presence and chat independently of map', () {
+  test('Phase 3 flags enable presence and chat independently of streaming', () {
     expect(FeatureFlags.liveEventPresenceEnabled, isTrue);
     expect(FeatureFlags.liveEventChatEnabled, isTrue);
-    expect(FeatureFlags.liveMapEnabled, isFalse);
+    expect(FeatureFlags.liveStreamingEnabled, isFalse);
   });
 
   test('migration defines presence expiry + ownership RLS/RPC', () {

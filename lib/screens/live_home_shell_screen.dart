@@ -12,6 +12,7 @@ import '../services/live_home_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../theme/live_tokens.dart';
 import '../screens/live_event_detail_screen.dart';
+import '../screens/live_map_screen.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/live/live_category_row.dart';
 import '../widgets/live/live_right_now_card.dart';
@@ -78,9 +79,7 @@ class _LiveHomeShellScreenState extends State<LiveHomeShellScreen> {
       );
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Live Map is not available yet.')),
-    );
+    LiveMapScreen.open(context);
   }
 
   void _openVue(DiscoveryFeedItem item) {

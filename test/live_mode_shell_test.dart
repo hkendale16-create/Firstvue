@@ -74,7 +74,7 @@ void main() {
   test('live_mode flag is distinct from livestream streaming flag', () {
     expect(FeatureFlags.liveModeEnabled, isTrue);
     expect(FeatureFlags.liveStreamingEnabled, isFalse);
-    expect(FeatureFlags.liveMapEnabled, isFalse);
+    expect(FeatureFlags.liveMapEnabled, isTrue);
   });
 
   testWidgets('LIVE home empty state and map CTA render', (tester) async {

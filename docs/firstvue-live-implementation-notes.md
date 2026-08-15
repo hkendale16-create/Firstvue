@@ -1,48 +1,48 @@
 # FirstVue LIVE — Implementation Notes
 
-Last updated: 2026-08-15 (Phase 3 complete — stopped)
+Last updated: 2026-08-15 (Phase 4 complete — stopped)
 
 ## Architecture
 
 ### Mode shell
-- VUE tab switch → `LiveHomeShellScreen` → Right Now cards open `LiveEventDetailScreen`
+- VUE|LIVE switch → LIVE Home → Event Detail / Live Map
 
-### Phase 3 engagement
-- Going: existing `event_attendance` (status=`attending`)
-- Hot: new `event_hot_reactions` (1 row / user / event)
-- I’m Here: new `event_presence` via RPCs `set_event_presence` / `clear_event_presence`
-  - 4h TTL, max 12h constraint, **no GPS columns**
-  - Here Now: `event_here_now_count` + non-expired rows only
-- Chat: existing `EventConversationPage` + `fv_msg_*` join/enable
-- Directions: external Google Maps search on `location_label`
-- Share: existing `FirstVueShareSheet` / `AppConfig.eventShareUrl`
-- Live VUEs: `CommunityNewsService.fetchPostsForEvent`
+### Map (Phase 4)
+- **No prior interactive map SDK** — added `flutter_map` + `latlong2` (smallest path)
+- Dark Carto tiles (`dark_all`) for night aesthetic
+- Pins from: event lat/lng OR event→business_locations join OR Food Truck businesses with coords
+- Debounced viewport reload (450ms, only after move end — not every frame)
+- Client filter cache on loaded pins
+- Recenter via `LocationService` (Atlanta coords only as GPS fallback)
+- CTA: Explore Live Map → `LiveMapScreen`
+
+### Engagement (Phase 3)
+- Going / Hot / I’m Here (timed presence, no GPS)
 
 ### Flags
-- `liveEventPresenceEnabled` default **true**
-- `liveEventChatEnabled` default **true**
-- `liveMapEnabled` still false
+- `liveMapEnabled` default **true**
+- presence + chat default true
 
-## Schema / RLS (additive)
-Migration: `supabase/migrations/20261001_live_event_presence_hot.sql`
-- RLS ownership on insert/update/delete
-- Authenticated read of active presence / hot reactions
-- Security-definer RPCs enforce auth.uid() + approved event
+## Schema
+- `20261001_live_event_presence_hot.sql` — presence + hot
+- `20261002_live_event_geo.sql` — nullable `community_events.latitude/longitude` + index
 
-## Files (Phase 3)
-- `supabase/migrations/20261001_live_event_presence_hot.sql`
-- `lib/services/live_event_engagement_service.dart`
-- `lib/screens/live_event_detail_screen.dart`
-- `lib/screens/live_home_shell_screen.dart` (opens detail)
+## Files (Phase 4)
+- `pubspec.yaml` (flutter_map, latlong2)
+- `lib/services/live_map_service.dart`
+- `lib/screens/live_map_screen.dart`
+- `lib/screens/live_home_shell_screen.dart` (CTA wire)
 - `lib/config/feature_flags.dart`
-- `test/live_event_detail_test.dart`
+- `supabase/migrations/20261002_live_event_geo.sql`
+- `test/live_map_test.dart`
 
-## Visual vs refs 02/03
-Matched: hero + LIVE badge, title/location, Going/Here Now/Hot stats, reaction row, Open Chat + Directions, Live VUEs shelf, Event Info.
-Diffs: no fabricated view count; avatar stack deferred (ids available, full profile media join later); reactions modal not separate sheet (inline buttons).
+## Visual vs ref 04
+Matched: dark map, glowing LIVE pins, soft radius, compact popup, filter chips, recenter.
+Diffs: OSM/Carto tiles (not custom 3D buildings); Food Truck pins show real locations without fabricated LIVE status; empty area copy when no geo data.
 
-## Tests
-- analyze clean; `live_event_detail_test` + live home + vue landing pass
+## Gaps
+- Most events still lack coordinates until organizers set lat/lng or link a business location
+- No city-wide realtime subscription (by design)
 
 ## Next (blocked)
-- Phase 4: LIVE Map (provider analysis first)
+- Phase 5: lifecycle polish + Heating Up
