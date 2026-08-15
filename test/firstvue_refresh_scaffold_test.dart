@@ -36,7 +36,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     await tester.fling(find.text('row 0'), const Offset(0, 400), 1000);
     await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
 
     // Debounce / in-flight guard should keep this from stacking many reloads.
