@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
+import '../models/publish_destination.dart';
 import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../auth/ensure_signed_in.dart';
@@ -459,6 +460,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
           builder: (_) => CreatePostScreen(
             communityId: groupId,
             lockIdentity: true,
+            initialDestination: PublishDestination.entityOnly,
           ),
         ),
       );
