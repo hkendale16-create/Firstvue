@@ -30,7 +30,8 @@ class BoostPostSheet extends StatefulWidget {
 }
 
 class _BoostPostSheetState extends State<BoostPostSheet> {
-  late Future<List<MonetizationProduct>> _tiers = PostBoostService.fetchBoostTiers();
+  final Future<List<MonetizationProduct>> _tiers =
+      PostBoostService.fetchBoostTiers();
   String? _selectedProductId;
   bool _saving = false;
   String? _error;
