@@ -743,18 +743,9 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
                 ? details.description!
                 : 'The owner has not added a business description yet.',
           ),
-          FutureBuilder<Map<String, dynamic>>(
-            future: EntityDetailsService.fetchBusinessDetails(details.id),
-            builder: (context, snap) {
-              final map = snap.data ?? const <String, dynamic>{};
-              return EntityDetailsSection(
-                title: 'Details',
-                details: map,
-                fields: EntityDetailSchemas.forBusinessType(
-                  details.businessType,
-                ),
-              );
-            },
+          _BusinessEntityDetailsSection(
+            businessId: details.id,
+            businessType: details.businessType,
           ),
           const SizedBox(height: 22),
           const _ProfileSectionTitle('LOCATION'),
@@ -1087,14 +1078,73 @@ class _ReviewCard extends StatelessWidget {
   );
 }
 
-class _BusinessMediaGallery extends StatelessWidget {
+class _BusinessEntityDetailsSection extends StatefulWidget {
+  final String businessId;
+  final String businessType;
+
+  const _BusinessEntityDetailsSection({
+    required this.businessId,
+    required this.businessType,
+  });
+
+  @override
+  State<_BusinessEntityDetailsSection> createState() =>
+      _BusinessEntityDetailsSectionState();
+}
+
+class _BusinessEntityDetailsSectionState
+    extends State<_BusinessEntityDetailsSection> {
+  late Future<Map<String, dynamic>> _details =
+      EntityDetailsService.fetchBusinessDetails(widget.businessId);
+
+  @override
+  void didUpdateWidget(covariant _BusinessEntityDetailsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.businessId != widget.businessId) {
+      _details = EntityDetailsService.fetchBusinessDetails(widget.businessId);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _details,
+      builder: (context, snap) {
+        final map = snap.data ?? const <String, dynamic>{};
+        return EntityDetailsSection(
+          title: 'Details',
+          details: map,
+          fields: EntityDetailSchemas.forBusinessType(widget.businessType),
+        );
+      },
+    );
+  }
+}
+
+class _BusinessMediaGallery extends StatefulWidget {
   final String businessId;
 
   const _BusinessMediaGallery({required this.businessId});
 
   @override
+  State<_BusinessMediaGallery> createState() => _BusinessMediaGalleryState();
+}
+
+class _BusinessMediaGalleryState extends State<_BusinessMediaGallery> {
+  late Future<List<BusinessMediaItem>> _media =
+      BusinessMediaService.fetchMedia(widget.businessId);
+
+  @override
+  void didUpdateWidget(covariant _BusinessMediaGallery oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.businessId != widget.businessId) {
+      _media = BusinessMediaService.fetchMedia(widget.businessId);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) => FutureBuilder<List<BusinessMediaItem>>(
-    future: BusinessMediaService.fetchMedia(businessId),
+    future: _media,
     builder: (context, snapshot) {
       if (snapshot.hasError) {
         return const _ProfileInfoCard(
@@ -1456,15 +1506,33 @@ class _MeetOwnerButtonState extends State<_MeetOwnerButton> {
   }
 }
 
-class _BusinessSocialLinksSection extends StatelessWidget {
+class _BusinessSocialLinksSection extends StatefulWidget {
   final String businessId;
 
   const _BusinessSocialLinksSection({required this.businessId});
 
   @override
+  State<_BusinessSocialLinksSection> createState() =>
+      _BusinessSocialLinksSectionState();
+}
+
+class _BusinessSocialLinksSectionState
+    extends State<_BusinessSocialLinksSection> {
+  late Future<List<BusinessSocialLink>> _links =
+      BusinessSocialLinksService.fetchForBusiness(widget.businessId);
+
+  @override
+  void didUpdateWidget(covariant _BusinessSocialLinksSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.businessId != widget.businessId) {
+      _links = BusinessSocialLinksService.fetchForBusiness(widget.businessId);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<BusinessSocialLink>>(
-      future: BusinessSocialLinksService.fetchForBusiness(businessId),
+      future: _links,
       builder: (context, snapshot) {
         final links = snapshot.data ?? const [];
         if (links.isEmpty) {
@@ -1497,16 +1565,32 @@ class _BusinessSocialLinksSection extends StatelessWidget {
   }
 }
 
-class _DiningMenuSection extends StatelessWidget {
+class _DiningMenuSection extends StatefulWidget {
   final String businessId;
 
   const _DiningMenuSection({required this.businessId});
 
   @override
+  State<_DiningMenuSection> createState() => _DiningMenuSectionState();
+}
+
+class _DiningMenuSectionState extends State<_DiningMenuSection> {
+  late Future<List<BusinessMenuItem>> _items =
+      BusinessMenuService.fetchMenuItems(widget.businessId);
+
+  @override
+  void didUpdateWidget(covariant _DiningMenuSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.businessId != widget.businessId) {
+      _items = BusinessMenuService.fetchMenuItems(widget.businessId);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final fv = context.fv;
     return FutureBuilder<List<BusinessMenuItem>>(
-      future: BusinessMenuService.fetchMenuItems(businessId),
+      future: _items,
       builder: (context, snapshot) {
         final items = snapshot.data ?? const [];
         if (!snapshot.hasData && !snapshot.hasError) {
@@ -1638,15 +1722,31 @@ class _DiningMenuSection extends StatelessWidget {
   }
 }
 
-class _DiningSpecialsSection extends StatelessWidget {
+class _DiningSpecialsSection extends StatefulWidget {
   final String businessId;
 
   const _DiningSpecialsSection({required this.businessId});
 
   @override
+  State<_DiningSpecialsSection> createState() => _DiningSpecialsSectionState();
+}
+
+class _DiningSpecialsSectionState extends State<_DiningSpecialsSection> {
+  late Future<List<BusinessSpecial>> _specials =
+      BusinessMenuService.fetchSpecials(widget.businessId);
+
+  @override
+  void didUpdateWidget(covariant _DiningSpecialsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.businessId != widget.businessId) {
+      _specials = BusinessMenuService.fetchSpecials(widget.businessId);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<BusinessSpecial>>(
-      future: BusinessMenuService.fetchSpecials(businessId),
+      future: _specials,
       builder: (context, snapshot) {
         final specials = snapshot.data ?? const [];
         if (specials.isEmpty) {

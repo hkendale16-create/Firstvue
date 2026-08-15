@@ -29,6 +29,7 @@ class _WhatsNowScreenState extends State<WhatsNowScreen>
   late TabController _tabController;
   bool _tabsReady = false;
   bool _showComingSoon = false;
+  int _refreshToken = 0;
 
   final _tabLabels = <String>['Trending', 'New', 'Recommended'];
 
@@ -73,7 +74,7 @@ class _WhatsNowScreenState extends State<WhatsNowScreen>
   }
 
   Future<void> _refresh() async {
-    setState(() {});
+    setState(() => _refreshToken++);
   }
 
   @override
@@ -138,7 +139,7 @@ class _WhatsNowScreenState extends State<WhatsNowScreen>
                 builder: (context, _) {
                   final label = _labels[_tabController.index];
                   return _TrendingFeedTab(
-                    key: ValueKey(label),
+                    key: ValueKey('$label-$_refreshToken'),
                     label: label,
                     loadBusinesses: () => _loadBusinessesForLabel(label),
                   );
@@ -151,7 +152,7 @@ class _WhatsNowScreenState extends State<WhatsNowScreen>
               accent: FirstVueColors.teal,
             ),
             const SizedBox(height: 12),
-            const _EventsFeedSection(),
+            _EventsFeedSection(key: ValueKey('events-$_refreshToken')),
             const SizedBox(height: 28),
             const _SectionLabel(
               title: 'COMMUNITY PULSE',
@@ -199,7 +200,7 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _TrendingFeedTab extends StatelessWidget {
+class _TrendingFeedTab extends StatefulWidget {
   final String label;
   final Future<List<TrendingBusiness>> Function() loadBusinesses;
 
@@ -210,9 +211,26 @@ class _TrendingFeedTab extends StatelessWidget {
   });
 
   @override
+  State<_TrendingFeedTab> createState() => _TrendingFeedTabState();
+}
+
+class _TrendingFeedTabState extends State<_TrendingFeedTab> {
+  late Future<List<TrendingBusiness>> _future = widget.loadBusinesses();
+
+  @override
+  void didUpdateWidget(covariant _TrendingFeedTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Parent rebuilds create a new loadBusinesses closure; only reload when
+    // the tab label changes (key usually remounts, but keep this as a guard).
+    if (oldWidget.label != widget.label) {
+      _future = widget.loadBusinesses();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<TrendingBusiness>>(
-      future: loadBusinesses(),
+      future: _future,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return const _FeedEmptyCard(
@@ -229,7 +247,7 @@ class _TrendingFeedTab extends StatelessWidget {
         }
         final businesses = snapshot.data!;
         if (businesses.isEmpty) {
-          return _FeedEmptyCard(message: 'No $label listings yet.');
+          return _FeedEmptyCard(message: 'No ${widget.label} listings yet.');
         }
         return Column(
           children: [
@@ -421,8 +439,16 @@ class _TrendingFeedCard extends StatelessWidget {
   }
 }
 
-class _EventsFeedSection extends StatelessWidget {
-  const _EventsFeedSection();
+class _EventsFeedSection extends StatefulWidget {
+  const _EventsFeedSection({super.key});
+
+  @override
+  State<_EventsFeedSection> createState() => _EventsFeedSectionState();
+}
+
+class _EventsFeedSectionState extends State<_EventsFeedSection> {
+  late final Future<List<CommunityEvent>> _eventsFuture =
+      ThingsToDoService.fetchApprovedEvents();
 
   String _formatEventDate(DateTime? date) {
     if (date == null) return 'Date TBA';
@@ -453,7 +479,7 @@ class _EventsFeedSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<CommunityEvent>>(
-      future: ThingsToDoService.fetchApprovedEvents(),
+      future: _eventsFuture,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return const _FeedEmptyCard(

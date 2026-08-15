@@ -134,11 +134,96 @@ class LiveBusinessOpenService {
   static Future<LiveBusinessOpenSession?> activeForBusiness(
     String businessId,
   ) async {
-    final all = await listActive(limit: 100);
-    for (final s in all) {
-      if (s.businessId == businessId) return s;
+    if (!FeatureFlags.liveFoodTrucksEnabled) return null;
+    if (businessId.trim().isEmpty) return null;
+    try {
+      final row = await _client
+          .from('business_open_sessions')
+          .select(
+            'id, business_id, note, latitude, longitude, started_at, ends_at, '
+            'location_type, status, place_label, address_text, '
+            'businesses!inner(name, business_type)',
+          )
+          .eq('business_id', businessId)
+          .eq('status', 'active')
+          .gt('ends_at', DateTime.now().toUtc().toIso8601String())
+          .order('started_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      if (row == null) return null;
+      final business = row['businesses'];
+      final name = business is Map ? business['name'] as String? : null;
+      final type = business is Map ? business['business_type'] as String? : null;
+      return _mapRow({
+        ...Map<String, dynamic>.from(row),
+        'session_id': row['id'],
+        'business_name': name ?? 'Open now',
+        'business_type': type,
+      });
+    } catch (_) {
+      // Fallback: RPC list then filter (older schemas / RLS edge cases).
+      final all = await listActive(limit: 40);
+      for (final s in all) {
+        if (s.businessId == businessId) return s;
+      }
+      return null;
     }
-    return null;
+  }
+
+  /// Active open sessions whose coordinates fall inside a map viewport.
+  static Future<List<LiveBusinessOpenSession>> listActiveInBounds({
+    required double minLat,
+    required double maxLat,
+    required double minLng,
+    required double maxLng,
+    int limit = 40,
+  }) async {
+    if (!FeatureFlags.liveFoodTrucksEnabled) return const [];
+    try {
+      final rows = await _client
+          .from('business_open_sessions')
+          .select(
+            'id, business_id, note, latitude, longitude, started_at, ends_at, '
+            'location_type, status, place_label, address_text, '
+            'businesses!inner(name, business_type)',
+          )
+          .eq('status', 'active')
+          .gt('ends_at', DateTime.now().toUtc().toIso8601String())
+          .not('latitude', 'is', null)
+          .not('longitude', 'is', null)
+          .gte('latitude', minLat)
+          .lte('latitude', maxLat)
+          .gte('longitude', minLng)
+          .lte('longitude', maxLng)
+          .order('started_at', ascending: false)
+          .limit(limit);
+      final out = <LiveBusinessOpenSession>[];
+      for (final row in rows) {
+        final business = row['businesses'];
+        final name = business is Map ? business['name'] as String? : null;
+        final type =
+            business is Map ? business['business_type'] as String? : null;
+        final mapped = _mapRow({
+          ...Map<String, dynamic>.from(row as Map),
+          'session_id': row['id'],
+          'business_name': name ?? 'Open now',
+          'business_type': type,
+        });
+        if (mapped != null) out.add(mapped);
+      }
+      return out;
+    } catch (_) {
+      final all = await listActive(limit: limit * 2);
+      return all.where((s) {
+        final lat = s.latitude;
+        final lng = s.longitude;
+        if (lat == null || lng == null) return false;
+        return lat >= minLat &&
+            lat <= maxLat &&
+            lng >= minLng &&
+            lng <= maxLng;
+      }).take(limit).toList();
+    }
   }
 
   static Future<LiveBusinessOpenSession> start({
