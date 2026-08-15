@@ -63,6 +63,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   ];
 
   final _body = TextEditingController();
+  final _bodyFocus = FocusNode();
   List<XFile> _attachedMedia = const [];
   List<PostIdentityOption> _identityOptions = const [];
   PostIdentityOption? _selectedIdentity;
@@ -79,6 +80,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     if (widget.initialBody != null) {
       _body.text = widget.initialBody!;
     }
+    _bodyFocus.addListener(() {
+      if (mounted) setState(() {});
+    });
     _destination = widget.initialDestination ??
         (_hasLockedEntityScope
             ? PublishDestination.entityOnly
@@ -100,8 +104,20 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   @override
   void dispose() {
+    _bodyFocus.dispose();
     _body.dispose();
     super.dispose();
+  }
+
+  Color _composerSurface(FirstVuePalette fv, Color? preview) {
+    if (preview != null) return preview;
+    // Borderless well: soft fill marks the writing area; focus lifts it slightly.
+    final base = fv.elevatedSurface;
+    if (!_bodyFocus.hasFocus) return base;
+    return Color.alphaBlend(
+      FirstVueColors.teal.withValues(alpha: 0.08),
+      base,
+    );
   }
 
   Future<void> _loadIdentities() async {
@@ -299,12 +315,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   constraints: const BoxConstraints(minHeight: 220),
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
                   decoration: BoxDecoration(
-                    color: preview ?? fv.elevatedSurface,
+                    color: _composerSurface(fv, preview),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: fv.borderSubtle.withValues(alpha: 0.55)),
                   ),
                   child: MentionAutocompleteField(
                     controller: _body,
+                    focusNode: _bodyFocus,
                     minLines: 8,
                     maxLines: null,
                     hintText: 'Share news… Use #hashtags and @handles.',
@@ -319,6 +335,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       filled: true,
                       fillColor: Colors.transparent,
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
                       isDense: true,
                       contentPadding: EdgeInsets.zero,
                     ),
