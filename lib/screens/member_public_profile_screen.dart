@@ -21,6 +21,7 @@ import '../messaging/screens/messaging_shell_screen.dart';
 import '../messaging/services/fv_messaging_service.dart';
 import '../widgets/feed_comments_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/founding_member_badge.dart';
 import '../widgets/profile_affiliations_section.dart';
 import '../widgets/signed_media_viewer.dart';
 import '../auth/ensure_signed_in.dart';
@@ -573,6 +574,10 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
                         onPressed: _openMessage,
                       ),
                     ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+              child: FoundingMemberBadgeLoader(profileId: widget.profileId),
             ),
             const SizedBox(height: 8),
             SocialGoldUnderlineTabs(

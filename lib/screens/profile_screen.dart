@@ -35,6 +35,7 @@ import '../services/portfolio_album_service.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/follow_requests_section.dart';
 import '../widgets/firstvue_settings_drawer.dart';
+import '../widgets/founding_member_badge.dart';
 import '../models/share_payload.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -764,6 +765,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         tooltip: 'Settings',
                       ),
               ),
+              if (user != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                  child: FoundingMemberBadgeLoader(profileId: user.id),
+                ),
               if (user != null) ...[
                 const SizedBox(height: 16),
                 SocialGoldUnderlineTabs(

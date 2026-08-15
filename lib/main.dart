@@ -30,6 +30,7 @@ import 'theme/firstvue_theme.dart';
 import 'utils/web_safari_media.dart';
 import 'widgets/firstvue_bottom_nav.dart';
 import 'widgets/firstvue_onboarding.dart';
+import 'widgets/early_access_feedback_prompt.dart';
 import 'widgets/firstvue_refresh_scaffold.dart';
 import 'widgets/firstvue_settings_drawer.dart';
 import 'widgets/floating_messages_bubble.dart';
@@ -38,6 +39,7 @@ import 'widgets/home_city_chip.dart';
 import 'widgets/home_discovery_section.dart';
 import 'widgets/network_photo.dart';
 import 'widgets/social_chrome.dart';
+import 'services/early_access_prompt_service.dart';
 import 'services/profile_media_service.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -169,7 +171,18 @@ class _FirstVueHomeState extends State<FirstVueHome> {
       // Leftover ?msg= from Messages (or a Safari crash reload) must not linger
       // on Home/Feeds/VUE — repeated history writes + video decode OOM Safari.
       if (kIsWeb) clearMessagingUrl();
+      unawaited(_maybeShowEarlyAccessPrompt());
     });
+  }
+
+  /// Soft Early Access prompt after a few signed-in sessions — never on first launch.
+  Future<void> _maybeShowEarlyAccessPrompt() async {
+    if (Supabase.instance.client.auth.currentUser == null) return;
+    await EarlyAccessPromptService.recordMeaningfulSession();
+    // Let onboarding finish before competing for attention.
+    await Future<void>.delayed(const Duration(seconds: 4));
+    if (!mounted) return;
+    await EarlyAccessFeedbackPrompt.maybeShow(context);
   }
 
   /// Tab routes are consumed before the first frame so Home never flashes.
