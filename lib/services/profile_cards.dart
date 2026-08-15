@@ -194,20 +194,48 @@ class ProfileCards {
     String? excludeId,
     int limit = 20,
   }) async {
-    final trimmed = query.trim();
+    return searchProfiles(query: query, excludeId: excludeId, limit: limit);
+  }
+
+  /// Search public cards by display name or username (for role assignment).
+  static Future<List<Map<String, dynamic>>> searchProfiles({
+    required String query,
+    String? excludeId,
+    int limit = 20,
+  }) async {
+    final trimmed = query.trim().replaceFirst(RegExp(r'^@'), '');
     if (trimmed.isEmpty) return const [];
 
-    Future<List<Map<String, dynamic>>> run(String table) async {
+    Future<List<Map<String, dynamic>>> byColumn(
+      String table,
+      String column,
+    ) async {
       var request = _client
           .from(table)
           .select(nameColumns)
-          .not('display_name', 'is', null)
-          .ilike('display_name', '%$trimmed%');
+          .ilike(column, '%$trimmed%');
       if (excludeId != null && excludeId.isNotEmpty) {
         request = request.neq('id', excludeId);
       }
       final rows = await request.limit(limit);
       return List<Map<String, dynamic>>.from(rows as List);
+    }
+
+    Future<List<Map<String, dynamic>>> run(String table) async {
+      final byName = await byColumn(table, 'display_name');
+      List<Map<String, dynamic>> byUsername = const [];
+      try {
+        byUsername = await byColumn(table, 'username');
+      } catch (_) {}
+      final seen = <String>{};
+      final merged = <Map<String, dynamic>>[];
+      for (final row in [...byName, ...byUsername]) {
+        final id = row['id'] as String?;
+        if (id == null || !seen.add(id)) continue;
+        merged.add(row);
+        if (merged.length >= limit) break;
+      }
+      return merged;
     }
 
     try {
@@ -216,5 +244,13 @@ class ProfileCards {
       if (!isMissingRelation(error)) rethrow;
       return run('profiles');
     }
+  }
+
+  static Future<List<Map<String, dynamic>>> searchByDisplayNameOnly({
+    required String query,
+    String? excludeId,
+    int limit = 20,
+  }) async {
+    return searchProfiles(query: query, excludeId: excludeId, limit: limit);
   }
 }

@@ -70,6 +70,25 @@ class Community {
   bool get isLeaderRole =>
       myRole == 'owner' || myRole == 'admin' || myRole == 'moderator';
 
+  /// Whether [profileId] may create posts in this Group's newsfeed.
+  /// Matches persisted [postingPermission] + creator ownership.
+  bool canPostAs(String? profileId) {
+    if (profileId == null) return false;
+    if (profileId == creatorId) return true;
+    if (!isMember && !isPendingMember) return false;
+    if (isPendingMember) return false;
+    final role = (myRole ?? 'member').toLowerCase();
+    switch (postingPermission.toLowerCase()) {
+      case 'admins':
+        return role == 'owner' || role == 'admin';
+      case 'moderators':
+        return role == 'owner' || role == 'admin' || role == 'moderator';
+      case 'members':
+      default:
+        return isMember || role == 'owner' || role == 'admin' || role == 'moderator';
+    }
+  }
+
   String? get locationLabel {
     final parts = [
       city,

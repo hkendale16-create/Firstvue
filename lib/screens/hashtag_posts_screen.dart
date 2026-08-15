@@ -63,7 +63,7 @@ class _HashtagPostsScreenState extends State<HashtagPostsScreen> {
                   Text(
                     'No posts with #${widget.tag} yet.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white.withValues(alpha: .5)),
+                    style: TextStyle(color: context.fv.secondaryText),
                   ),
                 ],
               );

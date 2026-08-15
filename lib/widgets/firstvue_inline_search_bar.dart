@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../navigation/firstvue_page_route.dart';
 import '../screens/search_screen.dart';
+import '../screens/hashtag_posts_screen.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../services/search_autocomplete_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -104,10 +105,18 @@ class _FirstVueInlineSearchBarState extends State<FirstVueInlineSearchBar> {
             builder: (_) => MemberPublicProfileScreen(profileId: result.id),
           ),
         );
+      case SearchResultType.hashtag:
+        Navigator.push(
+          context,
+          FirstVuePageRoute(
+            builder: (_) => HashtagPostsScreen(
+              tag: result.label.replaceFirst('#', '').toLowerCase(),
+            ),
+          ),
+        );
       case SearchResultType.business:
       case SearchResultType.community:
       case SearchResultType.communityHub:
-      case SearchResultType.hashtag:
         _controller.text = result.label;
         _openFullSearch(initialQuery: result.label);
     }
