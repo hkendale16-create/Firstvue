@@ -137,8 +137,7 @@ class PostBoostService {
           .inFilter('status', ['draft', 'pending'])
           .order('created_at', ascending: false);
       return [
-        for (final row in rows)
-          if (row is Map<String, dynamic>) PostPromotion.fromMap(row),
+        for (final row in rows) PostPromotion.fromMap(row),
       ];
     } catch (_) {
       return const [];
