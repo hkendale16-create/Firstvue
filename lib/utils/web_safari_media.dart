@@ -7,8 +7,11 @@ import 'package:flutter/rendering.dart';
 /// Use these gates on web only. Native apps keep richer media behavior.
 bool get webAvoidStackedMediaTabs => kIsWeb;
 
-/// Do not create [VideoPlayerController] / HTML `<video>` for feed or grid
+/// Do not create [VideoPlayerController] / HTML `<video>` for **feed**
 /// previews on web — posters + tap-to-fullscreen only.
+///
+/// VUE / Explore grid previews may still use a single capped player via
+/// `ExploreGridVideo.maxActiveControllers` (3-second muted loops).
 bool get webAvoidInlineVideoPreview => kIsWeb;
 
 /// Tighter scroll cache on web so off-screen HTML `<img>` platform views
