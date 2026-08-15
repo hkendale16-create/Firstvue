@@ -1,15 +1,45 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import '../theme/firstvue_theme.dart';
 
+/// Caps how many feed videos may hold a live [VideoPlayerController] at once.
+/// iOS Safari repeatedly kills the tab when many CanvasKit video textures stay
+/// allocated while scrolling Feeds / Home / VUE.
+class _FeedVideoBudget {
+  _FeedVideoBudget._();
+
+  static const int maxActiveWeb = 1;
+  static const int maxActiveNative = 3;
+
+  static final List<_FeedAutoplayVideoState> _active = [];
+
+  static int get _limit => kIsWeb ? maxActiveWeb : maxActiveNative;
+
+  static void claim(_FeedAutoplayVideoState state) {
+    if (_active.contains(state)) return;
+    _active.add(state);
+    while (_active.length > _limit) {
+      final oldest = _active.removeAt(0);
+      if (!identical(oldest, state)) {
+        oldest._releaseForBudget();
+      }
+    }
+  }
+
+  static void release(_FeedAutoplayVideoState state) {
+    _active.remove(state);
+  }
+}
+
 /// Feed video that autoplays muted when mostly on screen.
 ///
-/// By default ([previewOnly] = false) plays and loops continuously while
-/// visible. When [previewOnly] is true, pauses after [previewDuration].
+/// Controllers are created lazily when visible and released when scrolled away
+/// (especially on web) so Safari does not OOM mid-scroll.
 class FeedAutoplayVideo extends StatefulWidget {
   final String url;
   final double? width;
@@ -42,7 +72,9 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
   bool _failed = false;
   bool _playing = false;
   bool _previewFinished = false;
+  bool _initializing = false;
   Timer? _previewTimer;
+  Timer? _releaseTimer;
   bool _muted = true;
   bool _isMostlyVisible = false;
 
@@ -54,19 +86,16 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    _initController();
-  }
-
-  @override
   void didUpdateWidget(covariant FeedAutoplayVideo oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.url != widget.url) {
-      _disposeController();
+      _disposeController(releaseBudget: true);
       _previewFinished = false;
       _playing = false;
-      _initController();
+      _failed = false;
+      if (_isMostlyVisible) {
+        unawaited(_ensureController());
+      }
     } else if (oldWidget.previewOnly != widget.previewOnly &&
         _isMostlyVisible) {
       if (widget.previewOnly) {
@@ -79,25 +108,55 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
     }
   }
 
-  Future<void> _initController() async {
+  Future<void> _ensureController() async {
+    if (_controller != null || _initializing || _failed) return;
+    _initializing = true;
+    _FeedVideoBudget.claim(this);
     final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
     _controller = controller;
     try {
       await controller.initialize();
       await controller.setLooping(true);
       await controller.setVolume(_muted ? 0 : 1);
-      if (!mounted || _controller != controller) {
+      if (!mounted || _controller != controller || !_isMostlyVisible) {
         await controller.dispose();
+        if (_controller == controller) _controller = null;
+        _initializing = false;
+        _FeedVideoBudget.release(this);
         return;
       }
-      setState(() => _ready = true);
+      if (mounted) {
+        setState(() {
+          _ready = true;
+          _initializing = false;
+        });
+      } else {
+        _initializing = false;
+      }
       if (_isMostlyVisible) {
         _startPlayback();
       }
     } catch (_) {
-      if (!mounted || _controller != controller) return;
-      setState(() => _failed = true);
+      if (!mounted || _controller != controller) {
+        _initializing = false;
+        return;
+      }
+      setState(() {
+        _failed = true;
+        _initializing = false;
+      });
+      _FeedVideoBudget.release(this);
     }
+  }
+
+  void _releaseForBudget() {
+    if (!mounted) {
+      _disposeController(releaseBudget: false);
+      return;
+    }
+    _pausePlayback(reset: true);
+    _disposeController(releaseBudget: false);
+    if (mounted) setState(() {});
   }
 
   void _onVisibilityChanged(VisibilityInfo info) {
@@ -106,10 +165,22 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
     _isMostlyVisible = mostlyVisible;
 
     if (mostlyVisible) {
+      _releaseTimer?.cancel();
       _previewFinished = false;
+      unawaited(_ensureController());
       _startPlayback();
     } else {
       _pausePlayback(reset: true);
+      // Free decoder/GPU quickly on web; keep briefly on native for fling-back.
+      _releaseTimer?.cancel();
+      _releaseTimer = Timer(
+        Duration(milliseconds: kIsWeb ? 120 : 800),
+        () {
+          if (!mounted || _isMostlyVisible) return;
+          _disposeController(releaseBudget: true);
+          if (mounted) setState(() {});
+        },
+      );
     }
   }
 
@@ -122,10 +193,12 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
       controller.seekTo(Duration.zero);
     }
     controller.play();
-    setState(() {
-      _playing = true;
-      _previewFinished = false;
-    });
+    if (mounted) {
+      setState(() {
+        _playing = true;
+        _previewFinished = false;
+      });
+    }
 
     if (!widget.previewOnly) return;
 
@@ -168,16 +241,21 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
     }
   }
 
-  void _disposeController() {
+  void _disposeController({required bool releaseBudget}) {
     _previewTimer?.cancel();
-    _controller?.dispose();
+    _releaseTimer?.cancel();
+    final controller = _controller;
     _controller = null;
     _ready = false;
+    _initializing = false;
+    _playing = false;
+    if (releaseBudget) _FeedVideoBudget.release(this);
+    controller?.dispose();
   }
 
   @override
   void dispose() {
-    _disposeController();
+    _disposeController(releaseBudget: true);
     super.dispose();
   }
 
@@ -221,15 +299,21 @@ class _FeedAutoplayVideoState extends State<FeedAutoplayVideo> {
     if (!_ready || _controller == null) {
       return ColoredBox(
         color: FirstVueColors.elevatedSurface,
-        child: const Center(
-          child: SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: FirstVueColors.teal,
-            ),
-          ),
+        child: Center(
+          child: _initializing || _isMostlyVisible
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: FirstVueColors.teal,
+                  ),
+                )
+              : const Icon(
+                  Icons.play_circle_outline,
+                  color: Colors.white38,
+                  size: 40,
+                ),
         ),
       );
     }

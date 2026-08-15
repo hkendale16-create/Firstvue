@@ -54,16 +54,19 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
   double _savedMessagesOffset = 0;
   double _savedEventsOffset = 0;
   Timer? _debounce;
+  void Function()? _cancelUrlListen;
 
   @override
   void initState() {
     super.initState();
     _mode = widget.initialMode;
     _openId = widget.initialConversationId;
-    listenMessagingUrl((mode, conversationId) {
+    _cancelUrlListen = listenMessagingUrl((mode, conversationId) {
       if (!mounted) return;
       _setMode(mode == 'events' ? FvMode.events : FvMode.messages);
-      if (conversationId != null) setState(() => _openId = conversationId);
+      if (conversationId != null && conversationId != _openId) {
+        setState(() => _openId = conversationId);
+      }
     });
     _bootstrap();
   }
@@ -71,6 +74,9 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _cancelUrlListen?.call();
+    _cancelUrlListen = null;
+    clearMessagingUrl();
     _search.dispose();
     _messagesScroll.dispose();
     _eventsScroll.dispose();
