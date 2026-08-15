@@ -60,22 +60,29 @@ class LiveCategoryRow extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
+                  AnimatedScale(
+                    scale: active ? 1.06 : 1.0,
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: active
+                              ? LiveTokens.bronze
+                              : context.fv.borderSubtle,
+                          width: active ? 1.6 : 1,
+                        ),
                         color: active
-                            ? LiveTokens.bronze
-                            : context.fv.borderSubtle,
-                        width: active ? 1.6 : 1,
+                            ? LiveTokens.bronze.withValues(alpha: 0.12)
+                            : Colors.transparent,
                       ),
-                      color: active
-                          ? LiveTokens.bronze.withValues(alpha: 0.12)
-                          : Colors.transparent,
+                      child: Icon(cat.icon, size: 20, color: color),
                     ),
-                    child: Icon(cat.icon, size: 20, color: color),
                   ),
                   const SizedBox(height: 6),
                   Text(

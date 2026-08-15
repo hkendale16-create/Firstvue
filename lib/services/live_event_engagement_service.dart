@@ -20,6 +20,26 @@ class LiveEventEngagement {
     this.hereNowCount = 0,
     this.hereNowProfileIds = const [],
   });
+
+  LiveEventEngagement copyWith({
+    bool? going,
+    bool? hot,
+    bool? hereNow,
+    int? goingCount,
+    int? hotCount,
+    int? hereNowCount,
+    List<String>? hereNowProfileIds,
+  }) {
+    return LiveEventEngagement(
+      going: going ?? this.going,
+      hot: hot ?? this.hot,
+      hereNow: hereNow ?? this.hereNow,
+      goingCount: goingCount ?? this.goingCount,
+      hotCount: hotCount ?? this.hotCount,
+      hereNowCount: hereNowCount ?? this.hereNowCount,
+      hereNowProfileIds: hereNowProfileIds ?? this.hereNowProfileIds,
+    );
+  }
 }
 
 /// LIVE event Going / Hot / I'm Here. Presence is voluntary and time-limited.
@@ -36,38 +56,64 @@ class LiveEventEngagementService {
     if (!_isRealEventId(eventId)) return const LiveEventEngagement();
     final me = _client.auth.currentUser;
 
-    var going = false;
-    var hot = false;
-    var hereNow = false;
-    var goingCount = 0;
-    var hotCount = 0;
-    var hereNowCount = 0;
-    var hereIds = <String>[];
+    final goingFuture = () async {
+      var going = false;
+      var goingCount = 0;
+      try {
+        final rows = await _client
+            .from('event_attendance')
+            .select('profile_id')
+            .eq('event_id', eventId)
+            .eq('status', 'attending');
+        goingCount = rows.length;
+        if (me != null) {
+          going = rows.any((r) => r['profile_id'] == me.id);
+        }
+      } catch (_) {}
+      return (going, goingCount);
+    }();
 
-    try {
-      final rows = await _client
-          .from('event_attendance')
-          .select('profile_id, status')
-          .eq('event_id', eventId)
-          .eq('status', 'attending');
-      goingCount = rows.length;
-      if (me != null) {
-        going = rows.any((r) => r['profile_id'] == me.id);
+    final hotFuture = () async {
+      var hot = false;
+      var hotCount = 0;
+      try {
+        // Prefer count RPC (does not expose other profile ids).
+        try {
+          final count = await _client.rpc(
+            'event_hot_count',
+            params: {'p_event_id': eventId},
+          );
+          if (count is int) {
+            hotCount = count;
+          } else if (count is num) {
+            hotCount = count.toInt();
+          }
+        } catch (_) {
+          final rows = await _client
+              .from('event_hot_reactions')
+              .select('profile_id')
+              .eq('event_id', eventId);
+          hotCount = rows.length;
+        }
+        if (me != null) {
+          final mine = await _client
+              .from('event_hot_reactions')
+              .select('profile_id')
+              .eq('event_id', eventId)
+              .eq('profile_id', me.id)
+              .maybeSingle();
+          hot = mine != null;
+        }
+      } catch (_) {}
+      return (hot, hotCount);
+    }();
+
+    final presenceFuture = () async {
+      var hereNow = false;
+      var hereNowCount = 0;
+      if (!FeatureFlags.liveEventPresenceEnabled) {
+        return (hereNow, hereNowCount);
       }
-    } catch (_) {}
-
-    try {
-      final rows = await _client
-          .from('event_hot_reactions')
-          .select('profile_id')
-          .eq('event_id', eventId);
-      hotCount = rows.length;
-      if (me != null) {
-        hot = rows.any((r) => r['profile_id'] == me.id);
-      }
-    } catch (_) {}
-
-    if (FeatureFlags.liveEventPresenceEnabled) {
       try {
         final count = await _client.rpc(
           'event_here_now_count',
@@ -79,36 +125,39 @@ class LiveEventEngagementService {
           hereNowCount = count.toInt();
         }
       } catch (_) {}
+      if (me != null) {
+        try {
+          final mine = await _client
+              .from('event_presence')
+              .select('profile_id')
+              .eq('event_id', eventId)
+              .eq('profile_id', me.id)
+              .gt('expires_at', DateTime.now().toUtc().toIso8601String())
+              .maybeSingle();
+          hereNow = mine != null;
+        } catch (_) {}
+      }
+      return (hereNow, hereNowCount);
+    }();
 
-      try {
-        final rows = await _client
-            .from('event_presence')
-            .select('profile_id, expires_at')
-            .eq('event_id', eventId)
-            .gt('expires_at', DateTime.now().toUtc().toIso8601String())
-            .order('updated_at', ascending: false)
-            .limit(12);
-        hereIds = rows
-            .map((r) => r['profile_id'] as String?)
-            .whereType<String>()
-            .toList();
-        if (me != null) {
-          hereNow = hereIds.contains(me.id);
-        }
-        if (hereNowCount == 0 && hereIds.isNotEmpty) {
-          hereNowCount = hereIds.length;
-        }
-      } catch (_) {}
-    }
+    final results = await Future.wait<(bool, int)>([
+      goingFuture,
+      hotFuture,
+      presenceFuture,
+    ]);
+    final going = results[0];
+    final hot = results[1];
+    final presence = results[2];
 
     return LiveEventEngagement(
-      going: going,
-      hot: hot,
-      hereNow: hereNow,
-      goingCount: goingCount,
-      hotCount: hotCount,
-      hereNowCount: hereNowCount,
-      hereNowProfileIds: hereIds,
+      going: going.$1,
+      hot: hot.$1,
+      hereNow: presence.$1,
+      goingCount: going.$2,
+      hotCount: hot.$2,
+      hereNowCount: presence.$2,
+      // Do not broadcast other members' profile ids from presence.
+      hereNowProfileIds: presence.$1 && me != null ? [me.id] : const [],
     );
   }
 

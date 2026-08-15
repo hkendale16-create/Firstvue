@@ -54,6 +54,7 @@ class _LiveMapSurfaceOsmState extends State<LiveMapSurface> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       widget.onReady?.call(_OsmController(_mapController));
     });
   }
@@ -84,6 +85,7 @@ class _LiveMapSurfaceOsmState extends State<LiveMapSurface> {
         event is MapEventDoubleTapZoomEnd) {
       _debounce?.cancel();
       _debounce = Timer(const Duration(milliseconds: 450), () {
+        if (!mounted) return;
         final bounds = _mapController.camera.visibleBounds;
         widget.onCameraIdle(
           LiveMapBounds(
@@ -99,6 +101,7 @@ class _LiveMapSurfaceOsmState extends State<LiveMapSurface> {
 
   @override
   Widget build(BuildContext context) {
+    final selectedId = widget.selected?.id;
     return FlutterMap(
       mapController: _mapController,
       options: MapOptions(
@@ -120,12 +123,14 @@ class _LiveMapSurfaceOsmState extends State<LiveMapSurface> {
         ),
         CircleLayer(
           circles: [
-            for (final pin in widget.pins.where((p) => p.isLive))
+            for (final pin in widget.pins.where((p) => p.isLive || p.id == selectedId))
               CircleMarker(
                 point: pin.point,
-                radius: 28,
+                radius: pin.id == selectedId ? 36 : 28,
                 useRadiusInMeter: false,
-                color: _colorFor(pin).withValues(alpha: 0.18),
+                color: _colorFor(pin).withValues(
+                  alpha: pin.id == selectedId ? 0.28 : 0.18,
+                ),
                 borderStrokeWidth: 0,
               ),
           ],
@@ -135,25 +140,17 @@ class _LiveMapSurfaceOsmState extends State<LiveMapSurface> {
             for (final pin in widget.pins)
               Marker(
                 point: pin.point,
-                width: 44,
-                height: 54,
+                width: pin.id == selectedId ? 52 : 44,
+                height: pin.id == selectedId ? 62 : 54,
                 child: GestureDetector(
                   onTap: () => widget.onSelect(pin),
-                  child: _GlowPin(color: _colorFor(pin), live: pin.isLive),
+                  child: _GlowPin(
+                    color: _colorFor(pin),
+                    live: pin.isLive,
+                    selected: pin.id == selectedId,
+                  ),
                 ),
               ),
-            Marker(
-              point: widget.center,
-              width: 22,
-              height: 22,
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: LiveTokens.bronze,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-              ),
-            ),
           ],
         ),
       ],
@@ -164,46 +161,57 @@ class _LiveMapSurfaceOsmState extends State<LiveMapSurface> {
 class _GlowPin extends StatelessWidget {
   final Color color;
   final bool live;
-  const _GlowPin({required this.color, required this.live});
+  final bool selected;
+  const _GlowPin({
+    required this.color,
+    required this.live,
+    this.selected = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 34,
-          height: 34,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: 0.65),
-                blurRadius: live ? 14 : 8,
-                spreadRadius: live ? 2 : 0,
+    final size = selected ? 40.0 : 34.0;
+    return AnimatedScale(
+      scale: selected ? 1.08 : 1.0,
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: size,
+            height: size,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: selected ? 0.85 : 0.65),
+                  blurRadius: selected ? 18 : (live ? 14 : 8),
+                  spreadRadius: selected ? 3 : (live ? 2 : 0),
+                ),
+              ],
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.9),
+                width: selected ? 2.2 : 1.5,
               ),
-            ],
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.85),
-              width: 1.5,
+            ),
+            child: Text(
+              live ? 'LIVE' : '•',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: selected ? 9 : 8,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
-          child: Text(
-            live ? 'LIVE' : '•',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 8,
-              fontWeight: FontWeight.w800,
-            ),
+          CustomPaint(
+            size: const Size(10, 8),
+            painter: _PinTailPainter(color),
           ),
-        ),
-        CustomPaint(
-          size: const Size(10, 8),
-          painter: _PinTailPainter(color),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

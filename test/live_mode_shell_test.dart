@@ -134,7 +134,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('No LIVE food yet'), findsOneWidget);
-    expect(find.textContaining('will not invent'), findsOneWidget);
+    expect(find.textContaining('will show here'), findsOneWidget);
     expect(find.text('4 LIVE TRUCKS'), findsNothing);
   });
 

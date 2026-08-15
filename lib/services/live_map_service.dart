@@ -1,6 +1,7 @@
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/feature_flags.dart';
 import 'location_service.dart';
 import 'live_home_service.dart';
 import 'things_to_do_service.dart';
@@ -104,6 +105,16 @@ class LiveMapService {
     );
   }
 
+  /// Filters shown in the map chip row (hides Food Trucks until enabled).
+  static List<LiveMapFilter> visibleFilters() {
+    if (FeatureFlags.liveFoodTrucksEnabled) {
+      return LiveMapFilter.values;
+    }
+    return LiveMapFilter.values
+        .where((f) => f != LiveMapFilter.foodTrucks)
+        .toList();
+  }
+
   static Future<LatLng> resolveInitialCenter() async {
     try {
       final pos = await LocationService.getCurrentPosition();
@@ -141,7 +152,7 @@ class LiveMapService {
           .limit(limit);
 
       for (final row in rows) {
-        final event = await _mapEventRow(row);
+        final event = _mapEventRow(row);
         final lat = (row['latitude'] as num?)?.toDouble();
         final lng = (row['longitude'] as num?)?.toDouble();
         if (lat == null || lng == null) continue;
@@ -165,13 +176,16 @@ class LiveMapService {
           .limit(limit * 2);
 
       for (final row in rows) {
-        final event = await _mapEventRow(row);
+        final event = _mapEventRow(row);
         final point = _pointFromBusinessJoin(row);
         if (point == null) continue;
         if (!padded.contains(point)) continue;
         // Prefer explicit event coords already added.
         if (row['latitude'] != null && row['longitude'] != null) continue;
-        final pin = _pinFromEvent(event, point);
+        final pin = _pinFromEvent(
+          event.copyWith(latitude: point.latitude, longitude: point.longitude),
+          point,
+        );
         if (seen.add(pin.id)) pins.add(pin);
       }
     } catch (_) {
@@ -179,49 +193,51 @@ class LiveMapService {
     }
 
     // 3) Food truck businesses in viewport (real locations only; no fake LIVE).
-    try {
-      final rows = await _client
-          .from('businesses')
-          .select(
-            'id, name, business_type, status, '
-            'business_locations!inner(latitude, longitude, city, state)',
-          )
-          .eq('status', 'approved')
-          .ilike('business_type', '%Food Truck%')
-          .limit(40);
+    if (FeatureFlags.liveFoodTrucksEnabled) {
+      try {
+        final rows = await _client
+            .from('businesses')
+            .select(
+              'id, name, business_type, status, '
+              'business_locations!inner(latitude, longitude, city, state)',
+            )
+            .eq('status', 'approved')
+            .ilike('business_type', '%Food Truck%')
+            .limit(40);
 
-      for (final row in rows) {
-        final id = row['id'] as String?;
-        final name = row['name'] as String?;
-        if (id == null || name == null) continue;
-        final locs = row['business_locations'];
-        Map<String, dynamic>? loc;
-        if (locs is List && locs.isNotEmpty) {
-          loc = locs.first as Map<String, dynamic>;
-        } else if (locs is Map<String, dynamic>) {
-          loc = locs;
+        for (final row in rows) {
+          final id = row['id'] as String?;
+          final name = row['name'] as String?;
+          if (id == null || name == null) continue;
+          final locs = row['business_locations'];
+          Map<String, dynamic>? loc;
+          if (locs is List && locs.isNotEmpty) {
+            loc = locs.first as Map<String, dynamic>;
+          } else if (locs is Map<String, dynamic>) {
+            loc = locs;
+          }
+          final lat = (loc?['latitude'] as num?)?.toDouble();
+          final lng = (loc?['longitude'] as num?)?.toDouble();
+          if (lat == null || lng == null) continue;
+          final point = LatLng(lat, lng);
+          if (!padded.contains(point)) continue;
+          final city = loc?['city'] as String?;
+          final pinId = 'biz:$id';
+          if (!seen.add(pinId)) continue;
+          pins.add(
+            LiveMapPin(
+              id: pinId,
+              kind: LiveMapPinKind.foodTruck,
+              title: name,
+              subtitle: city,
+              point: point,
+              lifecycle: LiveLifecycleStatus.upcoming,
+              businessId: id,
+            ),
+          );
         }
-        final lat = (loc?['latitude'] as num?)?.toDouble();
-        final lng = (loc?['longitude'] as num?)?.toDouble();
-        if (lat == null || lng == null) continue;
-        final point = LatLng(lat, lng);
-        if (!padded.contains(point)) continue;
-        final city = loc?['city'] as String?;
-        final pinId = 'biz:$id';
-        if (!seen.add(pinId)) continue;
-        pins.add(
-          LiveMapPin(
-            id: pinId,
-            kind: LiveMapPinKind.foodTruck,
-            title: name,
-            subtitle: city,
-            point: point,
-            lifecycle: LiveLifecycleStatus.upcoming,
-            businessId: id,
-          ),
-        );
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
 
     return pins;
   }
@@ -287,8 +303,7 @@ class LiveMapService {
     return LatLng(lat, lng);
   }
 
-  static Future<CommunityEvent> _mapEventRow(Map<String, dynamic> row) async {
-    // Reuse ThingsToDo mapping by fetching single approved list item shape.
+  static CommunityEvent _mapEventRow(Map<String, dynamic> row) {
     final business = row['businesses'];
     String? businessName;
     if (business is Map) {
@@ -310,6 +325,8 @@ class LiveMapService {
       organizerId: row['organizer_id'] as String?,
       status: row['status'] as String?,
       coverImageUrl: null,
+      latitude: (row['latitude'] as num?)?.toDouble(),
+      longitude: (row['longitude'] as num?)?.toDouble(),
     );
   }
 }

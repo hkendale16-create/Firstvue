@@ -47,11 +47,30 @@ void main() {
         point: const LatLng(33.74, -84.40),
         lifecycle: LiveLifecycleStatus.upcoming,
       ),
+      LiveMapPin(
+        id: 'd',
+        kind: LiveMapPinKind.market,
+        title: 'Farmers Market',
+        point: const LatLng(33.73, -84.41),
+        lifecycle: LiveLifecycleStatus.upcoming,
+      ),
     ];
 
     expect(LiveMapService.applyFilter(pins, LiveMapFilter.liveNow).length, 1);
     expect(LiveMapService.applyFilter(pins, LiveMapFilter.events).length, 2);
     expect(LiveMapService.applyFilter(pins, LiveMapFilter.foodTrucks).length, 1);
+    expect(LiveMapService.applyFilter(pins, LiveMapFilter.markets).length, 1);
+    expect(
+      LiveMapService.applyFilter(pins, LiveMapFilter.nightlife).length,
+      2,
+    );
+  });
+
+  test('visibleFilters respects food truck flag', () {
+    expect(
+      LiveMapService.visibleFilters().contains(LiveMapFilter.foodTrucks),
+      FeatureFlags.liveFoodTrucksEnabled,
+    );
   });
 
   test('geo migration is additive and nullable', () {

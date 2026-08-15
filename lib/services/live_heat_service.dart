@@ -58,6 +58,7 @@ class LiveHeatService {
     final ids = eventIds
         .where((id) => id.isNotEmpty && !id.startsWith('proto-'))
         .toSet()
+        .take(100)
         .toList();
     if (ids.isEmpty) return const {};
 

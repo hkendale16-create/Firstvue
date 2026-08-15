@@ -18,7 +18,7 @@ import '../widgets/live/live_category_row.dart';
 import '../widgets/live/live_right_now_card.dart';
 import '../widgets/live/live_vue_feed_strip.dart';
 
-/// LIVE Home — Phase 2: Right Now + Map CTA stub + VUE strip.
+/// LIVE Home — Right Now + Explore Live Map + VUE strip.
 class LiveHomeShellScreen extends StatefulWidget {
   final VoidCallback? onReturnToVue;
 
@@ -70,11 +70,11 @@ class _LiveHomeShellScreenState extends State<LiveHomeShellScreen> {
     await LiveEventDetailScreen.open(context, event);
   }
 
-  void _openMapStub() {
+  void _openMap() {
     if (!FeatureFlags.liveMapEnabled) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Explore Live Map arrives in a later LIVE phase.'),
+          content: Text('Explore Live Map is turned off in this build.'),
         ),
       );
       return;
@@ -204,28 +204,14 @@ class _LiveHomeShellScreenState extends State<LiveHomeShellScreen> {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            data?.rightNowTitle ?? '🔥 HAPPENING NOW',
-                            style: TextStyle(
-                              color: fv.primaryText,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          'See All',
-                          style: TextStyle(
-                            color: LiveTokens.bronzeSoft,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      data?.rightNowTitle ?? '🔥 HAPPENING NOW',
+                      style: TextStyle(
+                        color: fv.primaryText,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
+                      ),
                     ),
                   ),
                 ),
@@ -254,7 +240,7 @@ class _LiveHomeShellScreenState extends State<LiveHomeShellScreen> {
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
                       child: OutlinedButton(
-                        onPressed: _openMapStub,
+                        onPressed: _openMap,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: LiveTokens.bronzeSoft,
                           side: const BorderSide(color: LiveTokens.bronze),
@@ -323,8 +309,8 @@ class _RightNowSection extends StatelessWidget {
         child: _EmptyCard(
           title: 'No LIVE ${category.label.toLowerCase()} yet',
           body:
-              'Food Truck / business LIVE locations are not in the backend yet. '
-              'We will not invent open counts.',
+              'Open locations for food trucks and businesses will show here '
+              'when they go live nearby.',
         ),
       );
     }
@@ -350,9 +336,23 @@ class _RightNowSection extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           final item = items[index];
-          return LiveRightNowCard(
-            item: item,
-            onTap: () => onOpen(item),
+          return TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: Duration(milliseconds: 220 + (index * 40).clamp(0, 200)),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value,
+                child: Transform.translate(
+                  offset: Offset(0, 8 * (1 - value)),
+                  child: child,
+                ),
+              );
+            },
+            child: LiveRightNowCard(
+              item: item,
+              onTap: () => onOpen(item),
+            ),
           );
         },
       ),

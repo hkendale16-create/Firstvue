@@ -75,7 +75,8 @@ class LiveHomeService {
     return '🔥 ${city.toUpperCase()} RIGHT NOW';
   }
 
-  /// Lifecycle from start time only until ends_at is modeled in app (Phase 5).
+  /// Lifecycle from start time only until ends_at is modeled.
+  /// Last hour of the LIVE window surfaces as ending soon.
   static LiveLifecycleStatus lifecycleFor(
     DateTime? eventAt, {
     DateTime? now,
@@ -85,8 +86,10 @@ class LiveHomeService {
     final minutesUntil = eventAt.difference(n).inMinutes;
     if (minutesUntil > 60) return LiveLifecycleStatus.upcoming;
     if (minutesUntil > 0) return LiveLifecycleStatus.startingSoon;
-    // Without ends_at, treat the first 6 hours after start as LIVE.
-    if (minutesUntil > -6 * 60) return LiveLifecycleStatus.live;
+    // Without ends_at, treat the first 5 hours after start as LIVE,
+    // then the 6th hour as ending soon.
+    if (minutesUntil > -5 * 60) return LiveLifecycleStatus.live;
+    if (minutesUntil > -6 * 60) return LiveLifecycleStatus.endingSoon;
     return LiveLifecycleStatus.ended;
   }
 
@@ -165,7 +168,7 @@ class LiveHomeService {
       rightNow: rightNow,
       vueItems: vueItems,
       foodTruckGapNote:
-          'Food Truck LIVE stops are not in the backend yet — no fabricated truck counts.',
+          'Food Truck LIVE check-ins will appear here when operators share open locations.',
     );
   }
 

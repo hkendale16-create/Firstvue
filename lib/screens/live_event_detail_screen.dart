@@ -191,16 +191,24 @@ class _LiveEventDetailScreenState extends State<LiveEventDetailScreen> {
   }
 
   Future<void> _directions() async {
-    final label = event.locationLabel?.trim();
-    if (label == null || label.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No location listed for this event.')),
+    final Uri uri;
+    if (event.hasCoordinates) {
+      uri = Uri.parse(
+        'https://www.google.com/maps/dir/?api=1&destination='
+        '${event.latitude},${event.longitude}',
       );
-      return;
+    } else {
+      final label = event.locationLabel?.trim();
+      if (label == null || label.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No location listed for this event.')),
+        );
+        return;
+      }
+      uri = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(label)}',
+      );
     }
-    final uri = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(label)}',
-    );
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -266,11 +274,6 @@ class _LiveEventDetailScreenState extends State<LiveEventDetailScreen> {
                   tooltip: 'Share',
                   onPressed: _share,
                   icon: const Icon(Icons.ios_share_outlined),
-                ),
-                IconButton(
-                  tooltip: 'More',
-                  onPressed: () {},
-                  icon: const Icon(Icons.more_horiz),
                 ),
               ],
               flexibleSpace: FlexibleSpaceBar(
@@ -487,27 +490,14 @@ class _LiveEventDetailScreenState extends State<LiveEventDetailScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
-                child: Row(
-                  children: [
-                    Text(
-                      'LIVE VUES FROM HERE',
-                      style: TextStyle(
-                        color: fv.primaryText,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'See All',
-                      style: TextStyle(
-                        color: LiveTokens.bronzeSoft,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  'LIVE VUES FROM HERE',
+                  style: TextStyle(
+                    color: fv.primaryText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.0,
+                  ),
                 ),
               ),
             ),

@@ -37,8 +37,11 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
   bool _loading = true;
   String? _cacheKey;
   LiveMapSurfaceController? _controller;
+  int _loadGen = 0;
 
-  bool get _mapboxActive => MapboxConfig.hasAccessToken;
+  late final List<LiveMapFilter> _filters = LiveMapService.visibleFilters();
+
+  bool get _mapboxActive => MapboxConfig.canUseNativeMap;
 
   @override
   void initState() {
@@ -50,7 +53,13 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
     final center = await LiveMapService.resolveInitialCenter();
     if (!mounted) return;
     setState(() => _center = center);
+    await _controller?.moveTo(center, zoom: 12.2, pitch: 55);
     await _loadForCenter(center);
+  }
+
+  void _onMapReady(LiveMapSurfaceController controller) {
+    _controller = controller;
+    unawaited(controller.moveTo(_center, zoom: 12.2, pitch: 55));
   }
 
   Future<void> _loadForCenter(LatLng center, {double zoom = 12}) async {
@@ -62,10 +71,12 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
   }
 
   Future<void> _loadBounds(LiveMapBounds bounds) async {
+    final gen = ++_loadGen;
     final key =
         '${bounds.minLat.toStringAsFixed(3)},${bounds.maxLat.toStringAsFixed(3)},'
         '${bounds.minLng.toStringAsFixed(3)},${bounds.maxLng.toStringAsFixed(3)}';
     if (key == _cacheKey && _pins.isNotEmpty) {
+      if (!mounted || gen != _loadGen) return;
       setState(() {
         _visible = LiveMapService.applyFilter(_pins, _filter);
         _loading = false;
@@ -74,7 +85,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
     }
     setState(() => _loading = true);
     final pins = await LiveMapService.fetchPinsInBounds(bounds);
-    if (!mounted) return;
+    if (!mounted || gen != _loadGen) return;
     _cacheKey = key;
     setState(() {
       _pins = pins;
@@ -143,6 +154,8 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
       );
     }
 
+    final showEmpty = _visible.isEmpty && !_loading && _selected == null;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -153,7 +166,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
             selected: _selected,
             onSelect: (pin) => setState(() => _selected = pin),
             onCameraIdle: (bounds) => unawaited(_loadBounds(bounds)),
-            onReady: (c) => _controller = c,
+            onReady: _onMapReady,
           ),
           SafeArea(
             child: Column(
@@ -179,7 +192,9 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                         ),
                       ),
                       Icon(
-                        _mapboxActive ? Icons.threed_rotation : Icons.map_outlined,
+                        _mapboxActive
+                            ? Icons.threed_rotation
+                            : Icons.map_outlined,
                         color: _mapboxActive
                             ? LiveTokens.bronzeSoft
                             : fv.mutedIcon,
@@ -193,7 +208,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
                     child: Text(
-                      'Add MAPBOX_ACCESS_TOKEN for pitched 3D neon buildings. Showing dark fallback map.',
+                      'Add MAPBOX_ACCESS_TOKEN on iOS/Android for pitched 3D buildings. Showing dark fallback map.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: fv.tertiaryText, fontSize: 11),
                     ),
@@ -203,10 +218,10 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    itemCount: LiveMapFilter.values.length,
+                    itemCount: _filters.length,
                     separatorBuilder: (_, _) => const SizedBox(width: 8),
                     itemBuilder: (context, index) {
-                      final f = LiveMapFilter.values[index];
+                      final f = _filters[index];
                       final selected = f == _filter;
                       return ChoiceChip(
                         label: Text(f.label),
@@ -257,11 +272,16 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
               left: 16,
               right: 16,
               bottom: 96,
-              child: _PinPopup(
-                pin: _selected!,
-                color: _colorFor(_selected!),
-                onOpen: () => _openPin(_selected!),
-                onClose: () => setState(() => _selected = null),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                switchInCurve: Curves.easeOutCubic,
+                child: _PinPopup(
+                  key: ValueKey(_selected!.id),
+                  pin: _selected!,
+                  color: _colorFor(_selected!),
+                  onOpen: () => _openPin(_selected!),
+                  onClose: () => setState(() => _selected = null),
+                ),
               ),
             ),
           Positioned(
@@ -273,7 +293,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
               onTap: _recenter,
             ),
           ),
-          if (_visible.isEmpty && !_loading)
+          if (showEmpty)
             Positioned(
               left: 24,
               right: 24,
@@ -307,6 +327,7 @@ class _PinPopup extends StatelessWidget {
   final VoidCallback onClose;
 
   const _PinPopup({
+    super.key,
     required this.pin,
     required this.color,
     required this.onOpen,

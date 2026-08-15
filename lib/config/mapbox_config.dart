@@ -1,3 +1,7 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart';
+
 /// Mapbox credentials for LIVE 3D map.
 ///
 /// Pass at build/run time:
@@ -19,4 +23,15 @@ class MapboxConfig {
   );
 
   static bool get hasAccessToken => accessToken.trim().isNotEmpty;
+
+  /// True only when the native Mapbox surface can actually run.
+  /// Web/desktop always use the OSM fallback even if a token is present.
+  static bool get canUseNativeMap {
+    if (!hasAccessToken || kIsWeb) return false;
+    try {
+      return Platform.isAndroid || Platform.isIOS;
+    } catch (_) {
+      return false;
+    }
+  }
 }

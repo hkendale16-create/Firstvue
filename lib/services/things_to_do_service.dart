@@ -35,6 +35,8 @@ class CommunityEvent {
   final String? coverImageUrl;
   final String? organizerId;
   final String? status;
+  final double? latitude;
+  final double? longitude;
 
   const CommunityEvent({
     required this.id,
@@ -48,6 +50,8 @@ class CommunityEvent {
     this.coverImageUrl,
     this.organizerId,
     this.status,
+    this.latitude,
+    this.longitude,
   });
 
   bool get isDraft =>
@@ -90,6 +94,8 @@ class CommunityEvent {
     String? coverImageUrl,
     String? organizerId,
     String? status,
+    double? latitude,
+    double? longitude,
   }) {
     return CommunityEvent(
       id: id ?? this.id,
@@ -103,8 +109,12 @@ class CommunityEvent {
       coverImageUrl: coverImageUrl ?? this.coverImageUrl,
       organizerId: organizerId ?? this.organizerId,
       status: status ?? this.status,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
     );
   }
+
+  bool get hasCoordinates => latitude != null && longitude != null;
 }
 
 class ThingsToDoService {
@@ -478,6 +488,8 @@ class ThingsToDoService {
       coverImageUrl: coverUrl,
       organizerId: row['organizer_id'] as String?,
       status: row['status'] as String?,
+      latitude: (row['latitude'] as num?)?.toDouble(),
+      longitude: (row['longitude'] as num?)?.toDouble(),
     );
   }
 
