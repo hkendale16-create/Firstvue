@@ -84,18 +84,20 @@ class DiscoveryFeedService {
       return run().timeout(timeout, onTimeout: () => const []);
     }
 
-    // Page only this window from each source. Oversample business media because
-    // many DB rows point at missing storage objects and drop after sign failure.
-    // Do NOT re-fetch/re-sign 0..(limit+offset) on every load-more.
-    final pageSize = limit;
+    // Exclude-based paging from the start of each source. Signed-URL cache
+    // makes re-reads cheap; independent DB offsets were skipping tiles that
+    // had been fetched then discarded by take(limit).
+    final already = excludeMediaIds.length;
+    final window = (limit + already + 12).clamp(limit, 180);
+    // Oversample business media: many DB rows point at missing storage objects.
     final businessItems = await safe(
-      () => _fetchBusinessMedia(limit: pageSize * 3, offset: offset * 2),
+      () => _fetchBusinessMedia(limit: window * 2, offset: 0),
     );
     final memberItems = await safe(
-      () => _fetchMemberProfileMedia(limit: pageSize * 2, offset: offset),
+      () => _fetchMemberProfileMedia(limit: window, offset: 0),
     );
     final vueNews = await safe(
-      () => _fetchVueNewsPosts(limit: pageSize * 2, offset: offset),
+      () => _fetchVueNewsPosts(limit: window, offset: 0),
     );
 
     final mine = me == null
@@ -107,7 +109,9 @@ class DiscoveryFeedService {
     var others = [
       ...vueNews.where((item) => item.ownerId != me),
       ...memberItems.where((item) => item.ownerId != me),
-      ...businessItems,
+      // Prefer rows that already have a usable URL (external/demo first).
+      ...businessItems.where((item) => item.mediaUrl.startsWith('http')),
+      ...businessItems.where((item) => !item.mediaUrl.startsWith('http')),
     ];
 
     others = switch (mode) {
@@ -120,13 +124,18 @@ class DiscoveryFeedService {
       ...mine,
       ...others,
     ]).where((item) {
-      if (item.mediaUrl.trim().isEmpty) return false;
-      // Videos without a real image poster are still eligible; the mosaic
-      // renders a placeholder instead of decoding the video URL as an image.
+      final hasMedia = item.mediaUrl.trim().isNotEmpty;
+      final hasPoster = (item.thumbnailUrl ?? '').trim().isNotEmpty;
+      if (!hasMedia && !hasPoster) return false;
       if (excludeMediaIds.contains(item.mediaId)) return false;
       return true;
     }).toList();
 
+    // `offset` kept for API compatibility; exclude set is the real cursor.
+    if (offset > 0 && excludeMediaIds.isEmpty) {
+      if (offset >= combined.length) return const [];
+      return combined.skip(offset).take(limit).toList();
+    }
     return combined.take(limit).toList();
   }
 
