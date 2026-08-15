@@ -220,12 +220,21 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
   }
 
   Future<void> _openConversation(FvConversationSummary row) async {
-    await FvMessagingService.markRead(row.id);
+    // Preview rows are not real conversations — skip the mark-read RPC.
+    if (!row.id.startsWith('event-preview:')) {
+      await FvMessagingService.markRead(row.id);
+    }
     if (!mounted) return;
-    final wide = MediaQuery.sizeOf(context).width >= 900;
+    final identity = _identity;
+    final width = MediaQuery.sizeOf(context).width;
+    final split = fvMessagingUsesSplitPane(
+      width: width,
+      isPersonal: identity?.isPersonal ?? true,
+      mode: _mode,
+    );
     setState(() => _openId = row.id);
     _syncUrl();
-    if (wide) return;
+    if (split) return;
     Widget page;
     if (row.kind == FvConversationKind.entityInbox) {
       page = EntityInboxPage(conversation: row, identity: _identity!);
@@ -248,8 +257,11 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
         identity != null &&
         !identity.isPersonal &&
         _mode == FvMode.messages;
-    final wide =
-        entityDesktop || (width >= 900 && (identity?.isPersonal ?? true));
+    final wide = fvMessagingUsesSplitPane(
+      width: width,
+      isPersonal: identity?.isPersonal ?? true,
+      mode: _mode,
+    );
 
     return Scaffold(
       backgroundColor: fv.background,
@@ -555,9 +567,15 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
             id: _openId!,
             kind: entityDesktop
                 ? FvConversationKind.entityInbox
-                : FvConversationKind.direct,
+                : (_openId!.startsWith('event-preview:') ||
+                        _mode == FvMode.events
+                    ? FvConversationKind.event
+                    : FvConversationKind.direct),
             title: widget.initialTitle ?? 'Conversation',
             lastMessageAt: DateTime.now(),
+            eventId: _openId!.startsWith('event-preview:')
+                ? _openId!.substring('event-preview:'.length)
+                : null,
           );
     if (conversation.kind == FvConversationKind.entityInbox || entityDesktop) {
       return EntityInboxPage(

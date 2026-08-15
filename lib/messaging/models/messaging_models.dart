@@ -16,6 +16,21 @@ enum FvRequestState { none, pending, accepted, deleted }
 
 enum FvMode { messages, events }
 
+/// Whether Messages/Events should use a master–detail split instead of pushing
+/// a full-screen conversation route.
+///
+/// Must stay in sync between [MessagingShellScreen.build] and conversation
+/// open handlers — a mismatch makes Event (and Message) row taps appear dead.
+bool fvMessagingUsesSplitPane({
+  required double width,
+  required bool isPersonal,
+  required FvMode mode,
+}) {
+  final entityDesktop =
+      width >= 1180 && !isPersonal && mode == FvMode.messages;
+  return entityDesktop || (width >= 900 && isPersonal);
+}
+
 class FvMessagingIdentity {
   final FvIdentityKind kind;
   final String? entityId;

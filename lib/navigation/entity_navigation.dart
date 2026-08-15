@@ -89,6 +89,7 @@ class EntityNavigation {
   }
 
   static Future<void> openEvent(BuildContext context, String id) async {
+    if (id.trim().isEmpty) return;
     try {
       final events = await ThingsToDoService.fetchApprovedEvents();
       if (!context.mounted) return;
@@ -99,9 +100,19 @@ class EntityNavigation {
           break;
         }
       }
-      if (match == null) return;
+      if (match == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('That event is no longer available.')),
+        );
+        return;
+      }
       await EventProfileSheet.show(context, event: match);
-    } catch (_) {}
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open this event.')),
+      );
+    }
   }
 
   static Future<void> openPostAuthor(
