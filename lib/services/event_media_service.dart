@@ -96,4 +96,44 @@ class EventMediaService {
       } catch (_) {}
     }
   }
+
+  static Future<void> removeCover(String eventId) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw const AuthException('Sign in before removing an event photo.');
+    }
+
+    final existing = await _client
+        .from('community_events')
+        .select('cover_storage_path, cover_storage_provider, organizer_id')
+        .eq('id', eventId)
+        .maybeSingle();
+    if (existing == null) {
+      throw const StorageException('Event not found.');
+    }
+    if (existing['organizer_id'] != user.id) {
+      throw const AuthException('Only the event organizer can update photos.');
+    }
+
+    final oldPath = existing['cover_storage_path'] as String?;
+    final oldProvider = MediaStorageProvider.parse(
+      existing['cover_storage_provider'] as String?,
+    );
+
+    await _client.from('community_events').update({
+      'cover_storage_path': null,
+      'cover_storage_provider': null,
+    }).eq('id', eventId);
+
+    if (oldPath != null && oldPath.isNotEmpty) {
+      try {
+        await MediaStorageService.deleteObject(
+          bucket: MediaBucket.event,
+          path: oldPath,
+          provider: oldProvider,
+          context: {'event_id': eventId},
+        );
+      } catch (_) {}
+    }
+  }
 }
