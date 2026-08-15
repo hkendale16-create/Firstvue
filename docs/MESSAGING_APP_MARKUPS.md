@@ -2,6 +2,23 @@
 
 Companion app to FirstVue: same account, same encrypted conversations, event- and gathering-first UX. Reuses `fv_msg_*` + Supabase Auth (no separate identity).
 
+## Visual mockups (PNG)
+
+Phone layouts in FirstVue dark gold/teal branding live in [`messaging-app-mockups/`](./messaging-app-mockups/):
+
+| Screen | File | Interaction |
+| --- | --- | --- |
+| Sign in | `fv-messages-01-signin.png` | Same FirstVue account |
+| Messages inbox | `fv-messages-02-inbox.png` | Messages/Events toggle, identity, unread |
+| Events hub | `fv-messages-03-events.png` | Live/going/hosting gatherings |
+| Direct chat | `fv-messages-04-direct-chat.png` | Bubbles, media, reactions, call entry |
+| Event chat | `fv-messages-05-event-chat.png` | Channels, pinned plan, who’s here |
+| Business inbox | `fv-messages-06-entity-inbox.png` | Assign / tags / staff notes |
+| Voice/video call | `fv-messages-07-call.png` | Mute, cam, end |
+| Settings | `fv-messages-08-settings.png` | Devices, recovery, open full app |
+| Compose | `fv-messages-09-compose.png` | People + businesses search |
+| Message requests | `fv-messages-10-requests.png` | Accept / Decline / Block |
+
 ---
 
 ## 0. Product frame
