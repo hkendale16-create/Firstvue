@@ -75,6 +75,54 @@ void main() {
     expect(opened, secret);
   });
 
+  test('split-pane layout matches Messages vs Events shell rules', () {
+    // Personal desktop: always split.
+    expect(
+      fvMessagingUsesSplitPane(
+        width: 1000,
+        isPersonal: true,
+        mode: FvMode.events,
+      ),
+      isTrue,
+    );
+    // Business / entity on Events: never split — must push a route.
+    expect(
+      fvMessagingUsesSplitPane(
+        width: 1200,
+        isPersonal: false,
+        mode: FvMode.events,
+      ),
+      isFalse,
+    );
+    // Mid-width business Messages: also push (entity desktop needs 1180+).
+    expect(
+      fvMessagingUsesSplitPane(
+        width: 1000,
+        isPersonal: false,
+        mode: FvMode.messages,
+      ),
+      isFalse,
+    );
+    // Wide business Messages: entity split.
+    expect(
+      fvMessagingUsesSplitPane(
+        width: 1200,
+        isPersonal: false,
+        mode: FvMode.messages,
+      ),
+      isTrue,
+    );
+    // Phone: always push.
+    expect(
+      fvMessagingUsesSplitPane(
+        width: 390,
+        isPersonal: true,
+        mode: FvMode.events,
+      ),
+      isFalse,
+    );
+  });
+
   test('edit window is 15 minutes', () {
     final now = DateTime(2026, 1, 1, 12, 0);
     expect(

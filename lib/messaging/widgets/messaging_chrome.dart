@@ -1724,8 +1724,8 @@ class FvInsideEventChatCard extends StatelessWidget {
     }
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
       decoration: BoxDecoration(
         color: fv.elevatedSurface,
         borderRadius: BorderRadius.circular(14),
@@ -1740,6 +1740,11 @@ class FvInsideEventChatCard extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
+          const SizedBox(height: 4),
+          Text(
+            'Open an event above to chat, view the event page, and join plans.',
+            style: TextStyle(color: fv.secondaryText, fontSize: 12),
+          ),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -1748,34 +1753,6 @@ class FvInsideEventChatCard extends StatelessWidget {
               item(Icons.groups_outlined, 'Attendee chat'),
               item(Icons.tag, 'Topic channels'),
             ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: fv.divider)),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.calendar_today_outlined,
-                  size: 16,
-                  color: FirstVueColors.gold,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Meet near the skyline bar',
-                    style: TextStyle(color: fv.primaryText, fontSize: 13),
-                  ),
-                ),
-                Text(
-                  '4 joined',
-                  style: TextStyle(color: fv.secondaryText, fontSize: 12),
-                ),
-                Icon(Icons.chevron_right, color: fv.mutedIcon),
-              ],
-            ),
           ),
         ],
       ),
