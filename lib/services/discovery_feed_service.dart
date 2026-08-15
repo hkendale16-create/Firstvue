@@ -74,6 +74,7 @@ class DiscoveryFeedService {
     int limit = 30,
     int offset = 0,
     VueFeedMode mode = VueFeedMode.forYou,
+    Set<String> excludeMediaIds = const {},
   }) async {
     const timeout = Duration(seconds: 12);
     final me = _client.auth.currentUser?.id;
@@ -83,16 +84,19 @@ class DiscoveryFeedService {
       return run().timeout(timeout, onTimeout: () => const []);
     }
 
-    final pageLimit = limit + offset;
-    // Oversample business media: many DB rows point at missing storage objects
-    // and drop after sign failure. Extra rows keep VUE from going sparse/blank.
+    // Page only this window from each source. Oversample business media because
+    // many DB rows point at missing storage objects and drop after sign failure.
+    // Do NOT re-fetch/re-sign 0..(limit+offset) on every load-more.
+    final pageSize = limit;
     final businessItems = await safe(
-      () => _fetchBusinessMedia(limit: pageLimit * 3),
+      () => _fetchBusinessMedia(limit: pageSize * 3, offset: offset * 2),
     );
     final memberItems = await safe(
-      () => _fetchMemberProfileMedia(limit: pageLimit),
+      () => _fetchMemberProfileMedia(limit: pageSize * 2, offset: offset),
     );
-    final vueNews = await safe(() => _fetchVueNewsPosts(limit: pageLimit));
+    final vueNews = await safe(
+      () => _fetchVueNewsPosts(limit: pageSize * 2, offset: offset),
+    );
 
     final mine = me == null
         ? const <DiscoveryFeedItem>[]
@@ -112,12 +116,29 @@ class DiscoveryFeedService {
       VueFeedMode.forYou => others,
     };
 
-    final combined = [
+    final combined = _dedupeByMediaId([
       ...mine,
       ...others,
-    ].where((item) => item.mediaUrl.trim().isNotEmpty).toList();
-    if (offset >= combined.length) return const [];
-    return combined.skip(offset).take(limit).toList();
+    ]).where((item) {
+      if (item.mediaUrl.trim().isEmpty) return false;
+      // Videos without a real image poster are still eligible; the mosaic
+      // renders a placeholder instead of decoding the video URL as an image.
+      if (excludeMediaIds.contains(item.mediaId)) return false;
+      return true;
+    }).toList();
+
+    return combined.take(limit).toList();
+  }
+
+  /// Prefer first occurrence of each media id (stable across pages).
+  static List<DiscoveryFeedItem> _dedupeByMediaId(List<DiscoveryFeedItem> items) {
+    final seen = <String>{};
+    final out = <DiscoveryFeedItem>[];
+    for (final item in items) {
+      if (!seen.add(item.mediaId)) continue;
+      out.add(item);
+    }
+    return out;
   }
 
   static List<DiscoveryFeedItem> _sortByRecency(List<DiscoveryFeedItem> items) {
@@ -131,6 +152,7 @@ class DiscoveryFeedService {
 
   static Future<List<DiscoveryFeedItem>> _fetchBusinessMedia({
     required int limit,
+    int offset = 0,
   }) async {
     try {
       const fullSelect =
@@ -138,20 +160,21 @@ class DiscoveryFeedService {
       const fallbackSelect =
           'id, storage_path, storage_provider, thumbnail_path, media_type, caption, businesses!inner(id, name, business_type, created_by, verification_status, average_rating, services, status, popularity_score, demand_score)';
       List<dynamic> rows;
+      final rangeEnd = offset + limit - 1;
       try {
         rows = await _client
             .from('business_media')
             .select(fullSelect)
             .eq('businesses.status', 'approved')
             .order('created_at', ascending: false)
-            .limit(limit);
+            .range(offset, rangeEnd);
       } catch (_) {
         rows = await _client
             .from('business_media')
             .select(fallbackSelect)
             .eq('businesses.status', 'approved')
             .order('created_at', ascending: false)
-            .limit(limit);
+            .range(offset, rangeEnd);
       }
 
       if (rows.isEmpty) return const [];
@@ -191,33 +214,46 @@ class DiscoveryFeedService {
               mediaType: storedType,
               pathOrUrl: storagePath,
             );
-            final thumbPath = row['thumbnail_path'] as String?;
+            final thumbPathRaw = row['thumbnail_path'] as String?;
             final provider = MediaStorageProvider.parse(
               row['storage_provider'] as String?,
             );
             // Prefer stored thumbnails for grid rendering; never require
             // full-resolution video just to paint the mosaic.
-            final thumbReadPath =
-                thumbPath ?? (mediaType == 'video' ? null : storagePath);
-            final gridPath = thumbReadPath ?? storagePath;
+            final thumbPath =
+                thumbPathRaw ?? (mediaType == 'video' ? null : storagePath);
             final mediaUrl = await MediaStorageService.createReadUrl(
               bucket: MediaBucket.business,
               path: storagePath,
               provider: provider,
               context: {'business_id': businessId},
             ).timeout(const Duration(seconds: 8), onTimeout: () => '');
-            if (mediaUrl.isEmpty) return null;
+            // Videos may still open full-screen from mediaUrl; mosaic needs a
+            // real image poster (or empty → placeholder). Never put a video
+            // object URL into Image.network.
+            if (mediaType != 'video' && mediaUrl.isEmpty) return null;
+            if (mediaType == 'video' &&
+                mediaUrl.isEmpty &&
+                (thumbPath == null || thumbPath.isEmpty)) {
+              return null;
+            }
             String? thumbnailUrl;
-            if (gridPath != storagePath) {
-              thumbnailUrl = await MediaStorageService.createReadUrl(
-                bucket: MediaBucket.business,
-                path: gridPath,
-                provider: provider,
-                context: {'business_id': businessId},
-              ).timeout(const Duration(seconds: 8), onTimeout: () => '');
-              if (thumbnailUrl.isEmpty) thumbnailUrl = null;
-            } else {
-              thumbnailUrl = mediaUrl;
+            if (thumbPath != null && thumbPath.isNotEmpty) {
+              if (thumbPath == storagePath && mediaType != 'video') {
+                thumbnailUrl = mediaUrl;
+              } else {
+                thumbnailUrl = await MediaStorageService.createReadUrl(
+                  bucket: MediaBucket.business,
+                  path: thumbPath,
+                  provider: provider,
+                  context: {'business_id': businessId},
+                ).timeout(const Duration(seconds: 8), onTimeout: () => '');
+                if (thumbnailUrl.isEmpty) thumbnailUrl = null;
+              }
+            }
+            if (mediaType != 'video') {
+              thumbnailUrl ??= mediaUrl.isEmpty ? null : mediaUrl;
+              if ((thumbnailUrl ?? '').isEmpty) return null;
             }
             final ownerId = (business['created_by'] as String?) ?? '';
             return DiscoveryFeedItem(
@@ -230,7 +266,7 @@ class DiscoveryFeedService {
               ownerName: ownerNames[ownerId] ?? business['name'] as String,
               caption: (row['caption'] as String?) ?? 'Discover this business',
               mediaType: mediaType,
-              mediaUrl: mediaUrl,
+              mediaUrl: mediaUrl.isNotEmpty ? mediaUrl : (thumbnailUrl ?? ''),
               thumbnailUrl: thumbnailUrl,
               durationLabel: _durationLabel(
                 (row['duration_seconds'] as num?)?.toInt(),
@@ -257,6 +293,7 @@ class DiscoveryFeedService {
 
   static Future<List<DiscoveryFeedItem>> _fetchMemberProfileMedia({
     required int limit,
+    int offset = 0,
   }) async {
     try {
       final rows = await _client
@@ -266,7 +303,7 @@ class DiscoveryFeedService {
           )
           .order('featured_for_trending', ascending: false)
           .order('created_at', ascending: false)
-          .limit(limit);
+          .range(offset, offset + limit - 1);
 
       if (rows.isEmpty) return const [];
 
@@ -314,6 +351,10 @@ class DiscoveryFeedService {
             if (mediaUrl.isEmpty) {
               return null;
             }
+            // Never feed a video object URL into the mosaic image decoder.
+            if (mediaType == 'video') {
+              return null;
+            }
             final role = (row['media_role'] as String?) ?? 'gallery';
             final caption = switch (role) {
               'avatar' => 'Profile photo',
@@ -331,7 +372,7 @@ class DiscoveryFeedService {
               caption: caption,
               mediaType: mediaType,
               mediaUrl: mediaUrl,
-              thumbnailUrl: mediaType == 'video' ? null : mediaUrl,
+              thumbnailUrl: mediaUrl,
               handle: profileHandles[profileId],
               verified: false,
               sponsored: false,
@@ -351,9 +392,11 @@ class DiscoveryFeedService {
 
   static Future<List<DiscoveryFeedItem>> _fetchVueNewsPosts({
     required int limit,
+    int offset = 0,
   }) async {
     try {
       List<dynamic> rows;
+      final rangeEnd = offset + limit - 1;
       try {
         rows = await _client
             .from('community_news_posts')
@@ -364,7 +407,7 @@ class DiscoveryFeedService {
             .eq('status', 'approved')
             .inFilter('publish_destination', ['vue', 'feed_and_vue'])
             .order('created_at', ascending: false)
-            .limit(limit);
+            .range(offset, rangeEnd);
       } catch (_) {
         rows = await _client
             .from('community_news_posts')
@@ -374,7 +417,7 @@ class DiscoveryFeedService {
             )
             .eq('status', 'approved')
             .order('created_at', ascending: false)
-            .limit(limit);
+            .range(offset, rangeEnd);
       }
       if (rows.isEmpty) return const [];
 
@@ -407,33 +450,61 @@ class DiscoveryFeedService {
         final mediaRows = row['community_news_post_media'];
         if (mediaRows is! List || mediaRows.isEmpty) continue;
         Map<String, dynamic>? video;
+        Map<String, dynamic>? image;
         Map<String, dynamic>? first;
         for (final media in mediaRows) {
           if (media is! Map) continue;
           final map = Map<String, dynamic>.from(media);
           first ??= map;
-          if ((map['media_type'] as String?) == 'video') {
-            video = map;
-            break;
+          final type = mediaTypeFromMetadata(
+            mediaType: (map['media_type'] as String?) ?? 'image',
+            pathOrUrl: map['storage_path'] as String?,
+          );
+          if (type == 'video') {
+            video ??= map;
+          } else {
+            image ??= map;
           }
         }
-        final chosen = video ?? first;
+        // Mosaic must show an image when possible. Video-only posts still
+        // appear with a placeholder tile (thumbnailUrl null).
+        final chosen = image ?? video ?? first;
         if (chosen == null) continue;
         final path = chosen['storage_path'] as String?;
         if (path == null) continue;
         final bucket = MediaBucket.fromId(chosen['storage_bucket'] as String?);
-        final url = await MediaStorageService.createReadUrl(
-          bucket: bucket,
-          path: path,
-          provider: MediaStorageProvider.parse(
-            chosen['storage_provider'] as String?,
-          ),
+        final provider = MediaStorageProvider.parse(
+          chosen['storage_provider'] as String?,
         );
         final mediaType = mediaTypeFromMetadata(
           mediaType: (chosen['media_type'] as String?) ?? 'image',
           pathOrUrl: path,
         );
+        final url = await MediaStorageService.createReadUrl(
+          bucket: bucket,
+          path: path,
+          provider: provider,
+        );
         if (url.isEmpty) continue;
+        // If we chose a video, also try to surface any image as poster.
+        String? thumbnailUrl;
+        if (mediaType == 'video') {
+          if (image != null) {
+            final imagePath = image['storage_path'] as String?;
+            if (imagePath != null) {
+              thumbnailUrl = await MediaStorageService.createReadUrl(
+                bucket: MediaBucket.fromId(image['storage_bucket'] as String?),
+                path: imagePath,
+                provider: MediaStorageProvider.parse(
+                  image['storage_provider'] as String?,
+                ),
+              );
+              if (thumbnailUrl.isEmpty) thumbnailUrl = null;
+            }
+          }
+        } else {
+          thumbnailUrl = url;
+        }
         final authorId = row['author_id'] as String;
         items.add(
           DiscoveryFeedItem(
@@ -446,7 +517,7 @@ class DiscoveryFeedService {
             caption: (row['body'] as String?) ?? '',
             mediaType: mediaType,
             mediaUrl: url,
-            thumbnailUrl: mediaType == 'video' ? null : url,
+            thumbnailUrl: thumbnailUrl,
             handle: handles[authorId],
             verified: false,
             sponsored: false,

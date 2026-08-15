@@ -186,7 +186,11 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
         if (!silent || _posts.isEmpty) {
           _error = 'Could not load community posts.';
         }
-        if (silent) _hasMore = false;
+        if (silent) {
+          // Keep the button so the user can retry instead of permanently
+          // ending pagination after a transient network/sign failure.
+          _hasMore = true;
+        }
       });
     }
   }
