@@ -4,8 +4,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../auth/auth_session_controller.dart';
 import '../config/feature_flags.dart';
 import '../navigation/firstvue_page_route.dart';
+import '../screens/about_firstvue_screen.dart';
 import '../screens/admin_business_reviews_screen.dart';
 import '../screens/admin_business_submissions_screen.dart';
+import '../screens/admin_early_access_screen.dart';
 import '../screens/admin_professional_profiles_screen.dart';
 import '../screens/admin_rentals_screen.dart';
 import '../screens/admin_approvals_hub_screen.dart';
@@ -14,6 +16,7 @@ import '../screens/bounty_discovery_screen.dart';
 import '../screens/business_campaign_dashboard_screen.dart';
 import '../screens/business_growth_screen.dart';
 import '../screens/creator_earnings_screen.dart';
+import '../screens/help_build_firstvue_screen.dart';
 import '../screens/join_firstvue_screen.dart';
 import '../screens/legal_policy_screen.dart';
 import '../screens/messages_inbox_screen.dart';
@@ -28,6 +31,7 @@ import '../screens/privacy_settings_screen.dart';
 import '../screens/settings_preferences_screen.dart';
 import '../services/admin_auth_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'early_access_badge.dart';
 import 'firstvue_onboarding.dart';
 
 typedef FirstVueSettingsOpen = void Function(Widget screen);
@@ -101,6 +105,24 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
             children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 14),
+                child: Row(
+                  children: [
+                    Text(
+                      'FirstVue',
+                      style: TextStyle(
+                        fontFamily: 'CormorantGaramond',
+                        color: fv.primaryText,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const EarlyAccessBadge(compact: true),
+                  ],
+                ),
+              ),
               _SettingsGroup(
                 title: 'Your profile',
                 children: [
@@ -241,6 +263,14 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                     subtitle: 'Sections tour or opening a business entity',
                     onTap: () => showOnboardingTourReplay(context),
                   ),
+                  _SettingsTile(
+                    icon: Icons.construction_outlined,
+                    title: 'Help Build FirstVue',
+                    subtitle: 'Feedback, bugs & feature ideas',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => _open(const HelpBuildFirstVueScreen()),
+                  ),
                 ],
               ),
               if (_adminLoaded && _isAdmin)
@@ -277,6 +307,12 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                       onTap: () => _open(const AdminRentalsScreen()),
                     ),
                     _SettingsTile(
+                      icon: Icons.insights_outlined,
+                      title: 'Early Access',
+                      subtitle: 'Feedback, ideas & founding members',
+                      onTap: () => _open(const AdminEarlyAccessScreen()),
+                    ),
+                    _SettingsTile(
                       icon: Icons.account_balance_outlined,
                       title: 'Financial controls',
                       subtitle: 'Campaigns, ledger, disputes, risk',
@@ -288,6 +324,12 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
               _SettingsGroup(
                 title: 'Legal & support',
                 children: [
+                  _SettingsTile(
+                    icon: Icons.info_outline,
+                    title: 'About FirstVue',
+                    subtitle: 'Early Access & app version',
+                    onTap: () => _open(const AboutFirstVueScreen()),
+                  ),
                   _SettingsTile(
                     icon: Icons.privacy_tip_outlined,
                     title: 'Privacy policy',
