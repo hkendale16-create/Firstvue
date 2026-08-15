@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -11,6 +12,7 @@ import 'auth/auth_link_handler.dart';
 import 'auth/auth_session_controller.dart';
 import 'config/app_config.dart';
 import 'config/supabase_config.dart';
+import 'messaging/routing/messaging_history.dart';
 import 'screens/discovery_feed_screen.dart';
 import 'screens/feeds_screen.dart';
 import 'screens/profile_screen.dart';
@@ -155,6 +157,9 @@ class _FirstVueHomeState extends State<FirstVueHome> {
     ActivityNotificationsService.listenForPushDelivery();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) showFirstLaunchExperience(context);
+      // Leftover ?msg= from Messages (or a Safari crash reload) must not linger
+      // on Home/Feeds/VUE — repeated history writes + video decode OOM Safari.
+      if (kIsWeb) clearMessagingUrl();
     });
   }
 
