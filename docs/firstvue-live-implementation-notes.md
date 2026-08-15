@@ -1,44 +1,42 @@
 # FirstVue LIVE — Implementation Notes
 
-Last updated: 2026-08-15 (Phase 6 polish + Mapbox hardening — complete)
+Last updated: 2026-08-15 (SQL unblock + Mapbox run path)
+
+## Status
+LIVE Mode Phases 1–6 are in code. Operator SQL: use the **minimal unblock** (or the short heat-only fix) and move on — do not re-run the old #1–#4 scripts that had `now()` index / `[1:100]` syntax issues.
 
 ## Map provider
 - **Mapbox** on iOS/Android when `MAPBOX_ACCESS_TOKEN` is set (`mapbox_maps_flutter`)
   - Dark style default: `mapbox://styles/mapbox/dark-v11`
-  - Pitch ~55° for 3D buildings; style-loaded pass enables building/extrusion layers
+  - Pitch ~55°; buildings enabled on style load
   - Optional `MAPBOX_STYLE_URI` for custom neon Studio style
-  - Ornament chrome inset so logo/attribution clear LIVE UI
-  - Selected pin glow + `customData` pinId mapping; serialized annotation sync
 - **Fallback**: Carto dark `flutter_map` (web / no token / desktop)
-- Gate UI on `MapboxConfig.canUseNativeMap` (token + iOS/Android), not token alone
-- Conditional import: `live_map_surface.dart` → native vs osm
+- Gate: `MapboxConfig.canUseNativeMap`
 
-## Phase 5 Heating Up
-- RPC `live_event_heat_scores(uuid[])` — recent Going / Here Now / Hot / VUEs
-- Statuses only when thresholds met: Active / Heating Up / Hot
-- Shown on Right Now cards + event detail (no fabricated heat)
+## Run with Mapbox (next step)
+```bash
+export MAPBOX_ACCESS_TOKEN=pk.YOUR_PUBLIC_TOKEN
+# optional:
+# export MAPBOX_STYLE_URI=mapbox://styles/you/your-neon-style
+./scripts/run-with-mapbox.sh ios      # or android
+```
+Or:
+```bash
+flutter run --dart-define=MAPBOX_ACCESS_TOKEN=pk....
+```
 
-## Phase 6 polish / regression
-- Stale viewport load cancellation; GPS camera apply after resolve
-- Food Trucks filter/fetch gated by `FIRSTVUE_LIVE_FOOD_TRUCKS` (default off)
-- Ending-soon lifecycle in final LIVE hour (until `ends_at` exists)
-- Directions prefer event lat/lng when present
-- Engagement fetch parallelized; presence/hot no longer list other profile ids
-- Migration `20261004`: RPC-only presence writes, own-row SELECT, `event_hot_count`, heat batch cap 100
-- Motion: category scale, Right Now card enter, pin popup switcher
-- Removed dead “See All” / stub phase copy
+## SQL (done / finishing)
+Preferred one-shot: `supabase/migrations/20261005_live_minimal_unblock.sql`  
+If that failed only on heat scores, run the fixed `live_event_heat_scores` from the same file (uses `limit 100`, not `[1:100]`).
 
-## Secrets required
-- `MAPBOX_ACCESS_TOKEN` (required for 3D Mapbox on device)
-- `MAPBOX_STYLE_URI` (optional custom neon style)
+Older files (`20261001`–`20261004`) are kept for history; prefer `20261005` + heat fix.
 
-## Migrations
-- `20261001` presence/hot
-- `20261002` event geo
-- `20261003` heat scores RPC
-- `20261004` Phase 6 hardening
+## Secrets
+- `MAPBOX_ACCESS_TOKEN` (required for 3D on device)
+- `MAPBOX_STYLE_URI` (optional)
 
-## Next (operator)
-- Apply migrations `20261001`–`20261004`
-- Add Mapbox token and run on iOS/Android with `--dart-define=MAPBOX_ACCESS_TOKEN=...`
-- Optional custom neon `MAPBOX_STYLE_URI` in Mapbox Studio
+## App checklist after SQL + token
+1. VUE tab → switch to LIVE
+2. Right Now cards open event detail (Going / Hot / I’m Here)
+3. Explore Live Map → pitched Mapbox (3D icon) on iOS/Android with token
+4. Heat badges only when real activity meets thresholds
