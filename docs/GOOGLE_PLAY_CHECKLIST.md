@@ -97,9 +97,10 @@ Also declare:
 
 Play requires an in-app path to request account deletion (or a documented web flow).
 
-- [ ] Provide **in-app account deletion** (Settings or Profile → delete account) **or** a clear link to a web form that completes deletion within the stated SLA.
-- [ ] Today: Legal policy mentions contacting support for deletion — **ship an in-app delete flow before production** or host a `https://firstvue.app/account/delete` page linked from Settings.
-- [ ] Document retention (what is anonymized vs. hard-deleted) in the privacy policy.
+- [x] **In-app account deletion** — Settings → Privacy → Delete account (SQL `delete_my_account`; Edge Function optional).
+- [x] Blocks deletion while the user still owns businesses / sole hubs / rentals (must remove first).
+- [x] Privacy policy documents in-app deletion + contact `hkendale16@gmail.com`.
+- [ ] Hosted privacy URL live on custom domain (`/privacy.html` shipped in `web/`).
 
 ---
 
@@ -145,9 +146,12 @@ Play requires an in-app path to request account deletion (or a documented web fl
 
 ## 11. Supabase / backend (release hygiene)
 
-- [ ] Apply `supabase/migrations/20260924_definer_execute_hardening.sql` (or paste `supabase/APPLY_DEFINER_HARDENING.sql`) on production.
-- [ ] Enable **leaked password protection** in Supabase Auth dashboard (not configurable via SQL).
+- [x] Apply prototype readiness SQL (`APPLY_PROTOTYPE_READINESS.sql`).
+- [x] Apply Play prep SQL (`APPLY_PLAY_PREP.sql`) — account blockers + DEFINER grants.
+- [x] Apply account self-delete SQL (`APPLY_ACCOUNT_SELF_DELETE.sql`).
+- [ ] Enable **leaked password protection** in Supabase Auth dashboard (confirm in UI).
 - [ ] Confirm production Supabase URL/anon key in release build config (no service-role key in the client).
+- [ ] Optional: deploy Edge Function `delete-account` (SQL path already works without it).
 
 ---
 
