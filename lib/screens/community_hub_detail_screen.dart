@@ -674,8 +674,8 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
               onPressed: () async {
                 final hub = _hub;
                 if (hub == null) return;
-                await Navigator.push(
-                  context,
+                final navigator = Navigator.of(context);
+                final result = await navigator.push<Object?>(
                   FirstVuePageRoute(
                     builder: (_) => CommunityHubSettingsScreen(
                       hubId: widget.hubId,
@@ -683,7 +683,12 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                     ),
                   ),
                 );
-                if (mounted) await _load();
+                if (!mounted) return;
+                if (result == 'deleted') {
+                  navigator.pop();
+                  return;
+                }
+                await _load();
               },
               icon: const Icon(Icons.settings_outlined),
             ),

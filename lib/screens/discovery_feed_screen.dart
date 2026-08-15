@@ -56,6 +56,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   bool _hasMore = true;
   int _loadGeneration = 0;
   int _loadMoreFailures = 0;
+  double _sessionSeed = 0;
   final _loadMoreGate = ScrollLoadMoreGate(thresholdPx: 480);
   static const _maxLoadMoreFailures = 3;
 
@@ -111,6 +112,9 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
     int limit = 30,
   }) async {
     final generation = ++_loadGeneration;
+    if (reset || _sessionSeed == 0) {
+      _sessionSeed = DateTime.now().microsecondsSinceEpoch.toDouble();
+    }
     try {
       final exclude = reset
           ? const <String>{}
@@ -120,6 +124,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
         limit: limit,
         offset: 0,
         excludeMediaIds: exclude,
+        seed: _sessionSeed,
       ).timeout(const Duration(seconds: 20));
       final usable = items.where((item) {
         final hasMedia = item.mediaUrl.trim().isNotEmpty;

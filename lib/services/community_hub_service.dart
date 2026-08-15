@@ -77,6 +77,13 @@ class CommunityHub {
   bool get isPublic => visibility == 'public';
   bool get isDiscoverable => isActive && isPublic;
 
+  /// Permanent delete: creator or designated leader. Role checks also run
+  /// server-side in [EntityDeletionService.deleteOwnedCommunityHub].
+  bool canDeleteAs(String? profileId) =>
+      profileId != null &&
+      (profileId == createdByProfileId ||
+          (leaderUserId != null && profileId == leaderUserId));
+
   factory CommunityHub.fromRow(Map<String, dynamic> row) {
     final createdRaw = row['created_at'];
     final storagePath = row['image_storage_path'] as String?;
@@ -530,6 +537,31 @@ class CommunityHubService {
           role == 'admin';
     } catch (error, stack) {
       debugPrint('CommunityHubService.isActiveManager failed: $error\n$stack');
+      return false;
+    }
+  }
+
+  /// True when the user may permanently delete this Community hub.
+  static Future<bool> canDeleteHub(String hubId, {String? profileId}) async {
+    final id = profileId ?? _client.auth.currentUser?.id;
+    if (id == null || hubId.trim().isEmpty) return false;
+    try {
+      final hub = await fetchHubById(hubId);
+      if (hub != null && hub.canDeleteAs(id)) return true;
+      final row = await _client
+          .from('community_hub_roles')
+          .select('role, status')
+          .eq('hub_id', hubId)
+          .eq('profile_id', id)
+          .eq('status', 'active')
+          .maybeSingle();
+      if (row == null) return false;
+      final role = (row['role'] as String?) ?? '';
+      return role == 'creator' ||
+          role == 'lead_leader' ||
+          role == 'leader';
+    } catch (error, stack) {
+      debugPrint('CommunityHubService.canDeleteHub failed: $error\n$stack');
       return false;
     }
   }

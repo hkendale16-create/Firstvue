@@ -1,4 +1,5 @@
-/// Central ranking weights and time windows for Feeds (New / Trending / Recommended).
+/// Central ranking weights and time windows for Feeds (New / Trending / Recommended)
+/// and the VUE discovery mosaic.
 ///
 /// Keep all tunable feed-ranking constants here so SQL RPCs and client fallbacks
 /// stay aligned. Server RPCs in `20260906_feeds_trending_recommended_interactions.sql`
@@ -54,4 +55,21 @@ class FeedRankingConfig {
   static const String sourceTrending = 'trending';
   static const String sourceNew = 'new';
   static const String sourceRecommended = 'recommended';
+
+  // --- VUE mosaic (Instagram Reels-style ranked shuffle) ---
+
+  /// Max contribution from seeded hash noise so order changes each visit
+  /// while still favoring stronger tiles.
+  static const double vueSeedVariance = 28.0;
+
+  static const double vueSponsoredBoost = 22.0;
+  static const double vueVerifiedBoost = 10.0;
+  static const double vueLiveBoost = 14.0;
+  static const double vueRatingBoost = 6.0; // per rating point (0–5)
+  static const double vueOwnContentBoost = 40.0;
+  static const double vueNewsBoost = 8.0;
+  static const double vueMemberBoost = 4.0;
+
+  /// Soft penalty for stacking the same creator back-to-back in ranked order.
+  static const double vueSameCreatorPenalty = 12.0;
 }

@@ -4,6 +4,7 @@ import '../config/app_config.dart';
 import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../services/community_hub_service.dart';
+import '../services/entity_deletion_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/entity_profile_media_editor.dart';
 import '../widgets/firstvue_share_sheet.dart';
@@ -34,7 +35,9 @@ class _CommunityHubSettingsScreenState
   CommunityHub? _hub;
   bool _loading = true;
   bool _saving = false;
+  bool _deleting = false;
   bool _photoUpdating = false;
+  bool _isHubLeader = false;
   String _visibility = 'public';
   List<CommunityGroupMembership> _memberships = const [];
 
@@ -64,10 +67,12 @@ class _CommunityHubSettingsScreenState
       widget.hubId,
       includePending: true,
     );
+    final isLeader = await CommunityHubService.canDeleteHub(widget.hubId);
     if (!mounted) return;
     setState(() {
       _hub = hub ?? _hub;
       _memberships = memberships;
+      _isHubLeader = isLeader;
       if (hub != null) {
         _name.text = hub.name;
         _description.text = hub.description ?? '';
@@ -285,6 +290,81 @@ class _CommunityHubSettingsScreenState
     }
   }
 
+  Future<void> _deleteCommunity() async {
+    if (_deleting || !_isHubLeader) return;
+    final hub = _hub;
+    if (hub == null) return;
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final fv = context.fv;
+        return AlertDialog(
+          backgroundColor: fv.surface,
+          title: Text(
+            'Delete community forever?',
+            style: TextStyle(color: fv.primaryText),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'This permanently deletes ${hub.name}. Linked groups are '
+                'unlinked but not deleted. This cannot be undone.',
+                style: TextStyle(color: fv.secondaryText),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Type DELETE to confirm.',
+                style: TextStyle(color: fv.secondaryText),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(hintText: 'DELETE'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: fv.error),
+              onPressed: () {
+                if (controller.text.trim() == 'DELETE') {
+                  Navigator.pop(ctx, true);
+                }
+              },
+              child: const Text('Delete forever'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deleting = true);
+    try {
+      await EntityDeletionService.deleteOwnedCommunityHub(widget.hubId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${hub.name} was permanently deleted.')),
+      );
+      Navigator.pop(context, 'deleted');
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
   void _share() {
     final hub = _hub;
     if (hub == null) return;
@@ -451,10 +531,22 @@ class _CommunityHubSettingsScreenState
                 ),
                 const SizedBox(height: 12),
                 TextButton(
-                  onPressed: _archive,
+                  onPressed: _deleting ? null : _archive,
                   style: TextButton.styleFrom(foregroundColor: FirstVueColors.coral),
                   child: const Text('Archive community'),
                 ),
+                if (_isHubLeader) ...[
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _deleting ? null : _deleteCommunity,
+                    style: TextButton.styleFrom(
+                      foregroundColor: FirstVueColors.coral,
+                    ),
+                    child: Text(
+                      _deleting ? 'Deleting…' : 'Delete community forever',
+                    ),
+                  ),
+                ],
               ],
             ),
     );
