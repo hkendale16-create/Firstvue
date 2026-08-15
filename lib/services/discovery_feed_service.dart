@@ -4,6 +4,7 @@ import '../config/media_config.dart';
 import 'media_storage_service.dart';
 import 'media_type_helpers.dart';
 import 'profile_cards.dart';
+import 'vue_feed_ranking.dart';
 
 enum VueFeedSource { business, member }
 
@@ -75,9 +76,12 @@ class DiscoveryFeedService {
     int offset = 0,
     VueFeedMode mode = VueFeedMode.forYou,
     Set<String> excludeMediaIds = const {},
+    double? seed,
   }) async {
     const timeout = Duration(seconds: 12);
     final me = _client.auth.currentUser?.id;
+    final sessionSeed =
+        seed ?? DateTime.now().microsecondsSinceEpoch.toDouble();
     Future<List<DiscoveryFeedItem>> safe(
       Future<List<DiscoveryFeedItem>> Function() run,
     ) {
@@ -100,29 +104,12 @@ class DiscoveryFeedService {
       () => _fetchVueNewsPosts(limit: window, offset: 0),
     );
 
-    final mine = me == null
-        ? const <DiscoveryFeedItem>[]
-        : [
-            ...vueNews.where((item) => item.ownerId == me),
-            ...memberItems.where((item) => item.ownerId == me),
-          ];
-    var others = [
-      ...vueNews.where((item) => item.ownerId != me),
-      ...memberItems.where((item) => item.ownerId != me),
+    final combined = _dedupeByMediaId([
+      ...vueNews,
+      ...memberItems,
       // Prefer rows that already have a usable URL (external/demo first).
       ...businessItems.where((item) => item.mediaUrl.startsWith('http')),
       ...businessItems.where((item) => !item.mediaUrl.startsWith('http')),
-    ];
-
-    others = switch (mode) {
-      VueFeedMode.nearby => _sortByRecency([...others]),
-      VueFeedMode.trending => _sortByRating([...others]),
-      VueFeedMode.forYou => others,
-    };
-
-    final combined = _dedupeByMediaId([
-      ...mine,
-      ...others,
     ]).where((item) {
       final hasMedia = item.mediaUrl.trim().isNotEmpty;
       final hasPoster = (item.thumbnailUrl ?? '').trim().isNotEmpty;
@@ -131,12 +118,21 @@ class DiscoveryFeedService {
       return true;
     }).toList();
 
+    // Ranked + seeded shuffle (Instagram Reels-style): different order each
+    // access / refresh while still boosting stronger tiles.
+    final ranked = rankVueFeedItems(
+      combined,
+      seed: sessionSeed,
+      viewerId: me,
+      mode: mode,
+    );
+
     // `offset` kept for API compatibility; exclude set is the real cursor.
     if (offset > 0 && excludeMediaIds.isEmpty) {
-      if (offset >= combined.length) return const [];
-      return combined.skip(offset).take(limit).toList();
+      if (offset >= ranked.length) return const [];
+      return ranked.skip(offset).take(limit).toList();
     }
-    return combined.take(limit).toList();
+    return ranked.take(limit).toList();
   }
 
   /// Prefer first occurrence of each media id (stable across pages).
@@ -148,15 +144,6 @@ class DiscoveryFeedService {
       out.add(item);
     }
     return out;
-  }
-
-  static List<DiscoveryFeedItem> _sortByRecency(List<DiscoveryFeedItem> items) {
-    return items;
-  }
-
-  static List<DiscoveryFeedItem> _sortByRating(List<DiscoveryFeedItem> items) {
-    final sorted = [...items]..sort((a, b) => b.rating.compareTo(a.rating));
-    return sorted;
   }
 
   static Future<List<DiscoveryFeedItem>> _fetchBusinessMedia({

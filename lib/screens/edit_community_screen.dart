@@ -2,8 +2,10 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/community_service.dart';
+import '../services/entity_deletion_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/location_autocomplete_field.dart';
 import '../widgets/media_picker_sheet.dart';
@@ -31,7 +33,13 @@ class _EditCommunityScreenState extends State<EditCommunityScreen> {
   Uint8List? _newImageBytes;
   bool _removeImage = false;
   bool _saving = false;
+  bool _deleting = false;
   String? _error;
+
+  bool get _canDelete {
+    final me = Supabase.instance.client.auth.currentUser?.id;
+    return widget.community.canDeleteAs(me);
+  }
 
   @override
   void initState() {
@@ -110,6 +118,83 @@ class _EditCommunityScreenState extends State<EditCommunityScreen> {
     }
   }
 
+  Future<void> _deleteGroup() async {
+    if (_deleting || !_canDelete) return;
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final fv = context.fv;
+        return AlertDialog(
+          backgroundColor: fv.surface,
+          title: Text(
+            'Delete group forever?',
+            style: TextStyle(color: fv.primaryText),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'This permanently deletes ${widget.community.name}, its members, '
+                'and group posts. This cannot be undone.',
+                style: TextStyle(color: fv.secondaryText),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Type DELETE to confirm.',
+                style: TextStyle(color: fv.secondaryText),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(hintText: 'DELETE'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: fv.error),
+              onPressed: () {
+                if (controller.text.trim() == 'DELETE') {
+                  Navigator.pop(ctx, true);
+                }
+              },
+              child: const Text('Delete forever'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _deleting = true;
+      _error = null;
+    });
+    try {
+      await EntityDeletionService.deleteOwnedGroup(widget.community.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${widget.community.name} was permanently deleted.'),
+        ),
+      );
+      Navigator.pop(context, 'deleted');
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _deleting = false;
+        _error = error.toString();
+      });
+    }
+  }
+
   Widget _previewAvatar() {
     const placeholder = Icon(
       Icons.add_a_photo_outlined,
@@ -140,6 +225,7 @@ class _EditCommunityScreenState extends State<EditCommunityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final busy = _saving || _deleting;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -148,7 +234,7 @@ class _EditCommunityScreenState extends State<EditCommunityScreen> {
         title: const Text('Edit Group'),
         actions: [
           TextButton(
-            onPressed: _saving ? null : _save,
+            onPressed: busy ? null : _save,
             child: Text(_saving ? 'Saving…' : 'Save'),
           ),
         ],
@@ -164,11 +250,11 @@ class _EditCommunityScreenState extends State<EditCommunityScreen> {
             child: Column(
               children: [
                 GestureDetector(
-                  onTap: _saving ? null : _pickImage,
+                  onTap: busy ? null : _pickImage,
                   child: _previewAvatar(),
                 ),
                 TextButton(
-                  onPressed: _saving ? null : _pickImage,
+                  onPressed: busy ? null : _pickImage,
                   child: Text(
                     (_newImage != null ||
                             (!_removeImage &&
@@ -181,7 +267,7 @@ class _EditCommunityScreenState extends State<EditCommunityScreen> {
                     (!_removeImage &&
                         (widget.community.imageUrl ?? '').isNotEmpty))
                   TextButton(
-                    onPressed: _saving
+                    onPressed: busy
                         ? null
                         : () => setState(() {
                               _newImage = null;
@@ -206,7 +292,7 @@ class _EditCommunityScreenState extends State<EditCommunityScreen> {
               ButtonSegment(value: 'private', label: Text('Private')),
             ],
             selected: {_privacy},
-            onSelectionChanged: _saving
+            onSelectionChanged: busy
                 ? null
                 : (v) => setState(() => _privacy = v.first),
           ),
@@ -226,6 +312,14 @@ class _EditCommunityScreenState extends State<EditCommunityScreen> {
           _field(_postalController, 'ZIP / postal code'),
           const SizedBox(height: 12),
           _field(_rulesController, 'Rules', lines: 3),
+          if (_canDelete) ...[
+            const SizedBox(height: 28),
+            TextButton(
+              onPressed: busy ? null : _deleteGroup,
+              style: TextButton.styleFrom(foregroundColor: FirstVueColors.coral),
+              child: Text(_deleting ? 'Deleting…' : 'Delete group'),
+            ),
+          ],
         ],
       ),
     );

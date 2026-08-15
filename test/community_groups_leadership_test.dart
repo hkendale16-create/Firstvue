@@ -32,7 +32,48 @@ void main() {
       expect(community.hubId, 'h1');
       expect(community.myRole, 'owner');
       expect(community.canManageAs('p1'), isTrue);
+      expect(community.canDeleteAs('p1'), isTrue);
+      expect(community.canDeleteAs('other'), isFalse);
       expect(community.locationLabel, 'Atlanta, GA');
+    });
+
+    test('admin can manage but not delete; owner role can delete', () {
+      final adminManaged = Community.fromRow({
+        'id': 'g2',
+        'name': 'Admin Group',
+        'creator_id': 'creator',
+        'privacy_type': 'public',
+        'created_at': '2026-08-01T00:00:00.000Z',
+      }, isMember: true, myRole: 'admin');
+      expect(adminManaged.canManageAs('admin-user'), isTrue);
+      expect(adminManaged.canDeleteAs('admin-user'), isFalse);
+      expect(adminManaged.canDeleteAs('creator'), isTrue);
+
+      final ownerMember = Community.fromRow({
+        'id': 'g3',
+        'name': 'Owner Group',
+        'creator_id': 'someone-else',
+        'privacy_type': 'public',
+        'created_at': '2026-08-01T00:00:00.000Z',
+      }, isMember: true, myRole: 'owner');
+      expect(ownerMember.canDeleteAs('owner-user'), isTrue);
+    });
+  });
+
+  group('CommunityHub delete permissions', () {
+    test('creator and leader can delete', () {
+      final hub = CommunityHub.fromRow({
+        'id': 'h1',
+        'name': 'Atlanta',
+        'created_by_profile_id': 'creator',
+        'leader_user_id': 'leader',
+        'visibility': 'public',
+        'status': 'active',
+        'created_at': '2026-08-01T00:00:00.000Z',
+      });
+      expect(hub.canDeleteAs('creator'), isTrue);
+      expect(hub.canDeleteAs('leader'), isTrue);
+      expect(hub.canDeleteAs('member'), isFalse);
     });
   });
 

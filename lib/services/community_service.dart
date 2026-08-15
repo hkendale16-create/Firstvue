@@ -67,6 +67,11 @@ class Community {
       profileId != null &&
       (profileId == creatorId || myRole == 'owner' || myRole == 'admin');
 
+  /// Permanent delete is restricted to the creator or Group Leader (owner).
+  bool canDeleteAs(String? profileId) =>
+      profileId != null &&
+      (profileId == creatorId || myRole == 'owner');
+
   bool get isLeaderRole =>
       myRole == 'owner' || myRole == 'admin' || myRole == 'moderator';
 
