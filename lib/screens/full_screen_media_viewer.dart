@@ -263,7 +263,11 @@ class _FullScreenVideoPlayerPageState extends State<FullScreenVideoPlayerPage> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: Text(widget.title ?? 'VIDEO'),
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(
+          widget.title ?? 'VIDEO',
+          style: const TextStyle(color: Colors.white),
+        ),
         actions: [
           if (!kIsWeb)
             IconButton(
