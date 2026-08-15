@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../navigation/firstvue_page_route.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/early_access_badge.dart';
+import 'help_build_firstvue_screen.dart';
 
 class AboutFirstVueScreen extends StatefulWidget {
   const AboutFirstVueScreen({super.key});
@@ -76,9 +78,18 @@ class _AboutFirstVueScreenState extends State<AboutFirstVueScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Align(
+              Align(
                 alignment: Alignment.centerLeft,
-                child: EarlyAccessBadge(),
+                child: EarlyAccessBadge(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      FirstVuePageRoute(
+                        builder: (_) => const HelpBuildFirstVueScreen(),
+                      ),
+                    );
+                  },
+                ),
               ),
               const SizedBox(height: 20),
               Text(
@@ -86,6 +97,27 @@ class _AboutFirstVueScreenState extends State<AboutFirstVueScreen> {
                 'community, and local culture before a wider launch. Feedback from '
                 'founding members shapes what we build next.',
                 style: TextStyle(color: fv.secondaryText, height: 1.5),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      FirstVuePageRoute(
+                        builder: (_) => const HelpBuildFirstVueScreen(),
+                      ),
+                    );
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: FirstVueColors.gold,
+                    foregroundColor: const Color(0xFF1A1520),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                  label: const Text('Send feedback'),
+                ),
               ),
               const SizedBox(height: 28),
               Text(
