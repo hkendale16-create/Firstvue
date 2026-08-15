@@ -73,7 +73,7 @@ void main() {
     expect(sql.contains('Users insert own event presence'), isTrue);
     expect(sql.contains('drop policy'), isTrue);
     expect(sql.contains('event_hot_count'), isTrue);
-    expect(sql.contains('[1:100]'), isTrue);
+    expect(sql.contains('limit 100'), isTrue);
     expect(sql.contains('Users read own event presence'), isTrue);
   });
 
