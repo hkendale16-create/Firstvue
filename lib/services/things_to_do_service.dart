@@ -223,6 +223,8 @@ class ThingsToDoService {
     DateTime? endsAt,
     String? locationLabel,
     String? businessId,
+    double? latitude,
+    double? longitude,
     XFile? coverPhoto,
     String status = 'approved',
   }) async {
@@ -237,6 +239,8 @@ class ThingsToDoService {
       endsAt: endsAt,
       locationLabel: locationLabel,
       businessId: businessId,
+      latitude: latitude,
+      longitude: longitude,
       status: status,
     );
 
@@ -252,6 +256,8 @@ class ThingsToDoService {
     DateTime? endsAt,
     String? locationLabel,
     String? businessId,
+    double? latitude,
+    double? longitude,
     XFile? coverPhoto,
   }) {
     return _createWithStatus(
@@ -261,6 +267,8 @@ class ThingsToDoService {
       endsAt: endsAt,
       locationLabel: locationLabel,
       businessId: businessId,
+      latitude: latitude,
+      longitude: longitude,
       coverPhoto: coverPhoto,
       preferredStatus: 'draft',
       fallbackStatus: 'pending',
@@ -274,6 +282,8 @@ class ThingsToDoService {
     DateTime? endsAt,
     String? locationLabel,
     String? businessId,
+    double? latitude,
+    double? longitude,
     XFile? coverPhoto,
   }) {
     return _createWithStatus(
@@ -283,6 +293,8 @@ class ThingsToDoService {
       endsAt: endsAt,
       locationLabel: locationLabel,
       businessId: businessId,
+      latitude: latitude,
+      longitude: longitude,
       coverPhoto: coverPhoto,
       preferredStatus: 'approved',
       fallbackStatus: 'approved',
@@ -297,6 +309,9 @@ class ThingsToDoService {
     DateTime? endsAt,
     String? locationLabel,
     String? businessId,
+    double? latitude,
+    double? longitude,
+    bool clearCoordinates = false,
     XFile? coverPhoto,
     bool clearCover = false,
     String? status,
@@ -313,6 +328,13 @@ class ThingsToDoService {
       'business_id': businessId,
       'status': ?status,
     };
+    if (clearCoordinates) {
+      payload['latitude'] = null;
+      payload['longitude'] = null;
+    } else if (latitude != null && longitude != null) {
+      payload['latitude'] = latitude;
+      payload['longitude'] = longitude;
+    }
 
     await _client
         .from('community_events')
@@ -408,6 +430,8 @@ class ThingsToDoService {
     DateTime? endsAt,
     String? locationLabel,
     String? businessId,
+    double? latitude,
+    double? longitude,
     XFile? coverPhoto,
     required String preferredStatus,
     required String fallbackStatus,
@@ -423,6 +447,8 @@ class ThingsToDoService {
       endsAt: endsAt,
       locationLabel: locationLabel,
       businessId: businessId,
+      latitude: latitude,
+      longitude: longitude,
       status: preferredStatus,
       statusFallback: fallbackStatus,
     );
@@ -441,10 +467,12 @@ class ThingsToDoService {
     DateTime? endsAt,
     String? locationLabel,
     String? businessId,
+    double? latitude,
+    double? longitude,
     required String status,
     String? statusFallback,
   }) async {
-    final payload = {
+    final payload = <String, dynamic>{
       'organizer_id': organizerId,
       'business_id': businessId,
       'title': title.trim(),
@@ -454,6 +482,10 @@ class ThingsToDoService {
       'location_label': locationLabel?.trim(),
       'status': status,
     };
+    if (latitude != null && longitude != null) {
+      payload['latitude'] = latitude;
+      payload['longitude'] = longitude;
+    }
 
     try {
       final inserted = await _client

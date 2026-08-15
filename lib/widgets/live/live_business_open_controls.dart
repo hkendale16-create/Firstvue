@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../config/feature_flags.dart';
 import '../../services/live_business_open_service.dart';
+import '../../services/location_service.dart';
 import '../../theme/firstvue_theme.dart';
 import '../../theme/live_tokens.dart';
 
@@ -41,9 +42,20 @@ class _LiveBusinessOpenControlsState extends State<LiveBusinessOpenControls> {
   Future<void> _start() async {
     setState(() => _busy = true);
     try {
+      double? lat;
+      double? lng;
+      try {
+        final pos = await LocationService.getCurrentPosition();
+        lat = pos.latitude;
+        lng = pos.longitude;
+      } catch (_) {
+        // Optional — session can still open using business_locations via RPC.
+      }
       final session = await LiveBusinessOpenService.start(
         businessId: widget.businessId,
         hours: 4,
+        latitude: lat,
+        longitude: lng,
       );
       if (!mounted) return;
       setState(() => _session = session);

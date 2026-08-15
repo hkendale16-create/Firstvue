@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../auth/ensure_signed_in.dart';
@@ -13,6 +16,7 @@ import '../services/community_news_service.dart';
 import '../services/live_event_engagement_service.dart';
 import '../services/live_heat_service.dart';
 import '../services/live_home_service.dart';
+import '../services/live_realtime_service.dart';
 import '../services/things_to_do_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../theme/live_tokens.dart';
@@ -42,6 +46,7 @@ class _LiveEventDetailScreenState extends State<LiveEventDetailScreen> {
   LiveHeatScore? _heat;
   bool _loading = true;
   bool _busy = false;
+  RealtimeChannel? _engagementChannel;
 
   CommunityEvent get event => widget.event;
 
@@ -49,6 +54,33 @@ class _LiveEventDetailScreenState extends State<LiveEventDetailScreen> {
   void initState() {
     super.initState();
     _load();
+    _engagementChannel = LiveRealtimeService.subscribeEventEngagement(
+      eventId: event.id,
+      onChange: () {
+        if (!mounted) return;
+        unawaited(_loadQuiet());
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _engagementChannel?.unsubscribe();
+    super.dispose();
+  }
+
+  Future<void> _loadQuiet() async {
+    final engagement = await LiveEventEngagementService.fetch(event.id);
+    LiveHeatScore? heat;
+    try {
+      final map = await LiveHeatService.fetchForEvents([event.id]);
+      heat = map[event.id];
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {
+      _engagement = engagement;
+      _heat = heat;
+    });
   }
 
   Future<void> _load() async {

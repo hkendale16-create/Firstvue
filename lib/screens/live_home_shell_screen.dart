@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../config/feature_flags.dart';
@@ -9,6 +11,7 @@ import '../screens/people_to_follow_screen.dart';
 import '../screens/post_detail_screen.dart';
 import '../services/discovery_feed_service.dart';
 import '../services/live_home_service.dart';
+import '../services/live_realtime_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../theme/live_tokens.dart';
 import '../screens/live_event_detail_screen.dart';
@@ -46,6 +49,18 @@ class _LiveHomeShellScreenState extends State<LiveHomeShellScreen> {
     _future = seed != null
         ? Future<LiveHomeSnapshot>.value(seed)
         : LiveHomeService.load();
+    if (seed == null) {
+      LiveRealtimeService.subscribeHome(onChange: () {
+        if (!mounted) return;
+        unawaited(_reload());
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    LiveRealtimeService.unsubscribeHome();
+    super.dispose();
   }
 
   Future<void> _reload() async {
