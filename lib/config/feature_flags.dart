@@ -8,4 +8,10 @@ class FeatureFlags {
     'FIRSTVUE_LIVE_STREAMING',
     defaultValue: false,
   );
+
+  /// Stripe checkout and paid upgrades. Default off during trial.
+  static const paymentsEnabled = bool.fromEnvironment(
+    'FIRSTVUE_PAYMENTS',
+    defaultValue: false,
+  );
 }

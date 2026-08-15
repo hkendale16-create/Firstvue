@@ -35,8 +35,9 @@ Sharing
 
 Your choices
 • You can sign out at any time from Profile.
+• You can delete your account in Settings → Privacy.
 • Location access is controlled by your device settings.
-• Contact us to request account deletion or data questions.
+• Contact us with data questions if you need help beyond in-app deletion.
 
 Security
 • Access is protected by authentication and database row-level security policies.
@@ -51,6 +52,7 @@ Last updated: August 11, 2026
 By using FirstVue, you agree to these Terms of Service.
 
 Using FirstVue
+• You must be at least 13 years old to use FirstVue.
 • You must provide accurate account information and keep credentials secure.
 • You may not impersonate others, scrape the platform, or attempt unauthorized access.
 • Business owners and professionals are responsible for the accuracy of listings they submit.

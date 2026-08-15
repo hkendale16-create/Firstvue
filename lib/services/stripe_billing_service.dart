@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/feature_flags.dart';
 import 'business_subscription_service.dart';
 
 class StripeBillingService {
@@ -11,6 +12,10 @@ class StripeBillingService {
     required String businessId,
     required BusinessPlan plan,
   }) async {
+    if (!FeatureFlags.paymentsEnabled) {
+      throw StateError('Payments are not enabled yet.');
+    }
+
     if (plan == BusinessPlan.basic) {
       throw ArgumentError('Basic plan does not require checkout.');
     }

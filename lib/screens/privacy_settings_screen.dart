@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../auth/auth_session_controller.dart';
+import '../services/account_deletion_service.dart';
 import '../services/profile_privacy_service.dart';
 import '../theme/firstvue_theme.dart';
 
@@ -15,6 +17,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
   ProfilePrivacySettings _settings = const ProfilePrivacySettings();
   bool _loading = true;
   bool _saving = false;
+  bool _deleting = false;
   String? _error;
 
   @override
@@ -79,6 +82,188 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
     setState(() {
       _settings = _settings.copyWith(fieldVisibility: merged);
     });
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    AccountDeletionBlockers blockers;
+    try {
+      blockers = await AccountDeletionService.fetchBlockers();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to check account deletion status.')),
+      );
+      return;
+    }
+
+    if (blockers.blocked) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: ctx.fv.surface,
+          title: const Text('Delete account blocked'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  blockers.message ??
+                      'Transfer or delete your businesses and communities first.',
+                  style: TextStyle(color: ctx.fv.secondaryText, height: 1.45),
+                ),
+                ..._blockerSections(ctx, blockers),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          backgroundColor: ctx.fv.surface,
+          title: const Text('Delete account?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'This permanently deletes your sign-in, profile, personal posts, '
+                'and media. Shared businesses and communities with other owners are not removed.',
+                style: TextStyle(color: ctx.fv.secondaryText, height: 1.45),
+              ),
+              const SizedBox(height: 12),
+              const Text('Type DELETE to confirm.'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(hintText: 'DELETE'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: ctx.fv.error),
+              onPressed: () {
+                if (controller.text.trim() == 'DELETE') {
+                  Navigator.pop(ctx, true);
+                }
+              },
+              child: const Text('Delete account'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deleting = true);
+    try {
+      await AccountDeletionService.deleteAccount();
+      await authSessionController.signOut();
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Your account was deleted.')),
+      );
+    } on AccountDeletionException catch (error) {
+      if (!mounted) return;
+      if (error.blockers?.blocked == true) {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: ctx.fv.surface,
+            title: const Text('Delete account blocked'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    error.message,
+                    style: TextStyle(color: ctx.fv.secondaryText, height: 1.45),
+                  ),
+                  if (error.blockers != null)
+                    ..._blockerSections(ctx, error.blockers!),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to delete your account.')),
+      );
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
+  List<Widget> _blockerSections(
+    BuildContext context,
+    AccountDeletionBlockers blockers,
+  ) {
+    final fv = context.fv;
+    Widget section(String title, List<AccountDeletionBlocker> items) {
+      if (items.isEmpty) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(top: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                color: FirstVueColors.gold,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 6),
+            for (final item in items)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('• ${item.label}', style: TextStyle(color: fv.primaryText)),
+              ),
+          ],
+        ),
+      );
+    }
+
+    return [
+      section('Businesses', blockers.businesses),
+      section('Communities', blockers.communityHubs),
+      section('Rental listings', blockers.rentalListings),
+    ];
   }
 
   @override
@@ -223,6 +408,43 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                     minimumSize: const Size.fromHeight(48),
                   ),
                   child: Text(_saving ? 'Saving…' : 'Save privacy settings'),
+                ),
+                const SizedBox(height: 32),
+                Text(
+                  'DANGER ZONE',
+                  style: TextStyle(
+                    color: fv.error,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Permanently delete your account and personal data.',
+                  style: TextStyle(color: fv.secondaryText, fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _deleting ? null : _confirmDeleteAccount,
+                  icon: _deleting
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: fv.error,
+                          ),
+                        )
+                      : Icon(Icons.delete_forever_outlined, color: fv.error),
+                  label: Text(
+                    _deleting ? 'Deleting account…' : 'Delete account',
+                    style: TextStyle(color: fv.error),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                    side: BorderSide(color: fv.error.withValues(alpha: .55)),
+                  ),
                 ),
               ],
             ),

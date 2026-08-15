@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../config/feature_flags.dart';
 import '../services/business_submission_service.dart';
 import '../services/business_subscription_service.dart';
 import '../services/stripe_billing_service.dart';
@@ -125,6 +126,7 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
             (business) => business.id == _selectedBusinessId,
           );
           final subscription = data.subscriptions[_selectedBusinessId!];
+          final paymentsEnabled = FeatureFlags.paymentsEnabled;
 
           return ListView(
             padding: const EdgeInsets.all(20),
@@ -143,6 +145,25 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                 style: const TextStyle(color: Colors.white54),
               ),
               const SizedBox(height: 16),
+              if (!paymentsEnabled) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: FirstVueColors.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: FirstVueColors.gold.withValues(alpha: .35),
+                    ),
+                  ),
+                  child: const Text(
+                    'Payments coming soon — plan previews and analytics are available, '
+                    'but Stripe checkout is disabled during the trial.',
+                    style: TextStyle(color: Colors.white70, height: 1.45),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               DropdownButtonFormField<String>(
                 initialValue: _selectedBusinessId,
                 dropdownColor: FirstVueColors.elevatedSurface,
@@ -199,10 +220,12 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                 isCurrent: subscription?.plan == BusinessPlan.verified &&
                     subscription!.isActive,
                 isLoading: _checkoutLoading,
-                onUpgrade: subscription?.plan == BusinessPlan.verified &&
-                        subscription!.isActive
+                onUpgrade: !paymentsEnabled
                     ? null
-                    : () => _subscribe(BusinessPlan.verified),
+                    : subscription?.plan == BusinessPlan.verified &&
+                            subscription!.isActive
+                        ? null
+                        : () => _subscribe(BusinessPlan.verified),
               ),
               _PlanCard(
                 name: 'FIRSTVUE PRO',
@@ -211,10 +234,12 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                 isCurrent:
                     subscription?.plan == BusinessPlan.pro && subscription!.isActive,
                 isLoading: _checkoutLoading,
-                onUpgrade: subscription?.plan == BusinessPlan.pro &&
-                        subscription!.isActive
+                onUpgrade: !paymentsEnabled
                     ? null
-                    : () => _subscribe(BusinessPlan.pro),
+                    : subscription?.plan == BusinessPlan.pro &&
+                            subscription!.isActive
+                        ? null
+                        : () => _subscribe(BusinessPlan.pro),
               ),
               const SizedBox(height: 22),
               const Text(
@@ -261,9 +286,11 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                 ],
               ),
               const SizedBox(height: 14),
-              const Text(
-                'Subscriptions are processed securely by Stripe. Your card is never stored in FirstVue.',
-                style: TextStyle(color: Colors.white54, height: 1.45),
+              Text(
+                paymentsEnabled
+                    ? 'Subscriptions are processed securely by Stripe. Your card is never stored in FirstVue.'
+                    : 'Paid subscriptions will be available soon. Your card will never be stored in FirstVue.',
+                style: const TextStyle(color: Colors.white54, height: 1.45),
               ),
             ],
           );
