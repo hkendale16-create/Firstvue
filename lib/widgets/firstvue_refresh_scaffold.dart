@@ -8,6 +8,9 @@ import '../theme/firstvue_theme.dart';
 ///
 /// Guarded so normal scrolling (especially on mobile web) does not keep
 /// firing refresh, flashing the indicator arrow, or blanking the page.
+///
+/// Important for Flutter web: [onRefresh] must not complete in 0ms. Instant
+/// returns (throttle / already-refreshing) leave the spinner stuck mid-screen.
 class FirstVueRefreshScaffold extends StatefulWidget {
   const FirstVueRefreshScaffold({
     super.key,
@@ -52,26 +55,41 @@ class FirstVueRefreshScaffold extends StatefulWidget {
 
 class _FirstVueRefreshScaffoldState extends State<FirstVueRefreshScaffold> {
   static const _minRefreshGap = Duration(seconds: 2);
+  /// Lets RefreshIndicator finish its show/dismiss animation on mobile web.
+  static const _minIndicatorSpin = Duration(milliseconds: 450);
 
-  bool _refreshing = false;
+  Future<void>? _inFlight;
   DateTime? _lastRefreshAt;
 
   Future<void> _handleRefresh() async {
-    if (_refreshing) return;
+    // Join the in-flight refresh instead of returning instantly (stuck spinner).
+    final existing = _inFlight;
+    if (existing != null) return existing;
+
     final last = _lastRefreshAt;
     if (last != null && DateTime.now().difference(last) < _minRefreshGap) {
+      await Future<void>.delayed(_minIndicatorSpin);
       return;
     }
-    _refreshing = true;
+
     _lastRefreshAt = DateTime.now();
-    try {
-      await widget.onRefresh();
-      if (widget.playRefreshSound) {
-        await FirstVueFeedbackSounds.playRefresh(intentional: true);
+    final started = DateTime.now();
+    final run = () async {
+      try {
+        await widget.onRefresh();
+        if (widget.playRefreshSound) {
+          await FirstVueFeedbackSounds.playRefresh(intentional: true);
+        }
+      } finally {
+        final elapsed = DateTime.now().difference(started);
+        if (elapsed < _minIndicatorSpin) {
+          await Future<void>.delayed(_minIndicatorSpin - elapsed);
+        }
+        _inFlight = null;
       }
-    } finally {
-      _refreshing = false;
-    }
+    }();
+    _inFlight = run;
+    await run;
   }
 
   bool _defaultPredicate(ScrollNotification notification) {
@@ -87,16 +105,17 @@ class _FirstVueRefreshScaffoldState extends State<FirstVueRefreshScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    // Mobile web overscroll is twitchy; require a longer pull before refresh.
-    final displacement = kIsWeb ? 72.0 : 56.0;
-    final edgeOffset = kIsWeb ? 12.0 : 8.0;
+    // Keep displacement modest so the spinner sits under the header
+    // instead of floating in the middle of the viewport (esp. mobile web).
+    const displacement = 40.0;
+    final edgeOffset = kIsWeb ? 8.0 : 0.0;
 
     return RefreshIndicator(
       color: FirstVueColors.teal,
       backgroundColor: context.fv.surface,
       displacement: displacement,
       edgeOffset: edgeOffset,
-      strokeWidth: kIsWeb ? 3.0 : 2.5,
+      strokeWidth: 2.5,
       triggerMode: RefreshIndicatorTriggerMode.onEdge,
       onRefresh: _handleRefresh,
       notificationPredicate:

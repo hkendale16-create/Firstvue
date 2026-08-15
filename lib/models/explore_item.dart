@@ -225,6 +225,7 @@ class ExploreSectionStore {
     for (final section in ExploreSectionX.visible)
       section: const ExploreSectionSnapshot(),
   };
+  final Map<ExploreSection, int> _loadEpoch = {};
 
   ExploreSectionSnapshot of(ExploreSection section) =>
       _pages[section] ?? const ExploreSectionSnapshot();
@@ -239,10 +240,17 @@ class ExploreSectionStore {
     bool refresh = false,
   }) async {
     final current = of(section);
-    if (current.loading) return;
-    if (!refresh && current.items.isNotEmpty && current.error == null) {
-      return;
+    // Non-refresh: skip duplicate loads and cache hits.
+    if (!refresh) {
+      if (current.loading) return;
+      if (current.items.isNotEmpty && current.error == null) return;
     }
+
+    // Refresh always proceeds — even if a prior load left `loading: true`
+    // (which used to make pull-to-refresh a no-op forever).
+    final epoch = (_loadEpoch[section] ?? 0) + 1;
+    _loadEpoch[section] = epoch;
+
     _pages[section] = current.copyWith(
       loading: true,
       clearError: true,
@@ -254,6 +262,7 @@ class ExploreSectionStore {
         beforeCreatedAt: null,
         beforeId: null,
       );
+      if (_loadEpoch[section] != epoch) return;
       final seen = <String>{};
       final items = <ExploreItem>[];
       for (final item in page.items) {
@@ -268,6 +277,7 @@ class ExploreSectionStore {
         seenIds: seen,
       );
     } catch (error, stack) {
+      if (_loadEpoch[section] != epoch) return;
       assert(() {
         // ignore: avoid_print
         print('ExploreSectionStore.load($section) failed: $error\n$stack');
@@ -288,6 +298,7 @@ class ExploreSectionStore {
   ) async {
     final current = of(section);
     if (current.loading || current.loadingMore || !current.hasMore) return;
+    final epoch = _loadEpoch[section] ?? 0;
     _pages[section] = current.copyWith(loadingMore: true, clearError: true);
     try {
       final page = await fetcher(
@@ -295,6 +306,7 @@ class ExploreSectionStore {
         beforeCreatedAt: current.cursorCreatedAt,
         beforeId: current.cursorId,
       );
+      if (_loadEpoch[section] != epoch) return;
       final seen = {...current.seenIds};
       final fresh = <ExploreItem>[];
       for (final item in page.items) {
@@ -311,6 +323,7 @@ class ExploreSectionStore {
         seenIds: seen,
       );
     } catch (_) {
+      if (_loadEpoch[section] != epoch) return;
       // Stop near-bottom retry loops; user can pull-to-refresh or change tabs.
       _pages[section] = of(section).copyWith(
         loadingMore: false,
