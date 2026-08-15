@@ -35,8 +35,8 @@ class BusinessDiscoveryAnalyticsService {
         'business_id': businessId,
         'profile_id': uid,
         'event_name': eventName,
-        if (sessionId != null) 'session_id': sessionId,
-        if (stopId != null) 'stop_id': stopId,
+        'session_id': ?sessionId,
+        'stop_id': ?stopId,
         'metadata': metadata ?? const <String, dynamic>{},
       });
     } catch (_) {

@@ -162,7 +162,6 @@ class FoodTruckDiscoveryService {
 
       final out = <FoodTruckDiscoveryItem>[];
       for (final raw in rows) {
-        if (raw is! Map) continue;
         final row = Map<String, dynamic>.from(raw);
         final id = row['id'] as String?;
         final name = row['name'] as String?;
