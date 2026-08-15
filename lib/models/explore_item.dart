@@ -276,7 +276,8 @@ class ExploreSectionStore {
       _pages[section] = of(section).copyWith(
         loading: false,
         error: 'Unable to load this section right now.',
-        items: refresh ? const [] : current.items,
+        // Keep whatever was on screen — a failed refresh must not blank Explore.
+        items: current.items,
       );
     }
   }

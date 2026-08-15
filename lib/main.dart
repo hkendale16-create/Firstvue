@@ -132,6 +132,8 @@ class _FirstVueHomeState extends State<FirstVueHome> {
   Widget? _vueTab;
   Widget? _exploreTab;
   bool _feedsMounted = false;
+  bool _homeMounted = true;
+  bool _profileMounted = false;
 
   @override
   void initState() {
@@ -149,6 +151,12 @@ class _FirstVueHomeState extends State<FirstVueHome> {
     }
     if (selectedIndex == FirstVueBottomNav.feedsIndex) {
       _feedsMounted = true;
+    }
+    if (selectedIndex == FirstVueBottomNav.profileIndex) {
+      _profileMounted = true;
+    }
+    if (selectedIndex == FirstVueBottomNav.homeIndex) {
+      _homeMounted = true;
     }
     _openInitialDeepLink();
     _listenForDeepLinks();
@@ -346,91 +354,97 @@ class _FirstVueHomeState extends State<FirstVueHome> {
               offstage: selectedIndex != FirstVueBottomNav.feedsIndex,
               child: FeedsScreen(refreshToken: _homeRefreshToken),
             ),
-          if (selectedIndex == FirstVueBottomNav.profileIndex)
-            ProfileScreen(refreshToken: _profileRefreshToken),
-          if (selectedIndex == FirstVueBottomNav.homeIndex)
-            SafeArea(
-              child: FirstVueRefreshScaffold(
-                onRefresh: _refreshHomeTab,
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: ClampingScrollPhysics(),
-                  ),
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  children: [
-                    Row(
-                      children: [
-                        _HomeProfileAvatar(
-                          key: _homeAvatarKey,
-                          refreshToken: _homeRefreshToken,
-                          onTap: _openProfile,
-                        ),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: _goHome,
-                            behavior: HitTestBehavior.opaque,
-                            child: const FirstVueAnimatedHeaderTitle(),
+          if (_profileMounted)
+            Offstage(
+              offstage: selectedIndex != FirstVueBottomNav.profileIndex,
+              child: ProfileScreen(refreshToken: _profileRefreshToken),
+            ),
+          if (_homeMounted)
+            Offstage(
+              offstage: selectedIndex != FirstVueBottomNav.homeIndex,
+              child: SafeArea(
+                child: FirstVueRefreshScaffold(
+                  onRefresh: _refreshHomeTab,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: ClampingScrollPhysics(),
+                    ),
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                    children: [
+                      Row(
+                        children: [
+                          _HomeProfileAvatar(
+                            key: _homeAvatarKey,
+                            refreshToken: _homeRefreshToken,
+                            onTap: _openProfile,
                           ),
-                        ),
-                        HomeCityChip(
-                          key: _cityChipKey,
-                          compact: true,
-                          pinOnly: true,
-                          onLocationChanged: _refreshHomeTab,
-                        ),
-                        IconButton(
-                          onPressed: () async {
-                            await Navigator.push(
-                              context,
-                              FirstVuePageRoute(
-                                builder: (_) => const NotificationsScreen(),
-                              ),
-                            );
-                            await _refreshNotificationBadge();
-                          },
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 40,
-                            minHeight: 40,
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: _goHome,
+                              behavior: HitTestBehavior.opaque,
+                              child: const FirstVueAnimatedHeaderTitle(),
+                            ),
                           ),
-                          icon: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              const Icon(
-                                Icons.notifications_none_rounded,
-                                color: FirstVueColors.gold,
-                                size: 26,
-                              ),
-                              Positioned(
-                                right: -1,
-                                top: -1,
-                                child: Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: _notificationBadge > 0
-                                        ? FirstVueColors.coral
-                                        : Colors.transparent,
-                                    shape: BoxShape.circle,
+                          HomeCityChip(
+                            key: _cityChipKey,
+                            compact: true,
+                            pinOnly: true,
+                            onLocationChanged: _refreshHomeTab,
+                          ),
+                          IconButton(
+                            onPressed: () async {
+                              await Navigator.push(
+                                context,
+                                FirstVuePageRoute(
+                                  builder: (_) => const NotificationsScreen(),
+                                ),
+                              );
+                              await _refreshNotificationBadge();
+                            },
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 40,
+                              minHeight: 40,
+                            ),
+                            icon: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                const Icon(
+                                  Icons.notifications_none_rounded,
+                                  color: FirstVueColors.gold,
+                                  size: 26,
+                                ),
+                                Positioned(
+                                  right: -1,
+                                  top: -1,
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: _notificationBadge > 0
+                                          ? FirstVueColors.coral
+                                          : Colors.transparent,
+                                      shape: BoxShape.circle,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
 
-                    const SizedBox(height: 14),
+                      const SizedBox(height: 14),
 
-                    const SocialSearchBar(iconOnly: true),
+                      const SocialSearchBar(iconOnly: true),
 
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-                    HomeDiscoverySection(refreshToken: _homeRefreshToken),
+                      HomeDiscoverySection(refreshToken: _homeRefreshToken),
 
-                    const SizedBox(height: 12),
-                  ],
+                      const SizedBox(height: 12),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -442,6 +456,9 @@ class _FirstVueHomeState extends State<FirstVueHome> {
       bottomNavigationBar: FirstVueBottomNav(
         selectedIndex: selectedIndex,
         onSelected: (index) {
+          // Leaving Messages via bottom nav must clear ?msg= so Safari does not
+          // remount into a messaging URL while Feeds/VUE videos are decoding.
+          if (kIsWeb) clearMessagingUrl();
           setState(() {
             selectedIndex = index;
             if (index == FirstVueBottomNav.exploreIndex) {
@@ -454,11 +471,15 @@ class _FirstVueHomeState extends State<FirstVueHome> {
             if (index == FirstVueBottomNav.feedsIndex) {
               _feedsMounted = true;
             }
-            if (index == FirstVueBottomNav.profileIndex) {
-              _profileRefreshToken++;
-            }
             if (index == FirstVueBottomNav.homeIndex) {
+              _homeMounted = true;
               _homeAvatarKey.currentState?.reload();
+            }
+            if (index == FirstVueBottomNav.profileIndex) {
+              final firstOpen = !_profileMounted;
+              _profileMounted = true;
+              // Soft-refresh only on revisit so the first paint is not blanked.
+              if (!firstOpen) _profileRefreshToken++;
             }
           });
         },

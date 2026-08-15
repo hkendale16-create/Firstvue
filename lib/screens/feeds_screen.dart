@@ -145,6 +145,7 @@ class _FeedsScreenState extends State<FeedsScreen>
             child: PageView.builder(
               controller: _pageController,
               itemCount: _tabs.length,
+              allowImplicitScrolling: true,
               onPageChanged: (index) {
                 if (_tabController.index != index) {
                   _syncing = true;
@@ -155,10 +156,14 @@ class _FeedsScreenState extends State<FeedsScreen>
               },
               itemBuilder: (context, index) {
                 final tab = _tabs[index];
-                return _FeedsTabBody(
-                  key: ValueKey('feeds-${tab.name}-${widget.refreshToken}'),
-                  tab: tab,
-                  refreshToken: widget.refreshToken,
+                // Do not put refreshToken in the key — Home pull-to-refresh was
+                // remounting every Feeds tab and blanking the page mid-swipe.
+                return _KeepAliveTab(
+                  key: ValueKey('feeds-${tab.name}'),
+                  child: _FeedsTabBody(
+                    tab: tab,
+                    refreshToken: widget.refreshToken,
+                  ),
                 );
               },
             ),
@@ -171,12 +176,33 @@ class _FeedsScreenState extends State<FeedsScreen>
   }
 }
 
+/// Keeps off-screen Feeds pages alive so fast swipes do not blank/reload.
+class _KeepAliveTab extends StatefulWidget {
+  final Widget child;
+
+  const _KeepAliveTab({super.key, required this.child});
+
+  @override
+  State<_KeepAliveTab> createState() => _KeepAliveTabState();
+}
+
+class _KeepAliveTabState extends State<_KeepAliveTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
+
 class _FeedsTabBody extends StatelessWidget {
   final FeedsTab tab;
   final int refreshToken;
 
   const _FeedsTabBody({
-    super.key,
     required this.tab,
     required this.refreshToken,
   });
