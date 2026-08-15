@@ -49,7 +49,10 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   bool _refreshing = false;
   bool _hasMore = true;
   int _loadGeneration = 0;
+  int _sourceOffset = 0;
+  int _loadMoreFailures = 0;
   final _loadMoreGate = ScrollLoadMoreGate(thresholdPx: 480);
+  static const _maxLoadMoreFailures = 3;
 
   @override
   void initState() {
@@ -72,13 +75,18 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   }) async {
     final generation = ++_loadGeneration;
     try {
+      final exclude = reset
+          ? const <String>{}
+          : _items.map((item) => item.mediaId).toSet();
+      final offset = reset ? 0 : _sourceOffset;
       final items = await DiscoveryFeedService.fetchFeed(
         mode: _mode,
         limit: limit,
-        offset: reset ? 0 : _items.length,
+        offset: offset,
+        excludeMediaIds: exclude,
       ).timeout(const Duration(seconds: 20));
       final usable = items
-          .where((item) => item.mediaUrl.trim().isNotEmpty)
+          .where((item) => item.mediaUrl.trim().isNotEmpty || item.isVideo)
           .toList();
       if (!mounted || generation != _loadGeneration) return usable;
 
@@ -91,19 +99,28 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
       )) {
         setState(() {
           _error = null;
-          _hasMore = false;
+          // Soft-empty after sign failures is not true end-of-feed.
+          _hasMore = _loadMoreFailures < _maxLoadMoreFailures;
         });
         return _items;
       }
 
       final arranged = reset
           ? await _arrangeFeatured(usable)
-          : [..._items, ...usable];
+          : _appendUnique(_items, usable);
       if (!mounted || generation != _loadGeneration) return usable;
       setState(() {
         _items = arranged;
         _error = null;
-        _hasMore = usable.length >= limit;
+        _loadMoreFailures = 0;
+        if (reset) {
+          _sourceOffset = usable.length;
+        } else {
+          _sourceOffset += limit;
+        }
+        // Keep paging while this page returned a full batch. Partial pages
+        // usually mean we exhausted the current window of signed media.
+        _hasMore = usable.length >= (limit / 2).ceil();
       });
       if (reset) _loadMoreGate.reset();
       return usable;
@@ -114,18 +131,35 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
         if (reset && _items.isEmpty) {
           _error = 'Unable to load VUE right now.';
         } else if (!reset) {
-          // Stop the near-bottom retry loop that was reloading until error.
-          _hasMore = false;
+          // Allow a few retries instead of permanently killing infinite scroll.
+          _loadMoreFailures += 1;
+          _hasMore = _loadMoreFailures < _maxLoadMoreFailures;
+          if (_hasMore) _loadMoreGate.reset();
         }
       });
       rethrow;
     }
   }
 
+  List<DiscoveryFeedItem> _appendUnique(
+    List<DiscoveryFeedItem> current,
+    List<DiscoveryFeedItem> incoming,
+  ) {
+    final seen = current.map((item) => item.mediaId).toSet();
+    final merged = [...current];
+    for (final item in incoming) {
+      if (!seen.add(item.mediaId)) continue;
+      merged.add(item);
+    }
+    return merged;
+  }
+
   Future<void> _refreshFeed() async {
     setState(() {
       _error = null;
       _hasMore = true;
+      _loadMoreFailures = 0;
+      _sourceOffset = 0;
       _refreshing = true;
       _feedFuture = _loadFeed(reset: true);
     });
@@ -313,6 +347,8 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                       _mode = next;
                       _error = null;
                       _hasMore = true;
+                      _loadMoreFailures = 0;
+                      _sourceOffset = 0;
                       _refreshing = true;
                       // Keep the current mosaic visible while the next mode loads.
                     });

@@ -539,12 +539,21 @@ class CommunityNewsService {
         params: {'p_limit': limit, 'p_seed': seed},
       );
       if (result is! List || result.isEmpty) {
-        return me == null ? await fetchPosts(limit: limit) : const [];
+        // Signed-in users previously got a hard empty feed when the RPC
+        // returned []. Always fall back to chronological posts.
+        return await fetchPosts(limit: limit);
       }
       final mapped = await _mapPostRows(result, currentUserId: me);
-      return mapped
+      final home = mapped
           .where((post) => post.publishDestination.appearsOnHome)
           .toList(growable: false);
+      if (home.isEmpty) {
+        final posts = await fetchPosts(limit: limit);
+        return posts
+            .where((post) => post.publishDestination.appearsOnHome)
+            .toList(growable: false);
+      }
+      return home;
     } catch (_) {
       final posts = await fetchPosts(limit: limit);
       return posts
@@ -817,39 +826,53 @@ class CommunityNewsService {
     List<dynamic> rows, {
     required String? currentUserId,
   }) async {
-    final postIds = rows.map((row) => row['id'] as String).toList();
-    final authorIds = rows
-        .map((row) => row['author_id'] as String)
-        .toSet()
-        .toList();
-    final businessIds = rows
-        .map((row) => row['business_id'] as String?)
-        .whereType<String>()
-        .toSet()
-        .toList();
-    final communityIds = rows
-        .map((row) => row['community_id'] as String?)
-        .whereType<String>()
-        .toSet()
-        .toList();
-    final professionalIds = rows
-        .map((row) => row['professional_profile_id'] as String?)
-        .whereType<String>()
-        .toSet()
-        .toList();
-    final eventIds = rows
-        .map((row) => row['event_id'] as String?)
-        .whereType<String>()
-        .toSet()
-        .toList();
+    final postIds = <String>[];
+    final authorIds = <String>{};
+    final businessIds = <String>{};
+    final communityIds = <String>{};
+    final professionalIds = <String>{};
+    final eventIds = <String>{};
+    final safeRows = <Map<String, dynamic>>[];
 
-    final authorNames = await _fetchProfileNames(authorIds);
-    final authorUsernames = await _fetchProfileUsernames(authorIds);
-    final businessInfo = await _fetchBusinessInfo(businessIds);
-    final communityNames = await _fetchCommunityNames(communityIds);
-    final communityImages = await _fetchCommunityImages(communityIds);
-    final professionalNames = await _fetchProfessionalNames(professionalIds);
-    final eventTitles = await _fetchEventTitles(eventIds);
+    for (final raw in rows) {
+      if (raw is! Map) continue;
+      final row = Map<String, dynamic>.from(raw);
+      final id = row['id'] as String?;
+      final authorId = row['author_id'] as String?;
+      if (id == null || id.isEmpty || authorId == null || authorId.isEmpty) {
+        continue;
+      }
+      safeRows.add(row);
+      postIds.add(id);
+      authorIds.add(authorId);
+      final businessId = row['business_id'] as String?;
+      if (businessId != null && businessId.isNotEmpty) {
+        businessIds.add(businessId);
+      }
+      final communityId = row['community_id'] as String?;
+      if (communityId != null && communityId.isNotEmpty) {
+        communityIds.add(communityId);
+      }
+      final professionalProfileId = row['professional_profile_id'] as String?;
+      if (professionalProfileId != null && professionalProfileId.isNotEmpty) {
+        professionalIds.add(professionalProfileId);
+      }
+      final eventId = row['event_id'] as String?;
+      if (eventId != null && eventId.isNotEmpty) {
+        eventIds.add(eventId);
+      }
+    }
+
+    if (safeRows.isEmpty) return const [];
+
+    final authorNames = await _fetchProfileNames(authorIds.toList());
+    final authorUsernames = await _fetchProfileUsernames(authorIds.toList());
+    final businessInfo = await _fetchBusinessInfo(businessIds.toList());
+    final communityNames = await _fetchCommunityNames(communityIds.toList());
+    final communityImages = await _fetchCommunityImages(communityIds.toList());
+    final professionalNames =
+        await _fetchProfessionalNames(professionalIds.toList());
+    final eventTitles = await _fetchEventTitles(eventIds.toList());
     final sparkCounts = await _fetchSparkCounts(postIds);
     final myReactions = currentUserId == null
         ? const <String, String>{}
@@ -864,13 +887,13 @@ class CommunityNewsService {
       postIds,
     );
     final followingAuthors = await _followingAuthorIds(
-      authorIds,
+      authorIds.toList(),
       currentUserId: currentUserId,
     );
-    final entityHandles = await _fetchEntityHandlesForPosts(rows);
+    final entityHandles = await _fetchEntityHandlesForPosts(safeRows);
 
     final posts = <CommunityNewsPost>[];
-    for (final row in rows) {
+    for (final row in safeRows) {
       try {
         final id = row['id'] as String?;
         final authorId = row['author_id'] as String?;

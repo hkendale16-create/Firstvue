@@ -387,7 +387,8 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
       if (!mounted) return;
       setState(() {
         _loadingMore = false;
-        _hasMore = false;
+        // Keep "See more" available for a manual retry.
+        _hasMore = true;
       });
     }
   }

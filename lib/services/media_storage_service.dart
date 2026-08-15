@@ -43,8 +43,12 @@ class MediaStorageService {
   /// Skip re-signing missing objects while scrolling (avoids 400 storms that
   /// blank tiles and can destabilize Flutter web).
   static const _missingTtl = Duration(minutes: 15);
+  /// Reuse successful signed URLs across VUE/feed page re-fetches.
+  /// Signed URLs last 3600s; refresh earlier so tiles do not expire mid-scroll.
+  static const _signedUrlTtl = Duration(minutes: 45);
   static const _maxConcurrentSigns = 4;
   static final Map<String, DateTime> _missingPaths = {};
+  static final Map<String, ({String url, DateTime at})> _signedUrlCache = {};
   static int _inflightSigns = 0;
   static final List<Completer<void>> _signWaiters = [];
 
@@ -71,11 +75,35 @@ class MediaStorageService {
   }
 
   static void _rememberMissing(MediaBucket bucket, String path) {
-    _missingPaths[_cacheKey(bucket, path)] = DateTime.now();
+    final key = _cacheKey(bucket, path);
+    _missingPaths[key] = DateTime.now();
+    _signedUrlCache.remove(key);
+  }
+
+  static String? _cachedSignedUrl(MediaBucket bucket, String path) {
+    final key = _cacheKey(bucket, path);
+    final hit = _signedUrlCache[key];
+    if (hit == null) return null;
+    if (DateTime.now().difference(hit.at) > _signedUrlTtl) {
+      _signedUrlCache.remove(key);
+      return null;
+    }
+    return hit.url;
+  }
+
+  static void _rememberSignedUrl(MediaBucket bucket, String path, String url) {
+    if (url.trim().isEmpty) return;
+    _signedUrlCache[_cacheKey(bucket, path)] = (
+      url: url,
+      at: DateTime.now(),
+    );
   }
 
   @visibleForTesting
-  static void clearMissingPathCache() => _missingPaths.clear();
+  static void clearMissingPathCache() {
+    _missingPaths.clear();
+    _signedUrlCache.clear();
+  }
 
   static bool _looksLikeMissingObject(Object error) {
     final text = error.toString().toLowerCase();
@@ -121,13 +149,18 @@ class MediaStorageService {
 
     if (_isKnownMissing(bucket, trimmed)) return '';
 
+    final cached = _cachedSignedUrl(bucket, trimmed);
+    if (cached != null) return cached;
+
     if (provider == MediaStorageProvider.s3 || useAwsMedia) {
       try {
-        return await _awsReadUrl(
+        final url = await _awsReadUrl(
           bucket: bucket,
           path: trimmed,
           context: context,
         );
+        _rememberSignedUrl(bucket, trimmed, url);
+        return url;
       } on StateError catch (error) {
         if (provider == MediaStorageProvider.s3) rethrow;
         if (!error.message.contains('not configured')) rethrow;
@@ -135,11 +168,18 @@ class MediaStorageService {
     }
 
     return _withSignSlot(() async {
+      // Another waiter may have filled the cache while we queued.
+      final raced = _cachedSignedUrl(bucket, trimmed);
+      if (raced != null) return raced;
+      if (_isKnownMissing(bucket, trimmed)) return '';
+
       try {
-        return await _client.storage
+        final url = await _client.storage
             .from(bucket.id)
             .createSignedUrl(trimmed, 3600)
             .timeout(_signTimeout);
+        _rememberSignedUrl(bucket, trimmed, url);
+        return url;
       } catch (error, stack) {
         if (_looksLikeMissingObject(error)) {
           _rememberMissing(bucket, trimmed);
@@ -160,10 +200,12 @@ class MediaStorageService {
           _client.auth.currentSession != null &&
           _isPublicSocialBucket(bucket)) {
         try {
-          return await _publicSignClient.storage
+          final url = await _publicSignClient.storage
               .from(bucket.id)
               .createSignedUrl(trimmed, 3600)
               .timeout(_signTimeout);
+          _rememberSignedUrl(bucket, trimmed, url);
+          return url;
         } catch (error, stack) {
           if (_looksLikeMissingObject(error)) {
             _rememberMissing(bucket, trimmed);

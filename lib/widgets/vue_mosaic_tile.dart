@@ -33,9 +33,12 @@ class VueMosaicTile extends StatelessWidget {
       if (item.services.isNotEmpty) item.services.first,
     ].where((part) => part.trim().isNotEmpty).take(2).join(' · ');
     final location = item.locationLabel?.trim() ?? '';
-    final thumbUrl = (item.thumbnailUrl?.trim().isNotEmpty == true)
-        ? item.thumbnailUrl!
-        : item.mediaUrl;
+    // Never decode a video object URL with Image.network — that freezes /
+    // stalls Flutter web (and Safari) while scrolling the mosaic.
+    final poster = item.thumbnailUrl?.trim() ?? '';
+    final safeImageUrl = (!item.isVideo && poster.isEmpty)
+        ? item.mediaUrl.trim()
+        : poster;
     final showVideoChrome = item.isVideo;
     final nameSize = featured ? 13.0 : 11.0;
     final metaSize = featured ? 11.0 : 10.0;
@@ -48,7 +51,7 @@ class VueMosaicTile extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            _media(fv, thumbUrl),
+            _media(fv, safeImageUrl),
             const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -181,9 +184,9 @@ class VueMosaicTile extends StatelessWidget {
   }
 
   Widget _media(FirstVuePalette fv, String thumbUrl) {
-    // Mosaic tiles stay still: cover-crop the thumbnail. Playback happens
-    // in the full-screen viewer so the grid does not size tiles from video.
-    if (thumbUrl.startsWith('http')) {
+    // Mosaic tiles stay still: cover-crop a real image poster. Playback
+    // happens in the full-screen viewer so the grid never sizes from video.
+    if (thumbUrl.startsWith('http') && !_looksLikeVideoUrl(thumbUrl)) {
       return SizedBox.expand(
         child: NetworkPhoto(url: thumbUrl, fit: BoxFit.cover),
       );
@@ -191,9 +194,24 @@ class VueMosaicTile extends StatelessWidget {
     return ColoredBox(
       color: fv.elevatedSurface,
       child: item.isVideo
-          ? const SizedBox.shrink()
+          ? const Center(
+              child: Icon(
+                Icons.play_circle_outline_rounded,
+                color: Colors.white54,
+                size: 36,
+              ),
+            )
           : Icon(Icons.photo_outlined, color: fv.mutedIcon),
     );
+  }
+
+  static bool _looksLikeVideoUrl(String url) {
+    final lower = url.toLowerCase();
+    return lower.contains('.mov') ||
+        lower.contains('.mp4') ||
+        lower.contains('.webm') ||
+        lower.contains('.m4v') ||
+        lower.contains('video/');
   }
 }
 
