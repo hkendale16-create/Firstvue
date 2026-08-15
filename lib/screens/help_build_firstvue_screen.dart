@@ -6,6 +6,7 @@ import '../services/early_access_prompt_service.dart';
 import '../services/product_analytics_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/early_access_badge.dart';
+import '../widgets/early_access_pmf_survey.dart';
 import 'early_access_feedback_form_screen.dart';
 import 'feature_ideas_board_screen.dart';
 
@@ -18,6 +19,8 @@ class HelpBuildFirstVueScreen extends StatefulWidget {
 }
 
 class _HelpBuildFirstVueScreenState extends State<HelpBuildFirstVueScreen> {
+  bool _showPmfEntry = false;
+
   @override
   void initState() {
     super.initState();
@@ -26,6 +29,13 @@ class _HelpBuildFirstVueScreenState extends State<HelpBuildFirstVueScreen> {
       'feedback_opened',
       screen: 'help_build_firstvue',
     );
+    _loadPmfEntry();
+  }
+
+  Future<void> _loadPmfEntry() async {
+    final show = await EarlyAccessPromptService.shouldShowPmfSurvey();
+    if (!mounted) return;
+    setState(() => _showPmfEntry = show);
   }
 
   void _openCategory(EarlyAccessFeedbackCategory category) {
@@ -94,7 +104,10 @@ class _HelpBuildFirstVueScreenState extends State<HelpBuildFirstVueScreen> {
               const SizedBox(height: 8),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.lightbulb_outline, color: FirstVueColors.gold),
+                leading: Icon(
+                  Icons.lightbulb_outline,
+                  color: FirstVueColors.gold,
+                ),
                 title: Text(
                   'Feature Ideas Board',
                   style: TextStyle(
@@ -131,13 +144,13 @@ class _CategoryTile extends StatelessWidget {
   const _CategoryTile({required this.category, required this.onTap});
 
   IconData get _icon => switch (category) {
-        EarlyAccessFeedbackCategory.suggestIdea => Icons.tips_and_updates_outlined,
-        EarlyAccessFeedbackCategory.reportProblem => Icons.bug_report_outlined,
-        EarlyAccessFeedbackCategory.whatILike => Icons.favorite_border,
-        EarlyAccessFeedbackCategory.whatsConfusing => Icons.help_outline,
-        EarlyAccessFeedbackCategory.whatShouldBeNearMe => Icons.place_outlined,
-        EarlyAccessFeedbackCategory.anythingElse => Icons.chat_bubble_outline,
-      };
+    EarlyAccessFeedbackCategory.suggestIdea => Icons.tips_and_updates_outlined,
+    EarlyAccessFeedbackCategory.reportProblem => Icons.bug_report_outlined,
+    EarlyAccessFeedbackCategory.whatILike => Icons.favorite_border,
+    EarlyAccessFeedbackCategory.whatsConfusing => Icons.help_outline,
+    EarlyAccessFeedbackCategory.whatShouldBeNearMe => Icons.place_outlined,
+    EarlyAccessFeedbackCategory.anythingElse => Icons.chat_bubble_outline,
+  };
 
   @override
   Widget build(BuildContext context) {

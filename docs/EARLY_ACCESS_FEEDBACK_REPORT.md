@@ -74,6 +74,7 @@ Demo profiles cannot receive badges and are excluded from admin overview aggrega
 - Founding Member / Builder profile badge (subtle text under header)
 - Early Access chip in Settings header
 - Soft “How’s FirstVue going so far?” prompt after meaningful sessions (cooldown 14d / max 3 dismissals / weekly re-show cap)
+- Optional PMF survey (“If FirstVue disappeared…”) for established testers via Help Build FirstVue — not shown in onboarding
 
 ## Admin
 
@@ -102,4 +103,4 @@ Recorded from this feature set: `feedback_opened`, `feedback_submitted`, `idea_s
 2. Confirm storage policies for `early-access-feedback` are live after migration.
 3. `package_info_plus` on web returns platform package metadata; verify version/build display on Netlify web build.
 4. Admin overview DAU/WAU only reflect users who emit `product_events` — sparse until more call sites adopt `ProductAnalyticsService`.
-5. Optional follow-up: surface PMF survey dialog after deeper engagement using `EarlyAccessPromptService.shouldShowPmfSurvey`.
+5. Optional follow-up: instrument more product surfaces with `ProductAnalyticsService` so DAU/WAU fill in.
