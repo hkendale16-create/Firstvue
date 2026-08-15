@@ -709,8 +709,8 @@ begin
     b.name as business_name,
     b.business_type,
     s.note,
-    coalesce(s.latitude, bl.latitude) as latitude,
-    coalesce(s.longitude, bl.longitude) as longitude,
+    coalesce(s.latitude, bl.loc_lat) as latitude,
+    coalesce(s.longitude, bl.loc_lng) as longitude,
     s.started_at,
     s.ends_at,
     s.location_type,
@@ -718,31 +718,32 @@ begin
     s.address_text,
     (
       69.0 * sqrt(
-        power(coalesce(s.latitude, bl.latitude) - p_latitude, 2) +
-        power((coalesce(s.longitude, bl.longitude) - p_longitude) *
+        power(coalesce(s.latitude, bl.loc_lat) - p_latitude, 2) +
+        power((coalesce(s.longitude, bl.loc_lng) - p_longitude) *
           cos(radians(p_latitude)), 2)
       )
     )::double precision as distance_miles
   from public.business_open_sessions s
   join public.businesses b on b.id = s.business_id
   left join lateral (
-    select latitude, longitude
-    from public.business_locations
-    where business_id = s.business_id
+    -- Qualify + rename: RETURNS TABLE exposes latitude/longitude as PL/pgSQL vars.
+    select bl2.latitude as loc_lat, bl2.longitude as loc_lng
+    from public.business_locations bl2
+    where bl2.business_id = s.business_id
     limit 1
   ) bl on true
   where s.status = 'active'
     and s.ends_at > now()
     and b.status = 'approved'
     and coalesce(b.is_demo, false) = false
-    and coalesce(s.latitude, bl.latitude) is not null
-    and coalesce(s.longitude, bl.longitude) is not null
-    and coalesce(s.latitude, bl.latitude)
+    and coalesce(s.latitude, bl.loc_lat) is not null
+    and coalesce(s.longitude, bl.loc_lng) is not null
+    and coalesce(s.latitude, bl.loc_lat)
         between p_latitude - v_delta and p_latitude + v_delta
-    and coalesce(s.longitude, bl.longitude)
+    and coalesce(s.longitude, bl.loc_lng)
         between p_longitude - v_delta and p_longitude + v_delta
     and (p_location_type is null or s.location_type = p_location_type)
-  order by distance_miles asc nulls last, s.started_at desc
+  order by 13 asc nulls last, s.started_at desc
   limit greatest(1, least(coalesce(p_limit, 40), 100));
 end;
 $$;
