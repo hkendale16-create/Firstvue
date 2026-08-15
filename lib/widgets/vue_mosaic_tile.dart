@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../services/discovery_feed_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'explore_grid_video.dart';
 import 'network_photo.dart';
 import 'social_chrome.dart';
 
 /// Cover-cropped VUE mosaic tile. Photos never show a video glyph.
+/// Video tiles play a muted 3-second loop via [ExploreGridVideo].
 class VueMosaicTile extends StatelessWidget {
   final DiscoveryFeedItem item;
   final bool featured;
@@ -184,8 +186,20 @@ class VueMosaicTile extends StatelessWidget {
   }
 
   Widget _media(FirstVuePalette fv, String thumbUrl) {
-    // Mosaic tiles stay still: cover-crop a real image poster. Playback
-    // happens in the full-screen viewer so the grid never sizes from video.
+    final mediaUrl = item.mediaUrl.trim();
+    // Video tiles: muted 3-second loop via [ExploreGridVideo] (max 1 on web).
+    if (item.isVideo && mediaUrl.startsWith('http')) {
+      final poster = (thumbUrl.startsWith('http') && !_looksLikeVideoUrl(thumbUrl))
+          ? thumbUrl
+          : null;
+      return ExploreGridVideo(
+        url: mediaUrl,
+        thumbnailUrl: poster,
+        onTap: onOpen,
+      );
+    }
+    // Photos: cover-crop a real image poster. Never decode a video object URL
+    // with Image.network — that freezes / stalls Flutter web while scrolling.
     if (thumbUrl.startsWith('http') && !_looksLikeVideoUrl(thumbUrl)) {
       return SizedBox.expand(
         child: NetworkPhoto(url: thumbUrl, fit: BoxFit.cover),
