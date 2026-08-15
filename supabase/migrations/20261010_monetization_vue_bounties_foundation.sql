@@ -1022,7 +1022,12 @@ security definer
 set search_path = public
 as $$
 begin
-  if auth.role() = 'service_role' or public.is_firstvue_admin() then
+  if auth.role() = 'service_role'
+     or current_user in ('postgres', 'supabase_admin')
+     or public.is_firstvue_admin() then
+    if tg_op = 'DELETE' then
+      return old;
+    end if;
     return new;
   end if;
   if tg_op = 'UPDATE' and old.locked_at is not null then
@@ -1030,6 +1035,9 @@ begin
   end if;
   if tg_op = 'DELETE' and old.locked_at is not null then
     raise exception 'Locked campaign requirements cannot be deleted';
+  end if;
+  if tg_op = 'DELETE' then
+    return old;
   end if;
   return new;
 end;
