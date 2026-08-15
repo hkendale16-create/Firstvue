@@ -129,6 +129,32 @@ class _HelpBuildFirstVueScreenState extends State<HelpBuildFirstVueScreen> {
                   );
                 },
               ),
+              if (_showPmfEntry) ...[
+                const SizedBox(height: 4),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    Icons.favorite_outline,
+                    color: FirstVueColors.gold,
+                  ),
+                  title: Text(
+                    'One quick question',
+                    style: TextStyle(
+                      color: fv.primaryText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Optional — only for established testers',
+                    style: TextStyle(color: fv.secondaryText, fontSize: 13),
+                  ),
+                  trailing: Icon(Icons.chevron_right, color: fv.tertiaryText),
+                  onTap: () async {
+                    await EarlyAccessPmfSurveyDialog.maybeShow(context);
+                    if (mounted) _loadPmfEntry();
+                  },
+                ),
+              ],
             ],
           ),
         ),
