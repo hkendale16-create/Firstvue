@@ -19,9 +19,10 @@ create table if not exists public.event_presence (
     check (expires_at <= created_at + interval '12 hours')
 );
 
+-- No `where expires_at > now()` — now() is not IMMUTABLE, so Postgres rejects it
+-- in a partial-index predicate.
 create index if not exists event_presence_active_idx
-  on public.event_presence (event_id, expires_at desc)
-  where expires_at > now();
+  on public.event_presence (event_id, expires_at desc);
 
 create index if not exists event_presence_profile_idx
   on public.event_presence (profile_id, expires_at desc);
