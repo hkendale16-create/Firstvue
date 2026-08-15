@@ -608,6 +608,8 @@ $$;
 revoke all on function public.fv_expire_stale_live_locations() from public;
 grant execute on function public.fv_expire_stale_live_locations() to authenticated, anon, service_role;
 
+drop function if exists public.list_active_business_open_sessions(integer);
+
 create or replace function public.list_active_business_open_sessions(
   p_limit int default 40
 )
@@ -627,7 +629,8 @@ returns table (
   status text
 )
 language plpgsql
-stable
+-- VOLATILE: expires stale sessions (UPDATE) before listing.
+volatile
 security definer
 set search_path = public
 as $$
@@ -668,6 +671,10 @@ begin
 end;
 $$;
 
+drop function if exists public.list_nearby_live_locations(
+  double precision, double precision, double precision, text, integer
+);
+
 create or replace function public.list_nearby_live_locations(
   p_latitude double precision,
   p_longitude double precision,
@@ -691,7 +698,8 @@ returns table (
   distance_miles double precision
 )
 language plpgsql
-stable
+-- VOLATILE: expires stale sessions (UPDATE) before listing.
+volatile
 security definer
 set search_path = public
 as $$
