@@ -24,7 +24,7 @@ void main() {
     expect(padded.contains(const LatLng(33.75, -84.45)), isTrue);
   });
 
-  test('applyFilter keeps live pins for Live Now', () {
+  test('applyFilter keeps tab-specific locations', () {
     final pins = [
       LiveMapPin(
         id: 'a',
@@ -54,16 +54,66 @@ void main() {
         point: const LatLng(33.73, -84.41),
         lifecycle: LiveLifecycleStatus.upcoming,
       ),
+      LiveMapPin(
+        id: 'e',
+        kind: LiveMapPinKind.nightlife,
+        title: 'Rooftop Bar',
+        point: const LatLng(33.72, -84.42),
+        lifecycle: LiveLifecycleStatus.upcoming,
+      ),
+      LiveMapPin(
+        id: 'f',
+        kind: LiveMapPinKind.foodTruck,
+        title: 'Open Truck',
+        point: const LatLng(33.71, -84.43),
+        lifecycle: LiveLifecycleStatus.live,
+      ),
     ];
 
-    expect(LiveMapService.applyFilter(pins, LiveMapFilter.liveNow).length, 1);
+    expect(LiveMapService.applyFilter(pins, LiveMapFilter.liveNow).length, 2);
     expect(LiveMapService.applyFilter(pins, LiveMapFilter.events).length, 2);
-    expect(LiveMapService.applyFilter(pins, LiveMapFilter.foodTrucks).length, 1);
+    expect(LiveMapService.applyFilter(pins, LiveMapFilter.foodTrucks).length, 2);
     expect(LiveMapService.applyFilter(pins, LiveMapFilter.markets).length, 1);
+    expect(LiveMapService.applyFilter(pins, LiveMapFilter.nightlife).length, 1);
+  });
+
+  test('kindForBusinessType maps directory types to tabs', () {
     expect(
-      LiveMapService.applyFilter(pins, LiveMapFilter.nightlife).length,
-      2,
+      LiveMapService.kindForBusinessType('Food Truck'),
+      LiveMapPinKind.foodTruck,
     );
+    expect(
+      LiveMapService.kindForBusinessType('Sports Bar'),
+      LiveMapPinKind.nightlife,
+    );
+    expect(
+      LiveMapService.kindForBusinessType('Farmers Market'),
+      LiveMapPinKind.market,
+    );
+    expect(LiveMapService.kindForBusinessType('Barbershop'), isNull);
+    expect(LiveMapService.kindForBusinessType('Restaurant'), isNull);
+  });
+
+  test('centroidOf averages pin locations', () {
+    final pins = [
+      LiveMapPin(
+        id: 'a',
+        kind: LiveMapPinKind.event,
+        title: 'A',
+        point: const LatLng(33.0, -84.0),
+        lifecycle: LiveLifecycleStatus.live,
+      ),
+      LiveMapPin(
+        id: 'b',
+        kind: LiveMapPinKind.event,
+        title: 'B',
+        point: const LatLng(35.0, -82.0),
+        lifecycle: LiveLifecycleStatus.live,
+      ),
+    ];
+    final c = LiveMapService.centroidOf(pins)!;
+    expect(c.latitude, closeTo(34.0, 0.001));
+    expect(c.longitude, closeTo(-83.0, 0.001));
   });
 
   test('visibleFilters respects food truck flag', () {

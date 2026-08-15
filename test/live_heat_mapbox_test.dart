@@ -53,6 +53,7 @@ void main() {
     expect(MapboxConfig.styleUri.contains('mapbox://styles/'), isTrue);
     // CI / Linux agents always fall back — canUseNativeMap must match surface.
     expect(MapboxConfig.canUseNativeMap, isFalse);
+    expect(MapboxConfig.fallbackBanner.isNotEmpty, isTrue);
     expect(FeatureFlags.liveHeatActivityEnabled, isTrue);
   });
 

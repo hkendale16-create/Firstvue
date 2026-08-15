@@ -34,4 +34,15 @@ class MapboxConfig {
       return false;
     }
   }
+
+  /// Short status line when Mapbox 3D is not active.
+  static String get fallbackBanner {
+    if (kIsWeb) {
+      return '3D neon Mapbox runs in the iOS/Android app. Showing the dark web map.';
+    }
+    if (!hasAccessToken) {
+      return 'Add MAPBOX_ACCESS_TOKEN when building the iOS/Android app for pitched 3D buildings.';
+    }
+    return 'Mapbox 3D needs an iOS or Android device. Showing the dark fallback map.';
+  }
 }

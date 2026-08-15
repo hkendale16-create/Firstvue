@@ -55,7 +55,18 @@ class _LiveMapSurfaceOsmState extends State<LiveMapSurface> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      widget.onReady?.call(_OsmController(_mapController));
+      final controller = _OsmController(_mapController);
+      widget.onReady?.call(controller);
+      // Kick an initial viewport load so pins appear without waiting for a pan.
+      final bounds = _mapController.camera.visibleBounds;
+      widget.onCameraIdle(
+        LiveMapBounds(
+          minLat: bounds.south,
+          maxLat: bounds.north,
+          minLng: bounds.west,
+          maxLng: bounds.east,
+        ),
+      );
     });
   }
 
@@ -109,17 +120,19 @@ class _LiveMapSurfaceOsmState extends State<LiveMapSurface> {
         initialZoom: widget.zoom,
         minZoom: 3,
         maxZoom: 18,
-        backgroundColor: const Color(0xFF0A0A0A),
+        backgroundColor: const Color(0xFF12141A),
         onMapEvent: _onMapEvent,
         onTap: (_, _) => widget.onSelect(null),
       ),
       children: [
         TileLayer(
+          // Single-host Carto dark tiles (no {s}/{r}) — more reliable on Flutter web.
           urlTemplate:
-              'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-          subdomains: const ['a', 'b', 'c', 'd'],
+              'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
           userAgentPackageName: 'com.firstvue.app',
-          retinaMode: RetinaMode.isHighDensity(context),
+          maxNativeZoom: 18,
+          keepBuffer: 2,
+          panBuffer: 1,
         ),
         CircleLayer(
           circles: [
