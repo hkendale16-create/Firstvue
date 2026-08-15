@@ -1,57 +1,39 @@
 import 'package:firstvue/config/feature_flags.dart';
 import 'package:firstvue/screens/live_home_shell_screen.dart';
+import 'package:firstvue/services/live_home_service.dart';
 import 'package:firstvue/services/live_mode_preference.dart';
 import 'package:firstvue/theme/firstvue_theme.dart';
+import 'package:firstvue/widgets/live/live_right_now_card.dart';
 import 'package:firstvue/widgets/vue_live_mode_switch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Mirrors Phase 1 VUE|LIVE shell wiring without DiscoveryFeedService/Supabase.
-class _LiveModeHarness extends StatefulWidget {
-  const _LiveModeHarness();
-
-  @override
-  State<_LiveModeHarness> createState() => _LiveModeHarnessState();
+LiveHomeSnapshot _emptySnap({String title = '🔥 HAPPENING NOW'}) {
+  return LiveHomeSnapshot(
+    rightNowTitle: title,
+    cityName: null,
+    rightNow: const [],
+    vueItems: const [],
+  );
 }
 
-class _LiveModeHarnessState extends State<_LiveModeHarness> {
-  FirstVueExperienceMode _mode = LiveModePreference.current;
-
-  @override
-  void initState() {
-    super.initState();
-    _hydrate();
-  }
-
-  Future<void> _hydrate() async {
-    final stored = await LiveModePreference.load();
-    if (!mounted || stored == _mode) return;
-    setState(() => _mode = stored);
-  }
-
-  Future<void> _setMode(FirstVueExperienceMode next) async {
-    setState(() => _mode = next);
-    await LiveModePreference.save(next);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          VueLiveModeSwitch(mode: _mode, onChanged: _setMode),
-          Expanded(
-            child: _mode == FirstVueExperienceMode.live
-                ? LiveHomeShellScreen(
-                    onReturnToVue: () => _setMode(FirstVueExperienceMode.vue),
-                  )
-                : const Center(child: Text('For You')),
-          ),
-        ],
-      ),
-    );
-  }
+LiveHomeSnapshot _eventSnap() {
+  final item = LiveRightNowItem(
+    id: 'evt-1',
+    kind: LiveRightNowKind.event,
+    title: 'Afrobeats Rooftop',
+    subtitle: 'Midtown',
+    lifecycle: LiveLifecycleStatus.live,
+    goingCount: 3,
+    locationLabel: 'Midtown',
+  );
+  return LiveHomeSnapshot(
+    rightNowTitle: '🔥 ATLANTA RIGHT NOW',
+    cityName: 'Atlanta',
+    rightNow: [item],
+    vueItems: const [],
+  );
 }
 
 void main() {
@@ -60,18 +42,33 @@ void main() {
     LiveModePreference.debugReset();
   });
 
-  test('LiveModePreference defaults to VUE and parses LIVE', () {
-    expect(LiveModePreference.parse(null), FirstVueExperienceMode.vue);
-    expect(LiveModePreference.parse('vue'), FirstVueExperienceMode.vue);
-    expect(LiveModePreference.parse('LIVE'), FirstVueExperienceMode.live);
-    expect(LiveModePreference.parse('live'), FirstVueExperienceMode.live);
+  test('rightNowHeading uses city and falls back without hardcoding Atlanta', () {
+    expect(
+      LiveHomeService.rightNowHeading('Charlotte'),
+      '🔥 CHARLOTTE RIGHT NOW',
+    );
+    expect(LiveHomeService.rightNowHeading(null), '🔥 HAPPENING NOW');
+    expect(LiveHomeService.rightNowHeading('Everywhere'), '🔥 HAPPENING NOW');
   });
 
-  test('LiveModePreference persists locally', () async {
-    expect(await LiveModePreference.load(), FirstVueExperienceMode.vue);
-    await LiveModePreference.save(FirstVueExperienceMode.live);
-    LiveModePreference.debugReset(mode: FirstVueExperienceMode.vue);
-    expect(await LiveModePreference.load(), FirstVueExperienceMode.live);
+  test('lifecycleFor derives LIVE / STARTING SOON from event_at', () {
+    final now = DateTime(2026, 8, 15, 12);
+    expect(
+      LiveHomeService.lifecycleFor(now.subtract(const Duration(hours: 1)), now: now),
+      LiveLifecycleStatus.live,
+    );
+    expect(
+      LiveHomeService.lifecycleFor(now.add(const Duration(minutes: 30)), now: now),
+      LiveLifecycleStatus.startingSoon,
+    );
+    expect(
+      LiveHomeService.lifecycleFor(now.add(const Duration(hours: 5)), now: now),
+      LiveLifecycleStatus.upcoming,
+    );
+    expect(
+      LiveHomeService.lifecycleFor(now.subtract(const Duration(hours: 8)), now: now),
+      LiveLifecycleStatus.ended,
+    );
   });
 
   test('live_mode flag is distinct from livestream streaming flag', () {
@@ -80,70 +77,87 @@ void main() {
     expect(FeatureFlags.liveMapEnabled, isFalse);
   });
 
-  testWidgets('VueLiveModeSwitch reports selection changes', (tester) async {
-    FirstVueExperienceMode mode = FirstVueExperienceMode.vue;
+  testWidgets('LIVE home empty state and map CTA render', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: FirstVueTheme.elegantDark,
         home: Scaffold(
-          body: Center(
-            child: VueLiveModeSwitch(
-              mode: mode,
-              onChanged: (next) => mode = next,
-            ),
+          body: LiveHomeShellScreen(
+            initialSnapshot: _emptySnap(),
+            onReturnToVue: () {},
           ),
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
-    await tester.tap(find.text('LIVE'));
-    await tester.pump();
-    expect(mode, FirstVueExperienceMode.live);
+    expect(find.text('🔥 HAPPENING NOW'), findsOneWidget);
+    expect(find.textContaining('quiet here right now'), findsOneWidget);
+    expect(find.textContaining('Explore Live Map'), findsOneWidget);
+    expect(find.text('VUE FEED'), findsOneWidget);
+    expect(find.text('Events'), findsOneWidget);
   });
 
-  testWidgets('LIVE shell offers return to VUE', (tester) async {
-    var returned = false;
+  testWidgets('LIVE home shows real Right Now cards without inventing counts', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: FirstVueTheme.elegantDark,
         home: Scaffold(
-          body: LiveHomeShellScreen(onReturnToVue: () => returned = true),
+          body: LiveHomeShellScreen(initialSnapshot: _eventSnap()),
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
-    expect(find.text('LIVE'), findsWidgets);
-    expect(find.text('Real-time discovery is coming next.'), findsOneWidget);
-    await tester.tap(find.text('Back to VUE'));
-    await tester.pump();
-    expect(returned, isTrue);
+    expect(find.text('🔥 ATLANTA RIGHT NOW'), findsOneWidget);
+    expect(find.byType(LiveRightNowCard), findsOneWidget);
+    expect(find.text('Afrobeats Rooftop'), findsOneWidget);
+    expect(find.textContaining('3 going'), findsOneWidget);
   });
 
-  testWidgets('mode switch restores VUE and persists LIVE', (tester) async {
-    SharedPreferences.setMockInitialValues({
-      LiveModePreference.prefsKey: 'live',
-    });
-    LiveModePreference.debugReset();
-
+  testWidgets('Food category shows honest backend gap, not fake truck counts', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: FirstVueTheme.elegantDark,
-        home: const _LiveModeHarness(),
+        home: Scaffold(
+          body: LiveHomeShellScreen(initialSnapshot: _eventSnap()),
+        ),
       ),
     );
-    await tester.pump();
-    await tester.pump();
+    await tester.pumpAndSettle();
 
-    expect(find.byType(VueLiveModeSwitch), findsOneWidget);
-    expect(find.byType(LiveHomeShellScreen), findsOneWidget);
-    expect(find.text('For You'), findsNothing);
+    await tester.tap(find.text('Food'));
+    await tester.pumpAndSettle();
 
-    await tester.tap(find.text('VUE').first);
-    await tester.pump();
-    await tester.pump();
+    expect(find.textContaining('No LIVE food yet'), findsOneWidget);
+    expect(find.textContaining('will not invent'), findsOneWidget);
+    expect(find.text('4 LIVE TRUCKS'), findsNothing);
+  });
 
-    expect(find.byType(LiveHomeShellScreen), findsNothing);
-    expect(find.text('For You'), findsOneWidget);
-    expect(LiveModePreference.current, FirstVueExperienceMode.vue);
+  testWidgets('mode switch harness still restores VUE', (tester) async {
+    FirstVueExperienceMode mode = FirstVueExperienceMode.live;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: FirstVueTheme.elegantDark,
+        home: Scaffold(
+          body: Column(
+            children: [
+              VueLiveModeSwitch(
+                mode: mode,
+                onChanged: (next) => mode = next,
+              ),
+              const Expanded(child: Text('LIVE_BODY')),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('VUE'));
+    await tester.pump();
+    expect(mode, FirstVueExperienceMode.vue);
   });
 }
