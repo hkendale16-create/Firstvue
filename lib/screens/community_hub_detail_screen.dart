@@ -4,11 +4,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/app_config.dart';
 import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
+import '../auth/ensure_signed_in.dart';
 import '../services/community_editor_service.dart';
 import '../services/community_hub_service.dart';
 import '../services/community_news_service.dart';
 import '../services/community_service.dart';
-import '../services/profile_cards.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/community_news_post_card.dart';
 import '../widgets/community_news_post_detail_sheet.dart';
@@ -17,8 +17,10 @@ import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/group_circle_avatar.dart';
 import '../widgets/network_photo.dart';
+import '../widgets/profile_search_picker.dart';
 import 'community_detail_screen.dart';
 import 'create_community_screen.dart';
+import 'create_post_screen.dart';
 import 'community_hub_settings_screen.dart';
 import 'member_public_profile_screen.dart';
 
@@ -53,6 +55,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
   bool _isLeader = false;
   bool _isPendingLeader = false;
   bool _isAuthorized = false;
+  bool _canPost = false;
 
   @override
   void initState() {
@@ -80,6 +83,14 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
     final isEditor =
         me != null && editors.any((e) => e.userId == me && e.isActive);
     final isAuthorized = isLeader || isEditor;
+    final canPost = isLeader ||
+        (me != null &&
+            editors.any(
+              (e) =>
+                  e.userId == me &&
+                  e.isActive &&
+                  e.hasPermission(CommunityEditorPermissions.manageNewsfeed),
+            ));
 
     List<CommunityGroupMembership> memberships = const [];
     List<Community> groups = const [];
@@ -130,6 +141,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
       _isLeader = isLeader;
       _isPendingLeader = isPendingLeader;
       _isAuthorized = isAuthorized;
+      _canPost = canPost;
       _loading = false;
     });
   }
@@ -167,16 +179,15 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
       final create = await showDialog<bool>(
         context: context,
         builder: (context) {
-          final fv = context.fv;
           return AlertDialog(
-            backgroundColor: fv.surface,
+            backgroundColor: context.fv.surface,
             title: Text(
               'No eligible groups',
-              style: TextStyle(color: fv.primaryText),
+              style: TextStyle(color: context.fv.primaryText),
             ),
             content: Text(
               'You have no groups available to add. Create a group first, then add it here.',
-              style: TextStyle(color: fv.secondaryText),
+              style: TextStyle(color: context.fv.secondaryText),
             ),
             actions: [
               TextButton(
@@ -203,7 +214,6 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        final fv = context.fv;
         return SafeArea(
           child: SizedBox(
             height: MediaQuery.of(context).size.height * 0.7,
@@ -216,7 +226,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: fv.divider,
+                      color: context.fv.divider,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -226,7 +236,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                   child: Text(
                     'Add existing group',
                     style: TextStyle(
-                      color: fv.primaryText,
+                      color: context.fv.primaryText,
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                     ),
@@ -236,7 +246,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Text(
                     'Select a group you lead or joined. Duplicate links are blocked.',
-                    style: TextStyle(color: fv.secondaryText, fontSize: 13),
+                    style: TextStyle(color: context.fv.secondaryText, fontSize: 13),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -244,7 +254,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                   child: ListView.separated(
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
                     itemCount: eligible.length,
-                    separatorBuilder: (_, _) => Divider(color: fv.divider),
+                    separatorBuilder: (_, _) => Divider(color: context.fv.divider),
                     itemBuilder: (context, index) {
                       final group = eligible[index];
                       return ListTile(
@@ -255,7 +265,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                         title: Text(
                           group.name,
                           style: TextStyle(
-                            color: fv.primaryText,
+                            color: context.fv.primaryText,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -263,7 +273,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                           group.category?.trim().isNotEmpty == true
                               ? group.category!
                               : (group.isMember ? 'Joined' : 'Yours'),
-                          style: TextStyle(color: fv.tertiaryText),
+                          style: TextStyle(color: context.fv.tertiaryText),
                         ),
                         onTap: () => Navigator.pop(context, group),
                       );
@@ -431,21 +441,40 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
     }
   }
 
-  Future<String?> _resolveProfileId(String raw) async {
-    final input = raw.trim().replaceFirst(RegExp(r'^@'), '');
-    if (input.isEmpty) return null;
-
-    final uuidPattern = RegExp(
-      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-'
-      r'[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
-    );
-    if (uuidPattern.hasMatch(input)) return input;
-
+  Future<void> _composeHubPost() async {
+    if (!_canPost) return;
+    if (Supabase.instance.client.auth.currentUser == null) {
+      await ensureSignedIn(context);
+      if (!mounted) return;
+      if (Supabase.instance.client.auth.currentUser == null) return;
+    }
     try {
-      final row = await ProfileCards.fetchByUsername(input);
-      return row?['id'] as String?;
-    } catch (_) {
-      return null;
+      final groupId = await CommunityHubService.ensureNewsfeedGroup(
+        widget.hubId,
+      );
+      if (!mounted) return;
+      final created = await Navigator.push<CommunityNewsPost>(
+        context,
+        FirstVuePageRoute(
+          builder: (_) => CreatePostScreen(
+            communityId: groupId,
+            lockIdentity: true,
+          ),
+        ),
+      );
+      if (created != null && mounted) await _load();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is AuthException
+                ? error.message
+                : 'Could not open Community composer. Apply the Community '
+                    'owner posting SQL if this persists.',
+          ),
+        ),
+      );
     }
   }
 
@@ -457,72 +486,27 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
       return;
     }
 
-    final controller = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF10151B),
-        title: const Text(
-          'Add Community Editor',
-          style: TextStyle(color: Color(0xFF16131F)),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Up to 6 Editors',
-              style: TextStyle(color: FirstVueColors.gold, fontSize: 12),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: controller,
-              style: const TextStyle(color: Color(0xFF16131F)),
-              decoration: const InputDecoration(
-                hintText: 'Profile UUID or username',
-                hintStyle: TextStyle(color: Color(0xFF8A8696)),
-                enabledBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: Color(0x1A16131F)),
-                ),
-                focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: FirstVueColors.teal),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Add'),
-          ),
-        ],
-      ),
+    final picked = await ProfileSearchPicker.show(
+      context,
+      title: 'Add Community Editor',
+      subtitle: 'Up to 6 editors. Search by name or @username.',
     );
-
-    final raw = controller.text;
-    controller.dispose();
-    if (confirmed != true || !mounted) return;
-
-    final userId = await _resolveProfileId(raw);
-    if (userId == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Profile not found.')));
-      return;
-    }
+    if (picked == null || !mounted) return;
 
     try {
       final permissions = {
         for (final key in CommunityEditorPermissions.allKeys) key: true,
       };
-      await CommunityEditorService.addEditor(widget.hubId, userId, permissions);
+      await CommunityEditorService.addEditor(
+        widget.hubId,
+        picked.id,
+        permissions,
+      );
       await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Added ${picked.displayName} as Editor.')),
+      );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -531,6 +515,43 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
             error is AuthException
                 ? error.message
                 : 'Could not add editor. Try again.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showAddLeaderDialog() async {
+    final picked = await ProfileSearchPicker.show(
+      context,
+      title: 'Invite Community Leader',
+      subtitle: 'Search profiles. Selecting stores their profile ID.',
+    );
+    if (picked == null || !mounted) return;
+
+    try {
+      await CommunityHubService.inviteHubLeader(
+        hubId: widget.hubId,
+        profileId: picked.id,
+        role: 'leader',
+      );
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Invited ${picked.displayName}. They appear under pending until approved.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is AuthException
+                ? error.message
+                : 'Could not invite leader. Try again.',
           ),
         ),
       );
@@ -670,13 +691,32 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
           ),
         ],
       ),
-      floatingActionButton: _isAuthorized
-          ? FloatingActionButton.extended(
-              onPressed: _addExistingGroup,
-              backgroundColor: FirstVueColors.coral,
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.group_add_outlined),
-              label: const Text('Add Group'),
+      floatingActionButton: (_isAuthorized || _canPost)
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (_canPost) ...[
+                  FloatingActionButton.extended(
+                    heroTag: 'hub-post',
+                    onPressed: _composeHubPost,
+                    backgroundColor: FirstVueColors.gold,
+                    foregroundColor: Colors.white,
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Post'),
+                  ),
+                  if (_isAuthorized) const SizedBox(height: 10),
+                ],
+                if (_isAuthorized)
+                  FloatingActionButton.extended(
+                    heroTag: 'hub-add-group',
+                    onPressed: _addExistingGroup,
+                    backgroundColor: FirstVueColors.coral,
+                    foregroundColor: Colors.white,
+                    icon: const Icon(Icons.group_add_outlined),
+                    label: const Text('Add Group'),
+                  ),
+              ],
             )
           : null,
       body: _loading && hub == null
@@ -684,10 +724,10 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
               child: CircularProgressIndicator(color: FirstVueColors.teal),
             )
           : hub == null
-          ? const Center(
+          ? Center(
               child: Text(
                 'Community not found.',
-                style: TextStyle(color: Color(0xFF5A5668)),
+                style: TextStyle(color: context.fv.secondaryText),
               ),
             )
           : FirstVueRefreshScaffold(
@@ -706,9 +746,10 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: const Text(
-                        'Your Community Leader request is still pending. '
-                        'You can view this public Community, but management '
-                        'tools stay locked until leadership is approved.',
+                        'Your Community management role is still pending. '
+                        'If you created this Community, ask a FirstVue admin '
+                        'to apply the owner-posting SQL so your creator role '
+                        'activates automatically.',
                         style: TextStyle(
                           color: FirstVueColors.gold,
                           height: 1.35,
@@ -731,8 +772,8 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                           children: [
                             Text(
                               hub.name,
-                              style: const TextStyle(
-                                color: Color(0xFF16131F),
+                              style: TextStyle(
+                        color: context.fv.primaryText,
                                 fontSize: 22,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -751,8 +792,8 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                             if (hub.locationLabel != null)
                               Text(
                                 hub.locationLabel!,
-                                style: const TextStyle(
-                                  color: Color(0xFF5A5668),
+                                style: TextStyle(
+                        color: context.fv.secondaryText,
                                 ),
                               ),
                             const SizedBox(height: 4),
@@ -796,8 +837,8 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                               children: [
                                 Text(
                                   _leader!.displayName,
-                                  style: const TextStyle(
-                                    color: Color(0xFF16131F),
+                                  style: TextStyle(
+                        color: context.fv.primaryText,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -826,29 +867,29 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                     Text(
                       hub.description!.trim(),
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: .78),
+                        color: context.fv.secondaryText,
                         height: 1.4,
                       ),
                     )
                   else
-                    const Text(
+                    Text(
                       'No description yet.',
-                      style: TextStyle(color: Color(0xFF5A5668)),
+                      style: TextStyle(color: context.fv.secondaryText),
                     ),
                   if (hub.rules?.trim().isNotEmpty == true) ...[
                     const SizedBox(height: 14),
-                    const Text(
+                    Text(
                       'Rules',
                       style: TextStyle(
-                        color: Color(0xFF5A5668),
+                        color: context.fv.secondaryText,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       hub.rules!.trim(),
-                      style: const TextStyle(
-                        color: Color(0xFF5A5668),
+                      style: TextStyle(
+                        color: context.fv.secondaryText,
                         height: 1.4,
                       ),
                     ),
@@ -860,12 +901,22 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                       Text(
                         'Up to 6 Editors',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: .45),
+                          color: context.fv.tertiaryText,
                           fontSize: 11,
                         ),
                       ),
                       if (_isLeader) ...[
                         const SizedBox(width: 4),
+                        IconButton(
+                          onPressed: _showAddLeaderDialog,
+                          icon: const Icon(
+                            Icons.workspace_premium_outlined,
+                            color: FirstVueColors.gold,
+                            size: 20,
+                          ),
+                          tooltip: 'Invite leader',
+                          visualDensity: VisualDensity.compact,
+                        ),
                         IconButton(
                           onPressed: _showAddEditorDialog,
                           icon: const Icon(
@@ -881,9 +932,9 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                   ),
                   const SizedBox(height: 8),
                   if (_editors.isEmpty)
-                    const Text(
+                    Text(
                       'No editors appointed yet.',
-                      style: TextStyle(color: Color(0xFF5A5668)),
+                      style: TextStyle(color: context.fv.secondaryText),
                     )
                   else
                     ..._editors.map((editor) {
@@ -908,13 +959,13 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                         ),
                         title: Text(
                           label,
-                          style: const TextStyle(color: Color(0xFF16131F)),
+                          style: TextStyle(color: context.fv.primaryText),
                         ),
                         subtitle: editor.username != null
                             ? Text(
                                 '@${editor.username}',
-                                style: const TextStyle(
-                                  color: Color(0xFF5A5668),
+                                style: TextStyle(
+                        color: context.fv.secondaryText,
                                   fontSize: 12,
                                 ),
                               )
@@ -949,11 +1000,11 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                         contentPadding: EdgeInsets.zero,
                         title: Text(
                           name,
-                          style: const TextStyle(color: Color(0xFF16131F)),
+                          style: TextStyle(color: context.fv.primaryText),
                         ),
                         subtitle: Text(
                           (req['role'] as String?) ?? 'leader',
-                          style: const TextStyle(color: Color(0xFF5A5668)),
+                          style: TextStyle(color: context.fv.secondaryText),
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1001,7 +1052,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                         ),
                         title: Text(
                           (group?['name'] as String?) ?? 'Group',
-                          style: const TextStyle(color: Color(0xFF16131F)),
+                          style: TextStyle(color: context.fv.primaryText),
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1038,9 +1089,9 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                   _sectionTitle('GROUPS'),
                   const SizedBox(height: 12),
                   if (_displayMemberships.isEmpty)
-                    const Text(
+                    Text(
                       'No groups linked yet. Create one to get started.',
-                      style: TextStyle(color: Color(0xFF5A5668)),
+                      style: TextStyle(color: context.fv.secondaryText),
                     )
                   else
                     ..._displayMemberships.map((membership) {
@@ -1059,12 +1110,12 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                                 size: 48,
                                 ringColor: membership.canPostToCommunityFeed
                                     ? FirstVueColors.teal
-                                    : Colors.white24,
+                                    : context.fv.borderSubtle,
                               ),
                               title: Text(
                                 name,
-                                style: const TextStyle(
-                                  color: Color(0xFF16131F),
+                                style: TextStyle(
+                        color: context.fv.primaryText,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -1203,10 +1254,30 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                   const SizedBox(height: 28),
                   _sectionTitle('COMMUNITY NEWSFEED'),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Groups publish into this feed.',
-                    style: TextStyle(color: Color(0xFF5A5668), fontSize: 12),
+                  Text(
+                    _canPost
+                        ? 'Owners, leaders, and permitted editors can post here. Linked Groups also publish into this feed.'
+                        : 'Posts from authorized Community roles and linked Groups appear here.',
+                    style: TextStyle(
+                      color: context.fv.secondaryText,
+                      fontSize: 12,
+                    ),
                   ),
+                  if (_canPost) ...[
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: FilledButton.icon(
+                        onPressed: _composeHubPost,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: FirstVueColors.gold,
+                          foregroundColor: Colors.white,
+                        ),
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: const Text('Create post'),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   if (_loading && _feedPosts.isEmpty)
                     const Padding(
@@ -1218,9 +1289,11 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                       ),
                     )
                   else if (_feedPosts.isEmpty)
-                    const Text(
-                      'No community posts yet.',
-                      style: TextStyle(color: Color(0xFF5A5668)),
+                    Text(
+                      _canPost
+                          ? 'No community posts yet. Create the first one.'
+                          : 'No community posts yet.',
+                      style: TextStyle(color: context.fv.secondaryText),
                     )
                   else
                     Column(

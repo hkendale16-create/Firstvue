@@ -1128,6 +1128,34 @@ class CommunityHubService {
     );
   }
 
+  /// Group id for posting into this Community's newsfeed (managers / editors).
+  static Future<String> ensureNewsfeedGroup(String hubId) async {
+    final result = await _client.rpc(
+      'ensure_hub_newsfeed_group',
+      params: {'p_hub_id': hubId},
+    );
+    if (result is String && result.trim().isNotEmpty) return result;
+    throw const AuthException('Could not open Community newsfeed composer.');
+  }
+
+  /// True when the signed-in user may compose posts for the hub newsfeed.
+  static Future<bool> canPostToNewsfeed(
+    String hubId, {
+    String? profileId,
+    List<CommunityEditor>? editors,
+  }) async {
+    final id = profileId ?? _client.auth.currentUser?.id;
+    if (id == null || hubId.trim().isEmpty) return false;
+    if (await isActiveManager(hubId, profileId: id)) return true;
+    final list = editors ?? await fetchEditors(hubId);
+    return list.any(
+      (e) =>
+          e.userId == id &&
+          e.isActive &&
+          e.hasPermission(CommunityEditorPermissions.manageNewsfeed),
+    );
+  }
+
   static Future<bool> isFollowing(String hubId) async {
     final me = _client.auth.currentUser;
     if (me == null || hubId.trim().isEmpty) return false;

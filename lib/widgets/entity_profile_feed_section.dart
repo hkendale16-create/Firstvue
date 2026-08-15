@@ -232,7 +232,7 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
                 ),
                 child: Text(
                   'Share news, links, photos, or videos…',
-                  style: TextStyle(color: Colors.white.withValues(alpha: .38)),
+                  style: TextStyle(color: context.fv.tertiaryText),
                 ),
               ),
             ),
@@ -277,7 +277,7 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
                   ? 'No posts yet. Share your first update above.'
                   : 'No posts yet.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withValues(alpha: .45)),
+              style: TextStyle(color: context.fv.secondaryText),
             ),
           );
         }
@@ -333,8 +333,8 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
                       EntityFeedScope.event => 'EVENT FEED',
                       EntityFeedScope.user => 'PROFILE FEED',
                     },
-                    style: const TextStyle(
-                      color: Colors.white54,
+                    style: TextStyle(
+                      color: context.fv.secondaryText,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1.2,
                       fontSize: 12,
@@ -343,7 +343,7 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
                 ),
                 IconButton(
                   onPressed: _refreshPosts,
-                  icon: const Icon(Icons.refresh, size: 18, color: Colors.white38),
+                  icon: Icon(Icons.refresh, size: 18, color: context.fv.mutedIcon),
                   tooltip: 'Refresh feed',
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
@@ -430,7 +430,7 @@ class _FeedTabButton extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? FirstVueColors.gold : Colors.white54,
+                  color: selected ? FirstVueColors.gold : context.fv.secondaryText,
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
                   letterSpacing: 1,

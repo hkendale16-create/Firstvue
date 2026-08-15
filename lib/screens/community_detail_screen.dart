@@ -188,8 +188,8 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     final community = _community;
     final me = Supabase.instance.client.auth.currentUser?.id;
     final canManage = community != null && me != null && community.canManageAs(me);
-    final canPost = community != null &&
-        (community.isMember || community.creatorId == me);
+    final canPost = community != null && community.canPostAs(me);
+    final fv = context.fv;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -215,10 +215,10 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
               child: CircularProgressIndicator(color: FirstVueColors.teal),
             )
           : community == null
-              ? const Center(
+              ? Center(
                   child: Text(
                     'Group not found.',
-                    style: TextStyle(color: Color(0xFF5A5668)),
+                    style: TextStyle(color: fv.secondaryText),
                   ),
                 )
               : FirstVueRefreshScaffold(
@@ -243,8 +243,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                 children: [
                                   Text(
                                     community.name,
-                                    style: const TextStyle(
-                                      color: Color(0xFF16131F),
+                                    style: TextStyle(color: fv.primaryText,
                                       fontSize: 22,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -252,8 +251,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                   if (community.locationLabel != null)
                                     Text(
                                       community.locationLabel!,
-                                      style: const TextStyle(
-                                        color: Color(0xFF5A5668),
+                                      style: TextStyle(color: fv.secondaryText,
                                       ),
                                     ),
                                   const SizedBox(height: 6),
@@ -330,8 +328,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                     children: [
                                       Text(
                                         _leader!.displayName,
-                                        style: const TextStyle(
-                                          color: Color(0xFF16131F),
+                                        style: TextStyle(color: fv.primaryText,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -418,8 +415,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: Text(
                             community.rules!.trim(),
-                            style: const TextStyle(
-                              color: Color(0xFF5A5668),
+                            style: TextStyle(color: fv.secondaryText,
                               height: 1.4,
                             ),
                           ),
@@ -452,7 +448,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                             ),
                             title: Text(
                               member.displayName,
-                              style: const TextStyle(color: Color(0xFF16131F)),
+                              style: TextStyle(color: fv.primaryText),
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -523,9 +519,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: _members.isEmpty
-                            ? const Text(
-                                'No members yet.',
-                                style: TextStyle(color: Color(0xFF5A5668)),
+                            ? Text('No members yet.', style: TextStyle(color: fv.secondaryText),
                               )
                             : Column(
                                 children: [
@@ -549,15 +543,13 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                       ),
                                       title: Text(
                                         member.displayName,
-                                        style: const TextStyle(
-                                          color: Color(0xFF16131F),
+                                        style: TextStyle(color: fv.primaryText,
                                         ),
                                       ),
                                       subtitle: member.username != null
                                           ? Text(
                                               '@${member.username}',
-                                              style: const TextStyle(
-                                                color: Color(0xFF5A5668),
+                                              style: TextStyle(color: fv.secondaryText,
                                               ),
                                             )
                                           : null,
@@ -582,15 +574,16 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
   }
 
   Widget _chip(String label) {
+    final fv = context.fv;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: FirstVueColors.elevatedSurface,
+        color: fv.elevatedSurface,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
-        style: const TextStyle(color: Color(0xFF5A5668), fontSize: 11),
+        style: TextStyle(color: fv.secondaryText, fontSize: 11),
       ),
     );
   }

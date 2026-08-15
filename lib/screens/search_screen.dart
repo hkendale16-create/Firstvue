@@ -4,6 +4,7 @@ import '../navigation/firstvue_page_route.dart';
 import '../screens/community_detail_screen.dart';
 import '../screens/community_hub_detail_screen.dart';
 import '../screens/firstvue_business_profile_screen.dart';
+import '../screens/hashtag_posts_screen.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../services/search_autocomplete_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -91,7 +92,14 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         );
       case SearchResultType.hashtag:
-        _search(result.label.replaceFirst('#', ''));
+        Navigator.push(
+          context,
+          FirstVuePageRoute(
+            builder: (_) => HashtagPostsScreen(
+              tag: result.label.replaceFirst('#', '').toLowerCase(),
+            ),
+          ),
+        );
     }
   }
 
