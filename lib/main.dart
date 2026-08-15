@@ -348,7 +348,9 @@ class _FirstVueHomeState extends State<FirstVueHome> {
               child: FirstVueRefreshScaffold(
                 onRefresh: _refreshHomeTab,
                 child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: ClampingScrollPhysics(),
+                  ),
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                   children: [
                     Row(

@@ -24,6 +24,7 @@ import '../screens/privacy_settings_screen.dart';
 import '../screens/settings_preferences_screen.dart';
 import '../services/admin_auth_service.dart';
 import '../theme/firstvue_theme.dart';
+
 typedef FirstVueSettingsOpen = void Function(Widget screen);
 
 /// Full-screen Settings shell (replaces the clipped end drawer).
