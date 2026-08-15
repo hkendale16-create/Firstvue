@@ -2,6 +2,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/feature_flags.dart';
+import 'event_geocode_service.dart';
 import 'live_business_open_service.dart';
 import 'live_home_service.dart';
 import 'location_service.dart';
@@ -221,6 +222,12 @@ class LiveMapService {
       bounds: bounds,
       limit: limit,
     );
+    await _addEventsFromLocationLabels(
+      pins: pins,
+      seen: seen,
+      bounds: bounds,
+      limit: limit,
+    );
     await _addDirectoryBusinesses(
       pins: pins,
       seen: seen,
@@ -302,6 +309,47 @@ class LiveMapService {
         if (row['latitude'] != null && row['longitude'] != null) continue;
         final event = _mapEventRow(row);
         final point = _pointFromBusinessJoin(row);
+        if (point == null) continue;
+        if (bounds != null && !bounds.contains(point)) continue;
+        final pin = _pinFromEvent(
+          event.copyWith(latitude: point.latitude, longitude: point.longitude),
+          point,
+        );
+        if (seen.add(pin.id)) pins.add(pin);
+      }
+    } catch (_) {}
+  }
+
+  /// Legacy events: location_label only (created before map pins).
+  static Future<void> _addEventsFromLocationLabels({
+    required List<LiveMapPin> pins,
+    required Set<String> seen,
+    required LiveMapBounds? bounds,
+    required int limit,
+  }) async {
+    try {
+      final rows = await _client
+          .from('community_events')
+          .select(
+            'id, title, description, event_at, ends_at, location_label, organizer_id, '
+            'business_id, status, cover_storage_path, cover_storage_provider, '
+            'latitude, longitude, businesses(name)',
+          )
+          .eq('status', 'approved')
+          .isFilter('latitude', null)
+          .not('location_label', 'is', null)
+          .limit(limit);
+
+      var geocodeBudget = 12;
+      for (final row in rows) {
+        final event = _mapEventRow(row);
+        if (event.locationLabel == null ||
+            event.locationLabel!.trim().isEmpty) {
+          continue;
+        }
+        if (geocodeBudget <= 0) break;
+        geocodeBudget -= 1;
+        final point = await EventGeocodeService.resolve(event.locationLabel);
         if (point == null) continue;
         if (bounds != null && !bounds.contains(point)) continue;
         final pin = _pinFromEvent(

@@ -82,7 +82,10 @@ class LiveHomeService {
   }
 
   /// Lifecycle from start + optional ends_at.
-  /// When ends_at is missing, keeps the start-only heuristic.
+  ///
+  /// When [endsAt] is missing (common for events created before Phase 7),
+  /// stay discoverable through the end of the event's local calendar day
+  /// so same-day classes / delayed events do not vanish after ~6 hours.
   static LiveLifecycleStatus lifecycleFor(
     DateTime? eventAt, {
     DateTime? endsAt,
@@ -101,10 +104,19 @@ class LiveHomeService {
       return LiveLifecycleStatus.live;
     }
 
-    // Without ends_at: first 5 hours LIVE, 6th hour ending soon.
-    if (minutesUntil > -5 * 60) return LiveLifecycleStatus.live;
-    if (minutesUntil > -6 * 60) return LiveLifecycleStatus.endingSoon;
-    return LiveLifecycleStatus.ended;
+    // Implicit same-day window for legacy events without ends_at.
+    final dayEnd = DateTime(
+      eventAt.year,
+      eventAt.month,
+      eventAt.day,
+      23,
+      59,
+      59,
+    );
+    if (!dayEnd.isAfter(n)) return LiveLifecycleStatus.ended;
+    final minutesToEnd = dayEnd.difference(n).inMinutes;
+    if (minutesToEnd <= 60) return LiveLifecycleStatus.endingSoon;
+    return LiveLifecycleStatus.live;
   }
 
   static String lifecycleLabel(LiveLifecycleStatus status) {

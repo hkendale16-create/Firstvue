@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/business_submission_service.dart';
+import '../services/event_geocode_service.dart';
 import '../services/location_service.dart';
 import '../services/things_to_do_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -11,6 +12,7 @@ import '../theme/live_tokens.dart';
 import '../widgets/event_date_time_fields.dart';
 import '../widgets/media_picker_sheet.dart';
 import '../widgets/network_photo.dart';
+import '../widgets/smart_address_field.dart';
 
 enum EditEventMode { create, edit, duplicate }
 
@@ -98,6 +100,21 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
     setState(() => _submitting = true);
     try {
+      // Legacy / text-only locations: geocode so LIVE map can show the event.
+      var lat = _latitude;
+      var lng = _longitude;
+      if (!_clearCoordinates &&
+          (lat == null || lng == null) &&
+          _location.text.trim().isNotEmpty) {
+        final point = await EventGeocodeService.resolve(_location.text);
+        if (point != null) {
+          lat = point.latitude;
+          lng = point.longitude;
+          _latitude = lat;
+          _longitude = lng;
+        }
+      }
+
       if (widget.mode == EditEventMode.edit && widget.event != null) {
         await ThingsToDoService.updateEvent(
           eventId: widget.event!.id,
@@ -107,9 +124,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
           endsAt: _endsAt,
           locationLabel: _location.text,
           businessId: _businessId,
-          latitude: _latitude,
-          longitude: _longitude,
-          clearCoordinates: _clearCoordinates && _latitude == null,
+          latitude: lat,
+          longitude: lng,
+          clearCoordinates: _clearCoordinates && lat == null,
           coverPhoto: _coverPhoto,
           clearCover: _clearCover && _coverPhoto == null,
           status: publish ? 'approved' : widget.event!.status,
@@ -129,8 +146,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
             endsAt: _endsAt,
             locationLabel: _location.text,
             businessId: _businessId,
-            latitude: _latitude,
-            longitude: _longitude,
+            latitude: lat,
+            longitude: lng,
             coverPhoto: _coverPhoto,
           );
         } else {
@@ -141,8 +158,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
             endsAt: _endsAt,
             locationLabel: _location.text,
             businessId: _businessId,
-            latitude: _latitude,
-            longitude: _longitude,
+            latitude: lat,
+            longitude: lng,
             coverPhoto: _coverPhoto,
           );
         }
@@ -269,10 +286,31 @@ class _EditEventScreenState extends State<EditEventScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: _location,
-            style: TextStyle(color: fv.primaryText),
-            decoration: const InputDecoration(labelText: 'Location'),
+          SmartAddressField(
+            streetController: _location,
+            streetLabel: 'Location',
+            showUnitField: false,
+            showStructuredFields: false,
+            onSelected: (AddressResult result) {
+              final label = (result.formatted?.trim().isNotEmpty ?? false)
+                  ? result.formatted!.trim()
+                  : [
+                      result.street,
+                      result.city,
+                      result.state,
+                      result.zip,
+                    ].where((p) => p.trim().isNotEmpty).join(', ');
+              if (label.isNotEmpty) {
+                _location.text = label;
+              }
+              setState(() {
+                if (result.lat != null && result.lng != null) {
+                  _latitude = result.lat;
+                  _longitude = result.lng;
+                  _clearCoordinates = false;
+                }
+              });
+            },
           ),
           const SizedBox(height: 18),
           EventDateTimeFields(
@@ -300,7 +338,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
           Text(
             _latitude != null && _longitude != null
                 ? 'Pinned: ${_latitude!.toStringAsFixed(5)}, ${_longitude!.toStringAsFixed(5)}'
-                : 'No map pin yet. Events without coordinates only appear via a linked business location.',
+                : 'No map pin yet. Choosing a suggested address, linking a business with a location, or using current location will place it on LIVE map. Older text-only locations are geocoded on save.',
             style: TextStyle(color: context.fv.secondaryText, fontSize: 12),
           ),
           const SizedBox(height: 8),
@@ -375,7 +413,42 @@ class _EditEventScreenState extends State<EditEventScreen> {
                         ),
                       ),
                     ],
-                    onChanged: (value) => setState(() => _businessId = value),
+                    onChanged: (value) async {
+                      setState(() => _businessId = value);
+                      if (value == null) return;
+                      if (_latitude != null && _longitude != null) return;
+                      try {
+                        final loc =
+                            await BusinessSubmissionService.fetchLocation(value);
+                        final lat = double.tryParse(loc['latitude'] ?? '');
+                        final lng = double.tryParse(loc['longitude'] ?? '');
+                        if (!mounted) return;
+                        if (lat == null || lng == null) return;
+                        setState(() {
+                          _latitude = lat;
+                          _longitude = lng;
+                          _clearCoordinates = false;
+                          if (_location.text.trim().isEmpty) {
+                            final formatted = loc['formatted_address']?.trim();
+                            if (formatted != null && formatted.isNotEmpty) {
+                              _location.text = formatted;
+                            } else {
+                              final parts = [
+                                loc['address'],
+                                loc['city'],
+                                loc['state'],
+                                loc['zip'],
+                              ]
+                                  .whereType<String>()
+                                  .where((p) => p.trim().isNotEmpty);
+                              if (parts.isNotEmpty) {
+                                _location.text = parts.join(', ');
+                              }
+                            }
+                          }
+                        });
+                      } catch (_) {}
+                    },
                   ),
                   const SizedBox(height: 18),
                 ],
