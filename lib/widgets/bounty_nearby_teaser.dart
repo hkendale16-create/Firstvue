@@ -82,8 +82,8 @@ class BountyNearbyTeaser extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   [
-                    if (distance != null) distance,
-                    if (campaign.locationLabel != null) campaign.locationLabel,
+                    ?distance,
+                    ?campaign.locationLabel,
                   ].join(' · '),
                   style: TextStyle(color: palette.tertiaryText, fontSize: 12),
                 ),
