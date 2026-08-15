@@ -147,7 +147,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
         builder: (_) => EditCommunityScreen(community: community),
       ),
     );
-    if (!mounted) return;
+    if (!context.mounted) return;
     if (updated == 'deleted') {
       Navigator.pop(context);
       return;

@@ -683,7 +683,7 @@ class _CommunityHubDetailScreenState extends State<CommunityHubDetailScreen> {
                     ),
                   ),
                 );
-                if (!mounted) return;
+                if (!context.mounted) return;
                 if (result == 'deleted') {
                   Navigator.pop(context);
                   return;
