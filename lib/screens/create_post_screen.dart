@@ -63,6 +63,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   ];
 
   final _body = TextEditingController();
+  final _bodyFocus = FocusNode();
   List<XFile> _attachedMedia = const [];
   List<PostIdentityOption> _identityOptions = const [];
   PostIdentityOption? _selectedIdentity;
@@ -79,11 +80,16 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     if (widget.initialBody != null) {
       _body.text = widget.initialBody!;
     }
+    _bodyFocus.addListener(_onBodyFocusChanged);
     _destination = widget.initialDestination ??
         (_hasLockedEntityScope
             ? PublishDestination.entityOnly
             : PublishDestination.feed);
     _loadIdentities();
+  }
+
+  void _onBodyFocusChanged() {
+    if (mounted) setState(() {});
   }
 
   bool get _hasLockedEntityScope =>
@@ -100,6 +106,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   @override
   void dispose() {
+    _bodyFocus.removeListener(_onBodyFocusChanged);
+    _bodyFocus.dispose();
     _body.dispose();
     super.dispose();
   }
@@ -297,32 +305,53 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
                   constraints: const BoxConstraints(minHeight: 220),
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                  padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
                   decoration: BoxDecoration(
-                    color: preview ?? fv.elevatedSurface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: fv.borderSubtle.withValues(alpha: 0.55)),
+                    // Soft fill (stronger while focused) marks the writing
+                    // zone without a hard border — more seamless composer.
+                    color: preview ??
+                        (_bodyFocus.hasFocus
+                            ? fv.elevatedSurface
+                            : Color.alphaBlend(
+                                fv.elevatedSurface.withValues(alpha: 0.42),
+                                fv.background,
+                              )),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: MentionAutocompleteField(
-                    controller: _body,
-                    minLines: 8,
-                    maxLines: null,
-                    hintText: 'Share news… Use #hashtags and @handles.',
-                    style: TextStyle(
-                      color: fv.primaryText,
-                      fontSize: 16,
-                      height: 1.35,
+                  child: Theme(
+                    data: Theme.of(context).copyWith(
+                      textSelectionTheme: TextSelectionThemeData(
+                        cursorColor: FirstVueColors.teal,
+                        selectionColor:
+                            FirstVueColors.teal.withValues(alpha: 0.28),
+                        selectionHandleColor: FirstVueColors.teal,
+                      ),
                     ),
-                    decoration: InputDecoration(
+                    child: MentionAutocompleteField(
+                      controller: _body,
+                      focusNode: _bodyFocus,
+                      minLines: 8,
+                      maxLines: null,
                       hintText: 'Share news… Use #hashtags and @handles.',
-                      hintStyle: TextStyle(color: fv.tertiaryText, fontSize: 16),
-                      filled: true,
-                      fillColor: Colors.transparent,
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
+                      style: TextStyle(
+                        color: fv.primaryText,
+                        fontSize: 16,
+                        height: 1.35,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Share news… Use #hashtags and @handles.',
+                        hintStyle:
+                            TextStyle(color: fv.tertiaryText, fontSize: 16),
+                        filled: true,
+                        fillColor: Colors.transparent,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      onChanged: (_) => setState(() {}),
                     ),
-                    onChanged: (_) => setState(() {}),
                   ),
                 ),
                 const SizedBox(height: 10),
