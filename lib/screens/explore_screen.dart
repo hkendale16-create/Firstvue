@@ -116,15 +116,30 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   List<ExploreItem> get _visibleItems {
     final items = _snap.items;
+    // People = personal profiles (+ their posts). Entity tabs never show profiles.
+    final byKind = _section == ExploreSection.people
+        ? [
+            for (final item in items)
+              if (item.kind == ExploreItemKind.profile ||
+                  (item.kind == ExploreItemKind.post &&
+                      item.post != null &&
+                      !item.post!.isEntityAuthor))
+                item,
+          ]
+        : [
+            for (final item in items)
+              if (item.kind != ExploreItemKind.profile) item,
+          ];
+
     final needle = (_filterBusinessType ?? '').trim().toLowerCase();
-    if (needle.isEmpty) return items;
+    if (needle.isEmpty) return byKind;
     if (_section == ExploreSection.people ||
         _section == ExploreSection.communities ||
         _section == ExploreSection.groups) {
-      return items;
+      return byKind;
     }
     return [
-      for (final item in items)
+      for (final item in byKind)
         if ((item.post?.businessType ?? item.entity?.subtitle ?? '')
             .toLowerCase()
             .contains(needle))
@@ -133,16 +148,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   void _openItem(ExploreItem item) {
-    if (item.kind == ExploreItemKind.post && item.post != null) {
-      Navigator.push(
-        context,
-        FirstVuePageRoute(
-          builder: (_) => PostDetailScreen(postId: item.post!.id),
-        ),
-      );
-      return;
-    }
+    // Profile cards belong only under People.
     if (item.kind == ExploreItemKind.profile && item.profile != null) {
+      if (_section != ExploreSection.people) return;
       openMemberProfile(
         context,
         profileId: item.profile!.id,
@@ -150,39 +158,91 @@ class _ExploreScreenState extends State<ExploreScreen> {
       );
       return;
     }
+
     final entity = item.entity;
-    if (entity == null) return;
-    switch (entity.kind) {
-      case 'community':
-        EntityNavigation.openShoutoutTarget(
-          context,
-          type: ShoutoutTargetType.community,
-          id: entity.id,
-        );
+    if (item.kind == ExploreItemKind.entity && entity != null) {
+      switch (entity.kind) {
+        case 'community':
+          EntityNavigation.openShoutoutTarget(
+            context,
+            type: ShoutoutTargetType.community,
+            id: entity.id,
+          );
+          return;
+        case 'group':
+          EntityNavigation.openShoutoutTarget(
+            context,
+            type: ShoutoutTargetType.group,
+            id: entity.id,
+          );
+          return;
+        case 'event':
+          EntityNavigation.openEvent(context, entity.id);
+          return;
+        case 'rental':
+          Navigator.push(
+            context,
+            FirstVuePageRoute(builder: (_) => const RentalsScreen()),
+          );
+          return;
+        case 'business':
+          EntityNavigation.openShoutoutTarget(
+            context,
+            type: ShoutoutTargetType.business,
+            id: entity.id,
+          );
+          return;
+      }
+    }
+
+    final post = item.post;
+    if (item.kind == ExploreItemKind.post && post != null) {
+      // Entity tabs: open the business/entity, never a personal member profile.
+      if (_section != ExploreSection.people) {
+        final businessId = post.businessId?.trim();
+        if (businessId != null && businessId.isNotEmpty) {
+          EntityNavigation.openShoutoutTarget(
+            context,
+            type: ShoutoutTargetType.business,
+            id: businessId,
+          );
+          return;
+        }
+        final professionalId = post.professionalProfileId?.trim();
+        if (professionalId != null && professionalId.isNotEmpty) {
+          EntityNavigation.openShoutoutTarget(
+            context,
+            type: ShoutoutTargetType.professional,
+            id: professionalId,
+          );
+          return;
+        }
+        final eventId = post.eventId?.trim();
+        if (eventId != null && eventId.isNotEmpty) {
+          EntityNavigation.openEvent(context, eventId);
+          return;
+        }
+        final communityId = post.communityId?.trim();
+        if (communityId != null && communityId.isNotEmpty) {
+          EntityNavigation.openShoutoutTarget(
+            context,
+            type: _section == ExploreSection.communities
+                ? ShoutoutTargetType.community
+                : ShoutoutTargetType.group,
+            id: communityId,
+          );
+          return;
+        }
+        // No entity id — still refuse to open a personal profile from entity tabs.
         return;
-      case 'group':
-        EntityNavigation.openShoutoutTarget(
-          context,
-          type: ShoutoutTargetType.group,
-          id: entity.id,
-        );
-        return;
-      case 'event':
-        EntityNavigation.openEvent(context, entity.id);
-        return;
-      case 'rental':
-        Navigator.push(
-          context,
-          FirstVuePageRoute(builder: (_) => const RentalsScreen()),
-        );
-        return;
-      case 'business':
-        EntityNavigation.openShoutoutTarget(
-          context,
-          type: ShoutoutTargetType.business,
-          id: entity.id,
-        );
-        return;
+      }
+
+      Navigator.push(
+        context,
+        FirstVuePageRoute(
+          builder: (_) => PostDetailScreen(postId: post.id),
+        ),
+      );
     }
   }
 
@@ -204,7 +264,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             const SocialPageHeader(
               title: 'EXPLORE',
               subtitle:
-                  'Discover local people, places, and communities — each section stands on its own.',
+                  'People are personal profiles. Businesses, events, and places are entities — each tab stays separate.',
             ),
             const SizedBox(height: 16),
             SocialSearchBar(
@@ -384,7 +444,9 @@ class _ExploreResultTile extends StatelessWidget {
           : item.entity?.subtitle,
       dateLabel: isNew ? 'NEW' : null,
       showPlay: item.isVideo && item.videoUrl == null,
-      showFollowOverlay: item.kind == ExploreItemKind.profile,
+      showFollowOverlay:
+          item.kind == ExploreItemKind.profile &&
+          item.section == ExploreSection.people,
       onTap: onTap,
     );
   }

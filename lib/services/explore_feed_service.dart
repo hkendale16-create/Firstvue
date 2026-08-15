@@ -11,6 +11,7 @@ import '../services/profile_cards.dart';
 import '../services/profile_media_service.dart';
 import '../services/rentals_store.dart';
 import '../services/things_to_do_service.dart';
+import '../services/trending_businesses_service.dart';
 import '../utils/explore_category_filter.dart';
 
 /// Isolated Explore queries. Each section uses its own filter configuration.
@@ -54,7 +55,11 @@ class ExploreFeedService {
           beforeId: beforeId,
           limit: limit,
         ),
-        ExploreSection.businesses ||
+        ExploreSection.businesses => _fetchBusinesses(
+          beforeCreatedAt: beforeCreatedAt,
+          beforeId: beforeId,
+          limit: limit,
+        ),
         ExploreSection.food ||
         ExploreSection.bars ||
         ExploreSection.thingsToDo => _fetchEntityPosts(
@@ -84,8 +89,11 @@ class ExploreFeedService {
       ExploreSection.groups => query.or(
         'author_profile_type.eq.community,community_id.not.is.null',
       ),
+      // Businesses: real businesses only — never personal member posts.
+      ExploreSection.businesses => query.or(
+        'author_profile_type.eq.business,business_id.not.is.null',
+      ),
       ExploreSection.rentals ||
-      ExploreSection.businesses ||
       ExploreSection.food ||
       ExploreSection.bars ||
       ExploreSection.thingsToDo => query.or(
@@ -276,6 +284,50 @@ class ExploreFeedService {
     return value.startsWith('@') ? value : '@$value';
   }
 
+  static Future<ExplorePageResult> _fetchBusinesses({
+    DateTime? beforeCreatedAt,
+    String? beforeId,
+    required int limit,
+  }) async {
+    final items = <ExploreItem>[];
+
+    // First page: approved business entities (not personal profiles).
+    if (beforeCreatedAt == null) {
+      try {
+        final businesses =
+            await TrendingBusinessesService.fetchTrendingNearYou(limit: 24);
+        for (final business in businesses) {
+          items.add(
+            ExploreItem.entityItem(
+              section: ExploreSection.businesses,
+              entity: ExploreEntityCard(
+                id: business.id,
+                kind: 'business',
+                name: business.name,
+                imageUrl: business.imageUrl,
+                subtitle: business.services.isEmpty
+                    ? null
+                    : business.services.take(2).join(' · '),
+                verified: business.verified,
+              ),
+            ),
+          );
+        }
+      } catch (error, stack) {
+        debugPrint('Explore businesses catalog failed: $error\n$stack');
+      }
+    }
+
+    final postPage = await _fetchEntityPosts(
+      section: ExploreSection.businesses,
+      beforeCreatedAt: beforeCreatedAt,
+      beforeId: beforeId,
+      limit: limit,
+    );
+    items.addAll(postPage.items);
+    return _page(items, limit: limit);
+  }
+
   static Future<ExplorePageResult> _fetchEntityPosts({
     required ExploreSection section,
     DateTime? beforeCreatedAt,
@@ -291,6 +343,13 @@ class ExploreFeedService {
     final items = <ExploreItem>[];
     for (final post in posts) {
       if (post.media.isEmpty) continue;
+      // Entity tabs never surface personal member content.
+      if (!post.isEntityAuthor) continue;
+      if (section == ExploreSection.businesses &&
+          (post.businessId == null || post.businessId!.trim().isEmpty) &&
+          post.resolvedAuthorProfileType != 'business') {
+        continue;
+      }
       if (!ExploreCategoryFilter.matches(post, section)) continue;
       items.add(ExploreItem.postItem(section: section, post: post));
     }
