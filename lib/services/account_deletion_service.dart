@@ -80,37 +80,85 @@ class AccountDeletionService {
     return const AccountDeletionBlockers(blocked: false);
   }
 
+  /// Deletes the signed-in account.
+  ///
+  /// Prefers Edge Function `delete-account` when deployed; otherwise uses
+  /// SQL RPC `delete_my_account` (no Edge Function required).
   static Future<void> deleteAccount() async {
     final user = _client.auth.currentUser;
     if (user == null) {
       throw const AuthException('Sign in to delete your account.');
     }
 
-    final response = await _client.functions.invoke(
-      'delete-account',
-      body: const {},
-    );
+    // 1) Prefer Edge Function when available.
+    try {
+      final response = await _client.functions.invoke(
+        'delete-account',
+        body: const {},
+      );
+      if (response.status == 200) {
+        await _client.auth.signOut();
+        return;
+      }
+      if (response.status != 404) {
+        final data = response.data;
+        if (data is Map) {
+          final blockersRaw = data['blockers'];
+          AccountDeletionBlockers? blockers;
+          if (blockersRaw is Map) {
+            blockers = AccountDeletionBlockers.fromJson(
+              blockersRaw.cast<String, dynamic>(),
+            );
+          }
+          throw AccountDeletionException(
+            data['error']?.toString() ??
+                'Unable to delete your account right now.',
+            blockers: blockers,
+          );
+        }
+        throw AccountDeletionException(
+          'Unable to delete your account (${response.status}).',
+        );
+      }
+    } on FunctionException catch (error) {
+      if (error.status != 404) {
+        throw AccountDeletionException(
+          error.details?.toString() ??
+              error.reasonPhrase ??
+              'Unable to delete your account right now.',
+        );
+      }
+      // Fall through to SQL path when function is not deployed.
+    } on AccountDeletionException {
+      rethrow;
+    } catch (_) {
+      // Fall through to SQL path on network / missing-function errors.
+    }
 
-    if (response.status == 200) {
+    // 2) SQL self-delete RPC (works without Edge Functions).
+    final result = await _client.rpc('delete_my_account');
+    Map<String, dynamic>? map;
+    if (result is Map<String, dynamic>) {
+      map = result;
+    } else if (result is Map) {
+      map = result.cast<String, dynamic>();
+    }
+
+    if (map != null && map['blocked'] == true) {
+      throw AccountDeletionException(
+        map['message']?.toString() ??
+            'Transfer or delete your businesses and communities first.',
+        blockers: AccountDeletionBlockers.fromJson(map),
+      );
+    }
+
+    if (map != null && map['deleted'] == true) {
+      await _client.auth.signOut();
       return;
     }
 
-    final data = response.data;
-    if (data is Map) {
-      final blockersRaw = data['blockers'];
-      AccountDeletionBlockers? blockers;
-      if (blockersRaw is Map) {
-        blockers = AccountDeletionBlockers.fromJson(
-          blockersRaw.cast<String, dynamic>(),
-        );
-      }
-      final message = data['error']?.toString() ??
-          'Unable to delete your account right now.';
-      throw AccountDeletionException(message, blockers: blockers);
-    }
-
-    throw AccountDeletionException(
-      'Unable to delete your account (${response.status}).',
+    throw const AccountDeletionException(
+      'Unable to delete your account right now.',
     );
   }
 }
