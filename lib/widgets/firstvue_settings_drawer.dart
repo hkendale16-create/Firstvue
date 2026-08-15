@@ -119,9 +119,28 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    const EarlyAccessBadge(compact: true),
+                    EarlyAccessBadge(
+                      compact: true,
+                      onTap: user == null
+                          ? _handleAccount
+                          : () => _open(const HelpBuildFirstVueScreen()),
+                    ),
                   ],
                 ),
+              ),
+              _SettingsGroup(
+                title: 'Early Access',
+                children: [
+                  _SettingsTile(
+                    icon: Icons.chat_bubble_outline,
+                    title: 'Send feedback',
+                    subtitle:
+                        'Bugs, ideas, confusion & what’s missing near you',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => _open(const HelpBuildFirstVueScreen()),
+                  ),
+                ],
               ),
               _SettingsGroup(
                 title: 'Your profile',
@@ -271,14 +290,6 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                     subtitle: 'Sections tour or opening a business entity',
                     onTap: () => showOnboardingTourReplay(context),
                   ),
-                  _SettingsTile(
-                    icon: Icons.construction_outlined,
-                    title: 'Help Build FirstVue',
-                    subtitle: 'Feedback, bugs & feature ideas',
-                    onTap: user == null
-                        ? _handleAccount
-                        : () => _open(const HelpBuildFirstVueScreen()),
-                  ),
                 ],
               ),
               if (_adminLoaded && _isAdmin)
@@ -337,6 +348,14 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                     title: 'About FirstVue',
                     subtitle: 'Early Access & app version',
                     onTap: () => _open(const AboutFirstVueScreen()),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.chat_bubble_outline,
+                    title: 'Send feedback',
+                    subtitle: 'Help shape Early Access',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => _open(const HelpBuildFirstVueScreen()),
                   ),
                   _SettingsTile(
                     icon: Icons.privacy_tip_outlined,

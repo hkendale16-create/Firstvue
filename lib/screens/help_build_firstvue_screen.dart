@@ -56,7 +56,7 @@ class _HelpBuildFirstVueScreenState extends State<HelpBuildFirstVueScreen> {
         backgroundColor: fv.background,
         surfaceTintColor: Colors.transparent,
         foregroundColor: fv.primaryText,
-        title: const Text('Help Build FirstVue'),
+        title: const Text('Send feedback'),
       ),
       body: Align(
         alignment: Alignment.topCenter,
@@ -77,7 +77,7 @@ class _HelpBuildFirstVueScreenState extends State<HelpBuildFirstVueScreen> {
               ),
               const SizedBox(height: 18),
               Text(
-                'You’re shaping what FirstVue becomes.',
+                'Help Build FirstVue',
                 style: TextStyle(
                   fontFamily: 'CormorantGaramond',
                   color: fv.primaryText,
@@ -88,7 +88,8 @@ class _HelpBuildFirstVueScreenState extends State<HelpBuildFirstVueScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Share bugs, confusion, ideas, and what’s missing near you. We read every note.',
+                'You’re shaping what FirstVue becomes. Pick a category below — '
+                'bugs, confusion, ideas, and what’s missing near you.',
                 style: TextStyle(color: fv.secondaryText, height: 1.45),
               ),
               const SizedBox(height: 28),
