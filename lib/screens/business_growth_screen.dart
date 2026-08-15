@@ -3,13 +3,13 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../config/feature_flags.dart';
 import '../config/monetization_config.dart';
+import '../navigation/firstvue_page_route.dart';
 import '../services/business_submission_service.dart';
 import '../services/business_subscription_service.dart';
 import '../services/monetization_products_service.dart';
 import '../services/stripe_billing_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'business_campaign_dashboard_screen.dart';
-import '../navigation/firstvue_page_route.dart';
 
 class BusinessGrowthScreen extends StatefulWidget {
   const BusinessGrowthScreen({super.key});
@@ -52,6 +52,18 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
     await _data;
   }
 
+  void _ensureSelection(List<OwnedBusiness> businesses) {
+    if (businesses.isEmpty) return;
+    final stillValid = businesses.any((b) => b.id == _selectedBusinessId);
+    if (_selectedBusinessId == null || !stillValid) {
+      // Defer setState so we never mutate during build.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _selectedBusinessId = businesses.first.id);
+      });
+    }
+  }
+
   Future<void> _subscribe(BusinessPlan plan) async {
     final businessId = _selectedBusinessId;
     if (businessId == null) {
@@ -85,15 +97,32 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
     );
   }
 
+  void _showComingSoon(String feature) {
+    _showMessage('$feature — payments coming soon during Early Access.');
+  }
+
+  void _openCampaignDashboard() {
+    Navigator.of(context).push(
+      FirstVuePageRoute(
+        builder: (_) => const BusinessCampaignDashboardScreen(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('FIRSTVUE FOR BUSINESS'),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         actions: [
-          IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: _refresh,
+            icon: const Icon(Icons.refresh),
+          ),
         ],
       ),
       body: FutureBuilder<_GrowthData>(
@@ -107,9 +136,23 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
 
           if (snapshot.hasError) {
             return Center(
-              child: Text(
-                'Unable to load business growth tools.',
-                style: TextStyle(color: Colors.white.withValues(alpha: .7)),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Unable to load business growth tools.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: fv.secondaryText),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: _refresh,
+                      child: const Text('Try again'),
+                    ),
+                  ],
+                ),
               ),
             );
           }
@@ -120,29 +163,31 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
           if (businesses.isEmpty) {
             return ListView(
               padding: const EdgeInsets.all(20),
-              children: const [
+              children: [
                 Text(
                   'Turn attention into customers',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: fv.primaryText,
                     fontSize: 23,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
                   'Create or claim a business profile to activate subscriptions and growth tools.',
-                  style: TextStyle(color: Colors.white54, height: 1.45),
+                  style: TextStyle(color: fv.secondaryText, height: 1.45),
                 ),
               ],
             );
           }
 
-          _selectedBusinessId ??= businesses.first.id;
+          _ensureSelection(businesses);
+          final selectedId = _selectedBusinessId ?? businesses.first.id;
           final selected = businesses.firstWhere(
-            (business) => business.id == _selectedBusinessId,
+            (business) => business.id == selectedId,
+            orElse: () => businesses.first,
           );
-          final subscription = data.subscriptions[_selectedBusinessId!];
+          final subscription = data.subscriptions[selectedId];
           final paymentsEnabled = FeatureFlags.effectiveBusinessSubscriptions;
           final verifiedPrice = data.verifiedProduct.priceLabel;
           final proPrice = data.proProduct.priceLabel;
@@ -150,10 +195,10 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
           return ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              const Text(
+              Text(
                 'Turn attention into customers',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: fv.primaryText,
                   fontSize: 23,
                   fontWeight: FontWeight.bold,
                 ),
@@ -161,7 +206,7 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
               const SizedBox(height: 8),
               Text(
                 'Managing growth for ${selected.name}',
-                style: const TextStyle(color: Colors.white54),
+                style: TextStyle(color: fv.secondaryText),
               ),
               const SizedBox(height: 16),
               if (!paymentsEnabled) ...[
@@ -169,28 +214,28 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: FirstVueColors.surface,
+                    color: fv.surface,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: FirstVueColors.gold.withValues(alpha: .35),
                     ),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Payments coming soon — plan previews and analytics are available, '
                     'but Stripe checkout is disabled during the trial.',
-                    style: TextStyle(color: Colors.white70, height: 1.45),
+                    style: TextStyle(color: fv.secondaryText, height: 1.45),
                   ),
                 ),
                 const SizedBox(height: 16),
               ],
               DropdownButtonFormField<String>(
-                initialValue: _selectedBusinessId,
-                dropdownColor: FirstVueColors.elevatedSurface,
+                initialValue: selectedId,
+                dropdownColor: fv.elevatedSurface,
                 decoration: InputDecoration(
                   labelText: 'Business',
-                  labelStyle: const TextStyle(color: Colors.white54),
+                  labelStyle: TextStyle(color: fv.tertiaryText),
                   filled: true,
-                  fillColor: FirstVueColors.surface,
+                  fillColor: fv.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -199,10 +244,16 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                   for (final business in businesses)
                     DropdownMenuItem(
                       value: business.id,
-                      child: Text(business.name),
+                      child: Text(
+                        business.name,
+                        style: TextStyle(color: fv.primaryText),
+                      ),
                     ),
                 ],
-                onChanged: (value) => setState(() => _selectedBusinessId = value),
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => _selectedBusinessId = value);
+                },
               ),
               if (subscription != null && subscription.isActive) ...[
                 const SizedBox(height: 14),
@@ -210,7 +261,7 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: FirstVueColors.surface,
+                    color: fv.surface,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: FirstVueColors.teal.withValues(alpha: .35),
@@ -219,7 +270,7 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                   child: Text(
                     'Active plan: ${subscription.plan.name.toUpperCase()} '
                     '(${subscription.status})',
-                    style: const TextStyle(color: Colors.white70),
+                    style: TextStyle(color: fv.secondaryText),
                   ),
                 ),
               ],
@@ -228,9 +279,14 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                 name: 'BASIC',
                 price: 'FREE',
                 features: 'Business listing • Services • Photos • Reviews',
-                isCurrent: subscription == null || subscription.plan == BusinessPlan.basic,
+                isCurrent:
+                    subscription == null || subscription.plan == BusinessPlan.basic,
                 isLoading: false,
-                onUpgrade: null,
+                actionLabel: null,
+                onAction: null,
+                onTap: () => _showMessage(
+                  'Basic is your free listing plan — always available.',
+                ),
               ),
               _PlanCard(
                 name: 'VERIFIED',
@@ -239,12 +295,30 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                 isCurrent: subscription?.plan == BusinessPlan.verified &&
                     subscription!.isActive,
                 isLoading: _checkoutLoading,
-                onUpgrade: !paymentsEnabled
-                    ? null
-                    : subscription?.plan == BusinessPlan.verified &&
+                actionLabel: !paymentsEnabled
+                    ? 'COMING SOON'
+                    : (subscription?.plan == BusinessPlan.verified &&
                             subscription!.isActive
                         ? null
-                        : () => _subscribe(BusinessPlan.verified),
+                        : 'UPGRADE WITH STRIPE'),
+                onAction: !paymentsEnabled
+                    ? () => _showComingSoon('Verified')
+                    : (subscription?.plan == BusinessPlan.verified &&
+                            subscription!.isActive
+                        ? null
+                        : () => _subscribe(BusinessPlan.verified)),
+                onTap: () {
+                  if (!paymentsEnabled) {
+                    _showComingSoon('Verified');
+                    return;
+                  }
+                  if (subscription?.plan == BusinessPlan.verified &&
+                      subscription!.isActive) {
+                    _showMessage('Verified is already your active plan.');
+                    return;
+                  }
+                  _subscribe(BusinessPlan.verified);
+                },
               ),
               _PlanCard(
                 name: 'FIRSTVUE PRO',
@@ -253,28 +327,51 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                 isCurrent:
                     subscription?.plan == BusinessPlan.pro && subscription!.isActive,
                 isLoading: _checkoutLoading,
-                onUpgrade: !paymentsEnabled
-                    ? null
-                    : subscription?.plan == BusinessPlan.pro &&
+                actionLabel: !paymentsEnabled
+                    ? 'COMING SOON'
+                    : (subscription?.plan == BusinessPlan.pro &&
                             subscription!.isActive
                         ? null
-                        : () => _subscribe(BusinessPlan.pro),
+                        : 'UPGRADE WITH STRIPE'),
+                onAction: !paymentsEnabled
+                    ? () => _showComingSoon('FirstVue Pro')
+                    : (subscription?.plan == BusinessPlan.pro &&
+                            subscription!.isActive
+                        ? null
+                        : () => _subscribe(BusinessPlan.pro)),
+                onTap: () {
+                  if (!paymentsEnabled) {
+                    _showComingSoon('FirstVue Pro');
+                    return;
+                  }
+                  if (subscription?.plan == BusinessPlan.pro &&
+                      subscription!.isActive) {
+                    _showMessage('FirstVue Pro is already your active plan.');
+                    return;
+                  }
+                  _subscribe(BusinessPlan.pro);
+                },
               ),
               if (FeatureFlags.vueBountiesEnabled) ...[
                 const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      FirstVuePageRoute(
-                        builder: (_) => const BusinessCampaignDashboardScreen(),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _openCampaignDashboard,
+                    icon: const Icon(Icons.campaign_outlined),
+                    label: const Text('Open VUE Bounty campaign dashboard'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: FirstVueColors.teal,
+                      side: BorderSide(
+                        color: FirstVueColors.teal.withValues(alpha: 0.5),
                       ),
-                    );
-                  },
-                  child: const Text('Open VUE Bounty campaign dashboard'),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
                 ),
               ],
               const SizedBox(height: 22),
-              const Text(
+              Text(
                 'PROMOTE',
                 style: TextStyle(
                   color: FirstVueColors.gold,
@@ -283,23 +380,30 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              const _Tool(
+              _Tool(
                 icon: Icons.push_pin_outlined,
                 title: 'Featured placement',
                 subtitle: 'Configurable boost products — payments coming soon',
+                onTap: () => _showComingSoon('Featured placement'),
               ),
-              const _Tool(
+              _Tool(
                 icon: Icons.ads_click,
                 title: 'Sponsored search & feed',
                 subtitle: 'CPC or CPM • Always clearly labeled',
+                onTap: () => _showComingSoon('Sponsored placements'),
               ),
-              const _Tool(
+              _Tool(
                 icon: Icons.campaign_outlined,
                 title: 'Promotional campaigns',
-                subtitle: 'Budget set per campaign product — not hardcoded here',
+                subtitle: FeatureFlags.vueBountiesEnabled
+                    ? 'Open your VUE Bounty campaign dashboard'
+                    : 'Budget set per campaign product — not hardcoded here',
+                onTap: FeatureFlags.vueBountiesEnabled
+                    ? _openCampaignDashboard
+                    : () => _showComingSoon('Promotional campaigns'),
               ),
               const SizedBox(height: 22),
-              const Text(
+              Text(
                 'PERFORMANCE',
                 style: TextStyle(
                   color: FirstVueColors.gold,
@@ -308,13 +412,37 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              const Row(
+              Row(
                 children: [
-                  Expanded(child: _Metric(value: '—', label: 'Video views')),
-                  SizedBox(width: 10),
-                  Expanded(child: _Metric(value: '—', label: 'Profile taps')),
-                  SizedBox(width: 10),
-                  Expanded(child: _Metric(value: '—', label: 'Leads')),
+                  Expanded(
+                    child: _Metric(
+                      value: '—',
+                      label: 'Video views',
+                      onTap: () => _showMessage(
+                        'Analytics populate after paid plans go live.',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _Metric(
+                      value: '—',
+                      label: 'Profile taps',
+                      onTap: () => _showMessage(
+                        'Analytics populate after paid plans go live.',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _Metric(
+                      value: '—',
+                      label: 'Leads',
+                      onTap: () => _showMessage(
+                        'Lead insights unlock with FirstVue Pro.',
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 14),
@@ -322,7 +450,7 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                 paymentsEnabled
                     ? 'Subscriptions are processed securely by Stripe. Your card is never stored in FirstVue.'
                     : 'Paid subscriptions will be available soon. Your card will never be stored in FirstVue.',
-                style: const TextStyle(color: Colors.white54, height: 1.45),
+                style: TextStyle(color: fv.tertiaryText, height: 1.45),
               ),
             ],
           );
@@ -352,7 +480,9 @@ class _PlanCard extends StatelessWidget {
   final String features;
   final bool isCurrent;
   final bool isLoading;
-  final VoidCallback? onUpgrade;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final VoidCallback? onTap;
 
   const _PlanCard({
     required this.name,
@@ -360,81 +490,101 @@ class _PlanCard extends StatelessWidget {
     required this.features,
     required this.isCurrent,
     required this.isLoading,
-    required this.onUpgrade,
+    required this.actionLabel,
+    required this.onAction,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(17),
-      decoration: BoxDecoration(
-        color: FirstVueColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isCurrent
-              ? FirstVueColors.teal.withValues(alpha: .45)
-              : FirstVueColors.gold.withValues(alpha: .2),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    final fv = context.fv;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Ink(
+            padding: const EdgeInsets.all(17),
+            decoration: BoxDecoration(
+              color: fv.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: isCurrent
+                    ? FirstVueColors.teal.withValues(alpha: .45)
+                    : FirstVueColors.gold.withValues(alpha: .2),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: TextStyle(
+                              color: fv.primaryText,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            features,
+                            style: TextStyle(
+                              color: fv.secondaryText,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     Text(
-                      name,
+                      price,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: FirstVueColors.gold,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Text(
-                      features,
-                      style: const TextStyle(color: Colors.white54, fontSize: 12),
-                    ),
                   ],
                 ),
-              ),
-              Text(
-                price,
-                style: const TextStyle(
-                  color: FirstVueColors.gold,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
+                if (isCurrent) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'Current plan',
+                    style: TextStyle(
+                      color: FirstVueColors.teal.withValues(alpha: .9),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+                if (actionLabel != null && onAction != null) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: isLoading ? null : onAction,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: FirstVueColors.coral,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor:
+                            FirstVueColors.coral.withValues(alpha: 0.45),
+                      ),
+                      child: Text(
+                        isLoading ? 'OPENING STRIPE...' : actionLabel!,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
-          if (isCurrent) ...[
-            const SizedBox(height: 10),
-            Text(
-              'Current plan',
-              style: TextStyle(
-                color: FirstVueColors.teal.withValues(alpha: .9),
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-              ),
-            ),
-          ] else if (onUpgrade != null) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: isLoading ? null : onUpgrade,
-                style: FilledButton.styleFrom(
-                  backgroundColor: FirstVueColors.coral,
-                  foregroundColor: Colors.white,
-                ),
-                child: Text(isLoading ? 'OPENING STRIPE...' : 'UPGRADE WITH STRIPE'),
-              ),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -444,52 +594,70 @@ class _Tool extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final VoidCallback onTap;
 
   const _Tool({
     required this.icon,
     required this.title,
     required this.subtitle,
+    required this.onTap,
   });
 
   @override
-  Widget build(BuildContext context) => ListTile(
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-    leading: Icon(icon, color: FirstVueColors.gold),
-    title: Text(title, style: const TextStyle(color: Colors.white)),
-    subtitle: Text(subtitle, style: const TextStyle(color: Colors.white54)),
-    trailing: const Icon(Icons.chevron_right, color: Colors.white38),
-  );
+  Widget build(BuildContext context) {
+    final fv = context.fv;
+    return ListTile(
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+      leading: Icon(icon, color: FirstVueColors.gold),
+      title: Text(title, style: TextStyle(color: fv.primaryText)),
+      subtitle: Text(subtitle, style: TextStyle(color: fv.secondaryText)),
+      trailing: Icon(Icons.chevron_right, color: fv.mutedIcon),
+    );
+  }
 }
 
 class _Metric extends StatelessWidget {
   final String value;
   final String label;
+  final VoidCallback onTap;
 
-  const _Metric({required this.value, required this.label});
+  const _Metric({
+    required this.value,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 5),
-    decoration: BoxDecoration(
-      color: FirstVueColors.surface,
+  Widget build(BuildContext context) {
+    final fv = context.fv;
+    return Material(
+      color: fv.surface,
       borderRadius: BorderRadius.circular(14),
-    ),
-    child: Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 5),
+          child: Column(
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  color: fv.primaryText,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: fv.tertiaryText, fontSize: 10),
+              ),
+            ],
           ),
         ),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.white38, fontSize: 10),
-        ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
