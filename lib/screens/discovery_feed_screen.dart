@@ -23,6 +23,16 @@ import 'full_screen_media_viewer.dart';
 import 'member_public_profile_screen.dart';
 import 'post_detail_screen.dart';
 
+/// Keep a previously painted VUE mosaic when a reset returns zero usable items
+/// (sign failures / timeouts). Used by [DiscoveryFeedScreen] and unit tests.
+bool shouldRetainVueItems({
+  required bool reset,
+  required int previousCount,
+  required int incomingCount,
+}) {
+  return reset && incomingCount == 0 && previousCount > 0;
+}
+
 class DiscoveryFeedScreen extends StatefulWidget {
   const DiscoveryFeedScreen({super.key});
 
@@ -36,7 +46,9 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   VueFeedMode _mode = VueTabPreference.current;
   String? _error;
   bool _loadingMore = false;
+  bool _refreshing = false;
   bool _hasMore = true;
+  int _loadGeneration = 0;
   final _loadMoreGate = ScrollLoadMoreGate(thresholdPx: 480);
 
   @override
@@ -58,6 +70,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
     bool reset = false,
     int limit = 30,
   }) async {
+    final generation = ++_loadGeneration;
     try {
       final items = await DiscoveryFeedService.fetchFeed(
         mode: _mode,
@@ -67,11 +80,26 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
       final usable = items
           .where((item) => item.mediaUrl.trim().isNotEmpty)
           .toList();
-      if (!mounted) return usable;
+      if (!mounted || generation != _loadGeneration) return usable;
+
+      // Empty "success" (sign timeouts / missing objects) must not wipe a
+      // mosaic the user is already scrolling.
+      if (shouldRetainVueItems(
+        reset: reset,
+        previousCount: _items.length,
+        incomingCount: usable.length,
+      )) {
+        setState(() {
+          _error = null;
+          _hasMore = false;
+        });
+        return _items;
+      }
+
       final arranged = reset
           ? await _arrangeFeatured(usable)
           : [..._items, ...usable];
-      if (!mounted) return usable;
+      if (!mounted || generation != _loadGeneration) return usable;
       setState(() {
         _items = arranged;
         _error = null;
@@ -80,7 +108,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
       if (reset) _loadMoreGate.reset();
       return usable;
     } catch (error) {
-      if (!mounted) return const [];
+      if (!mounted || generation != _loadGeneration) return const [];
       setState(() {
         // Never blank an already-visible mosaic on refresh / load-more failure.
         if (reset && _items.isEmpty) {
@@ -98,15 +126,19 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
     setState(() {
       _error = null;
       _hasMore = true;
+      _refreshing = true;
       _feedFuture = _loadFeed(reset: true);
     });
     try {
       await _feedFuture;
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
   }
 
   Future<void> _loadMore() async {
-    if (_loadingMore || !_hasMore) return;
+    if (_loadingMore || _refreshing || !_hasMore) return;
     setState(() => _loadingMore = true);
     try {
       await _loadFeed(reset: false);
@@ -281,11 +313,14 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                       _mode = next;
                       _error = null;
                       _hasMore = true;
-                      _items = const [];
+                      _refreshing = true;
+                      // Keep the current mosaic visible while the next mode loads.
                     });
                     _loadMoreGate.reset();
                     VueTabPreference.save(next);
-                    _feedFuture = _loadFeed(reset: true);
+                    _feedFuture = _loadFeed(reset: true).whenComplete(() {
+                      if (mounted) setState(() => _refreshing = false);
+                    });
                   },
                 ),
                 const SizedBox(height: 6),

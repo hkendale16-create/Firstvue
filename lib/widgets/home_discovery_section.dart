@@ -133,8 +133,9 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
           const _HomeRentalsSection()
         else
           _MixedSocialFeed(
-            key: ValueKey('$label-${widget.refreshToken}'),
+            key: ValueKey(label),
             label: label,
+            refreshToken: widget.refreshToken,
             loadBusinesses: () => _loadBusinessesForLabel(label),
             onSeeAllPeople: _openPeopleToFollow,
             showPeopleToFollow: label == 'Recommended',
@@ -144,8 +145,9 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
   }
 }
 
-class _MixedSocialFeed extends StatelessWidget {
+class _MixedSocialFeed extends StatefulWidget {
   final String label;
+  final int refreshToken;
   final Future<List<TrendingBusiness>> Function() loadBusinesses;
   final VoidCallback onSeeAllPeople;
   final bool showPeopleToFollow;
@@ -153,17 +155,50 @@ class _MixedSocialFeed extends StatelessWidget {
   const _MixedSocialFeed({
     super.key,
     required this.label,
+    required this.refreshToken,
     required this.loadBusinesses,
     required this.onSeeAllPeople,
     this.showPeopleToFollow = false,
   });
 
   @override
+  State<_MixedSocialFeed> createState() => _MixedSocialFeedState();
+}
+
+class _MixedSocialFeedState extends State<_MixedSocialFeed> {
+  late Future<List<TrendingBusiness>> _future;
+  List<TrendingBusiness> _businesses = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _MixedSocialFeed oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.label != widget.label ||
+        oldWidget.refreshToken != widget.refreshToken) {
+      _future = _load();
+    }
+  }
+
+  Future<List<TrendingBusiness>> _load() async {
+    final items = await widget.loadBusinesses();
+    if (mounted) {
+      setState(() => _businesses = items);
+    }
+    return items;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<TrendingBusiness>>(
-      future: loadBusinesses(),
+      future: _future,
       builder: (context, snapshot) {
-        final businesses = snapshot.data ?? const <TrendingBusiness>[];
+        // Prefer last good data so parent rebuilds / soft refreshes do not blank.
+        final businesses = snapshot.data ?? _businesses;
         final waiting =
             snapshot.connectionState == ConnectionState.waiting &&
             businesses.isEmpty;
@@ -182,7 +217,7 @@ class _MixedSocialFeed extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Text(
-                  label == 'Coming Soon'
+                  widget.label == 'Coming Soon'
                       ? 'No coming-soon listings near you yet.'
                       : 'Nothing here yet. Pull to refresh.',
                   style: TextStyle(color: context.fv.secondaryText),
@@ -190,9 +225,9 @@ class _MixedSocialFeed extends StatelessWidget {
               )
             else if (businesses.isNotEmpty)
               _InteractiveBusinessCard(business: businesses.first),
-            if (showPeopleToFollow) ...[
+            if (widget.showPeopleToFollow) ...[
               const SizedBox(height: 18),
-              PeopleToFollowRow(onSeeAll: onSeeAllPeople),
+              PeopleToFollowRow(onSeeAll: widget.onSeeAllPeople),
             ],
             const SizedBox(height: 18),
             const _FeaturedEventCard(),

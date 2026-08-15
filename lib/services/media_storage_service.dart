@@ -40,6 +40,14 @@ class MediaStorageService {
   /// while anon still succeeds. Fail fast so Explore/feeds can soft-fallback.
   static const _signTimeout = Duration(seconds: 4);
 
+  /// Skip re-signing missing objects while scrolling (avoids 400 storms that
+  /// blank tiles and can destabilize Flutter web).
+  static const _missingTtl = Duration(minutes: 15);
+  static const _maxConcurrentSigns = 4;
+  static final Map<String, DateTime> _missingPaths = {};
+  static int _inflightSigns = 0;
+  static final List<Completer<void>> _signWaiters = [];
+
   static bool _isPublicSocialBucket(MediaBucket bucket) {
     return bucket == MediaBucket.profile ||
         bucket == MediaBucket.business ||
@@ -47,6 +55,51 @@ class MediaStorageService {
         bucket == MediaBucket.communityNews ||
         bucket == MediaBucket.event ||
         bucket == MediaBucket.rental;
+  }
+
+  static String _cacheKey(MediaBucket bucket, String path) =>
+      '${bucket.id}|$path';
+
+  static bool _isKnownMissing(MediaBucket bucket, String path) {
+    final at = _missingPaths[_cacheKey(bucket, path)];
+    if (at == null) return false;
+    if (DateTime.now().difference(at) > _missingTtl) {
+      _missingPaths.remove(_cacheKey(bucket, path));
+      return false;
+    }
+    return true;
+  }
+
+  static void _rememberMissing(MediaBucket bucket, String path) {
+    _missingPaths[_cacheKey(bucket, path)] = DateTime.now();
+  }
+
+  @visibleForTesting
+  static void clearMissingPathCache() => _missingPaths.clear();
+
+  static bool _looksLikeMissingObject(Object error) {
+    final text = error.toString().toLowerCase();
+    return text.contains('nosuchkey') ||
+        text.contains('not_found') ||
+        text.contains('object not found') ||
+        text.contains('404');
+  }
+
+  static Future<T> _withSignSlot<T>(Future<T> Function() run) async {
+    while (_inflightSigns >= _maxConcurrentSigns) {
+      final gate = Completer<void>();
+      _signWaiters.add(gate);
+      await gate.future;
+    }
+    _inflightSigns++;
+    try {
+      return await run();
+    } finally {
+      _inflightSigns--;
+      if (_signWaiters.isNotEmpty) {
+        _signWaiters.removeAt(0).complete();
+      }
+    }
   }
 
   static Future<String> createReadUrl({
@@ -59,11 +112,14 @@ class MediaStorageService {
     if (trimmed.isEmpty) return '';
 
     // Demo / external assets store absolute URLs in storage_path.
+    // Also treat bare http(s) paths as external even if provider is mis-tagged.
     if (provider == MediaStorageProvider.external ||
         trimmed.startsWith('https://') ||
         trimmed.startsWith('http://')) {
       return trimmed;
     }
+
+    if (_isKnownMissing(bucket, trimmed)) return '';
 
     if (provider == MediaStorageProvider.s3 || useAwsMedia) {
       try {
@@ -78,41 +134,52 @@ class MediaStorageService {
       }
     }
 
-    try {
-      return await _client.storage
-          .from(bucket.id)
-          .createSignedUrl(trimmed, 3600)
-          .timeout(_signTimeout);
-    } catch (error, stack) {
-      assert(() {
-        debugPrint(
-          'MediaStorageService.createReadUrl failed '
-          '(${bucket.id}/$trimmed): $error\n$stack',
-        );
-        return true;
-      }());
-    }
-
-    // Authenticated storage signing can fail while anon still works (broken
-    // storage policies / schema). Fall back for public social media only.
-    if (_client.auth.currentSession != null && _isPublicSocialBucket(bucket)) {
+    return _withSignSlot(() async {
       try {
-        return await _publicSignClient.storage
+        return await _client.storage
             .from(bucket.id)
             .createSignedUrl(trimmed, 3600)
             .timeout(_signTimeout);
       } catch (error, stack) {
+        if (_looksLikeMissingObject(error)) {
+          _rememberMissing(bucket, trimmed);
+        }
         assert(() {
           debugPrint(
-            'MediaStorageService.createReadUrl anon fallback failed '
+            'MediaStorageService.createReadUrl failed '
             '(${bucket.id}/$trimmed): $error\n$stack',
           );
           return true;
         }());
       }
-    }
 
-    return '';
+      // Authenticated storage signing can fail while anon still works (broken
+      // storage policies / schema). Fall back for public social media only.
+      // Skip anon retry when we already know the object is missing.
+      if (!_isKnownMissing(bucket, trimmed) &&
+          _client.auth.currentSession != null &&
+          _isPublicSocialBucket(bucket)) {
+        try {
+          return await _publicSignClient.storage
+              .from(bucket.id)
+              .createSignedUrl(trimmed, 3600)
+              .timeout(_signTimeout);
+        } catch (error, stack) {
+          if (_looksLikeMissingObject(error)) {
+            _rememberMissing(bucket, trimmed);
+          }
+          assert(() {
+            debugPrint(
+              'MediaStorageService.createReadUrl anon fallback failed '
+              '(${bucket.id}/$trimmed): $error\n$stack',
+            );
+            return true;
+          }());
+        }
+      }
+
+      return '';
+    });
   }
 
   static Future<MediaUploadResult> uploadBytes({

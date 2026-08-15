@@ -84,8 +84,10 @@ class DiscoveryFeedService {
     }
 
     final pageLimit = limit + offset;
+    // Oversample business media: many DB rows point at missing storage objects
+    // and drop after sign failure. Extra rows keep VUE from going sparse/blank.
     final businessItems = await safe(
-      () => _fetchBusinessMedia(limit: pageLimit),
+      () => _fetchBusinessMedia(limit: pageLimit * 3),
     );
     final memberItems = await safe(
       () => _fetchMemberProfileMedia(limit: pageLimit),
