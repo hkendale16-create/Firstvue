@@ -7,7 +7,7 @@ void main() {
     expect(flags, contains('FIRSTVUE_PAYMENTS'));
     expect(flags, contains('defaultValue: false'));
     final stripe = File('lib/services/stripe_billing_service.dart').readAsStringSync();
-    expect(stripe, contains('FeatureFlags.paymentsEnabled'));
+    expect(stripe, contains('FeatureFlags.effectiveBusinessSubscriptions'));
   });
 
   test('account deletion UI and edge function exist', () {

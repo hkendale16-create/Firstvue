@@ -1,4 +1,9 @@
+import 'monetization_config.dart';
+
 /// Feature flags for incomplete platform capabilities.
+///
+/// Monetization money flows default OFF. [vueBountiesEnabled] may be ON for
+/// architecture/UI testing without funding or payouts.
 class FeatureFlags {
   FeatureFlags._();
 
@@ -10,8 +15,51 @@ class FeatureFlags {
   );
 
   /// Stripe checkout and paid upgrades. Default off during trial.
+  /// Prefer [businessSubscriptionsEnabled] for new call sites.
   static const paymentsEnabled = bool.fromEnvironment(
     'FIRSTVUE_PAYMENTS',
+    defaultValue: false,
+  );
+
+  /// Business subscription checkout (Stripe web / future IAP).
+  static const businessSubscriptionsEnabled = bool.fromEnvironment(
+    'FIRSTVUE_BUSINESS_SUBSCRIPTIONS',
+    defaultValue: false,
+  );
+
+  /// Paid business / event boost placements.
+  static const businessBoostsEnabled = bool.fromEnvironment(
+    'FIRSTVUE_BUSINESS_BOOSTS',
+    defaultValue: false,
+  );
+
+  /// VUE Bounty architecture + discovery UI (no real funding).
+  static const vueBountiesEnabled = bool.fromEnvironment(
+    'FIRSTVUE_VUE_BOUNTIES',
+    defaultValue: true,
+  );
+
+  /// Real campaign funding authorization. Keep false until provider approved.
+  static const bountyFundingEnabled = bool.fromEnvironment(
+    'FIRSTVUE_BOUNTY_FUNDING',
+    defaultValue: false,
+  );
+
+  /// Creator cash payouts / withdrawals.
+  static const creatorPayoutsEnabled = bool.fromEnvironment(
+    'FIRSTVUE_CREATOR_PAYOUTS',
+    defaultValue: false,
+  );
+
+  /// Share & Earn cash rewards.
+  static const affiliateRewardsEnabled = bool.fromEnvironment(
+    'FIRSTVUE_AFFILIATE_REWARDS',
+    defaultValue: false,
+  );
+
+  /// Paid ticketing.
+  static const ticketingEnabled = bool.fromEnvironment(
+    'FIRSTVUE_TICKETING',
     defaultValue: false,
   );
 
@@ -52,4 +100,35 @@ class FeatureFlags {
     'FIRSTVUE_LIVE_HEAT_ACTIVITY',
     defaultValue: true,
   );
+
+  /// Effective business subscription gate: compile-time OR legacy payments flag.
+  static bool get effectiveBusinessSubscriptions =>
+      paymentsEnabled || businessSubscriptionsEnabled;
+
+  /// True when any real-money path is compile-enabled (still requires server flag).
+  static bool get anyRealMoneyCompileEnabled =>
+      effectiveBusinessSubscriptions ||
+      businessBoostsEnabled ||
+      bountyFundingEnabled ||
+      creatorPayoutsEnabled ||
+      affiliateRewardsEnabled ||
+      ticketingEnabled;
+
+  /// Resolve a monetization flag using compile-time default + optional server override.
+  static bool resolve(String flagKey, {bool? serverEnabled}) {
+    final compile = switch (flagKey) {
+      MonetizationFlagKeys.businessSubscriptions =>
+        effectiveBusinessSubscriptions,
+      MonetizationFlagKeys.businessBoosts => businessBoostsEnabled,
+      MonetizationFlagKeys.vueBounties => vueBountiesEnabled,
+      MonetizationFlagKeys.bountyFunding => bountyFundingEnabled,
+      MonetizationFlagKeys.creatorPayouts => creatorPayoutsEnabled,
+      MonetizationFlagKeys.affiliateRewards => affiliateRewardsEnabled,
+      MonetizationFlagKeys.ticketing => ticketingEnabled,
+      _ => false,
+    };
+    // Both must be true when a server value is known; compile alone for offline.
+    if (serverEnabled == null) return compile;
+    return compile && serverEnabled;
+  }
 }
