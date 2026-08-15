@@ -1,4 +1,4 @@
-package com.example.firstvue
+package app.firstvue.mobile
 
 import io.flutter.embedding.android.FlutterActivity
 

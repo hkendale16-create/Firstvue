@@ -197,6 +197,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'news_comment':
       case 'spark':
       case 'comment':
+      case 'comment_reply':
+      case 'comment_spark':
         final postId = payload['post_id'] as String?;
         if (postId != null) {
           Navigator.push(

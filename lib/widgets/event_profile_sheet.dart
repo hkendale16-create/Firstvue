@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../auth/ensure_signed_in.dart';
+import '../config/app_config.dart';
+import '../models/share_payload.dart';
 import '../services/event_social_service.dart';
 import '../services/things_to_do_service.dart';
+import '../services/user_profile_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'entity_profile_feed_section.dart';
+import 'event_date_time_fields.dart';
+import 'firstvue_share_sheet.dart';
 import 'network_photo.dart';
 
 class EventProfileSheet extends StatefulWidget {
@@ -42,12 +49,23 @@ class EventProfileSheet extends StatefulWidget {
 class _EventProfileSheetState extends State<EventProfileSheet> {
   EventSocialState _social = const EventSocialState();
   bool _loadingSocial = true;
+  bool _busy = false;
   int _refreshToken = 0;
+  String? _organizerName;
 
   @override
   void initState() {
     super.initState();
     _loadSocial();
+    _loadOrganizer();
+  }
+
+  Future<void> _loadOrganizer() async {
+    final organizerId = widget.event.organizerId;
+    if (organizerId == null || organizerId.isEmpty) return;
+    final name = await UserProfileService.fetchDisplayNameForUser(organizerId);
+    if (!mounted) return;
+    setState(() => _organizerName = name);
   }
 
   Future<void> _loadSocial() async {
@@ -65,7 +83,77 @@ class _EventProfileSheetState extends State<EventProfileSheet> {
 
   Future<void> _refresh() async {
     setState(() => _refreshToken++);
-    await _loadSocial();
+    await Future.wait([_loadSocial(), _loadOrganizer()]);
+  }
+
+  Future<void> _setAttendance(EventAttendanceStatus status) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      EventAttendanceStatus? next;
+      if (_social.attendance == status) {
+        await EventSocialService.clearAttendance(widget.event.id);
+        next = null;
+      } else {
+        next = await EventSocialService.setAttendance(widget.event.id, status);
+      }
+      if (!mounted) return;
+      setState(() => _social = EventSocialState(
+            following: _social.following,
+            attendance: next,
+          ));
+    } on AuthException {
+      if (!mounted) return;
+      await ensureSignedIn(context);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to update RSVP.')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _toggleFollow() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final next = await EventSocialService.toggleFollow(
+        widget.event.id,
+        following: !_social.following,
+      );
+      if (!mounted) return;
+      setState(() => _social = EventSocialState(
+            following: next,
+            attendance: _social.attendance,
+          ));
+    } on AuthException {
+      if (!mounted) return;
+      await ensureSignedIn(context);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to save event.')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _shareEvent() {
+    final event = widget.event;
+    FirstVueShareSheet.show(
+      context,
+      payload: SharePayload(
+        title: event.title,
+        link: AppConfig.eventShareUrl(event.id),
+        subtitle: event.locationLabel,
+        detailLine: event.eventAt == null
+            ? null
+            : EventDateTimeFields.formatLabel(event.eventAt),
+      ),
+    );
   }
 
   @override
@@ -137,6 +225,44 @@ class _EventProfileSheetState extends State<EventProfileSheet> {
                           style: const TextStyle(color: FirstVueColors.gold),
                         ),
                       ],
+                      if (_organizerName != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.person_outline,
+                              size: 16,
+                              color: fv.secondaryText,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                'Organized by $_organizerName',
+                                style: TextStyle(color: fv.secondaryText),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (event.eventAt != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.schedule_outlined,
+                              size: 16,
+                              color: fv.secondaryText,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                EventDateTimeFields.formatLabel(event.eventAt),
+                                style: TextStyle(color: fv.secondaryText),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       if (event.locationLabel != null) ...[
                         const SizedBox(height: 8),
                         Row(
@@ -177,51 +303,69 @@ class _EventProfileSheetState extends State<EventProfileSheet> {
                         ? const LinearProgressIndicator(
                             color: FirstVueColors.teal,
                           )
-                        : Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              FilterChip(
-                                label: Text(
-                                  _social.following
-                                      ? 'Following'
-                                      : 'Follow event',
-                                  style: TextStyle(color: fv.primaryText),
-                                ),
-                                selected: _social.following,
-                                selectedColor: FirstVueColors.gold.withValues(
-                                  alpha: .25,
-                                ),
-                                checkmarkColor: FirstVueColors.gold,
-                                backgroundColor: fv.elevatedSurface,
-                                side: BorderSide(color: fv.borderSubtle),
-                                onSelected: (selected) async {
-                                  try {
-                                    final next =
-                                        await EventSocialService.toggleFollow(
-                                          widget.event.id,
-                                          following: selected,
-                                        );
-                                    if (!mounted) return;
-                                    setState(() {
-                                      _social = EventSocialState(
-                                        following: next,
-                                        attendance: _social.attendance,
-                                      );
-                                    });
-                                  } catch (_) {
-                                    if (!mounted) return;
-                                    ScaffoldMessenger.maybeOf(
-                                      this.context,
-                                    )?.showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Could not update event follow.',
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  FilterChip(
+                                    label: const Text('Going'),
+                                    selected: _social.attendance ==
+                                        EventAttendanceStatus.attending,
+                                    onSelected: _busy
+                                        ? null
+                                        : (_) => _setAttendance(
+                                              EventAttendanceStatus.attending,
+                                            ),
+                                  ),
+                                  FilterChip(
+                                    label: const Text('Interested'),
+                                    selected: _social.attendance ==
+                                        EventAttendanceStatus.interested,
+                                    onSelected: _busy
+                                        ? null
+                                        : (_) => _setAttendance(
+                                              EventAttendanceStatus.interested,
+                                            ),
+                                  ),
+                                  FilterChip(
+                                    label: const Text('Not going'),
+                                    selected: _social.attendance ==
+                                        EventAttendanceStatus.notAttending,
+                                    onSelected: _busy
+                                        ? null
+                                        : (_) => _setAttendance(
+                                              EventAttendanceStatus
+                                                  .notAttending,
+                                            ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  OutlinedButton.icon(
+                                    onPressed: _busy ? null : _toggleFollow,
+                                    icon: Icon(
+                                      _social.following
+                                          ? Icons.bookmark
+                                          : Icons.bookmark_border,
+                                      size: 16,
+                                    ),
+                                    label: Text(
+                                      _social.following ? 'Saved' : 'Save',
+                                    ),
+                                  ),
+                                  OutlinedButton.icon(
+                                    onPressed: _shareEvent,
+                                    icon: const Icon(Icons.ios_share, size: 16),
+                                    label: const Text('Share'),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

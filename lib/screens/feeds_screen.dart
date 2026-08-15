@@ -410,6 +410,38 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
     });
   }
 
+  Future<void> _setReaction(int index, PostReactionType type) async {
+    final post = _posts[index];
+    await _withBusy(post.id, () async {
+      final previous = post;
+      final togglingOff = post.myReaction == type;
+      final optimistic = post.copyWith(
+        sparkedByMe: !togglingOff,
+        myReactionType: togglingOff ? null : type.value,
+        sparkCount:
+            post.sparkCount + (togglingOff ? -1 : (post.sparkedByMe ? 0 : 1)),
+      );
+      setState(() => _posts[index] = optimistic);
+      try {
+        final updated = await CommunityNewsService.setReaction(post, type);
+        if (!mounted) return;
+        setState(() => _posts[index] = updated);
+        FeedInteractionService.record(
+          postId: post.id,
+          interactionType: updated.sparkedByMe ? 'spark' : 'unspark',
+          sourceTab: widget.source,
+        );
+      } on AuthException {
+        if (!mounted) return;
+        setState(() => _posts[index] = previous);
+        await _ensureSignedIn();
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _posts[index] = previous);
+      }
+    });
+  }
+
   Future<void> _save(int index) async {
     final post = _posts[index];
     await _withBusy(post.id, () async {
@@ -539,6 +571,7 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
                           )
                       : null,
                   onSpark: () => _spark(i),
+                  onSetReaction: (type) => _setReaction(i, type),
                   onSave: () => _save(i),
                   onComment: () {
                     FeedCommentsSheet.show(

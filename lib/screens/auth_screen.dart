@@ -843,6 +843,19 @@ class _AuthScreenState extends State<AuthScreen> {
                 ],
               ),
             ),
+          if (signIn || create)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Center(
+                child: Text(
+                  'FirstVue is for users 13 and older.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: .55),
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
         ],
       ],
     );

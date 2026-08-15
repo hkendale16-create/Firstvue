@@ -39,15 +39,31 @@ class PostMetadataService {
   }
 
   static Future<void> syncForPost(String postId, String body) async {
-    final parsed = parse(body);
-    if (parsed.hashtags.isEmpty && parsed.mentionUsernames.isEmpty) return;
-
-    for (final tag in parsed.hashtags) {
-      await _linkHashtag(postId, tag);
+    try {
+      await _client.rpc(
+        'sync_post_hashtags',
+        params: {'p_post_id': postId, 'p_body': body},
+      );
+    } catch (_) {
+      final parsed = parse(body);
+      for (final tag in parsed.hashtags) {
+        await _linkHashtag(postId, tag);
+      }
     }
+
+    final parsed = parse(body);
     for (final username in parsed.mentionUsernames) {
       await _linkMention(postId, username);
     }
+  }
+
+  static Future<void> updatePostBody(String postId, String body) async {
+    final trimmed = body.trim();
+    await _client
+        .from('community_news_posts')
+        .update({'body': trimmed})
+        .eq('id', postId);
+    await syncForPost(postId, trimmed);
   }
 
   static Future<void> _linkHashtag(String postId, String tag) async {

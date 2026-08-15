@@ -1,7 +1,8 @@
-import 'dart:ui' show Color;
-
+import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../theme/firstvue_theme.dart';
 
 import 'activity_notifications_service.dart';
 import 'community_news_media_service.dart';
@@ -11,6 +12,43 @@ import 'post_metadata_service.dart';
 import 'profile_cards.dart';
 import 'saved_items_service.dart';
 import '../models/publish_destination.dart';
+
+enum PostReactionType {
+  spark,
+  love,
+  excited,
+  laugh,
+  wow,
+  celebrate;
+
+  String get value => name;
+
+  IconData get icon => switch (this) {
+        PostReactionType.spark => Icons.bolt_rounded,
+        PostReactionType.love => Icons.favorite_rounded,
+        PostReactionType.excited => Icons.auto_awesome_rounded,
+        PostReactionType.laugh => Icons.sentiment_very_satisfied_rounded,
+        PostReactionType.wow => Icons.visibility_rounded,
+        PostReactionType.celebrate => Icons.celebration_rounded,
+      };
+
+  Color get color => switch (this) {
+        PostReactionType.spark => FirstVueColors.gold,
+        PostReactionType.love => const Color(0xFFFF6B8A),
+        PostReactionType.excited => FirstVueColors.teal,
+        PostReactionType.laugh => const Color(0xFFFFC857),
+        PostReactionType.wow => const Color(0xFF8B7CFF),
+        PostReactionType.celebrate => const Color(0xFFFF9F43),
+      };
+
+  static PostReactionType? tryParse(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    for (final type in PostReactionType.values) {
+      if (type.name == raw.trim().toLowerCase()) return type;
+    }
+    return null;
+  }
+}
 
 class ProfileEngagementStats {
   final int postCount;
@@ -23,6 +61,8 @@ class ProfileEngagementStats {
 }
 
 class CommunityNewsPost {
+  static const _unset = Object();
+
   final String id;
   final String body;
   final String authorId;
@@ -44,6 +84,8 @@ class CommunityNewsPost {
   final bool viewerFollowsAuthor;
   final int sparkCount;
   final bool sparkedByMe;
+  final String? myReactionType;
+  final String? entityHandle;
   final bool savedByMe;
   final int repostCount;
   final String visibility;
@@ -80,6 +122,8 @@ class CommunityNewsPost {
     this.viewerFollowsAuthor = false,
     required this.sparkCount,
     required this.sparkedByMe,
+    this.myReactionType,
+    this.entityHandle,
     required this.savedByMe,
     this.repostCount = 0,
     this.visibility = 'public',
@@ -117,10 +161,13 @@ class CommunityNewsPost {
   }
 
   String? get displayAuthorHandle {
-    final handle = authorUsername?.trim();
+    final handle = (entityHandle ?? authorUsername)?.trim();
     if (handle == null || handle.isEmpty) return null;
     return handle.startsWith('@') ? handle : '@$handle';
   }
+
+  PostReactionType? get myReaction =>
+      PostReactionType.tryParse(myReactionType);
 
   String get entityTypeLabel {
     return switch (resolvedAuthorProfileType) {
@@ -181,6 +228,8 @@ class CommunityNewsPost {
     bool? viewerFollowsAuthor,
     int? sparkCount,
     bool? sparkedByMe,
+    Object? myReactionType = _unset,
+    Object? entityHandle = _unset,
     bool? savedByMe,
     int? repostCount,
     String? visibility,
@@ -218,6 +267,12 @@ class CommunityNewsPost {
       viewerFollowsAuthor: viewerFollowsAuthor ?? this.viewerFollowsAuthor,
       sparkCount: sparkCount ?? this.sparkCount,
       sparkedByMe: sparkedByMe ?? this.sparkedByMe,
+      myReactionType: identical(myReactionType, _unset)
+          ? this.myReactionType
+          : myReactionType as String?,
+      entityHandle: identical(entityHandle, _unset)
+          ? this.entityHandle
+          : entityHandle as String?,
       savedByMe: savedByMe ?? this.savedByMe,
       repostCount: repostCount ?? this.repostCount,
       visibility: visibility ?? this.visibility,
@@ -796,9 +851,9 @@ class CommunityNewsService {
     final professionalNames = await _fetchProfessionalNames(professionalIds);
     final eventTitles = await _fetchEventTitles(eventIds);
     final sparkCounts = await _fetchSparkCounts(postIds);
-    final mySparks = currentUserId == null
-        ? const <String>{}
-        : await _fetchMySparks(postIds, currentUserId);
+    final myReactions = currentUserId == null
+        ? const <String, String>{}
+        : await _fetchMyReactions(postIds, currentUserId);
     final mySaves = currentUserId == null
         ? const <String>{}
         : await SavedItemsService.fetchSavedIds(
@@ -812,6 +867,7 @@ class CommunityNewsService {
       authorIds,
       currentUserId: currentUserId,
     );
+    final entityHandles = await _fetchEntityHandlesForPosts(rows);
 
     final posts = <CommunityNewsPost>[];
     for (final row in rows) {
@@ -876,6 +932,16 @@ class CommunityNewsService {
                         ? 'community'
                         : 'user'))
                 .toLowerCase();
+        final entityProfileId =
+            authorProfileId ??
+            businessId ??
+            professionalProfileId ??
+            eventId ??
+            (resolvedType == 'community' ? communityId : null);
+        final entityHandleKey = entityProfileId == null
+            ? null
+            : '$resolvedType:$entityProfileId';
+        final myReaction = myReactions[id];
         final entityDisplayName = contextName?.trim();
         final displayName =
             (resolvedType != 'user' &&
@@ -917,7 +983,10 @@ class CommunityNewsService {
             isMine: isMine,
             viewerFollowsAuthor: followsAuthor,
             sparkCount: sparkCounts[id] ?? 0,
-            sparkedByMe: mySparks.contains(id),
+            sparkedByMe: myReaction != null,
+            myReactionType: myReaction,
+            entityHandle:
+                entityHandleKey == null ? null : entityHandles[entityHandleKey],
             savedByMe: mySaves.contains(id),
             visibility: visibility,
             backgroundColor: backgroundColor,
@@ -979,6 +1048,63 @@ class CommunityNewsService {
 
   static Future<List<CommunityNewsPost>> mapPostRowsPublic(List<dynamic> rows) {
     return _mapPostRows(rows, currentUserId: _client.auth.currentUser?.id);
+  }
+
+  static Future<Map<String, String>> _fetchEntityHandlesForPosts(
+    List<dynamic> rows,
+  ) async {
+    final keys = <String, ({String type, String id})>{};
+    for (final row in rows) {
+      final authorProfileType = row['author_profile_type'] as String?;
+      final businessId = row['business_id'] as String?;
+      final professionalProfileId = row['professional_profile_id'] as String?;
+      final eventId = row['event_id'] as String?;
+      final communityId = row['community_id'] as String?;
+      final authorProfileId = row['author_profile_id'] as String?;
+      final resolvedType =
+          (authorProfileType ??
+                  (businessId != null
+                      ? 'business'
+                      : professionalProfileId != null
+                      ? 'professional'
+                      : eventId != null
+                      ? 'event'
+                      : communityId != null
+                      ? 'community'
+                      : 'user'))
+              .toLowerCase();
+      if (resolvedType == 'user') continue;
+      final entityId =
+          authorProfileId ??
+          businessId ??
+          professionalProfileId ??
+          eventId ??
+          (resolvedType == 'community' ? communityId : null);
+      if (entityId == null) continue;
+      keys['$resolvedType:$entityId'] = (type: resolvedType, id: entityId);
+    }
+    if (keys.isEmpty) return const {};
+
+    try {
+      final orFilters = keys.values
+          .map((entry) => 'and(entity_type.eq.${entry.type},entity_id.eq.${entry.id})')
+          .join(',');
+      final handleRows = await _client
+          .from('entity_handles')
+          .select('entity_type, entity_id, handle')
+          .or(orFilters);
+      final out = <String, String>{};
+      for (final row in handleRows) {
+        final type = row['entity_type'] as String?;
+        final id = row['entity_id'] as String?;
+        final handle = row['handle'] as String?;
+        if (type == null || id == null || handle == null) continue;
+        out['$type:$id'] = handle;
+      }
+      return out;
+    } catch (_) {
+      return const {};
+    }
   }
 
   static Future<Map<String, String>> _fetchProfileNames(
@@ -1286,7 +1412,7 @@ class CommunityNewsService {
     }
   }
 
-  static Future<Set<String>> _fetchMySparks(
+  static Future<Map<String, String>> _fetchMyReactions(
     List<String> postIds,
     String userId,
   ) async {
@@ -1294,12 +1420,29 @@ class CommunityNewsService {
     try {
       final rows = await _client
           .from('community_news_post_sparks')
-          .select('post_id')
+          .select('post_id, reaction_type')
           .eq('user_id', userId)
           .inFilter('post_id', postIds);
-      return rows.map((row) => row['post_id'] as String).toSet();
+      return {
+        for (final row in rows)
+          if (row['post_id'] is String)
+            row['post_id'] as String:
+                (row['reaction_type'] as String?) ?? 'spark',
+      };
     } catch (_) {
-      return {};
+      try {
+        final rows = await _client
+            .from('community_news_post_sparks')
+            .select('post_id')
+            .eq('user_id', userId)
+            .inFilter('post_id', postIds);
+        return {
+          for (final row in rows)
+            if (row['post_id'] is String) row['post_id'] as String: 'spark',
+        };
+      } catch (_) {
+        return {};
+      }
     }
   }
 
@@ -1740,13 +1883,51 @@ class CommunityNewsService {
         .eq('author_id', me.id);
   }
 
-  static Future<CommunityNewsPost> toggleSpark(CommunityNewsPost post) async {
+  static Future<CommunityNewsPost> toggleSpark(CommunityNewsPost post) {
+    return setReaction(post, PostReactionType.spark);
+  }
+
+  static Future<CommunityNewsPost> setReaction(
+    CommunityNewsPost post,
+    PostReactionType reactionType,
+  ) async {
     final me = _client.auth.currentUser;
-    if (me == null) throw const AuthException('Sign in to spark posts.');
+    if (me == null) throw const AuthException('Sign in to react to posts.');
 
     await _ensureProfile(me);
 
-    if (post.sparkedByMe) {
+    final previousReaction = post.myReaction;
+    final togglingOff =
+        previousReaction != null && previousReaction == reactionType;
+
+    try {
+      final result = await _client.rpc(
+        'set_post_reaction',
+        params: {
+          'p_post_id': post.id,
+          'p_reaction_type': reactionType.value,
+        },
+      );
+      if (result is List && result.isNotEmpty) {
+        final row = Map<String, dynamic>.from(result.first as Map);
+        final nextType = row['reaction_type'] as String?;
+        final nextCount =
+            (row['spark_count'] as num?)?.toInt() ?? post.sparkCount;
+        final updated = post.copyWith(
+          sparkedByMe: nextType != null,
+          myReactionType: nextType,
+          sparkCount: nextCount,
+        );
+        if (!togglingOff && !post.isMine && nextType != null) {
+          await _notifySpark(post);
+        }
+        return updated;
+      }
+    } catch (_) {
+      // Fall through to direct upsert when RPC is not deployed yet.
+    }
+
+    if (togglingOff) {
       await _client
           .from('community_news_post_sparks')
           .delete()
@@ -1754,36 +1935,67 @@ class CommunityNewsService {
           .eq('user_id', me.id);
       return post.copyWith(
         sparkedByMe: false,
+        myReactionType: null,
         sparkCount: post.sparkCount > 0 ? post.sparkCount - 1 : 0,
       );
     }
 
-    await _client.from('community_news_post_sparks').insert({
-      'post_id': post.id,
-      'user_id': me.id,
-    });
-
-    if (!post.isMine) {
-      try {
-        final author = await _client
-            .from('community_news_posts')
-            .select('author_id')
-            .eq('id', post.id)
-            .maybeSingle();
-        final recipient = author?['author_id'] as String?;
-        if (recipient != null && recipient != me.id) {
-          await ActivityNotificationsService.notifyUser(
-            userId: recipient,
-            type: 'news_spark',
-            title: 'Someone sparked your news post',
-            body: post.body,
-            payload: {'post_id': post.id},
-          );
-        }
-      } catch (_) {}
+    if (previousReaction != null) {
+      await _client
+          .from('community_news_post_sparks')
+          .update({'reaction_type': reactionType.value})
+          .eq('post_id', post.id)
+          .eq('user_id', me.id);
+      return post.copyWith(
+        sparkedByMe: true,
+        myReactionType: reactionType.value,
+      );
     }
 
-    return post.copyWith(sparkedByMe: true, sparkCount: post.sparkCount + 1);
+    try {
+      await _client.from('community_news_post_sparks').insert({
+        'post_id': post.id,
+        'user_id': me.id,
+        'reaction_type': reactionType.value,
+      });
+    } catch (_) {
+      await _client.from('community_news_post_sparks').insert({
+        'post_id': post.id,
+        'user_id': me.id,
+      });
+    }
+
+    if (!post.isMine) {
+      await _notifySpark(post);
+    }
+
+    return post.copyWith(
+      sparkedByMe: true,
+      myReactionType: reactionType.value,
+      sparkCount: post.sparkCount + 1,
+    );
+  }
+
+  static Future<void> _notifySpark(CommunityNewsPost post) async {
+    final me = _client.auth.currentUser?.id;
+    if (me == null) return;
+    try {
+      final author = await _client
+          .from('community_news_posts')
+          .select('author_id')
+          .eq('id', post.id)
+          .maybeSingle();
+      final recipient = author?['author_id'] as String?;
+      if (recipient != null && recipient != me) {
+        await ActivityNotificationsService.notifyUser(
+          userId: recipient,
+          type: 'news_spark',
+          title: 'Someone sparked your news post',
+          body: post.body,
+          payload: {'post_id': post.id},
+        );
+      }
+    } catch (_) {}
   }
 
   static Future<List<SparkUser>> fetchSparkUsers(

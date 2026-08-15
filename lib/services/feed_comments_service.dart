@@ -280,7 +280,14 @@ class FeedCommentsService {
             type: 'comment_reply',
             title: 'New reply on your comment',
             body: trimmed,
-            payload: {'comment_id': inserted['id'], 'media_id': mediaId},
+            payload: {
+              'comment_id': inserted['id'],
+              'media_id': mediaId,
+              if (mediaId.startsWith('news-post:'))
+                'post_id': CommunityNewsService.normalizePostId(
+                  mediaId.substring('news-post:'.length),
+                ),
+            },
           );
         }
       } else if (mediaId.startsWith('news-post:')) {
@@ -340,12 +347,29 @@ class FeedCommentsService {
         });
         final authorId = comment.authorId;
         if (authorId != null && authorId != me) {
+          String? postId;
+          try {
+            final row = await _client
+                .from('feed_comments')
+                .select('media_id')
+                .eq('id', comment.id)
+                .maybeSingle();
+            final mediaId = row?['media_id'] as String?;
+            if (mediaId != null && mediaId.startsWith('news-post:')) {
+              postId = CommunityNewsService.normalizePostId(
+                mediaId.substring('news-post:'.length),
+              );
+            }
+          } catch (_) {}
           await ActivityNotificationsService.notifyUser(
             userId: authorId,
             type: 'comment_spark',
             title: 'Someone sparked your comment',
             body: comment.body,
-            payload: {'comment_id': comment.id},
+            payload: {
+              'comment_id': comment.id,
+              'post_id': ?postId,
+            },
           );
         }
       }

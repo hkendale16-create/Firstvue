@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/auth_session_controller.dart';
+import '../config/feature_flags.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../screens/admin_business_reviews_screen.dart';
 import '../screens/admin_business_submissions_screen.dart';
@@ -18,6 +19,7 @@ import '../screens/rental_inquiries_screen.dart';
 import '../screens/rentals_screen.dart';
 import '../screens/appearance_settings_screen.dart';
 import '../screens/entity_settings_screen.dart';
+import '../screens/event_planner_screen.dart';
 import '../screens/privacy_settings_screen.dart';
 import '../screens/settings_preferences_screen.dart';
 import '../services/admin_auth_service.dart';
@@ -143,6 +145,14 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                 title: 'Activity',
                 children: [
                   _SettingsTile(
+                    icon: Icons.event_note_outlined,
+                    title: 'Event Planner',
+                    subtitle: 'Create & manage your events',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => _open(const EventPlannerScreen()),
+                  ),
+                  _SettingsTile(
                     icon: Icons.chat_bubble_outline,
                     title: 'Messages',
                     onTap: user == null
@@ -151,7 +161,12 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                   ),
                   _SettingsTile(
                     icon: Icons.trending_up_rounded,
-                    title: 'Growth, plans & analytics',
+                    title: FeatureFlags.paymentsEnabled
+                        ? 'Growth, plans & analytics'
+                        : 'Growth & analytics',
+                    subtitle: FeatureFlags.paymentsEnabled
+                        ? null
+                        : 'Plans preview — payments coming soon',
                     onTap: user == null
                         ? _handleAccount
                         : () => _open(const BusinessGrowthScreen()),

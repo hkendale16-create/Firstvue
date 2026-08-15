@@ -24,6 +24,7 @@ class CommunityNewsPostCard extends StatefulWidget {
   final VoidCallback? onTap;
   final VoidCallback? onAuthorTap;
   final VoidCallback? onSpark;
+  final Future<void> Function(PostReactionType type)? onSetReaction;
   final VoidCallback? onSave;
   final VoidCallback? onComment;
   final VoidCallback? onRepost;
@@ -39,6 +40,7 @@ class CommunityNewsPostCard extends StatefulWidget {
     this.onTap,
     this.onAuthorTap,
     this.onSpark,
+    this.onSetReaction,
     this.onSave,
     this.onComment,
     this.onRepost,
@@ -100,6 +102,58 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
     final horizontalPadding = _isTimeline ? 0.0 : 14.0;
     final topPadding = _isTimeline ? 0.0 : 14.0;
     final handle = post.displayAuthorHandle;
+    final isEntity = post.isEntityAuthor;
+
+    Widget identityLine() {
+      if (isEntity && handle != null) {
+        return Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: post.displayAuthorName,
+                style: TextStyle(
+                  color: context.fv.primaryText,
+                  fontWeight: FontWeight.w700,
+                  fontSize: _isTimeline ? 15 : 14,
+                ),
+              ),
+              TextSpan(
+                text: ' • $handle',
+                style: TextStyle(
+                  color: context.fv.secondaryText,
+                  fontWeight: FontWeight.w500,
+                  fontSize: _isTimeline ? 14 : 13,
+                ),
+              ),
+            ],
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        );
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            post.displayAuthorName,
+            style: TextStyle(
+              color: context.fv.primaryText,
+              fontWeight: FontWeight.w700,
+              fontSize: _isTimeline ? 15 : 14,
+            ),
+          ),
+          if (handle != null)
+            Text(
+              handle,
+              style: TextStyle(
+                color: context.fv.secondaryText,
+                fontSize: 12,
+              ),
+            ),
+        ],
+      );
+    }
 
     final row = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,44 +177,28 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
             children: [
               Row(
                 children: [
-                  Expanded(
-                    child: Text(
-                      post.displayAuthorName,
-                      style: TextStyle(
-                        color: context.fv.primaryText,
-                        fontWeight: FontWeight.w700,
-                        fontSize: _isTimeline ? 15 : 14,
+                  Expanded(child: identityLine()),
+                  if (isEntity)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: FirstVueColors.teal.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        post.entityTypeLabel,
+                        style: TextStyle(
+                          color: FirstVueColors.teal.withValues(alpha: .95),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: FirstVueColors.teal.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      post.entityTypeLabel,
-                      style: TextStyle(
-                        color: FirstVueColors.teal.withValues(alpha: .95),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
                 ],
               ),
-              if (handle != null)
-                Text(
-                  handle,
-                  style: TextStyle(
-                    color: context.fv.secondaryText,
-                    fontSize: 12,
-                  ),
-                ),
               if (post.communityName != null &&
                   post.resolvedAuthorProfileType != 'community') ...[
                 const SizedBox(height: 4),
@@ -201,7 +239,7 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
                   ),
                 ),
               ],
-              if (post.authorUsername != null) ...[
+              if (!isEntity && post.authorUsername != null) ...[
                 const SizedBox(height: 2),
                 Text(
                   '@${post.authorUsername}',
@@ -353,11 +391,18 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
                 child: StopPropagation(
                   child: SparkReactionButton(
                     sparked: post.sparkedByMe,
+                    reactionType: post.myReaction,
                     count: post.sparkCount,
                     onPressed: () {
                       FirstVueFeedbackSounds.playSpark(fromUserTap: true);
                       widget.onSpark!();
                     },
+                    onReactionSelected: widget.onSetReaction == null
+                        ? null
+                        : (type) async {
+                            FirstVueFeedbackSounds.playSpark(fromUserTap: true);
+                            await widget.onSetReaction!(type);
+                          },
                   ),
                 ),
               ),
