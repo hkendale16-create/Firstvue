@@ -6,22 +6,23 @@ import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import '../theme/firstvue_theme.dart';
-import '../utils/web_safari_media.dart';
 import 'network_photo.dart';
 
-/// Muted Explore-grid video preview with visibility-aware controller lifecycle.
+/// Muted grid video preview with a 3-second muted loop.
 ///
-/// Plays silently while mostly visible. Reverse (boomerang) playback is not
-/// reliably supported by `video_player`, so previews use a seamless forward
-/// loop. Controllers are disposed when tiles leave the viewport so Explore does
-/// not keep unlimited players alive.
+/// Used by Explore tiles and the VUE mosaic. Plays silently while mostly
+/// visible; seeks to zero every [previewLoop] so clips stay short. Controllers
+/// dispose when tiles leave the viewport.
 ///
-/// On Flutter web, previews stay poster-only — Safari OOMs when several
-/// CanvasKit video textures stay allocated in the Explore grid.
+/// On Flutter web, at most one controller is live at a time — enough for VUE /
+/// Explore previews without stacking Safari video textures.
 class ExploreGridVideo extends StatefulWidget {
   final String url;
   final String? thumbnailUrl;
   final VoidCallback? onTap;
+
+  /// Preview loop length (seek-to-zero cadence).
+  static const previewLoop = Duration(seconds: 3);
 
   const ExploreGridVideo({
     super.key,
@@ -30,8 +31,8 @@ class ExploreGridVideo extends StatefulWidget {
     this.onTap,
   });
 
-  /// Soft cap on simultaneously initialized Explore video controllers.
-  static int get maxActiveControllers => kIsWeb ? 0 : 4;
+  /// Soft cap on simultaneously initialized Explore / VUE video controllers.
+  static int get maxActiveControllers => kIsWeb ? 1 : 4;
 
   static int _activeControllers = 0;
   static final List<VoidCallback> _waitQueue = <VoidCallback>[];
@@ -77,7 +78,6 @@ class _ExploreGridVideoState extends State<ExploreGridVideo> {
   Timer? _hideDisposeTimer;
   Timer? _previewLoopTimer;
   VoidCallback? _queuedAcquire;
-  static const _previewLoop = Duration(seconds: 3);
 
   @override
   void didUpdateWidget(covariant ExploreGridVideo oldWidget) {
@@ -108,7 +108,7 @@ class _ExploreGridVideoState extends State<ExploreGridVideo> {
     _previewLoopTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
       if (!_visible || !_ready) return;
       final position = controller.value.position;
-      if (position >= _previewLoop) {
+      if (position >= ExploreGridVideo.previewLoop) {
         controller.seekTo(Duration.zero);
       }
     });
@@ -122,6 +122,7 @@ class _ExploreGridVideoState extends State<ExploreGridVideo> {
   }
 
   void _onVisibilityChanged(VisibilityInfo info) {
+    if (!mounted) return;
     final visible = info.visibleFraction >= 0.35;
     if (visible) {
       _hideDisposeTimer?.cancel();
@@ -147,7 +148,8 @@ class _ExploreGridVideoState extends State<ExploreGridVideo> {
   }
 
   void _requestController() {
-    if (webAvoidInlineVideoPreview) return;
+    // Cap concurrent players via [maxActiveControllers] (1 on web). Do not use
+    // [webAvoidInlineVideoPreview] here — that gate is for Feeds only.
     if (_controller != null || _loading || _failed || _holdsSlot) return;
     if (ExploreGridVideo._tryAcquire()) {
       _holdsSlot = true;
