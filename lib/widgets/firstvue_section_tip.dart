@@ -104,7 +104,6 @@ Future<void> maybeShowSectionTip(
       transitionDuration: const Duration(milliseconds: 180),
       pageBuilder: (ctx, anim, secondary) {
         return _SectionTipOverlay(
-          section: section,
           title: content.title,
           body: content.body,
           targetKey: key,
@@ -128,13 +127,11 @@ Future<void> maybeShowSectionTip(
 enum _TipAction { gotIt, skipAll }
 
 class _SectionTipOverlay extends StatelessWidget {
-  final TutorialSection section;
   final String title;
   final String body;
   final GlobalKey? targetKey;
 
   const _SectionTipOverlay({
-    required this.section,
     required this.title,
     required this.body,
     this.targetKey,
