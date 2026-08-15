@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../config/feature_flags.dart';
 import '../constants/business_types.dart';
 import '../models/explore_item.dart';
 import '../models/explore_section.dart';
 import '../navigation/entity_navigation.dart';
 import '../navigation/firstvue_page_route.dart';
+import '../screens/bounty_discovery_screen.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../screens/post_detail_screen.dart';
 import '../screens/rentals_screen.dart';
@@ -266,6 +268,31 @@ class _ExploreScreenState extends State<ExploreScreen> {
               subtitle:
                   'People are personal profiles. Businesses, events, and places are entities — each tab stays separate.',
             ),
+            if (FeatureFlags.vueBountiesEnabled) ...[
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      FirstVuePageRoute(
+                        builder: (_) => const BountyDiscoveryScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(
+                    Icons.local_fire_department_outlined,
+                    size: 18,
+                    color: FirstVueColors.gold,
+                  ),
+                  label: const Text('VUE Bounties nearby'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: FirstVueColors.gold,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             SocialSearchBar(
               iconOnly: true,

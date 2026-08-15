@@ -9,7 +9,11 @@ import '../screens/admin_business_submissions_screen.dart';
 import '../screens/admin_professional_profiles_screen.dart';
 import '../screens/admin_rentals_screen.dart';
 import '../screens/admin_approvals_hub_screen.dart';
+import '../screens/admin_financial_controls_screen.dart';
+import '../screens/bounty_discovery_screen.dart';
+import '../screens/business_campaign_dashboard_screen.dart';
 import '../screens/business_growth_screen.dart';
+import '../screens/creator_earnings_screen.dart';
 import '../screens/join_firstvue_screen.dart';
 import '../screens/legal_policy_screen.dart';
 import '../screens/messages_inbox_screen.dart';
@@ -162,16 +166,42 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                   ),
                   _SettingsTile(
                     icon: Icons.trending_up_rounded,
-                    title: FeatureFlags.paymentsEnabled
+                    title: FeatureFlags.effectiveBusinessSubscriptions
                         ? 'Growth, plans & analytics'
                         : 'Growth & analytics',
-                    subtitle: FeatureFlags.paymentsEnabled
+                    subtitle: FeatureFlags.effectiveBusinessSubscriptions
                         ? null
                         : 'Plans preview — payments coming soon',
                     onTap: user == null
                         ? _handleAccount
                         : () => _open(const BusinessGrowthScreen()),
                   ),
+                  if (FeatureFlags.vueBountiesEnabled) ...[
+                    _SettingsTile(
+                      icon: Icons.local_fire_department_outlined,
+                      title: 'VUE Bounties',
+                      subtitle: 'Discover creator campaigns nearby',
+                      onTap: user == null
+                          ? _handleAccount
+                          : () => _open(const BountyDiscoveryScreen()),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.account_balance_wallet_outlined,
+                      title: 'Creator earnings',
+                      subtitle: 'Applications, pending & history',
+                      onTap: user == null
+                          ? _handleAccount
+                          : () => _open(const CreatorEarningsScreen()),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.campaign_outlined,
+                      title: 'Campaign dashboard',
+                      subtitle: 'Business bounty results',
+                      onTap: user == null
+                          ? _handleAccount
+                          : () => _open(const BusinessCampaignDashboardScreen()),
+                    ),
+                  ],
                   _SettingsTile(
                     icon: Icons.key_outlined,
                     title: 'My rental listings',
@@ -245,6 +275,13 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                       icon: Icons.admin_panel_settings_outlined,
                       title: 'Rental approvals',
                       onTap: () => _open(const AdminRentalsScreen()),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.account_balance_outlined,
+                      title: 'Financial controls',
+                      subtitle: 'Campaigns, ledger, disputes, risk',
+                      onTap: () =>
+                          _open(const AdminFinancialControlsScreen()),
                     ),
                   ],
                 ),
