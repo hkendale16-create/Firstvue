@@ -8,19 +8,28 @@ import '../config/mapbox_config.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../screens/firstvue_business_profile_screen.dart';
 import '../screens/live_event_detail_screen.dart';
+import '../services/live_business_open_service.dart';
 import '../services/live_home_service.dart';
 import '../services/live_map_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../theme/live_tokens.dart';
+import '../widgets/live/live_food_truck_pin_sheet.dart';
 import '../widgets/live/live_map_surface.dart';
 
 /// LIVE Map — Mapbox 3D when token+mobile; OSM dark fallback otherwise.
 class LiveMapScreen extends StatefulWidget {
-  const LiveMapScreen({super.key});
+  final LiveMapFilter? initialFilter;
 
-  static Future<void> open(BuildContext context) {
+  const LiveMapScreen({super.key, this.initialFilter});
+
+  static Future<void> open(
+    BuildContext context, {
+    LiveMapFilter? initialFilter,
+  }) {
     return Navigator.of(context).push(
-      FirstVuePageRoute(builder: (_) => const LiveMapScreen()),
+      FirstVuePageRoute(
+        builder: (_) => LiveMapScreen(initialFilter: initialFilter),
+      ),
     );
   }
 
@@ -29,7 +38,7 @@ class LiveMapScreen extends StatefulWidget {
 }
 
 class _LiveMapScreenState extends State<LiveMapScreen> {
-  LiveMapFilter _filter = LiveMapFilter.liveNow;
+  late LiveMapFilter _filter;
   List<LiveMapPin> _pins = const [];
   List<LiveMapPin> _visible = const [];
   LiveMapPin? _selected;
@@ -46,6 +55,10 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
   @override
   void initState() {
     super.initState();
+    final preferred = widget.initialFilter;
+    _filter = preferred != null && _filters.contains(preferred)
+        ? preferred
+        : LiveMapFilter.liveNow;
     _bootstrap();
   }
 
@@ -137,6 +150,17 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
     if (pin.event != null) {
       await LiveEventDetailScreen.open(context, pin.event!);
       return;
+    }
+    if (pin.kind == LiveMapPinKind.foodTruck &&
+        pin.businessId != null &&
+        pin.businessId!.isNotEmpty) {
+      final session =
+          await LiveBusinessOpenService.activeForBusiness(pin.businessId!);
+      if (!mounted) return;
+      if (session != null && session.isActive) {
+        await showLiveFoodTruckPinSheet(context, session: session);
+        return;
+      }
     }
     if (pin.businessId != null && pin.businessId!.isNotEmpty) {
       await Navigator.push(

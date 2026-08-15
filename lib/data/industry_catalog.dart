@@ -143,6 +143,13 @@ class IndustryCatalog {
       sortOrder: 23,
     ),
     IndustryDefinition(
+      slug: 'food-truck',
+      name: 'Food Truck',
+      template: IndustryTemplate.food,
+      parentSlug: 'food-dining',
+      sortOrder: 24,
+    ),
+    IndustryDefinition(
       slug: 'nightlife',
       name: 'Nightlife',
       template: IndustryTemplate.nightlife,
@@ -329,6 +336,12 @@ class IndustryCatalog {
         type.contains('nail') ||
         type.contains('beauty')) {
       return _resolveKnown('spa');
+    }
+    // Food truck before generic food → restaurant.
+    if (type.contains('food truck') ||
+        type.contains('foodtruck') ||
+        type.contains('food-truck')) {
+      return _resolveKnown('food-truck');
     }
     if (type.contains('restaurant') ||
         type.contains('food') ||

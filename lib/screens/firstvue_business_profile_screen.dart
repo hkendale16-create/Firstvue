@@ -5,12 +5,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/approved_businesses_service.dart';
+import '../services/business_discovery_analytics_service.dart';
 import '../services/business_follow_service.dart';
+import '../services/business_launch_badge_service.dart';
 import '../services/business_media_service.dart';
 import '../services/business_menu_service.dart';
 import '../services/business_reviews_service.dart';
+import '../services/business_scheduled_stops_service.dart';
 import '../services/business_social_links_service.dart';
 import '../services/entity_details_service.dart';
+import '../services/food_truck_discovery_service.dart';
+import '../services/live_business_open_service.dart';
 import '../services/messaging_service.dart';
 import '../services/profile_cards.dart';
 import '../widgets/social_platform_icon.dart';
@@ -33,6 +38,8 @@ import 'business_menu_item_detail_screen.dart';
 import 'meet_the_owner_screen.dart';
 import '../widgets/live/live_business_open_controls.dart';
 import '../config/feature_flags.dart';
+import '../theme/live_tokens.dart';
+import '../data/industry_catalog.dart';
 
 class FirstVueBusinessProfileScreen extends StatefulWidget {
   final String businessId;
@@ -171,16 +178,216 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
   BusinessImageSet _profileImages = const BusinessImageSet();
   int _selectedTab = 0;
   int _followerCount = 0;
+  LiveBusinessOpenSession? _liveSession;
+  List<BusinessLaunchBadge> _badges = const [];
+  List<BusinessScheduledStop> _todayStops = const [];
+
+  bool get _isFoodTruck => FoodTruckDiscoveryService.looksLikeFoodTruck(
+        businessType: widget.details.businessType,
+        industrySlug:
+            IndustryCatalog.fromDisplayType(widget.details.businessType).slug,
+      );
 
   @override
   void initState() {
     super.initState();
     _loadImages();
     _loadFollowerCount();
+    _loadFoodTruckExtras();
     final tabs = EntityProfileTabs.forBusinessType(widget.details.businessType);
     // Prefer MENU first for dining; ABOUT for general businesses.
     _selectedTab = 0;
     assert(tabs.isNotEmpty);
+  }
+
+  Future<void> _loadFoodTruckExtras() async {
+    if (!FeatureFlags.liveFoodTrucksEnabled) return;
+    final live = await LiveBusinessOpenService.activeForBusiness(
+      widget.details.id,
+    );
+    final badges = await BusinessLaunchBadgeService.fetchActiveForBusiness(
+      widget.details.id,
+    );
+    final stops =
+        await BusinessScheduledStopsService.listUpcomingTodayForBusiness(
+      widget.details.id,
+    );
+    if (!mounted) return;
+    setState(() {
+      _liveSession = live;
+      _badges = badges;
+      _todayStops = stops;
+    });
+    if (_isFoodTruck && live != null) {
+      await BusinessDiscoveryAnalyticsService.recordEvent(
+        eventName: 'food_truck_live_viewed',
+        businessId: widget.details.id,
+        sessionId: live.sessionId,
+      );
+    } else if (_isFoodTruck) {
+      await BusinessDiscoveryAnalyticsService.recordEvent(
+        eventName: 'food_truck_profile_viewed',
+        businessId: widget.details.id,
+      );
+    }
+  }
+
+  Future<void> _openLiveDirections() async {
+    final fresh = await LiveBusinessOpenService.activeForBusiness(
+      widget.details.id,
+    );
+    if (!mounted) return;
+    if (fresh == null || !fresh.isActive || !fresh.hasCoordinates) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Live location is no longer active.'),
+        ),
+      );
+      setState(() => _liveSession = fresh);
+      return;
+    }
+    await BusinessDiscoveryAnalyticsService.recordEvent(
+      eventName: 'food_truck_directions_tapped',
+      businessId: fresh.businessId,
+      sessionId: fresh.sessionId,
+    );
+    final uri = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination='
+      '${fresh.latitude},${fresh.longitude}',
+    );
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open directions.')),
+      );
+    }
+  }
+
+  Future<void> _addScheduledStop(String businessId) async {
+    final placeController = TextEditingController();
+    final noteController = TextEditingController();
+    TimeOfDay start = const TimeOfDay(hour: 12, minute: 0);
+    TimeOfDay end = const TimeOfDay(hour: 15, minute: 0);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            return AlertDialog(
+              title: const Text('Scheduled stop'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: placeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Place / neighborhood',
+                        hintText: 'e.g. Piedmont Park',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('Starts ${start.format(ctx)}'),
+                      trailing: const Icon(Icons.schedule),
+                      onTap: () async {
+                        final next = await showTimePicker(
+                          context: ctx,
+                          initialTime: start,
+                        );
+                        if (next != null) setLocal(() => start = next);
+                      },
+                    ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('Ends ${end.format(ctx)}'),
+                      trailing: const Icon(Icons.schedule),
+                      onTap: () async {
+                        final next = await showTimePicker(
+                          context: ctx,
+                          initialTime: end,
+                        );
+                        if (next != null) setLocal(() => end = next);
+                      },
+                    ),
+                    TextField(
+                      controller: noteController,
+                      decoration: const InputDecoration(
+                        labelText: 'Note (optional)',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Scheduled is not the same as LIVE NOW — customers won’t see you as physically present until you Go Live.',
+                      style: Theme.of(ctx).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    final place = placeController.text.trim();
+    final note = noteController.text.trim();
+    placeController.dispose();
+    noteController.dispose();
+    if (confirmed != true || !mounted) return;
+    if (place.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add a place label for the stop.')),
+      );
+      return;
+    }
+    final now = DateTime.now();
+    final startsAt = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      start.hour,
+      start.minute,
+    );
+    var endsAt = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      end.hour,
+      end.minute,
+    );
+    if (!endsAt.isAfter(startsAt)) {
+      endsAt = endsAt.add(const Duration(days: 1));
+    }
+    try {
+      await BusinessScheduledStopsService.create(
+        businessId: businessId,
+        startsAt: startsAt,
+        endsAt: endsAt,
+        placeLabel: place,
+        note: note.isEmpty ? null : note,
+      );
+      await _loadFoodTruckExtras();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Scheduled stop added for today.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save stop: $error')),
+      );
+    }
   }
 
   Future<void> _loadFollowerCount() async {
@@ -313,6 +520,20 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
                 if (isOwnerPreview) ...[
                   if (FeatureFlags.liveFoodTrucksEnabled && isApproved)
                     LiveBusinessOpenControls(businessId: details.id),
+                  if (_isFoodTruck && isApproved) ...[
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () => _addScheduledStop(details.id),
+                        icon: const Icon(Icons.schedule, size: 18),
+                        label: const Text('Add scheduled stop'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: LiveTokens.foodTruck,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
@@ -348,6 +569,58 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
                   ),
                   const SizedBox(height: 16),
                 ],
+                if (!isOwnerPreview &&
+                    FeatureFlags.liveFoodTrucksEnabled &&
+                    _liveSession != null &&
+                    _liveSession!.isActive) ...[
+                  _LiveNowBanner(
+                    session: _liveSession!,
+                    onDirections: _openLiveDirections,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (_badges.isNotEmpty) ...[
+                  for (final badge in _badges)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        badge.displayLabel,
+                        style: TextStyle(
+                          color: LiveTokens.bronzeSoft,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 4),
+                ],
+                if (_isFoodTruck && _todayStops.isNotEmpty) ...[
+                  Text(
+                    "TODAY'S SCHEDULE",
+                    style: TextStyle(
+                      color: fv.secondaryText,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final stop in _todayStops)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        '${_formatClock(stop.startsAt)}–${_formatClock(stop.endsAt)}'
+                        ' · ${stop.locationLabel}',
+                        style: TextStyle(
+                          color: fv.primaryText,
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                ],
                 const SizedBox(height: 8),
                 EntityProfileTabBar(
                   labels: tabs,
@@ -367,6 +640,14 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
         ),
       ],
     );
+  }
+
+  static String _formatClock(DateTime dt) {
+    final local = dt.toLocal();
+    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final period = local.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute $period';
   }
 
   List<Widget> _buildTabBody({
@@ -1331,7 +1612,7 @@ class _DiningMenuSection extends StatelessWidget {
                                   if (!item.isAvailable) ...[
                                     const SizedBox(height: 6),
                                     Text(
-                                      'Sold out',
+                                      'Sold Out',
                                       style: TextStyle(
                                         color: fv.tertiaryText,
                                         fontSize: 11,
@@ -1390,6 +1671,78 @@ class _DiningSpecialsSection extends StatelessWidget {
               .toList(),
         );
       },
+    );
+  }
+}
+
+class _LiveNowBanner extends StatelessWidget {
+  final LiveBusinessOpenSession session;
+  final VoidCallback onDirections;
+
+  const _LiveNowBanner({
+    required this.session,
+    required this.onDirections,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fv = context.fv;
+    final local = session.endsAt.toLocal();
+    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final period = local.hour >= 12 ? 'PM' : 'AM';
+    final until = '$hour:$minute $period';
+    final place = session.placeLabel ?? session.addressText;
+    final miles = session.distanceMiles;
+    final bits = <String>['LIVE NOW', 'until $until'];
+    if (miles != null) {
+      bits.insert(1, '${miles.toStringAsFixed(miles < 10 ? 1 : 0)} mi');
+    }
+    if (place != null && place.trim().isNotEmpty) {
+      bits.add(place.trim());
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: session.hasCoordinates ? onDirections : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: LiveTokens.foodTruck,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  bits.join(' · '),
+                  style: const TextStyle(
+                    color: LiveTokens.foodTruck,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+              if (session.hasCoordinates)
+                Text(
+                  'Directions',
+                  style: TextStyle(
+                    color: fv.secondaryText,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
