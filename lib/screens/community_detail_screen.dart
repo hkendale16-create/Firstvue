@@ -141,15 +141,15 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
   Future<void> _edit() async {
     final community = _community;
     if (community == null) return;
-    final updated = await Navigator.push<Object?>(
-      context,
+    final navigator = Navigator.of(context);
+    final updated = await navigator.push<Object?>(
       FirstVuePageRoute(
         builder: (_) => EditCommunityScreen(community: community),
       ),
     );
-    if (!context.mounted) return;
+    if (!mounted) return;
     if (updated == 'deleted') {
-      Navigator.pop(context);
+      navigator.pop();
       return;
     }
     if (updated is Community) {
