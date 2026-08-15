@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/live_home_service.dart';
+import '../../services/live_heat_service.dart';
 import '../../theme/firstvue_theme.dart';
 import '../../theme/live_tokens.dart';
 import '../network_photo.dart';
@@ -68,6 +69,23 @@ class LiveRightNowCard extends StatelessWidget {
                   showDot: item.isLive,
                 ),
               ),
+              if (item.heatStatus != null)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: _StatusPill(
+                    label: switch (item.heatStatus!) {
+                      LiveHeatStatus.hot => '🔥 HOT',
+                      LiveHeatStatus.heatingUp => 'Heating Up',
+                      LiveHeatStatus.active => 'Active',
+                    },
+                    color: switch (item.heatStatus!) {
+                      LiveHeatStatus.hot => LiveTokens.liveEvent,
+                      LiveHeatStatus.heatingUp => LiveTokens.happyHour,
+                      LiveHeatStatus.active => LiveTokens.bronzeSoft,
+                    },
+                  ),
+                ),
               Positioned(
                 left: 10,
                 right: 10,

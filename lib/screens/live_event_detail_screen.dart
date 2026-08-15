@@ -11,6 +11,7 @@ import '../navigation/firstvue_page_route.dart';
 import '../screens/post_detail_screen.dart';
 import '../services/community_news_service.dart';
 import '../services/live_event_engagement_service.dart';
+import '../services/live_heat_service.dart';
 import '../services/live_home_service.dart';
 import '../services/things_to_do_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -38,6 +39,7 @@ class LiveEventDetailScreen extends StatefulWidget {
 class _LiveEventDetailScreenState extends State<LiveEventDetailScreen> {
   LiveEventEngagement _engagement = const LiveEventEngagement();
   List<CommunityNewsPost> _vues = const [];
+  LiveHeatScore? _heat;
   bool _loading = true;
   bool _busy = false;
 
@@ -56,10 +58,16 @@ class _LiveEventDetailScreenState extends State<LiveEventDetailScreen> {
     try {
       vues = await CommunityNewsService.fetchPostsForEvent(event.id, limit: 12);
     } catch (_) {}
+    LiveHeatScore? heat;
+    try {
+      final map = await LiveHeatService.fetchForEvents([event.id]);
+      heat = map[event.id];
+    } catch (_) {}
     if (!mounted) return;
     setState(() {
       _engagement = engagement;
       _vues = vues;
+      _heat = heat;
       _loading = false;
     });
   }
@@ -360,6 +368,26 @@ class _LiveEventDetailScreenState extends State<LiveEventDetailScreen> {
                             ),
                           ),
                         ),
+                        if (_heat?.badgeLabel != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: LiveTokens.elevated,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: LiveTokens.happyHour),
+                            ),
+                            child: Text(
+                              _heat!.badgeLabel!,
+                              style: const TextStyle(
+                                color: LiveTokens.happyHour,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                     if (event.businessName != null) ...[

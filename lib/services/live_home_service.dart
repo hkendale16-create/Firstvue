@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'discovery_feed_service.dart';
+import 'live_heat_service.dart';
 import 'things_to_do_service.dart';
 import 'user_preferences_service.dart';
 
@@ -24,6 +25,7 @@ class LiveRightNowItem {
   final int? goingCount;
   final String? locationLabel;
   final CommunityEvent? event;
+  final LiveHeatStatus? heatStatus;
 
   const LiveRightNowItem({
     required this.id,
@@ -35,6 +37,7 @@ class LiveRightNowItem {
     this.goingCount,
     this.locationLabel,
     this.event,
+    this.heatStatus,
   });
 
   bool get isLive =>
@@ -115,6 +118,9 @@ class LiveHomeService {
     final goingCounts = await _fetchGoingCounts(
       ranked.map((e) => e.id).toList(),
     );
+    final heat = await LiveHeatService.fetchForEvents(
+      ranked.map((e) => e.id).toList(),
+    );
 
     final rightNow = <LiveRightNowItem>[];
     for (final event in ranked) {
@@ -131,6 +137,7 @@ class LiveHomeService {
           goingCount: goingCounts[event.id],
           locationLabel: event.locationLabel,
           event: event,
+          heatStatus: heat[event.id]?.status,
         ),
       );
     }

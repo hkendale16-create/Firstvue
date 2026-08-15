@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../config/feature_flags.dart';
+import '../config/mapbox_config.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../screens/firstvue_business_profile_screen.dart';
 import '../screens/live_event_detail_screen.dart';
@@ -13,8 +12,9 @@ import '../services/live_home_service.dart';
 import '../services/live_map_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../theme/live_tokens.dart';
+import '../widgets/live/live_map_surface.dart';
 
-/// LIVE Map — Phase 4 (visual target: reference 04).
+/// LIVE Map — Mapbox 3D when token+mobile; OSM dark fallback otherwise.
 class LiveMapScreen extends StatefulWidget {
   const LiveMapScreen({super.key});
 
@@ -29,28 +29,21 @@ class LiveMapScreen extends StatefulWidget {
 }
 
 class _LiveMapScreenState extends State<LiveMapScreen> {
-  final _mapController = MapController();
   LiveMapFilter _filter = LiveMapFilter.liveNow;
   List<LiveMapPin> _pins = const [];
   List<LiveMapPin> _visible = const [];
   LiveMapPin? _selected;
   LatLng _center = LiveMapService.atlantaFallback;
   bool _loading = true;
-  bool _moving = false;
-  Timer? _debounce;
   String? _cacheKey;
+  LiveMapSurfaceController? _controller;
+
+  bool get _mapboxActive => MapboxConfig.hasAccessToken;
 
   @override
   void initState() {
     super.initState();
     _bootstrap();
-  }
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _mapController.dispose();
-    super.dispose();
   }
 
   Future<void> _bootstrap() async {
@@ -94,34 +87,6 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
     });
   }
 
-  void _onMapEvent(MapEvent event) {
-    if (event is MapEventMoveStart || event is MapEventFlingAnimationStart) {
-      _moving = true;
-      return;
-    }
-    if (event is MapEventMoveEnd ||
-        event is MapEventFlingAnimationEnd ||
-        event is MapEventDoubleTapZoomEnd) {
-      if (!_moving && event is! MapEventMoveEnd) return;
-      _moving = false;
-      _debounce?.cancel();
-      _debounce = Timer(const Duration(milliseconds: 450), () {
-        final cam = _mapController.camera;
-        final bounds = cam.visibleBounds;
-        unawaited(
-          _loadBounds(
-            LiveMapBounds(
-              minLat: bounds.south,
-              maxLat: bounds.north,
-              minLng: bounds.west,
-              maxLng: bounds.east,
-            ),
-          ),
-        );
-      });
-    }
-  }
-
   void _setFilter(LiveMapFilter filter) {
     setState(() {
       _filter = filter;
@@ -137,7 +102,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
     final center = await LiveMapService.resolveInitialCenter();
     if (!mounted) return;
     setState(() => _center = center);
-    _mapController.move(center, 12.5);
+    await _controller?.moveTo(center, zoom: 12.5, pitch: 55);
     await _loadForCenter(center, zoom: 12.5);
   }
 
@@ -182,74 +147,13 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _center,
-              initialZoom: 12.2,
-              minZoom: 3,
-              maxZoom: 18,
-              backgroundColor: const Color(0xFF0A0A0A),
-              onMapEvent: _onMapEvent,
-              onTap: (_, _) => setState(() => _selected = null),
-            ),
-            children: [
-              TileLayer(
-                // Carto Dark Matter — night aesthetic without Google Maps chrome.
-                urlTemplate:
-                    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
-                userAgentPackageName: 'com.firstvue.app',
-                retinaMode: RetinaMode.isHighDensity(context),
-              ),
-              CircleLayer(
-                circles: [
-                  for (final pin in _visible.where((p) => p.isLive))
-                    CircleMarker(
-                      point: pin.point,
-                      radius: 28,
-                      useRadiusInMeter: false,
-                      color: _colorFor(pin).withValues(alpha: 0.18),
-                      borderStrokeWidth: 0,
-                    ),
-                ],
-              ),
-              MarkerLayer(
-                markers: [
-                  for (final pin in _visible)
-                    Marker(
-                      point: pin.point,
-                      width: 44,
-                      height: 54,
-                      child: GestureDetector(
-                        onTap: () => setState(() => _selected = pin),
-                        child: _GlowPin(
-                          color: _colorFor(pin),
-                          live: pin.isLive,
-                        ),
-                      ),
-                    ),
-                  Marker(
-                    point: _center,
-                    width: 22,
-                    height: 22,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: LiveTokens.bronze,
-                        border: Border.all(color: Colors.white, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: LiveTokens.bronze.withValues(alpha: 0.55),
-                            blurRadius: 10,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+          LiveMapSurface(
+            center: _center,
+            pins: _visible,
+            selected: _selected,
+            onSelect: (pin) => setState(() => _selected = pin),
+            onCameraIdle: (bounds) => unawaited(_loadBounds(bounds)),
+            onReady: (c) => _controller = c,
           ),
           SafeArea(
             child: Column(
@@ -274,14 +178,26 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                           ),
                         ),
                       ),
-                      IconButton(
-                        onPressed: () {},
-                        icon: const Icon(Icons.tune_rounded),
-                        color: fv.mutedIcon,
+                      Icon(
+                        _mapboxActive ? Icons.threed_rotation : Icons.map_outlined,
+                        color: _mapboxActive
+                            ? LiveTokens.bronzeSoft
+                            : fv.mutedIcon,
+                        size: 20,
                       ),
+                      const SizedBox(width: 10),
                     ],
                   ),
                 ),
+                if (!_mapboxActive)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
+                    child: Text(
+                      'Add MAPBOX_ACCESS_TOKEN for pitched 3D neon buildings. Showing dark fallback map.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: fv.tertiaryText, fontSize: 11),
+                    ),
+                  ),
                 SizedBox(
                   height: 40,
                   child: ListView.separated(
@@ -296,7 +212,8 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                         label: Text(f.label),
                         selected: selected,
                         onSelected: (_) => _setFilter(f),
-                        selectedColor: LiveTokens.happyHour.withValues(alpha: 0.25),
+                        selectedColor:
+                            LiveTokens.happyHour.withValues(alpha: 0.25),
                         labelStyle: TextStyle(
                           color: selected
                               ? LiveTokens.happyHour
@@ -383,71 +300,6 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
   }
 }
 
-class _GlowPin extends StatelessWidget {
-  final Color color;
-  final bool live;
-
-  const _GlowPin({required this.color, required this.live});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 34,
-          height: 34,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: 0.65),
-                blurRadius: live ? 14 : 8,
-                spreadRadius: live ? 2 : 0,
-              ),
-            ],
-            border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 1.5),
-          ),
-          child: Text(
-            live ? 'LIVE' : '•',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 8,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.4,
-            ),
-          ),
-        ),
-        CustomPaint(
-          size: const Size(10, 8),
-          painter: _PinTailPainter(color),
-        ),
-      ],
-    );
-  }
-}
-
-class _PinTailPainter extends CustomPainter {
-  final Color color;
-  _PinTailPainter(this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = ui.Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width / 2, size.height)
-      ..lineTo(size.width, 0)
-      ..close();
-    canvas.drawPath(path, Paint()..color = color);
-  }
-
-  @override
-  bool shouldRepaint(covariant _PinTailPainter oldDelegate) =>
-      oldDelegate.color != color;
-}
-
 class _PinPopup extends StatelessWidget {
   final LiveMapPin pin;
   final Color color;
@@ -476,10 +328,7 @@ class _PinPopup extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: color.withValues(alpha: 0.7)),
             boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: 0.28),
-                blurRadius: 16,
-              ),
+              BoxShadow(color: color.withValues(alpha: 0.28), blurRadius: 16),
             ],
           ),
           child: Row(
@@ -487,12 +336,12 @@ class _PinPopup extends StatelessWidget {
               Container(
                 width: 48,
                 height: 48,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: LiveTokens.elevated,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: color.withValues(alpha: 0.5)),
                 ),
-                alignment: Alignment.center,
                 child: Text(
                   pin.isLive ? 'LIVE' : pin.kind.name.toUpperCase(),
                   style: TextStyle(
@@ -518,7 +367,6 @@ class _PinPopup extends StatelessWidget {
                         fontSize: 14,
                       ),
                     ),
-                    const SizedBox(height: 2),
                     Text(
                       pin.isLive
                           ? '● Live Now'
@@ -534,7 +382,8 @@ class _PinPopup extends StatelessWidget {
                         pin.subtitle!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: fv.secondaryText, fontSize: 11),
+                        style:
+                            TextStyle(color: fv.secondaryText, fontSize: 11),
                       ),
                   ],
                 ),

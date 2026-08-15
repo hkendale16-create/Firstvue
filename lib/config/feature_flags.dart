@@ -49,6 +49,6 @@ class FeatureFlags {
   /// Heating Up / activity scores (Phase 5).
   static const liveHeatActivityEnabled = bool.fromEnvironment(
     'FIRSTVUE_LIVE_HEAT_ACTIVITY',
-    defaultValue: false,
+    defaultValue: true,
   );
 }
