@@ -35,7 +35,6 @@ import '../services/portfolio_album_service.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/follow_requests_section.dart';
 import '../widgets/firstvue_settings_drawer.dart';
-import '../widgets/start_over_flow.dart';
 import '../models/share_payload.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -461,24 +460,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _startOverFromProfile() async {
-    try {
-      final didReset = await confirmAndStartOver(context);
-      if (!didReset || !mounted) return;
-      setState(() {});
-      await _loadStats();
-      await _loadProfileImages();
-      await _loadDisplayName();
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to reset this profile right now.'),
-        ),
-      );
-    }
-  }
-
   int get _effectiveRefreshToken => widget.refreshToken + _pullRefreshToken;
 
   Future<void> _refreshProfile() async {
@@ -753,10 +734,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         OutlinedButton(
                           onPressed: _shareProfile,
                           child: const Text('Share profile'),
-                        ),
-                        OutlinedButton(
-                          onPressed: _startOverFromProfile,
-                          child: const Text('Start over'),
                         ),
                       ],
                 trailing: user == null

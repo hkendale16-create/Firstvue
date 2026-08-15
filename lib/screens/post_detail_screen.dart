@@ -97,6 +97,31 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
+  Future<void> _setReaction(PostReactionType type) async {
+    final post = _post;
+    if (post == null) return;
+    final previous = post;
+    final togglingOff = post.myReaction == type;
+    setState(() {
+      _post = post.copyWith(
+        sparkedByMe: !togglingOff,
+        myReactionType: togglingOff ? null : type.value,
+        sparkCount: post.sparkCount + (togglingOff ? -1 : (post.sparkedByMe ? 0 : 1)),
+      );
+    });
+    try {
+      final updated = await CommunityNewsService.setReaction(post, type);
+      if (mounted) setState(() => _post = updated);
+    } on AuthException {
+      if (!mounted) return;
+      setState(() => _post = previous);
+      await ensureSignedIn(context);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _post = previous);
+    }
+  }
+
   Future<void> _toggleSave() async {
     final post = _post;
     if (post == null) return;
@@ -180,6 +205,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                   )
                               : null,
                           onSpark: _toggleSpark,
+                          onSetReaction: _setReaction,
                           onSave: _toggleSave,
                           onDelete: _post!.isMine ? _deletePost : null,
                           onComment: () => FeedCommentsSheet.show(

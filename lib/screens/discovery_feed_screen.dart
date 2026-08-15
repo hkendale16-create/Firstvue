@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../auth/ensure_signed_in.dart';
+import '../config/app_config.dart';
+import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../services/discovery_feed_service.dart';
+import '../services/saved_items_service.dart';
 import '../services/vue_featured_rotation.dart';
 import '../services/vue_tab_preference.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/fv_ui.dart';
+import '../widgets/social_rich_text.dart';
 import '../widgets/vue_mosaic_layout.dart';
 import '../widgets/vue_mosaic_view.dart';
 import 'create_post_screen.dart';
@@ -138,11 +145,16 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
       return;
     }
     if (item.mediaUrl.startsWith('http')) {
+      final footer = _VueMediaActionFooter(
+        item: item,
+        onOpenProfile: () => _openProfile(item),
+      );
       if (item.isVideo) {
         openFullScreenVideoPlayer(
           context,
           url: item.mediaUrl,
           title: item.businessName,
+          footer: footer,
         );
       } else {
         openFullScreenImageViewer(
@@ -151,10 +163,10 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
             FullScreenMediaItem(
               url: item.mediaUrl,
               isVideo: false,
-              caption: item.caption,
             ),
           ],
           title: item.businessName,
+          footer: footer,
         );
       }
       return;
@@ -349,6 +361,152 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _VueMediaActionFooter extends StatefulWidget {
+  final DiscoveryFeedItem item;
+  final VoidCallback onOpenProfile;
+
+  const _VueMediaActionFooter({
+    required this.item,
+    required this.onOpenProfile,
+  });
+
+  @override
+  State<_VueMediaActionFooter> createState() => _VueMediaActionFooterState();
+}
+
+class _VueMediaActionFooterState extends State<_VueMediaActionFooter> {
+  bool _saved = false;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSaved();
+  }
+
+  Future<void> _loadSaved() async {
+    final saved = await SavedItemsService.isSaved(
+      contentType: SavedContentType.vueMedia,
+      contentId: widget.item.mediaId,
+    );
+    if (!mounted) return;
+    setState(() => _saved = saved);
+  }
+
+  Future<void> _toggleSave() async {
+    if (_busy) return;
+    if (Supabase.instance.client.auth.currentUser == null) {
+      await ensureSignedIn(context);
+      if (!mounted) return;
+      if (Supabase.instance.client.auth.currentUser == null) return;
+    }
+    setState(() => _busy = true);
+    final previous = _saved;
+    setState(() => _saved = !_saved);
+    try {
+      final saved = await SavedItemsService.toggleSave(
+        contentType: SavedContentType.vueMedia,
+        contentId: widget.item.mediaId,
+        currentlySaved: previous,
+      );
+      if (!mounted) return;
+      setState(() {
+        _saved = saved;
+        _busy = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _saved = previous;
+        _busy = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to save this VUE right now.')),
+      );
+    }
+  }
+
+  void _share() {
+    final item = widget.item;
+    final title = item.businessName.isNotEmpty
+        ? item.businessName
+        : item.ownerName;
+    FirstVueShareSheet.show(
+      context,
+      payload: SharePayload(
+        title: title,
+        subtitle: item.caption,
+        link: '${AppConfig.webBaseUrl}/?vue=${item.mediaId}',
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final caption = widget.item.caption.trim();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (caption.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: SocialRichText(
+              text: caption,
+              style: const TextStyle(color: Colors.white70, height: 1.35),
+            ),
+          ),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _busy ? null : _toggleSave,
+                icon: Icon(
+                  _saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                  size: 18,
+                ),
+                label: Text(_saved ? 'Saved' : 'Save'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _saved ? FirstVueColors.gold : Colors.white70,
+                  side: BorderSide(
+                    color: _saved
+                        ? FirstVueColors.gold.withValues(alpha: 0.6)
+                        : Colors.white24,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _share,
+                icon: const Icon(Icons.ios_share_outlined, size: 18),
+                label: const Text('Share'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white70,
+                  side: const BorderSide(color: Colors.white24),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: widget.onOpenProfile,
+                icon: const Icon(Icons.person_outline_rounded, size: 18),
+                label: const Text('Profile'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white70,
+                  side: const BorderSide(color: Colors.white24),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

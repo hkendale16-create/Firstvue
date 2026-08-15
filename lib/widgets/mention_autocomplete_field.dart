@@ -3,9 +3,26 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../services/entity_handle_service.dart';
+import '../services/search_autocomplete_service.dart';
 import '../theme/firstvue_theme.dart';
 
-/// Multi-line text field with `@` mention suggestions overlay.
+enum _ComposerSuggestKind { mention, hashtag }
+
+class _ComposerSuggestion {
+  final _ComposerSuggestKind kind;
+  final String primary;
+  final String secondary;
+  final String insertion;
+
+  const _ComposerSuggestion({
+    required this.kind,
+    required this.primary,
+    required this.secondary,
+    required this.insertion,
+  });
+}
+
+/// Multi-line composer field with `@` mention and `#` hashtag suggestions.
 class MentionAutocompleteField extends StatefulWidget {
   final TextEditingController controller;
   final FocusNode? focusNode;
@@ -38,9 +55,11 @@ class MentionAutocompleteField extends StatefulWidget {
 }
 
 class _MentionAutocompleteFieldState extends State<MentionAutocompleteField> {
+  static final _hashtagTokenPattern = RegExp(r'#([A-Za-z0-9_]{0,30})$');
+
   late final FocusNode _focusNode;
   Timer? _debounce;
-  List<EntityHandleSuggestion> _suggestions = const [];
+  List<_ComposerSuggestion> _suggestions = const [];
   bool _loading = false;
   OverlayEntry? _overlay;
 
@@ -80,21 +99,44 @@ class _MentionAutocompleteFieldState extends State<MentionAutocompleteField> {
     _debounce = Timer(const Duration(milliseconds: 220), _loadSuggestions);
   }
 
-  Future<void> _loadSuggestions() async {
+  ({_ComposerSuggestKind kind, String token})? _tokenAtCursor() {
     final text = widget.controller.text;
     final cursor = widget.controller.selection.baseOffset;
     final effectiveCursor = cursor < 0 ? text.length : cursor;
-    final token = EntityHandleService.mentionTokenAt(text, effectiveCursor);
-    if (token == null || token.length < 2) {
+    final before = text.substring(0, effectiveCursor);
+
+    final mention = EntityHandleService.mentionTokenAt(text, effectiveCursor);
+    if (mention != null && mention.isNotEmpty) {
+      return (kind: _ComposerSuggestKind.mention, token: mention);
+    }
+
+    final hashMatch = _hashtagTokenPattern.firstMatch(before);
+    if (hashMatch != null) {
+      return (
+        kind: _ComposerSuggestKind.hashtag,
+        token: hashMatch.group(1) ?? '',
+      );
+    }
+    return null;
+  }
+
+  Future<void> _loadSuggestions() async {
+    final active = _tokenAtCursor();
+    if (active == null) {
       if (_suggestions.isNotEmpty || _overlay != null) {
-        setState(() => _suggestions = const []);
+        setState(() {
+          _suggestions = const [];
+        });
         _removeOverlay();
       }
       return;
     }
 
     setState(() => _loading = true);
-    final results = await EntityHandleService.suggest(token, limit: 10);
+    final results = switch (active.kind) {
+      _ComposerSuggestKind.mention => await _loadMentions(active.token),
+      _ComposerSuggestKind.hashtag => await _loadHashtags(active.token),
+    };
     if (!mounted) return;
     setState(() {
       _suggestions = results;
@@ -107,24 +149,89 @@ class _MentionAutocompleteFieldState extends State<MentionAutocompleteField> {
     }
   }
 
-  void _insertSuggestion(EntityHandleSuggestion suggestion) {
+  Future<List<_ComposerSuggestion>> _loadMentions(String token) async {
+    if (token.length < 2) return const [];
+    final results = await EntityHandleService.suggest(token, limit: 10);
+    return results
+        .map(
+          (item) => _ComposerSuggestion(
+            kind: _ComposerSuggestKind.mention,
+            primary: item.displayName,
+            secondary: '${item.atHandle} · ${item.entityType.label}',
+            insertion: '${item.atHandle} ',
+          ),
+        )
+        .toList();
+  }
+
+  Future<List<_ComposerSuggestion>> _loadHashtags(String token) async {
+    final prefix = token.toLowerCase();
+    final results = <_ComposerSuggestion>[];
+
+    if (prefix.length >= 2) {
+      try {
+        final rows = await SearchAutocompleteService.search(prefix);
+        for (final row in rows) {
+          if (row.type != SearchResultType.hashtag) continue;
+          final tag = row.label.startsWith('#')
+              ? row.label.substring(1)
+              : row.label;
+          results.add(
+            _ComposerSuggestion(
+              kind: _ComposerSuggestKind.hashtag,
+              primary: '#$tag',
+              secondary: row.subtitle ?? 'Hashtag',
+              insertion: '#$tag ',
+            ),
+          );
+          if (results.length >= 8) break;
+        }
+      } catch (_) {}
+    }
+
+    // Always offer the typed tag itself (Facebook-style create-as-you-type).
+    if (prefix.length >= 2) {
+      final already = results.any(
+        (item) => item.primary.toLowerCase() == '#$prefix',
+      );
+      if (!already) {
+        results.insert(
+          0,
+          _ComposerSuggestion(
+            kind: _ComposerSuggestKind.hashtag,
+            primary: '#$prefix',
+            secondary: 'Add hashtag',
+            insertion: '#$prefix ',
+          ),
+        );
+      }
+    }
+    return results;
+  }
+
+  void _insertSuggestion(_ComposerSuggestion suggestion) {
     final text = widget.controller.text;
     final cursor = widget.controller.selection.baseOffset;
     final effectiveCursor = cursor < 0 ? text.length : cursor;
-    final token = EntityHandleService.mentionTokenAt(text, effectiveCursor);
-    if (token == null) return;
+    final active = _tokenAtCursor();
+    if (active == null) return;
 
-    final start = effectiveCursor - token.length;
+    final tokenLength = switch (active.kind) {
+      _ComposerSuggestKind.mention => active.token.length,
+      _ComposerSuggestKind.hashtag => active.token.length + 1, // include '#'
+    };
+    final start = (effectiveCursor - tokenLength).clamp(0, text.length);
     final before = text.substring(0, start);
     final after = text.substring(effectiveCursor);
-    final insertion = '${suggestion.atHandle} ';
-    final next = '$before$insertion$after';
-    final nextCursor = before.length + insertion.length;
+    final next = '$before${suggestion.insertion}$after';
+    final nextCursor = before.length + suggestion.insertion.length;
     widget.controller.value = TextEditingValue(
       text: next,
       selection: TextSelection.collapsed(offset: nextCursor),
     );
-    setState(() => _suggestions = const []);
+    setState(() {
+      _suggestions = const [];
+    });
     _removeOverlay();
   }
 
@@ -162,8 +269,15 @@ class _MentionAutocompleteFieldState extends State<MentionAutocompleteField> {
                   final item = _suggestions[index];
                   return ListTile(
                     dense: true,
+                    leading: Icon(
+                      item.kind == _ComposerSuggestKind.hashtag
+                          ? Icons.tag_rounded
+                          : Icons.alternate_email_rounded,
+                      color: FirstVueColors.gold,
+                      size: 18,
+                    ),
                     title: Text(
-                      item.displayName,
+                      item.primary,
                       style: TextStyle(
                         color: fv.primaryText,
                         fontWeight: FontWeight.w600,
@@ -171,7 +285,7 @@ class _MentionAutocompleteFieldState extends State<MentionAutocompleteField> {
                       ),
                     ),
                     subtitle: Text(
-                      '${item.atHandle} · ${item.entityType.label}',
+                      item.secondary,
                       style: TextStyle(color: fv.tertiaryText, fontSize: 12),
                     ),
                     onTap: () => _insertSuggestion(item),
@@ -191,7 +305,8 @@ class _MentionAutocompleteFieldState extends State<MentionAutocompleteField> {
     final fv = context.fv;
     final decoration = widget.decoration ??
         InputDecoration(
-          hintText: widget.hintText ?? 'Write something… Use @ to mention',
+          hintText:
+              widget.hintText ?? 'Write something… Use #hashtags and @handles',
           hintStyle: TextStyle(color: fv.tertiaryText),
           filled: true,
           fillColor: fv.inputFill,

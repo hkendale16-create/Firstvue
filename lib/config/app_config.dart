@@ -27,6 +27,10 @@ class AppConfig {
     return '$webBaseUrl/?post=$postId';
   }
 
+  static String eventShareUrl(String eventId) {
+    return '$webBaseUrl/?event=$eventId';
+  }
+
   static String? initialBusinessIdFromUri() {
     if (!kIsWeb) return null;
     final id = Uri.base.queryParameters['business'];

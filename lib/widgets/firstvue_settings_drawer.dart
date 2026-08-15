@@ -18,12 +18,11 @@ import '../screens/rental_inquiries_screen.dart';
 import '../screens/rentals_screen.dart';
 import '../screens/appearance_settings_screen.dart';
 import '../screens/entity_settings_screen.dart';
+import '../screens/event_planner_screen.dart';
 import '../screens/privacy_settings_screen.dart';
 import '../screens/settings_preferences_screen.dart';
 import '../services/admin_auth_service.dart';
 import '../theme/firstvue_theme.dart';
-import 'start_over_flow.dart';
-
 typedef FirstVueSettingsOpen = void Function(Widget screen);
 
 /// Full-screen Settings shell (replaces the clipped end drawer).
@@ -76,22 +75,6 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
     widget.onSignOut?.call();
   }
 
-  Future<void> _startOver() async {
-    try {
-      final didReset = await confirmAndStartOver(context);
-      if (!didReset || !mounted) return;
-      widget.onSignOut?.call();
-      Navigator.pop(context);
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to reset this profile right now.'),
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
@@ -111,18 +94,6 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
             children: [
-              if (user != null)
-                _SettingsGroup(
-                  title: 'Prototype',
-                  children: [
-                    _SettingsTile(
-                      icon: Icons.restart_alt,
-                      title: 'Start over',
-                      subtitle: 'Clear photos on this account and sign out',
-                      onTap: _startOver,
-                    ),
-                  ],
-                ),
               _SettingsGroup(
                 title: 'Your profile',
                 children: [
@@ -171,6 +142,14 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
               _SettingsGroup(
                 title: 'Activity',
                 children: [
+                  _SettingsTile(
+                    icon: Icons.event_note_outlined,
+                    title: 'Event Planner',
+                    subtitle: 'Create & manage your events',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => _open(const EventPlannerScreen()),
+                  ),
                   _SettingsTile(
                     icon: Icons.chat_bubble_outline,
                     title: 'Messages',

@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/event_social_service.dart';
 import '../services/things_to_do_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../widgets/event_date_time_fields.dart';
 import '../widgets/event_profile_sheet.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/media_picker_sheet.dart';
@@ -54,6 +55,7 @@ class _ThingsToDoScreenState extends State<ThingsToDoScreen> {
       backgroundColor: FirstVueColors.surface,
       builder: (context) {
         XFile? coverPhoto;
+        DateTime? eventAt;
         return StatefulBuilder(
           builder: (context, setSheetState) {
             return Padding(
@@ -63,7 +65,8 @@ class _ThingsToDoScreenState extends State<ThingsToDoScreen> {
                 20,
                 MediaQuery.viewInsetsOf(context).bottom + 24,
               ),
-              child: Column(
+              child: SingleChildScrollView(
+                child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -93,6 +96,11 @@ class _ThingsToDoScreenState extends State<ThingsToDoScreen> {
                     controller: location,
                     style: const TextStyle(color: Colors.white),
                     decoration: const InputDecoration(labelText: 'Location'),
+                  ),
+                  const SizedBox(height: 14),
+                  EventDateTimeFields(
+                    value: eventAt,
+                    onChanged: (next) => setSheetState(() => eventAt = next),
                   ),
                   const SizedBox(height: 14),
                   OutlinedButton.icon(
@@ -138,6 +146,7 @@ class _ThingsToDoScreenState extends State<ThingsToDoScreen> {
                         await ThingsToDoService.postEvent(
                           title: title.text,
                           description: description.text,
+                          eventAt: eventAt,
                           locationLabel: location.text,
                           coverPhoto: coverPhoto,
                         );
@@ -147,6 +156,7 @@ class _ThingsToDoScreenState extends State<ThingsToDoScreen> {
                     ),
                   ),
                 ],
+              ),
               ),
             );
           },

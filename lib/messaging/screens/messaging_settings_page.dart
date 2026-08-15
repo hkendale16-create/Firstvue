@@ -15,7 +15,6 @@ class MessagingSettingsPage extends StatefulWidget {
 class _MessagingSettingsPageState extends State<MessagingSettingsPage> {
   FvIndicatorPrefs _indicators = const FvIndicatorPrefs();
   FvNotificationPrefs _notes = const FvNotificationPrefs();
-  FvParentalSettings? _parental;
   bool _localSearch = false;
   bool _loading = true;
   final _pass = TextEditingController();
@@ -41,13 +40,11 @@ class _MessagingSettingsPageState extends State<MessagingSettingsPage> {
     final notes = await FvMessagingService.fetchNotificationPrefs(
       identity: widget.identity,
     );
-    final parental = await FvMessagingService.fetchParentalSettings();
     final search = await FvMessagingService.localSearchEnabled();
     if (!mounted) return;
     setState(() {
       _indicators = indicators;
       _notes = notes;
-      _parental = parental;
       _localSearch = search;
       _quietStart.text = notes.quietStart ?? '';
       _quietEnd.text = notes.quietEnd ?? '';
@@ -288,82 +285,16 @@ class _MessagingSettingsPageState extends State<MessagingSettingsPage> {
                 ),
                 const Divider(),
                 Text(
-                  'Children and parental controls',
+                  'Age requirement',
                   style: TextStyle(
                     color: fv.primaryText,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 Text(
-                  'Accounts under 13 can only message parent-approved contacts. If supervision allows a parent to read messages, the parent’s verified device is added as an authorized encrypted endpoint. Encryption is not secretly bypassed.',
+                  'FirstVue is for members 13 and older. Parental messaging controls are disabled for this prototype.',
                   style: TextStyle(color: fv.secondaryText, fontSize: 12),
                 ),
-                if (_parental != null) ...[
-                  Text(
-                    'Supervision: ${_parental!.supervisionLevel}',
-                    style: TextStyle(color: fv.primaryText),
-                  ),
-                  SwitchListTile(
-                    title: const Text('Allow calls'),
-                    value: _parental!.allowCalls,
-                    onChanged: (v) => _saveParental(
-                      FvParentalSettings(
-                        childId: _parental!.childId,
-                        supervisionLevel: _parental!.supervisionLevel,
-                        allowCalls: v,
-                        allowDownloads: _parental!.allowDownloads,
-                        allowMedia: _parental!.allowMedia,
-                        allowLocation: _parental!.allowLocation,
-                      ),
-                    ),
-                  ),
-                  SwitchListTile(
-                    title: const Text('Allow downloads'),
-                    value: _parental!.allowDownloads,
-                    onChanged: (v) => _saveParental(
-                      FvParentalSettings(
-                        childId: _parental!.childId,
-                        supervisionLevel: _parental!.supervisionLevel,
-                        allowCalls: _parental!.allowCalls,
-                        allowDownloads: v,
-                        allowMedia: _parental!.allowMedia,
-                        allowLocation: _parental!.allowLocation,
-                      ),
-                    ),
-                  ),
-                  SwitchListTile(
-                    title: const Text('Allow photos and video'),
-                    value: _parental!.allowMedia,
-                    onChanged: (v) => _saveParental(
-                      FvParentalSettings(
-                        childId: _parental!.childId,
-                        supervisionLevel: _parental!.supervisionLevel,
-                        allowCalls: _parental!.allowCalls,
-                        allowDownloads: _parental!.allowDownloads,
-                        allowMedia: v,
-                        allowLocation: _parental!.allowLocation,
-                      ),
-                    ),
-                  ),
-                  SwitchListTile(
-                    title: const Text('Allow location sharing'),
-                    value: _parental!.allowLocation,
-                    onChanged: (v) => _saveParental(
-                      FvParentalSettings(
-                        childId: _parental!.childId,
-                        supervisionLevel: _parental!.supervisionLevel,
-                        allowCalls: _parental!.allowCalls,
-                        allowDownloads: _parental!.allowDownloads,
-                        allowMedia: _parental!.allowMedia,
-                        allowLocation: v,
-                      ),
-                    ),
-                  ),
-                ] else
-                  Text(
-                    'No child account is linked to this profile.',
-                    style: TextStyle(color: fv.secondaryText, fontSize: 12),
-                  ),
                 const Divider(),
                 TextButton(
                   onPressed: () async {
@@ -396,10 +327,5 @@ class _MessagingSettingsPageState extends State<MessagingSettingsPage> {
       identity: widget.identity,
       prefs: prefs,
     );
-  }
-
-  Future<void> _saveParental(FvParentalSettings settings) async {
-    setState(() => _parental = settings);
-    await FvMessagingService.saveParentalSettings(settings);
   }
 }
