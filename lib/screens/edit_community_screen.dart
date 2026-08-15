@@ -168,15 +168,28 @@ class _EditCommunityScreenState extends State<EditCommunityScreen> {
                   child: _previewAvatar(),
                 ),
                 TextButton(
-                  onPressed: _saving
-                      ? null
-                      : () => setState(() {
-                            _newImage = null;
-                            _newImageBytes = null;
-                            _removeImage = true;
-                          }),
-                  child: const Text('Remove photo'),
+                  onPressed: _saving ? null : _pickImage,
+                  child: Text(
+                    (_newImage != null ||
+                            (!_removeImage &&
+                                (widget.community.imageUrl ?? '').isNotEmpty))
+                        ? 'Change photo'
+                        : 'Add photo',
+                  ),
                 ),
+                if (_newImage != null ||
+                    (!_removeImage &&
+                        (widget.community.imageUrl ?? '').isNotEmpty))
+                  TextButton(
+                    onPressed: _saving
+                        ? null
+                        : () => setState(() {
+                              _newImage = null;
+                              _newImageBytes = null;
+                              _removeImage = true;
+                            }),
+                    child: const Text('Remove photo'),
+                  ),
               ],
             ),
           ),

@@ -13,6 +13,7 @@ import '../services/profile_completion_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/editable_media_grid.dart';
 import '../widgets/entity_details_form.dart';
+import '../widgets/entity_profile_media_editor.dart';
 import '../widgets/fv_ui.dart';
 import '../widgets/media_picker_sheet.dart';
 import '../widgets/signed_media_viewer.dart';
@@ -164,6 +165,56 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
     );
     if (!mounted) return;
     setState(() => _profileImages = images);
+  }
+
+  Future<void> _showAvatarOptions() async {
+    final hasPhoto = _profileImages.avatar != null;
+    final action = await showEntityPhotoActionSheet(
+      context,
+      photoLabel: 'profile photo',
+      hasPhoto: hasPhoto,
+    );
+    if (!mounted || action == null) return;
+    if (action == 'remove') {
+      await _removeAvatar();
+    } else if (action == 'view') {
+      final avatar = _profileImages.avatar;
+      if (avatar != null) {
+        openSignedMedia(
+          context,
+          url: avatar.signedUrl,
+          isVideo: false,
+          title: 'PROFILE PHOTO',
+        );
+      }
+    } else if (action == 'change') {
+      await _changeAvatar();
+    }
+  }
+
+  Future<void> _showCoverOptions() async {
+    final hasPhoto = _profileImages.cover != null;
+    final action = await showEntityPhotoActionSheet(
+      context,
+      photoLabel: 'cover photo',
+      hasPhoto: hasPhoto,
+    );
+    if (!mounted || action == null) return;
+    if (action == 'remove') {
+      await _removeCover();
+    } else if (action == 'view') {
+      final cover = _profileImages.cover;
+      if (cover != null) {
+        openSignedMedia(
+          context,
+          url: cover.signedUrl,
+          isVideo: false,
+          title: 'COVER PHOTO',
+        );
+      }
+    } else if (action == 'change') {
+      await _changeCover();
+    }
   }
 
   Future<void> _changeCover() async {
@@ -654,6 +705,23 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
               padding: const EdgeInsets.only(bottom: 12),
               children: [
                 _buildProfileHeader(fv),
+                Padding(
+                  padding: FvUi.pagePadding(top: 8, bottom: 4),
+                  child: EntityProfileMediaEditor(
+                    avatarUrl: _profileImages.avatar?.signedUrl,
+                    coverUrl: _profileImages.cover?.signedUrl,
+                    updating: _profileMediaUpdating,
+                    placeholderIcon: Icons.storefront_outlined,
+                    onChangeCover: _showCoverOptions,
+                    onChangeAvatar: _showAvatarOptions,
+                    onRemoveCover: _profileImages.cover == null
+                        ? null
+                        : _removeCover,
+                    onRemoveAvatar: _profileImages.avatar == null
+                        ? null
+                        : _removeAvatar,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 FvUnderlineTabs(
                   labels: tabs,
@@ -718,10 +786,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
                     bottom: 12,
                     child: _CameraFab(
                       busy: _profileMediaUpdating,
-                      onTap: _changeCover,
-                      onLongPress: _profileImages.cover == null
-                          ? null
-                          : _removeCover,
+                      onTap: _showCoverOptions,
                     ),
                   ),
                 ],
@@ -759,10 +824,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
                     child: _CameraFab(
                       compact: true,
                       busy: _profileMediaUpdating,
-                      onTap: _changeAvatar,
-                      onLongPress: _profileImages.avatar == null
-                          ? null
-                          : _removeAvatar,
+                      onTap: _showAvatarOptions,
                     ),
                   ),
                 ],
@@ -1292,13 +1354,11 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
 
 class _CameraFab extends StatelessWidget {
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
   final bool busy;
   final bool compact;
 
   const _CameraFab({
     required this.onTap,
-    this.onLongPress,
     this.busy = false,
     this.compact = false,
   });
@@ -1312,7 +1372,6 @@ class _CameraFab extends StatelessWidget {
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: busy ? null : onTap,
-        onLongPress: busy ? null : onLongPress,
         child: SizedBox(
           width: size,
           height: size,

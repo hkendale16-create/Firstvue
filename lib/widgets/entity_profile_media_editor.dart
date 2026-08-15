@@ -3,6 +3,61 @@ import 'package:flutter/material.dart';
 import '../theme/firstvue_theme.dart';
 import 'network_photo.dart';
 
+/// Returns `change`, `view`, `remove`, or null if dismissed.
+Future<String?> showEntityPhotoActionSheet(
+  BuildContext context, {
+  required String photoLabel,
+  required bool hasPhoto,
+}) {
+  final changeLabel = hasPhoto ? 'Change $photoLabel' : 'Add $photoLabel';
+  return showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: const Color(0xFF10151B),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(
+              Icons.photo_library_outlined,
+              color: FirstVueColors.gold,
+            ),
+            title: Text(
+              changeLabel,
+              style: const TextStyle(color: Colors.white),
+            ),
+            onTap: () => Navigator.pop(ctx, 'change'),
+          ),
+          if (hasPhoto) ...[
+            ListTile(
+              leading: const Icon(
+                Icons.visibility_outlined,
+                color: FirstVueColors.teal,
+              ),
+              title: Text(
+                'View $photoLabel',
+                style: const TextStyle(color: Colors.white),
+              ),
+              onTap: () => Navigator.pop(ctx, 'view'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.white54),
+              title: Text(
+                'Remove $photoLabel',
+                style: const TextStyle(color: Colors.white70),
+              ),
+              onTap: () => Navigator.pop(ctx, 'remove'),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
 /// Cover + profile photo controls for business and professional edit screens.
 class EntityProfileMediaEditor extends StatelessWidget {
   final String? avatarUrl;
@@ -13,6 +68,8 @@ class EntityProfileMediaEditor extends StatelessWidget {
   final VoidCallback? onChangeAvatar;
   final VoidCallback? onRemoveAvatar;
   final VoidCallback? onRemoveCover;
+  final String avatarLabel;
+  final String coverLabel;
 
   const EntityProfileMediaEditor({
     super.key,
@@ -24,6 +81,8 @@ class EntityProfileMediaEditor extends StatelessWidget {
     this.onChangeAvatar,
     this.onRemoveAvatar,
     this.onRemoveCover,
+    this.avatarLabel = 'Profile photo',
+    this.coverLabel = 'Cover photo',
   });
 
   @override
@@ -33,6 +92,8 @@ class EntityProfileMediaEditor extends StatelessWidget {
         onRemoveCover != null && coverUrl != null && coverUrl!.isNotEmpty;
     final showRemoveAvatar =
         onRemoveAvatar != null && avatarUrl != null && avatarUrl!.isNotEmpty;
+    final hasAvatar = avatarUrl != null && avatarUrl!.isNotEmpty;
+    final hasCover = coverUrl != null && coverUrl!.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -47,7 +108,7 @@ class EntityProfileMediaEditor extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Tap cover or profile photo to upload — just like your main profile.',
+          'Add, change, or remove cover and profile photos for this entity.',
           style: TextStyle(
             color: fv.tertiaryText,
             fontSize: 12,
@@ -67,7 +128,7 @@ class EntityProfileMediaEditor extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                if (coverUrl != null)
+                if (hasCover)
                   NetworkPhoto(url: coverUrl!, fit: BoxFit.cover)
                 else
                   DecoratedBox(
@@ -90,7 +151,7 @@ class EntityProfileMediaEditor extends StatelessWidget {
                       color: fv.primaryText,
                     ),
                     label: Text(
-                      'Cover photo',
+                      hasCover ? coverLabel : 'Add $coverLabel',
                       style: TextStyle(color: fv.primaryText),
                     ),
                   ),
@@ -117,7 +178,7 @@ class EntityProfileMediaEditor extends StatelessWidget {
             GestureDetector(
               onTap: updating ? null : onChangeAvatar,
               child: NetworkCircleAvatar(
-                imageUrl: avatarUrl,
+                imageUrl: hasAvatar ? avatarUrl : null,
                 radius: 40,
                 backgroundColor: fv.elevatedSurface,
                 placeholder: Icon(
@@ -132,7 +193,11 @@ class EntityProfileMediaEditor extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: updating ? null : onChangeAvatar,
                 icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-                label: Text(updating ? 'Uploading…' : 'Profile photo'),
+                label: Text(
+                  updating
+                      ? 'Uploading…'
+                      : (hasAvatar ? avatarLabel : 'Add $avatarLabel'),
+                ),
               ),
             ),
           ],

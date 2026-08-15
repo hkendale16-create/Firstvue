@@ -277,6 +277,7 @@ class ThingsToDoService {
     String? locationLabel,
     String? businessId,
     XFile? coverPhoto,
+    bool clearCover = false,
     String? status,
   }) async {
     final user = _client.auth.currentUser;
@@ -299,6 +300,8 @@ class ThingsToDoService {
 
     if (coverPhoto != null) {
       await EventMediaService.setCover(eventId: eventId, file: coverPhoto);
+    } else if (clearCover) {
+      await EventMediaService.removeCover(eventId);
     }
   }
 

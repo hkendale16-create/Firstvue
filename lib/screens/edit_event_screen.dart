@@ -45,6 +45,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
   DateTime? _eventAt;
   String? _businessId;
   XFile? _coverPhoto;
+  bool _clearCover = false;
   bool _submitting = false;
   late Future<List<OwnedBusiness>> _businessesFuture;
 
@@ -96,6 +97,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
           locationLabel: _location.text,
           businessId: _businessId,
           coverPhoto: _coverPhoto,
+          clearCover: _clearCover && _coverPhoto == null,
           status: publish ? 'approved' : widget.event!.status,
         );
         if (publish) {
@@ -283,15 +285,34 @@ class _EditEventScreenState extends State<EditEventScreen> {
                 : () async {
                     final files = await showImagePickerSheet(context);
                     if (files == null || files.isEmpty) return;
-                    setState(() => _coverPhoto = files.first);
+                    setState(() {
+                      _coverPhoto = files.first;
+                      _clearCover = false;
+                    });
                   },
             icon: const Icon(Icons.add_photo_alternate_outlined),
             label: Text(
-              _coverPhoto == null && existingCover == null
+              _coverPhoto == null &&
+                      (existingCover == null || _clearCover)
                   ? 'Add cover photo'
                   : 'Change cover photo',
             ),
           ),
+          if ((_coverPhoto != null ||
+                  (existingCover != null && !_clearCover)) &&
+              widget.mode != EditEventMode.duplicate)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _submitting
+                    ? null
+                    : () => setState(() {
+                          _coverPhoto = null;
+                          _clearCover = true;
+                        }),
+                child: const Text('Remove cover photo'),
+              ),
+            ),
           if (_coverPhoto != null) ...[
             const SizedBox(height: 10),
             FutureBuilder<Uint8List>(
@@ -315,6 +336,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
               },
             ),
           ] else if (existingCover != null &&
+              !_clearCover &&
               widget.mode != EditEventMode.duplicate) ...[
             const SizedBox(height: 10),
             ClipRRect(

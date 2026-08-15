@@ -1092,4 +1092,35 @@ class CommunityMediaService {
       context: {'profile_id': user.id},
     );
   }
+
+  static Future<MediaUploadResult> uploadHubCover({
+    required String hubIdHint,
+    required XFile file,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw const AuthException('Sign in to upload a community cover.');
+    }
+
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) throw const StorageException('Selected file is empty.');
+    if (bytes.length > _maxBytes) {
+      throw const StorageException('Community cover must be 10 MB or smaller.');
+    }
+
+    final mediaType = mediaTypeForFile(file, bytes: bytes);
+    if (mediaType != 'image') {
+      throw const StorageException('Community cover must be a photo.');
+    }
+
+    return MediaStorageService.uploadBytes(
+      bucket: MediaBucket.profile,
+      bytes: bytes,
+      contentType: mimeTypeForFile(file, mediaType),
+      fileName: file.name,
+      index: 0,
+      subfolder: 'community-hub-covers/$hubIdHint',
+      context: {'profile_id': user.id},
+    );
+  }
 }

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../config/app_config.dart';
 import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../services/community_hub_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../widgets/entity_profile_media_editor.dart';
 import '../widgets/firstvue_share_sheet.dart';
-import '../widgets/group_circle_avatar.dart';
+import '../widgets/media_picker_sheet.dart';
 import 'community_hub_detail_screen.dart';
 
 /// Leader/editor settings surface for an umbrella Community (hub).
@@ -34,6 +34,7 @@ class _CommunityHubSettingsScreenState
   CommunityHub? _hub;
   bool _loading = true;
   bool _saving = false;
+  bool _photoUpdating = false;
   String _visibility = 'public';
   List<CommunityGroupMembership> _memberships = const [];
 
@@ -104,39 +105,80 @@ class _CommunityHubSettingsScreenState
   }
 
   Future<void> _pickImage({required bool cover}) async {
-    final picker = ImagePicker();
-    final file = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1920,
-      imageQuality: 85,
-    );
-    if (file == null) return;
+    final files = await showImagePickerSheet(context);
+    if (files == null || files.isEmpty || !mounted) return;
+    setState(() => _photoUpdating = true);
     try {
-      // Hub image upload path; cover uses the same media helper when available.
-      final updated = await CommunityHubService.updateHubImage(
-        hubId: widget.hubId,
-        file: file,
-      );
+      final updated = cover
+          ? await CommunityHubService.updateHubCover(
+              hubId: widget.hubId,
+              file: files.first,
+            )
+          : await CommunityHubService.updateHubImage(
+              hubId: widget.hubId,
+              file: files.first,
+            );
       if (!mounted) return;
       setState(() => _hub = updated);
-      if (cover) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Image updated. Cover uses the community photo.'),
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(cover ? 'Cover photo updated.' : 'Profile photo updated.'),
+        ),
+      );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             cover
-                ? 'Could not update cover image.'
-                : 'Could not update profile image.',
+                ? 'Could not update cover photo.'
+                : 'Could not update profile photo.',
           ),
         ),
       );
+    } finally {
+      if (mounted) setState(() => _photoUpdating = false);
+    }
+  }
+
+  Future<void> _removeImage({required bool cover}) async {
+    setState(() => _photoUpdating = true);
+    try {
+      final updated = cover
+          ? await CommunityHubService.removeHubCover(widget.hubId)
+          : await CommunityHubService.removeHubImage(widget.hubId);
+      if (!mounted) return;
+      setState(() => _hub = updated);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            cover
+                ? 'Could not remove cover photo.'
+                : 'Could not remove profile photo.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _photoUpdating = false);
+    }
+  }
+
+  Future<void> _showPhotoOptions({required bool cover}) async {
+    final hub = _hub;
+    final url = cover ? hub?.coverUrl : hub?.imageUrl;
+    final hasPhoto = url != null && url.isNotEmpty;
+    final action = await showEntityPhotoActionSheet(
+      context,
+      photoLabel: cover ? 'cover photo' : 'profile photo',
+      hasPhoto: hasPhoto,
+    );
+    if (!mounted || action == null) return;
+    if (action == 'remove') {
+      await _removeImage(cover: cover);
+    } else if (action == 'change') {
+      await _pickImage(cover: cover);
     }
   }
 
@@ -283,30 +325,21 @@ class _CommunityHubSettingsScreenState
           : ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
               children: [
-                Row(
-                  children: [
-                    GroupCircleAvatar(
-                      imageUrl: hub?.imageUrl,
-                      size: 72,
-                      fallbackIcon: Icons.hub_outlined,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          TextButton(
-                            onPressed: () => _pickImage(cover: false),
-                            child: const Text('Change photo'),
-                          ),
-                          TextButton(
-                            onPressed: () => _pickImage(cover: true),
-                            child: const Text('Change cover'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                EntityProfileMediaEditor(
+                  avatarUrl: hub?.imageUrl,
+                  coverUrl: hub?.coverUrl,
+                  updating: _photoUpdating,
+                  placeholderIcon: Icons.hub_outlined,
+                  onChangeCover: () => _showPhotoOptions(cover: true),
+                  onChangeAvatar: () => _showPhotoOptions(cover: false),
+                  onRemoveCover:
+                      (hub?.coverUrl == null || hub!.coverUrl!.isEmpty)
+                      ? null
+                      : () => _removeImage(cover: true),
+                  onRemoveAvatar:
+                      (hub?.imageUrl == null || hub!.imageUrl!.isEmpty)
+                      ? null
+                      : () => _removeImage(cover: false),
                 ),
                 const SizedBox(height: 16),
                 TextField(

@@ -369,6 +369,26 @@ class CommunityHubService {
     };
   }
 
+  static Map<String, dynamic> _coverPersistPayload(MediaUploadResult upload) {
+    return {
+      'cover_url': upload.path,
+      'cover_storage_path': upload.path,
+      'cover_storage_provider': upload.provider.value,
+    };
+  }
+
+  static const _clearImagePayload = {
+    'image_url': null,
+    'image_storage_path': null,
+    'image_storage_provider': null,
+  };
+
+  static const _clearCoverPayload = {
+    'cover_url': null,
+    'cover_storage_path': null,
+    'cover_storage_provider': null,
+  };
+
   static Future<List<CommunityHub>> _resolveHubImages(
     List<CommunityHub> hubs,
   ) async {
@@ -710,6 +730,7 @@ class CommunityHubService {
     String? coverUrl,
     String? status,
     bool clearImage = false,
+    bool clearCover = false,
   }) async {
     final patch = <String, dynamic>{
       'updated_at': DateTime.now().toIso8601String(),
@@ -726,10 +747,8 @@ class CommunityHubService {
     }
     if (coverUrl != null) patch['cover_url'] = coverUrl.trim();
     if (status != null) patch['status'] = status.trim();
-    if (clearImage) {
-      patch['image_url'] = null;
-      patch['image_storage_path'] = null;
-    }
+    if (clearImage) patch.addAll(_clearImagePayload);
+    if (clearCover) patch.addAll(_clearCoverPayload);
 
     try {
       final row = await _client
@@ -743,6 +762,9 @@ class CommunityHubService {
       patch.remove('cover_url');
       patch.remove('status');
       patch.remove('image_storage_path');
+      patch.remove('image_storage_provider');
+      patch.remove('cover_storage_path');
+      patch.remove('cover_storage_provider');
       final row = await _client
           .from('community_hubs')
           .update(patch)
@@ -784,6 +806,90 @@ class CommunityHubService {
           .single();
       return await CommunityHub.fromRow(row).withResolvedImages();
     }
+  }
+
+  static Future<CommunityHub> updateHubCover({
+    required String hubId,
+    required XFile file,
+  }) async {
+    final upload = await CommunityMediaService.uploadHubCover(
+      hubIdHint: hubId,
+      file: file,
+    );
+    final patch = {
+      ..._coverPersistPayload(upload),
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    try {
+      final row = await _client
+          .from('community_hubs')
+          .update(patch)
+          .eq('id', hubId)
+          .select(_columns)
+          .single();
+      return await CommunityHub.fromRow(row).withResolvedImages();
+    } catch (_) {
+      // Older schemas may only have cover_url.
+      final legacy = {
+        'cover_url': upload.path,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      final row = await _client
+          .from('community_hubs')
+          .update(legacy)
+          .eq('id', hubId)
+          .select(_columnsLegacy)
+          .single();
+      return await CommunityHub.fromRow(row).withResolvedImages();
+    }
+  }
+
+  static Future<CommunityHub> removeHubImage(String hubId) async {
+    await _deleteHubStoredObject(
+      hubId: hubId,
+      pathColumn: 'image_storage_path',
+      providerColumn: 'image_storage_provider',
+      legacyUrlColumn: 'image_url',
+    );
+    return updateHub(hubId: hubId, clearImage: true);
+  }
+
+  static Future<CommunityHub> removeHubCover(String hubId) async {
+    await _deleteHubStoredObject(
+      hubId: hubId,
+      pathColumn: 'cover_storage_path',
+      providerColumn: 'cover_storage_provider',
+      legacyUrlColumn: 'cover_url',
+    );
+    return updateHub(hubId: hubId, clearCover: true);
+  }
+
+  static Future<void> _deleteHubStoredObject({
+    required String hubId,
+    required String pathColumn,
+    required String providerColumn,
+    required String legacyUrlColumn,
+  }) async {
+    try {
+      final row = await _client
+          .from('community_hubs')
+          .select('$pathColumn, $providerColumn, $legacyUrlColumn')
+          .eq('id', hubId)
+          .maybeSingle();
+      if (row == null) return;
+      final path =
+          ((row[pathColumn] as String?) ?? (row[legacyUrlColumn] as String?))
+              ?.trim();
+      if (path == null || path.isEmpty || path.startsWith('http')) return;
+      await MediaStorageService.deleteObject(
+        bucket: MediaBucket.profile,
+        path: path,
+        provider: MediaStorageProvider.parse(row[providerColumn] as String?),
+        context: {
+          'profile_id': _client.auth.currentUser?.id ?? '',
+        },
+      );
+    } catch (_) {}
   }
 
   static Future<CommunityHubLeader?> fetchPrimaryLeader(String hubId) async {

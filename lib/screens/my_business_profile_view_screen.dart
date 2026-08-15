@@ -130,10 +130,8 @@ class _MyBusinessProfileViewScreenState extends State<MyBusinessProfileViewScree
                   avatarIcon: Icons.storefront_outlined,
                   avatarImageUrl: avatarUrl,
                   coverImageUrl: coverUrl,
-                  onAvatarTap: avatarUrl != null
-                      ? () => _openEdit()
-                      : null,
-                  onCoverTap: coverUrl != null ? () => _openEdit() : null,
+                  onAvatarTap: _openEdit,
+                  onCoverTap: _openEdit,
                   actionButtons: [
                     OutlinedButton.icon(
                       onPressed: _openEdit,
