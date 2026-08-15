@@ -152,6 +152,26 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                   activeThumbColor: FirstVueColors.teal,
                   onChanged: _toggleNotifications,
                 ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Live nearby alerts',
+                    style: TextStyle(color: fv.primaryText),
+                  ),
+                  subtitle: Text(
+                    'When a Food Truck you follow goes LIVE nearby',
+                    style: TextStyle(color: fv.secondaryText, fontSize: 12),
+                  ),
+                  value: _prefs.pushLiveNearby,
+                  activeThumbColor: FirstVueColors.teal,
+                  onChanged: (value) async {
+                    await UserPreferencesService.updatePushLiveNearby(value);
+                    if (!mounted) return;
+                    setState(
+                      () => _prefs = _prefs.copyWith(pushLiveNearby: value),
+                    );
+                  },
+                ),
                 const SizedBox(height: 28),
                 const Text(
                   'INTERACTIONS',

@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config/feature_flags.dart';
+import '../config/monetization_config.dart';
 import '../services/business_submission_service.dart';
 import '../services/business_subscription_service.dart';
+import '../services/monetization_products_service.dart';
 import '../services/stripe_billing_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'business_campaign_dashboard_screen.dart';
+import '../navigation/firstvue_page_route.dart';
 
 class BusinessGrowthScreen extends StatefulWidget {
   const BusinessGrowthScreen({super.key});
@@ -24,9 +28,22 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
     final subscriptions = await BusinessSubscriptionService.fetchForBusinesses(
       businesses.map((business) => business.id),
     );
+    final products = await MonetizationProductsService.fetchProducts();
+    MonetizationProduct verified = MonetizationProductCatalog.fallbackById(
+      MonetizationProductIds.businessVerified,
+    );
+    MonetizationProduct pro = MonetizationProductCatalog.fallbackById(
+      MonetizationProductIds.businessPro,
+    );
+    for (final p in products) {
+      if (p.id == MonetizationProductIds.businessVerified) verified = p;
+      if (p.id == MonetizationProductIds.businessPro) pro = p;
+    }
     return _GrowthData(
       businesses: businesses,
       subscriptions: subscriptions,
+      verifiedProduct: verified,
+      proProduct: pro,
     );
   }
 
@@ -126,7 +143,9 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
             (business) => business.id == _selectedBusinessId,
           );
           final subscription = data.subscriptions[_selectedBusinessId!];
-          final paymentsEnabled = FeatureFlags.paymentsEnabled;
+          final paymentsEnabled = FeatureFlags.effectiveBusinessSubscriptions;
+          final verifiedPrice = data.verifiedProduct.priceLabel;
+          final proPrice = data.proProduct.priceLabel;
 
           return ListView(
             padding: const EdgeInsets.all(20),
@@ -215,7 +234,7 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
               ),
               _PlanCard(
                 name: 'VERIFIED',
-                price: '\$9.99 / month',
+                price: verifiedPrice,
                 features: 'Verified badge • Trust tools • Owner identity',
                 isCurrent: subscription?.plan == BusinessPlan.verified &&
                     subscription!.isActive,
@@ -229,7 +248,7 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
               ),
               _PlanCard(
                 name: 'FIRSTVUE PRO',
-                price: '\$29.99 / month',
+                price: proPrice,
                 features: 'Analytics • Lead insights • Campaign tools',
                 isCurrent:
                     subscription?.plan == BusinessPlan.pro && subscription!.isActive,
@@ -241,6 +260,19 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                         ? null
                         : () => _subscribe(BusinessPlan.pro),
               ),
+              if (FeatureFlags.vueBountiesEnabled) ...[
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      FirstVuePageRoute(
+                        builder: (_) => const BusinessCampaignDashboardScreen(),
+                      ),
+                    );
+                  },
+                  child: const Text('Open VUE Bounty campaign dashboard'),
+                ),
+              ],
               const SizedBox(height: 22),
               const Text(
                 'PROMOTE',
@@ -254,7 +286,7 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
               const _Tool(
                 icon: Icons.push_pin_outlined,
                 title: 'Featured placement',
-                subtitle: '\$50–\$300 per campaign — Stripe campaigns coming soon',
+                subtitle: 'Configurable boost products — payments coming soon',
               ),
               const _Tool(
                 icon: Icons.ads_click,
@@ -264,7 +296,7 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
               const _Tool(
                 icon: Icons.campaign_outlined,
                 title: 'Promotional campaigns',
-                subtitle: '\$100–\$1,000+ based on budget',
+                subtitle: 'Budget set per campaign product — not hardcoded here',
               ),
               const SizedBox(height: 22),
               const Text(
@@ -303,10 +335,14 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
 class _GrowthData {
   final List<OwnedBusiness> businesses;
   final Map<String, BusinessSubscription> subscriptions;
+  final MonetizationProduct verifiedProduct;
+  final MonetizationProduct proProduct;
 
   const _GrowthData({
     required this.businesses,
     required this.subscriptions,
+    required this.verifiedProduct,
+    required this.proProduct,
   });
 }
 

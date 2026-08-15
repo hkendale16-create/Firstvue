@@ -9,6 +9,7 @@ class UserPreferences {
   final bool browseEverywhere;
   final bool notificationsEnabled;
   final bool floatingBubbleVisible;
+  final bool pushLiveNearby;
 
   const UserPreferences({
     this.locationCity,
@@ -16,6 +17,7 @@ class UserPreferences {
     this.browseEverywhere = false,
     this.notificationsEnabled = true,
     this.floatingBubbleVisible = true,
+    this.pushLiveNearby = true,
   });
 
   String? get locationLabel {
@@ -33,6 +35,7 @@ class UserPreferences {
     bool? browseEverywhere,
     bool? notificationsEnabled,
     bool? floatingBubbleVisible,
+    bool? pushLiveNearby,
   }) {
     return UserPreferences(
       locationCity: locationCity ?? this.locationCity,
@@ -41,6 +44,7 @@ class UserPreferences {
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       floatingBubbleVisible:
           floatingBubbleVisible ?? this.floatingBubbleVisible,
+      pushLiveNearby: pushLiveNearby ?? this.pushLiveNearby,
     );
   }
 }
@@ -55,6 +59,7 @@ class UserPreferencesService {
   static const _prefsEverywhereKey = 'firstvue_pref_everywhere';
   static const _prefsNotificationsKey = 'firstvue_pref_notifications';
   static const _prefsBubbleKey = 'firstvue_pref_floating_bubble';
+  static const _prefsLiveNearbyKey = 'firstvue_pref_push_live_nearby';
 
   static Future<UserPreferences> fetch() async {
     final user = _client.auth.currentUser;
@@ -63,7 +68,7 @@ class UserPreferencesService {
         final row = await _client
             .from('user_preferences')
             .select(
-              'preferred_city, preferred_state, browse_everywhere, push_messages, show_floating_messages',
+              'preferred_city, preferred_state, browse_everywhere, push_messages, show_floating_messages, push_live_nearby',
             )
             .eq('profile_id', user.id)
             .maybeSingle();
@@ -76,6 +81,7 @@ class UserPreferencesService {
             notificationsEnabled: row['push_messages'] as bool? ?? true,
             floatingBubbleVisible:
                 row['show_floating_messages'] as bool? ?? true,
+            pushLiveNearby: row['push_live_nearby'] as bool? ?? true,
           );
           await _cacheLocally(prefs);
           return prefs;
@@ -99,6 +105,7 @@ class UserPreferencesService {
               notificationsEnabled: row['push_messages'] as bool? ?? true,
               floatingBubbleVisible:
                   row['show_floating_messages'] as bool? ?? true,
+              pushLiveNearby: local.pushLiveNearby,
             );
             await _cacheLocally(prefs);
             return prefs;
@@ -113,6 +120,7 @@ class UserPreferencesService {
           locationCity: profile?.city,
           locationState: profile?.state,
           browseEverywhere: local.browseEverywhere,
+          pushLiveNearby: local.pushLiveNearby,
         );
         await _cacheLocally(prefs);
         return prefs;
@@ -131,6 +139,7 @@ class UserPreferencesService {
         browseEverywhere: sp.getBool(_prefsEverywhereKey) ?? false,
         notificationsEnabled: sp.getBool(_prefsNotificationsKey) ?? true,
         floatingBubbleVisible: sp.getBool(_prefsBubbleKey) ?? true,
+        pushLiveNearby: sp.getBool(_prefsLiveNearbyKey) ?? true,
       );
     } catch (_) {
       return const UserPreferences();
@@ -153,6 +162,7 @@ class UserPreferencesService {
       await sp.setBool(_prefsEverywhereKey, prefs.browseEverywhere);
       await sp.setBool(_prefsNotificationsKey, prefs.notificationsEnabled);
       await sp.setBool(_prefsBubbleKey, prefs.floatingBubbleVisible);
+      await sp.setBool(_prefsLiveNearbyKey, prefs.pushLiveNearby);
     } catch (_) {
       // Local cache is best-effort — never break Explore / nearby queries.
     }
@@ -236,6 +246,22 @@ class UserPreferencesService {
       await _client.from('user_preferences').upsert({
         'profile_id': user.id,
         'show_floating_messages': visible,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (_) {}
+  }
+
+  static Future<void> updatePushLiveNearby(bool enabled) async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setBool(_prefsLiveNearbyKey, enabled);
+
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await _client.from('user_preferences').upsert({
+        'profile_id': user.id,
+        'push_live_nearby': enabled,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
     } catch (_) {}

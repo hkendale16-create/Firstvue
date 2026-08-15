@@ -223,7 +223,10 @@ class ExploreClassifier {
     final parent = def.parentSlug ?? '';
     final sections = <ExploreSection>{};
 
-    if (def.template == IndustryTemplate.food ||
+    if (slug == 'food-truck' ||
+        def.name.toLowerCase().contains('food truck')) {
+      sections.add(ExploreSection.foodTrucks);
+    } else if (def.template == IndustryTemplate.food ||
         slug == 'food-dining' ||
         parent == 'food-dining') {
       sections.add(ExploreSection.food);
@@ -285,7 +288,11 @@ class ExploreClassifier {
     ].whereType<String>().join(' ').toLowerCase();
     if (blob.isEmpty) return const {};
     final sections = <ExploreSection>{};
-    if (_looksLikeFood(blob)) sections.add(ExploreSection.food);
+    if (_looksLikeFoodTruck(blob)) {
+      sections.add(ExploreSection.foodTrucks);
+    } else if (_looksLikeFood(blob)) {
+      sections.add(ExploreSection.food);
+    }
     if (_looksLikeBar(blob)) sections.add(ExploreSection.bars);
     if (_looksLikeActivity(blob)) sections.add(ExploreSection.thingsToDo);
     if (_looksLikeRental(blob)) sections.add(ExploreSection.rentals);
@@ -304,7 +311,11 @@ class ExploreClassifier {
     final blob = '${tags.join(' ')} ${input.body}'.toLowerCase();
     if (blob.trim().isEmpty) return const {};
     final sections = <ExploreSection>{};
-    if (_looksLikeFood(blob)) sections.add(ExploreSection.food);
+    if (_looksLikeFoodTruck(blob)) {
+      sections.add(ExploreSection.foodTrucks);
+    } else if (_looksLikeFood(blob)) {
+      sections.add(ExploreSection.food);
+    }
     if (_looksLikeBar(blob)) sections.add(ExploreSection.bars);
     if (_looksLikeActivity(blob)) sections.add(ExploreSection.thingsToDo);
     if (_looksLikeRental(blob)) sections.add(ExploreSection.rentals);
@@ -313,8 +324,16 @@ class ExploreClassifier {
   }
 
   static bool _looksLikeFood(String blob) {
+    if (_looksLikeFoodTruck(blob)) return false;
     return RegExp(
       r'\b(restaurants?|food|dining|cafes?|cafés?|baker(?:y|ies)|cater(?:ing)?|bistros?)\b',
+      caseSensitive: false,
+    ).hasMatch(blob);
+  }
+
+  static bool _looksLikeFoodTruck(String blob) {
+    return RegExp(
+      r'food[\s_-]?trucks?',
       caseSensitive: false,
     ).hasMatch(blob);
   }

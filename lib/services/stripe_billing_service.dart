@@ -12,7 +12,7 @@ class StripeBillingService {
     required String businessId,
     required BusinessPlan plan,
   }) async {
-    if (!FeatureFlags.paymentsEnabled) {
+    if (!FeatureFlags.effectiveBusinessSubscriptions) {
       throw StateError('Payments are not enabled yet.');
     }
 
