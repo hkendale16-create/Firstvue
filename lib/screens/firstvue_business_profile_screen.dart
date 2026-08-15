@@ -31,6 +31,8 @@ import '../messaging/services/fv_messaging_service.dart';
 import '../auth/ensure_signed_in.dart';
 import 'business_menu_item_detail_screen.dart';
 import 'meet_the_owner_screen.dart';
+import '../widgets/live/live_business_open_controls.dart';
+import '../config/feature_flags.dart';
 
 class FirstVueBusinessProfileScreen extends StatefulWidget {
   final String businessId;
@@ -309,6 +311,8 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (isOwnerPreview) ...[
+                  if (FeatureFlags.liveFoodTrucksEnabled && isApproved)
+                    LiveBusinessOpenControls(businessId: details.id),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),

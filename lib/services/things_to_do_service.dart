@@ -35,6 +35,9 @@ class CommunityEvent {
   final String? coverImageUrl;
   final String? organizerId;
   final String? status;
+  final double? latitude;
+  final double? longitude;
+  final DateTime? endsAt;
 
   const CommunityEvent({
     required this.id,
@@ -48,6 +51,9 @@ class CommunityEvent {
     this.coverImageUrl,
     this.organizerId,
     this.status,
+    this.latitude,
+    this.longitude,
+    this.endsAt,
   });
 
   bool get isDraft =>
@@ -90,6 +96,9 @@ class CommunityEvent {
     String? coverImageUrl,
     String? organizerId,
     String? status,
+    double? latitude,
+    double? longitude,
+    DateTime? endsAt,
   }) {
     return CommunityEvent(
       id: id ?? this.id,
@@ -103,8 +112,13 @@ class CommunityEvent {
       coverImageUrl: coverImageUrl ?? this.coverImageUrl,
       organizerId: organizerId ?? this.organizerId,
       status: status ?? this.status,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      endsAt: endsAt ?? this.endsAt,
     );
   }
+
+  bool get hasCoordinates => latitude != null && longitude != null;
 }
 
 class ThingsToDoService {
@@ -113,7 +127,7 @@ class ThingsToDoService {
   static final _client = Supabase.instance.client;
 
   static const _eventSelect =
-      'id, title, description, event_at, created_at, location_label, organizer_id, business_id, status, cover_storage_path, cover_storage_provider, businesses(name)';
+      'id, title, description, event_at, ends_at, created_at, location_label, organizer_id, business_id, status, cover_storage_path, cover_storage_provider, latitude, longitude, businesses(name)';
 
   static Future<List<CommunityEvent>> fetchApprovedEvents() async {
     try {
@@ -206,8 +220,11 @@ class ThingsToDoService {
     required String title,
     required String description,
     DateTime? eventAt,
+    DateTime? endsAt,
     String? locationLabel,
     String? businessId,
+    double? latitude,
+    double? longitude,
     XFile? coverPhoto,
     String status = 'approved',
   }) async {
@@ -219,8 +236,11 @@ class ThingsToDoService {
       title: title,
       description: description,
       eventAt: eventAt,
+      endsAt: endsAt,
       locationLabel: locationLabel,
       businessId: businessId,
+      latitude: latitude,
+      longitude: longitude,
       status: status,
     );
 
@@ -233,16 +253,22 @@ class ThingsToDoService {
     required String title,
     String description = '',
     DateTime? eventAt,
+    DateTime? endsAt,
     String? locationLabel,
     String? businessId,
+    double? latitude,
+    double? longitude,
     XFile? coverPhoto,
   }) {
     return _createWithStatus(
       title: title,
       description: description,
       eventAt: eventAt,
+      endsAt: endsAt,
       locationLabel: locationLabel,
       businessId: businessId,
+      latitude: latitude,
+      longitude: longitude,
       coverPhoto: coverPhoto,
       preferredStatus: 'draft',
       fallbackStatus: 'pending',
@@ -253,16 +279,22 @@ class ThingsToDoService {
     required String title,
     String description = '',
     DateTime? eventAt,
+    DateTime? endsAt,
     String? locationLabel,
     String? businessId,
+    double? latitude,
+    double? longitude,
     XFile? coverPhoto,
   }) {
     return _createWithStatus(
       title: title,
       description: description,
       eventAt: eventAt,
+      endsAt: endsAt,
       locationLabel: locationLabel,
       businessId: businessId,
+      latitude: latitude,
+      longitude: longitude,
       coverPhoto: coverPhoto,
       preferredStatus: 'approved',
       fallbackStatus: 'approved',
@@ -274,8 +306,12 @@ class ThingsToDoService {
     required String title,
     required String description,
     DateTime? eventAt,
+    DateTime? endsAt,
     String? locationLabel,
     String? businessId,
+    double? latitude,
+    double? longitude,
+    bool clearCoordinates = false,
     XFile? coverPhoto,
     bool clearCover = false,
     String? status,
@@ -287,10 +323,18 @@ class ThingsToDoService {
       'title': title.trim(),
       'description': description.trim(),
       'event_at': eventAt?.toIso8601String(),
+      'ends_at': endsAt?.toIso8601String(),
       'location_label': locationLabel?.trim(),
       'business_id': businessId,
       'status': ?status,
     };
+    if (clearCoordinates) {
+      payload['latitude'] = null;
+      payload['longitude'] = null;
+    } else if (latitude != null && longitude != null) {
+      payload['latitude'] = latitude;
+      payload['longitude'] = longitude;
+    }
 
     await _client
         .from('community_events')
@@ -383,8 +427,11 @@ class ThingsToDoService {
     required String title,
     String description = '',
     DateTime? eventAt,
+    DateTime? endsAt,
     String? locationLabel,
     String? businessId,
+    double? latitude,
+    double? longitude,
     XFile? coverPhoto,
     required String preferredStatus,
     required String fallbackStatus,
@@ -397,8 +444,11 @@ class ThingsToDoService {
       title: title,
       description: description,
       eventAt: eventAt,
+      endsAt: endsAt,
       locationLabel: locationLabel,
       businessId: businessId,
+      latitude: latitude,
+      longitude: longitude,
       status: preferredStatus,
       statusFallback: fallbackStatus,
     );
@@ -414,20 +464,28 @@ class ThingsToDoService {
     required String title,
     required String description,
     DateTime? eventAt,
+    DateTime? endsAt,
     String? locationLabel,
     String? businessId,
+    double? latitude,
+    double? longitude,
     required String status,
     String? statusFallback,
   }) async {
-    final payload = {
+    final payload = <String, dynamic>{
       'organizer_id': organizerId,
       'business_id': businessId,
       'title': title.trim(),
       'description': description.trim(),
       'event_at': eventAt?.toIso8601String(),
+      'ends_at': endsAt?.toIso8601String(),
       'location_label': locationLabel?.trim(),
       'status': status,
     };
+    if (latitude != null && longitude != null) {
+      payload['latitude'] = latitude;
+      payload['longitude'] = longitude;
+    }
 
     try {
       final inserted = await _client
@@ -478,6 +536,11 @@ class ThingsToDoService {
       coverImageUrl: coverUrl,
       organizerId: row['organizer_id'] as String?,
       status: row['status'] as String?,
+      latitude: (row['latitude'] as num?)?.toDouble(),
+      longitude: (row['longitude'] as num?)?.toDouble(),
+      endsAt: row['ends_at'] == null
+          ? null
+          : DateTime.tryParse(row['ends_at'] as String),
     );
   }
 

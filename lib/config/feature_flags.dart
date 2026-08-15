@@ -14,4 +14,42 @@ class FeatureFlags {
     'FIRSTVUE_PAYMENTS',
     defaultValue: false,
   );
+
+  /// Top-level VUE | LIVE mode switch and LIVE shell.
+  /// Disable with `--dart-define=FIRSTVUE_LIVE_MODE=false`.
+  static const liveModeEnabled = bool.fromEnvironment(
+    'FIRSTVUE_LIVE_MODE',
+    defaultValue: true,
+  );
+
+  /// LIVE map (Phase 4). Independent of [liveModeEnabled].
+  static const liveMapEnabled = bool.fromEnvironment(
+    'FIRSTVUE_LIVE_MAP',
+    defaultValue: true,
+  );
+
+  /// I'm Here / Here Now presence (Phase 3).
+  static const liveEventPresenceEnabled = bool.fromEnvironment(
+    'FIRSTVUE_LIVE_EVENT_PRESENCE',
+    defaultValue: true,
+  );
+
+  /// Event conversation entry from LIVE detail (Phase 3).
+  static const liveEventChatEnabled = bool.fromEnvironment(
+    'FIRSTVUE_LIVE_EVENT_CHAT',
+    defaultValue: true,
+  );
+
+  /// Food Truck / business LIVE open sessions (Phase 8).
+  /// Disable with `--dart-define=FIRSTVUE_LIVE_FOOD_TRUCKS=false`.
+  static const liveFoodTrucksEnabled = bool.fromEnvironment(
+    'FIRSTVUE_LIVE_FOOD_TRUCKS',
+    defaultValue: true,
+  );
+
+  /// Heating Up / activity scores (Phase 5).
+  static const liveHeatActivityEnabled = bool.fromEnvironment(
+    'FIRSTVUE_LIVE_HEAT_ACTIVITY',
+    defaultValue: true,
+  );
 }

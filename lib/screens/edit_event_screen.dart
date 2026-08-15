@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/business_submission_service.dart';
+import '../services/location_service.dart';
 import '../services/things_to_do_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../theme/live_tokens.dart';
 import '../widgets/event_date_time_fields.dart';
 import '../widgets/media_picker_sheet.dart';
 import '../widgets/network_photo.dart';
@@ -43,6 +45,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
   late final TextEditingController _description;
   late final TextEditingController _location;
   DateTime? _eventAt;
+  DateTime? _endsAt;
+  double? _latitude;
+  double? _longitude;
+  bool _clearCoordinates = false;
+  bool _pinningLocation = false;
   String? _businessId;
   XFile? _coverPhoto;
   bool _clearCover = false;
@@ -60,6 +67,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
     _description = TextEditingController(text: seed?.description ?? '');
     _location = TextEditingController(text: seed?.locationLabel ?? '');
     _eventAt = seed?.eventAt;
+    _endsAt = seed?.endsAt;
+    _latitude = seed?.latitude;
+    _longitude = seed?.longitude;
     _businessId = seed?.businessId;
     _businessesFuture = BusinessSubmissionService.fetchMyBusinesses();
   }
@@ -94,8 +104,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
           title: _title.text,
           description: _description.text,
           eventAt: _eventAt,
+          endsAt: _endsAt,
           locationLabel: _location.text,
           businessId: _businessId,
+          latitude: _latitude,
+          longitude: _longitude,
+          clearCoordinates: _clearCoordinates && _latitude == null,
           coverPhoto: _coverPhoto,
           clearCover: _clearCover && _coverPhoto == null,
           status: publish ? 'approved' : widget.event!.status,
@@ -112,8 +126,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
             title: _title.text,
             description: _description.text,
             eventAt: _eventAt,
+            endsAt: _endsAt,
             locationLabel: _location.text,
             businessId: _businessId,
+            latitude: _latitude,
+            longitude: _longitude,
             coverPhoto: _coverPhoto,
           );
         } else {
@@ -121,8 +138,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
             title: _title.text,
             description: _description.text,
             eventAt: _eventAt,
+            endsAt: _endsAt,
             locationLabel: _location.text,
             businessId: _businessId,
+            latitude: _latitude,
+            longitude: _longitude,
             coverPhoto: _coverPhoto,
           );
         }
@@ -186,6 +206,37 @@ class _EditEventScreenState extends State<EditEventScreen> {
     }
   }
 
+  Future<void> _pinCurrentLocation() async {
+    setState(() => _pinningLocation = true);
+    try {
+      final pos = await LocationService.getCurrentPosition();
+      if (!mounted) return;
+      setState(() {
+        _latitude = pos.latitude;
+        _longitude = pos.longitude;
+        _clearCoordinates = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Map pin set from your current location.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not set map pin: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _pinningLocation = false);
+    }
+  }
+
+  void _clearMapPin() {
+    setState(() {
+      _latitude = null;
+      _longitude = null;
+      _clearCoordinates = true;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final fv = context.fv;
@@ -227,6 +278,58 @@ class _EditEventScreenState extends State<EditEventScreen> {
           EventDateTimeFields(
             value: _eventAt,
             onChanged: (next) => setState(() => _eventAt = next),
+          ),
+          const SizedBox(height: 18),
+          EventDateTimeFields(
+            sectionLabel: 'ENDS AT (OPTIONAL)',
+            allowClear: true,
+            value: _endsAt,
+            onChanged: (next) => setState(() => _endsAt = next),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'LIVE MAP PIN (OPTIONAL)',
+            style: TextStyle(
+              color: context.fv.tertiaryText,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.1,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _latitude != null && _longitude != null
+                ? 'Pinned: ${_latitude!.toStringAsFixed(5)}, ${_longitude!.toStringAsFixed(5)}'
+                : 'No map pin yet. Events without coordinates only appear via a linked business location.',
+            style: TextStyle(color: context.fv.secondaryText, fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _pinningLocation ? null : _pinCurrentLocation,
+                  icon: _pinningLocation
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.my_location_rounded, size: 18),
+                  label: const Text('Use current location'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: LiveTokens.bronzeSoft,
+                  ),
+                ),
+              ),
+              if (_latitude != null) ...[
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: _clearMapPin,
+                  child: const Text('Clear'),
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 18),
           FutureBuilder<List<OwnedBusiness>>(

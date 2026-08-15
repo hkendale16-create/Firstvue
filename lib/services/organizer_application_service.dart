@@ -72,6 +72,19 @@ class OrganizerApplicationService {
     required String profileId,
     required bool approved,
   }) async {
+    try {
+      await _client.rpc(
+        'review_organizer_application',
+        params: {
+          'p_application_id': applicationId,
+          'p_approve': approved,
+        },
+      );
+      return;
+    } catch (_) {
+      // Fallback for projects that have not applied 20261009 yet.
+    }
+
     await _client
         .from('community_organizer_applications')
         .update({'status': approved ? 'approved' : 'rejected'})
