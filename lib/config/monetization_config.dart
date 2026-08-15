@@ -11,6 +11,15 @@ class MonetizationProductIds {
   static const businessPro = 'business_pro';
   static const vueBountyDefault = 'vue_bounty_default';
   static const shareAndEarnDefault = 'share_and_earn_default';
+  static const postBoostLocalSmall = 'post_boost_local_small';
+  static const postBoostLocalLarge = 'post_boost_local_large';
+  static const postBoostMultiDay = 'post_boost_multi_day';
+
+  static const postBoostTierIds = <String>[
+    postBoostLocalSmall,
+    postBoostLocalLarge,
+    postBoostMultiDay,
+  ];
 }
 
 class MonetizationFlagKeys {
@@ -134,7 +143,38 @@ class MonetizationProductCatalog {
       productFamily: 'affiliate_program',
       isActive: false,
     ),
+    MonetizationProduct(
+      id: MonetizationProductIds.postBoostLocalSmall,
+      displayName: 'Small Local Boost',
+      productFamily: 'post_boost',
+      billingPeriod: 'one_time',
+      priceCents: 500,
+      isActive: false,
+    ),
+    MonetizationProduct(
+      id: MonetizationProductIds.postBoostLocalLarge,
+      displayName: 'Larger Local Reach',
+      productFamily: 'post_boost',
+      billingPeriod: 'one_time',
+      priceCents: 1500,
+      isActive: false,
+    ),
+    MonetizationProduct(
+      id: MonetizationProductIds.postBoostMultiDay,
+      displayName: 'Multi-Day Promotion',
+      productFamily: 'post_boost',
+      billingPeriod: 'one_time',
+      priceCents: 3000,
+      isActive: false,
+    ),
   ];
+
+  static List<MonetizationProduct> postBoostTiers() {
+    return [
+      for (final id in MonetizationProductIds.postBoostTierIds)
+        fallbackById(id),
+    ];
+  }
 
   static MonetizationProduct fallbackById(String id) {
     return fallbacks.firstWhere(

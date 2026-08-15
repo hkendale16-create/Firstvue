@@ -186,14 +186,17 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                         ? _handleAccount
                         : () => _open(const MessagesInboxScreen()),
                   ),
+                ],
+              ),
+              _SettingsGroup(
+                title: 'Monetization',
+                children: [
                   _SettingsTile(
-                    icon: Icons.trending_up_rounded,
-                    title: FeatureFlags.effectiveBusinessSubscriptions
-                        ? 'Growth, plans & analytics'
-                        : 'Growth & analytics',
+                    icon: Icons.payments_outlined,
+                    title: 'Monetization & Plans',
                     subtitle: FeatureFlags.effectiveBusinessSubscriptions
-                        ? null
-                        : 'Plans preview — payments coming soon',
+                        ? 'Business plans, boosts & analytics'
+                        : 'Plan previews — payments coming soon',
                     onTap: user == null
                         ? _handleAccount
                         : () => _open(const BusinessGrowthScreen()),
@@ -224,6 +227,11 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                           : () => _open(const BusinessCampaignDashboardScreen()),
                     ),
                   ],
+                ],
+              ),
+              _SettingsGroup(
+                title: 'Listings',
+                children: [
                   _SettingsTile(
                     icon: Icons.key_outlined,
                     title: 'My rental listings',

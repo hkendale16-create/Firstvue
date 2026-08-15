@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/app_config.dart';
 import '../models/share_payload.dart';
 import '../auth/ensure_signed_in.dart';
+import '../screens/boost_post_sheet.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../services/community_news_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -208,6 +209,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           onSetReaction: _setReaction,
                           onSave: _toggleSave,
                           onDelete: _post!.isMine ? _deletePost : null,
+                          onBoost: _post!.isMine
+                              ? () => openBoostPostFlow(context, _post!)
+                              : null,
                           onComment: () => FeedCommentsSheet.show(
                             context,
                             mediaId: _post!.commentsMediaId,
