@@ -153,6 +153,10 @@ class _MapboxSurfaceState extends State<_MapboxSurface> {
     _map = map;
     widget.onReady?.call(_MapboxController(map));
     await _configureChrome(map);
+    map.addInteraction(
+      mb.TapInteraction.onMap((_) => widget.onSelect(null)),
+      interactionID: 'live-map-clear-selection',
+    );
     _circles = await map.annotations.createCircleAnnotationManager();
     _points = await map.annotations.createPointAnnotationManager();
     _points?.tapEvents(
@@ -337,7 +341,7 @@ class _MapboxSurfaceState extends State<_MapboxSurface> {
     return mb.MapWidget(
       key: const ValueKey('firstvue-live-mapbox'),
       styleUri: MapboxConfig.styleUri,
-      cameraOptions: mb.CameraOptions(
+      viewport: mb.CameraViewportState(
         center: mb.Point(
           coordinates: mb.Position(
             widget.center.longitude,
@@ -351,7 +355,6 @@ class _MapboxSurfaceState extends State<_MapboxSurface> {
       onMapCreated: _onCreated,
       onStyleLoadedListener: _onStyleLoaded,
       onCameraChangeListener: _onCameraChanged,
-      onTapListener: (_) => widget.onSelect(null),
     );
   }
 }
