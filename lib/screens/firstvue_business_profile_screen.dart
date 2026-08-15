@@ -393,6 +393,20 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
                 if (isOwnerPreview) ...[
                   if (FeatureFlags.liveFoodTrucksEnabled && isApproved)
                     LiveBusinessOpenControls(businessId: details.id),
+                  if (_isFoodTruck && isApproved) ...[
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () => _addScheduledStop(details.id),
+                        icon: const Icon(Icons.schedule, size: 18),
+                        label: const Text('Add scheduled stop'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: LiveTokens.foodTruck,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),

@@ -83,10 +83,10 @@ create index if not exists business_open_sessions_active_geo_idx
 create index if not exists business_open_sessions_location_type_idx
   on public.business_open_sessions (location_type, status, ends_at desc);
 
--- At most one active live location per business.
+-- At most one active live location per business (status-based; expire via RPC).
 create unique index if not exists business_open_sessions_one_active_uidx
   on public.business_open_sessions (business_id)
-  where status = 'active' and ends_at > now();
+  where status = 'active';
 
 -- ---------------------------------------------------------------------------
 -- Scheduled stops (distinct from LIVE NOW)
