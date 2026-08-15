@@ -65,8 +65,17 @@ void main() {
       LiveHomeService.lifecycleFor(now.add(const Duration(hours: 5)), now: now),
       LiveLifecycleStatus.upcoming,
     );
+    // Same calendar day without ends_at stays LIVE (legacy events).
     expect(
       LiveHomeService.lifecycleFor(now.subtract(const Duration(hours: 8)), now: now),
+      LiveLifecycleStatus.live,
+    );
+    // Prior calendar day without ends_at is ended.
+    expect(
+      LiveHomeService.lifecycleFor(
+        DateTime(2026, 8, 14, 18),
+        now: now,
+      ),
       LiveLifecycleStatus.ended,
     );
   });

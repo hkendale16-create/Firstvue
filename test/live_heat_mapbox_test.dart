@@ -91,14 +91,14 @@ void main() {
     );
   });
 
-  test('lifecycleFor marks ending soon in final LIVE hour', () {
+  test('lifecycleFor keeps same-day legacy events without ends_at', () {
     final now = DateTime(2026, 8, 15, 12);
     expect(
       LiveHomeService.lifecycleFor(
         now.subtract(const Duration(hours: 5, minutes: 30)),
         now: now,
       ),
-      LiveLifecycleStatus.endingSoon,
+      LiveLifecycleStatus.live,
     );
     expect(
       LiveHomeService.lifecycleFor(
@@ -106,6 +106,20 @@ void main() {
         now: now,
       ),
       LiveLifecycleStatus.live,
+    );
+    expect(
+      LiveHomeService.lifecycleFor(
+        DateTime(2026, 8, 15, 23, 30),
+        now: DateTime(2026, 8, 15, 23, 20),
+      ),
+      LiveLifecycleStatus.startingSoon,
+    );
+    expect(
+      LiveHomeService.lifecycleFor(
+        DateTime(2026, 8, 15, 10),
+        now: DateTime(2026, 8, 15, 23, 30),
+      ),
+      LiveLifecycleStatus.endingSoon,
     );
   });
 
