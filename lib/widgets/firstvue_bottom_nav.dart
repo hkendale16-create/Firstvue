@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/firstvue_theme.dart';
+import 'tutorial_targets.dart';
 
 class FirstVueBottomNav extends StatelessWidget {
   final int selectedIndex;
@@ -55,6 +56,7 @@ class FirstVueBottomNav extends StatelessWidget {
             child: Row(
               children: [
                 _NavItem(
+                  key: TutorialTargets.homeNav,
                   label: 'HOME',
                   icon: Icons.home_outlined,
                   selectedIcon: Icons.home_rounded,
@@ -63,6 +65,7 @@ class FirstVueBottomNav extends StatelessWidget {
                   onTap: () => onSelected(0),
                 ),
                 _NavItem(
+                  key: TutorialTargets.feedsNav,
                   label: 'FEEDS',
                   icon: Icons.dynamic_feed_outlined,
                   selectedIcon: Icons.dynamic_feed_rounded,
@@ -72,6 +75,7 @@ class FirstVueBottomNav extends StatelessWidget {
                 ),
                 const Expanded(child: SizedBox(width: 72)),
                 _NavItem(
+                  key: TutorialTargets.exploreNav,
                   label: 'EXPLORE',
                   icon: Icons.search,
                   selectedIcon: Icons.search,
@@ -92,9 +96,12 @@ class FirstVueBottomNav extends StatelessWidget {
           ),
           Positioned(
             bottom: 18 + bottomInset,
-            child: _VueCenterTab(
-              selected: selectedIndex == vueIndex,
-              onTap: () => onSelected(vueIndex),
+            child: KeyedSubtree(
+              key: TutorialTargets.vueNav,
+              child: _VueCenterTab(
+                selected: selectedIndex == vueIndex,
+                onTap: () => onSelected(vueIndex),
+              ),
             ),
           ),
         ],
@@ -112,6 +119,7 @@ class _NavItem extends StatelessWidget {
   final VoidCallback onTap;
 
   const _NavItem({
+    super.key,
     required this.label,
     required this.icon,
     required this.selectedIcon,

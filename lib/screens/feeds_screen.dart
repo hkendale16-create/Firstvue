@@ -25,10 +25,13 @@ import '../widgets/community_news_post_detail_sheet.dart';
 import '../widgets/feed_comments_sheet.dart';
 import '../widgets/feed_impression_tracker.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/firstvue_section_tip.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/group_circle_avatar.dart';
 import '../widgets/home_community_feed_block.dart';
 import '../widgets/social_chrome.dart';
+import '../widgets/tutorial_targets.dart';
+import '../services/onboarding_store.dart';
 
 enum FeedsTab {
   main,
@@ -82,6 +85,9 @@ class _FeedsScreenState extends State<FeedsScreen>
     _tabController = TabController(length: _tabs.length, vsync: this);
     _pageController = PageController();
     _tabController.addListener(_onTabChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybeShowSectionTip(context, TutorialSection.feeds);
+    });
   }
 
   @override
@@ -130,18 +136,21 @@ class _FeedsScreenState extends State<FeedsScreen>
             ),
           ),
           const SizedBox(height: 12),
-          SocialPillTabs(
-            labels: _tabs.map((t) => t.label).toList(),
-            selectedIndex: _tabController.index,
-            onSelected: (index) {
-              _tabController.index = index;
-              _pageController.animateToPage(
-                index,
-                duration: const Duration(milliseconds: 280),
-                curve: Curves.easeOutCubic,
-              );
-              setState(() {});
-            },
+          KeyedSubtree(
+            key: TutorialTargets.feedsTabs,
+            child: SocialPillTabs(
+              labels: _tabs.map((t) => t.label).toList(),
+              selectedIndex: _tabController.index,
+              onSelected: (index) {
+                _tabController.index = index;
+                _pageController.animateToPage(
+                  index,
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeOutCubic,
+                );
+                setState(() {});
+              },
+            ),
           ),
           const SizedBox(height: 8),
           Expanded(
