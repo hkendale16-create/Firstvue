@@ -13,6 +13,11 @@ class LiveBusinessOpenSession {
   final double? longitude;
   final DateTime startedAt;
   final DateTime endsAt;
+  final String? locationType;
+  final String? placeLabel;
+  final String? addressText;
+  final String? status;
+  final double? distanceMiles;
 
   const LiveBusinessOpenSession({
     required this.sessionId,
@@ -24,12 +29,30 @@ class LiveBusinessOpenSession {
     this.longitude,
     required this.startedAt,
     required this.endsAt,
+    this.locationType,
+    this.placeLabel,
+    this.addressText,
+    this.status,
+    this.distanceMiles,
   });
 
+  bool get isActive {
+    final s = (status ?? 'active').toLowerCase();
+    return s == 'active' && endsAt.isAfter(DateTime.now());
+  }
+
   bool get isFoodTruck {
+    final type = (locationType ?? '').toLowerCase();
+    if (type == 'food_truck') return true;
     final t = (businessType ?? '').toLowerCase();
     return t.contains('food truck') || t.contains('foodtruck');
   }
+
+  bool get hasCoordinates =>
+      latitude != null &&
+      longitude != null &&
+      latitude!.isFinite &&
+      longitude!.isFinite;
 
   LiveLifecycleStatus lifecycle({DateTime? now}) {
     final n = now ?? DateTime.now();
@@ -44,15 +67,15 @@ class LiveBusinessOpenSession {
       id: 'open:$sessionId',
       kind: LiveRightNowKind.business,
       title: businessName,
-      subtitle: note ?? businessType,
+      subtitle: note ?? placeLabel ?? businessType,
       lifecycle: lifecycle(),
-      locationLabel: note,
+      locationLabel: placeLabel ?? note,
       businessId: businessId,
     );
   }
 }
 
-/// Operator open check-ins for Food Truck / business LIVE (Phase 8).
+/// Operator open check-ins for Food Truck / business LIVE (Phase 8+).
 class LiveBusinessOpenService {
   LiveBusinessOpenService._();
 
@@ -66,6 +89,36 @@ class LiveBusinessOpenService {
       final rows = await _client.rpc(
         'list_active_business_open_sessions',
         params: {'p_limit': limit},
+      );
+      if (rows is! List) return const [];
+      return rows
+          .whereType<Map>()
+          .map(_mapRow)
+          .whereType<LiveBusinessOpenSession>()
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<List<LiveBusinessOpenSession>> listNearby({
+    required double latitude,
+    required double longitude,
+    double radiusMiles = 15,
+    String? locationType,
+    int limit = 40,
+  }) async {
+    if (!FeatureFlags.liveFoodTrucksEnabled) return const [];
+    try {
+      final rows = await _client.rpc(
+        'list_nearby_live_locations',
+        params: {
+          'p_latitude': latitude,
+          'p_longitude': longitude,
+          'p_radius_miles': radiusMiles,
+          'p_location_type': locationType,
+          'p_limit': limit,
+        },
       );
       if (rows is! List) return const [];
       return rows
@@ -105,6 +158,63 @@ class LiveBusinessOpenService {
         'p_longitude': longitude,
       },
     );
+    return _mapStartedRow(row, businessId);
+  }
+
+  /// Preferred Go Live path — supports place label / address text.
+  static Future<LiveBusinessOpenSession> startLive({
+    required String businessId,
+    double hours = 4,
+    String? note,
+    double? latitude,
+    double? longitude,
+    String? placeLabel,
+    String? addressText,
+    String? locationType,
+    String? eventId,
+  }) async {
+    final row = await _client.rpc(
+      'start_business_live_location',
+      params: {
+        'p_business_id': businessId,
+        'p_hours': hours,
+        'p_note': note,
+        'p_latitude': latitude,
+        'p_longitude': longitude,
+        'p_place_label': placeLabel,
+        'p_address_text': addressText,
+        'p_event_id': eventId,
+        'p_location_type': locationType,
+      },
+    );
+    return _mapStartedRow(row, businessId);
+  }
+
+  static Future<LiveBusinessOpenSession> extend({
+    required String businessId,
+    double additionalHours = 1,
+  }) async {
+    final row = await _client.rpc(
+      'extend_business_open_session',
+      params: {
+        'p_business_id': businessId,
+        'p_additional_hours': additionalHours,
+      },
+    );
+    return _mapStartedRow(row, businessId);
+  }
+
+  static Future<void> end({required String businessId}) async {
+    await _client.rpc(
+      'end_business_open_session',
+      params: {'p_business_id': businessId},
+    );
+  }
+
+  static Future<LiveBusinessOpenSession> _mapStartedRow(
+    dynamic row,
+    String businessId,
+  ) async {
     if (row is Map) {
       final mapped = _mapRow({
         ...Map<String, dynamic>.from(row),
@@ -117,13 +227,6 @@ class LiveBusinessOpenService {
     final refreshed = await activeForBusiness(businessId);
     if (refreshed != null) return refreshed;
     throw StateError('Could not start open session.');
-  }
-
-  static Future<void> end({required String businessId}) async {
-    await _client.rpc(
-      'end_business_open_session',
-      params: {'p_business_id': businessId},
-    );
   }
 
   static LiveBusinessOpenSession? _mapRow(Map row) {
@@ -153,6 +256,11 @@ class LiveBusinessOpenService {
       longitude: (row['longitude'] as num?)?.toDouble(),
       startedAt: started,
       endsAt: ends,
+      locationType: row['location_type'] as String?,
+      placeLabel: row['place_label'] as String?,
+      addressText: row['address_text'] as String?,
+      status: row['status'] as String?,
+      distanceMiles: (row['distance_miles'] as num?)?.toDouble(),
     );
   }
 }

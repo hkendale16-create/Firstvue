@@ -68,6 +68,9 @@ class ExploreFeedService {
           beforeId: beforeId,
           limit: limit,
         ),
+        // Dedicated discovery screen — no post feed on this chip.
+        ExploreSection.foodTrucks =>
+          const ExplorePageResult(items: [], hasMore: false),
       };
     } catch (error, stack) {
       debugPrint('ExploreFeedService.fetchPage(${section.name}) failed: $error\n$stack');
@@ -96,7 +99,8 @@ class ExploreFeedService {
       ExploreSection.rentals ||
       ExploreSection.food ||
       ExploreSection.bars ||
-      ExploreSection.thingsToDo => query.or(
+      ExploreSection.thingsToDo ||
+      ExploreSection.foodTrucks => query.or(
         'author_profile_type.eq.business,author_profile_type.eq.professional,'
         'business_id.not.is.null,professional_profile_id.not.is.null',
       ),

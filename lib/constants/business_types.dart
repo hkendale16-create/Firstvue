@@ -82,6 +82,7 @@ IconData iconForIndustrySlug(String slug) {
     'restaurant' => Icons.restaurant,
     'cafe' => Icons.local_cafe,
     'bakery' => Icons.bakery_dining,
+    'food-truck' => Icons.local_shipping_outlined,
     'bar' || 'lounge' => Icons.local_bar,
     _ => Icons.business_center_outlined,
   };
