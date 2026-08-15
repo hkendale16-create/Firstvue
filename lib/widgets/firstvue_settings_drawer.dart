@@ -24,6 +24,7 @@ import '../screens/privacy_settings_screen.dart';
 import '../screens/settings_preferences_screen.dart';
 import '../services/admin_auth_service.dart';
 import '../theme/firstvue_theme.dart';
+import 'firstvue_onboarding.dart';
 
 typedef FirstVueSettingsOpen = void Function(Widget screen);
 
@@ -203,6 +204,12 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                     onTap: user == null
                         ? _handleAccount
                         : () => _open(const SettingsPreferencesScreen()),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.menu_book_outlined,
+                    title: 'App tutorial',
+                    subtitle: 'Sections tour or opening a business entity',
+                    onTap: () => showOnboardingTourReplay(context),
                   ),
                 ],
               ),

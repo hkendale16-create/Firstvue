@@ -11,8 +11,8 @@ void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     SharedPreferences.setMockInitialValues({
-      'firstvue_welcome_v1_seen': true,
-      'firstvue_tutorial_v1_completed': true,
+      'firstvue_welcome_v2_seen': true,
+      'firstvue_tutorial_v2_completed': true,
     });
     await Supabase.initialize(
       url: SupabaseConfig.url,
