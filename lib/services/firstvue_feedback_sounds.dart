@@ -9,6 +9,7 @@ class FirstVueFeedbackSounds {
 
   static final AudioPlayer _player = AudioPlayer();
   static DateTime? _lastRefreshAt;
+  static const _audioTimeout = Duration(milliseconds: 800);
 
   static Future<void> playSpark({required bool fromUserTap}) async {
     if (!fromUserTap) return;
@@ -17,9 +18,9 @@ class FirstVueFeedbackSounds {
       return;
     }
     try {
-      await _player.stop();
-      await _player.setVolume(0.35);
-      await _player.play(AssetSource('sounds/spark.wav'));
+      await _player.stop().timeout(_audioTimeout);
+      await _player.setVolume(0.35).timeout(_audioTimeout);
+      await _player.play(AssetSource('sounds/spark.wav')).timeout(_audioTimeout);
     } catch (_) {
       SystemSound.play(SystemSoundType.click);
     }
@@ -38,9 +39,11 @@ class FirstVueFeedbackSounds {
       return;
     }
     try {
-      await _player.stop();
-      await _player.setVolume(0.22);
-      await _player.play(AssetSource('sounds/refresh.wav'));
+      await _player.stop().timeout(_audioTimeout);
+      await _player.setVolume(0.22).timeout(_audioTimeout);
+      await _player
+          .play(AssetSource('sounds/refresh.wav'))
+          .timeout(_audioTimeout);
     } catch (_) {
       // Soft fail — refresh should never break on audio.
     }
@@ -51,9 +54,11 @@ class FirstVueFeedbackSounds {
       return;
     }
     try {
-      await _player.stop();
-      await _player.setVolume(0.28);
-      await _player.play(AssetSource('sounds/refresh.wav'));
+      await _player.stop().timeout(_audioTimeout);
+      await _player.setVolume(0.28).timeout(_audioTimeout);
+      await _player
+          .play(AssetSource('sounds/refresh.wav'))
+          .timeout(_audioTimeout);
     } catch (_) {
       SystemSound.play(SystemSoundType.click);
     }
