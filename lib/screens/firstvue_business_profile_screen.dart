@@ -263,6 +263,133 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
     }
   }
 
+  Future<void> _addScheduledStop(String businessId) async {
+    final placeController = TextEditingController();
+    final noteController = TextEditingController();
+    TimeOfDay start = const TimeOfDay(hour: 12, minute: 0);
+    TimeOfDay end = const TimeOfDay(hour: 15, minute: 0);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            return AlertDialog(
+              title: const Text('Scheduled stop'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: placeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Place / neighborhood',
+                        hintText: 'e.g. Piedmont Park',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('Starts ${start.format(ctx)}'),
+                      trailing: const Icon(Icons.schedule),
+                      onTap: () async {
+                        final next = await showTimePicker(
+                          context: ctx,
+                          initialTime: start,
+                        );
+                        if (next != null) setLocal(() => start = next);
+                      },
+                    ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('Ends ${end.format(ctx)}'),
+                      trailing: const Icon(Icons.schedule),
+                      onTap: () async {
+                        final next = await showTimePicker(
+                          context: ctx,
+                          initialTime: end,
+                        );
+                        if (next != null) setLocal(() => end = next);
+                      },
+                    ),
+                    TextField(
+                      controller: noteController,
+                      decoration: const InputDecoration(
+                        labelText: 'Note (optional)',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Scheduled is not the same as LIVE NOW — customers won’t see you as physically present until you Go Live.',
+                      style: Theme.of(ctx).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    final place = placeController.text.trim();
+    final note = noteController.text.trim();
+    placeController.dispose();
+    noteController.dispose();
+    if (confirmed != true || !mounted) return;
+    if (place.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add a place label for the stop.')),
+      );
+      return;
+    }
+    final now = DateTime.now();
+    final startsAt = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      start.hour,
+      start.minute,
+    );
+    var endsAt = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      end.hour,
+      end.minute,
+    );
+    if (!endsAt.isAfter(startsAt)) {
+      endsAt = endsAt.add(const Duration(days: 1));
+    }
+    try {
+      await BusinessScheduledStopsService.create(
+        businessId: businessId,
+        startsAt: startsAt,
+        endsAt: endsAt,
+        placeLabel: place,
+        note: note.isEmpty ? null : note,
+      );
+      await _loadFoodTruckExtras();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Scheduled stop added for today.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save stop: $error')),
+      );
+    }
+  }
+
   Future<void> _loadFollowerCount() async {
     final count = await BusinessFollowService.followerCount(widget.details.id);
     if (!mounted) return;
