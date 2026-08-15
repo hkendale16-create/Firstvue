@@ -328,6 +328,55 @@ void main() {
       expect(item.originalSourceLabel, 'ATL Eats');
       expect(item.post!.resolvedAuthorProfileType, 'business');
     });
+
+    test('People cards are profiles; Businesses cards are entities', () {
+      final profile = ExploreItem.profileItem(
+        profile: const ExploreProfileCard(
+          id: 'u1',
+          displayName: 'Ada',
+          handle: '@ada',
+        ),
+      );
+      final business = ExploreItem.entityItem(
+        section: ExploreSection.businesses,
+        entity: const ExploreEntityCard(
+          id: 'b1',
+          kind: 'business',
+          name: 'Glow Studio',
+          subtitle: 'Hair · Nails',
+        ),
+      );
+
+      expect(profile.kind, ExploreItemKind.profile);
+      expect(profile.section, ExploreSection.people);
+      expect(profile.entity, isNull);
+
+      expect(business.kind, ExploreItemKind.entity);
+      expect(business.section, ExploreSection.businesses);
+      expect(business.profile, isNull);
+      expect(business.entity!.kind, 'business');
+    });
+
+    test('entity tabs reject personal authors; People rejects business authors',
+        () {
+      final personal = _post(authorProfileType: 'user');
+      final business = _post(
+        authorProfileType: 'business',
+        businessId: 'b1',
+        industrySlug: 'consulting',
+      );
+
+      expect(personal.isEntityAuthor, isFalse);
+      expect(business.isEntityAuthor, isTrue);
+      expect(
+        ExploreCategoryFilter.matches(personal, ExploreSection.businesses),
+        isFalse,
+      );
+      expect(
+        ExploreCategoryFilter.matches(business, ExploreSection.people),
+        isFalse,
+      );
+    });
   });
 
   group('Explore section store pagination', () {
