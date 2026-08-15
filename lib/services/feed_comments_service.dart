@@ -368,7 +368,7 @@ class FeedCommentsService {
             body: comment.body,
             payload: {
               'comment_id': comment.id,
-              if (postId != null) 'post_id': postId,
+              'post_id': ?postId,
             },
           );
         }

@@ -22,15 +22,17 @@ class EditEventScreen extends StatefulWidget {
     this.event,
   });
 
-  const EditEventScreen.create({super.key}) : mode = EditEventMode.create, event = null;
+  const EditEventScreen.create({super.key})
+      : mode = EditEventMode.create,
+        event = null;
 
-  EditEventScreen.edit({super.key, required CommunityEvent event})
-      : mode = EditEventMode.edit,
-        event = event;
+  const EditEventScreen.edit({super.key, required CommunityEvent this.event})
+      : mode = EditEventMode.edit;
 
-  EditEventScreen.duplicate({super.key, required CommunityEvent event})
-      : mode = EditEventMode.duplicate,
-        event = event;
+  const EditEventScreen.duplicate({
+    super.key,
+    required CommunityEvent this.event,
+  }) : mode = EditEventMode.duplicate;
 
   @override
   State<EditEventScreen> createState() => _EditEventScreenState();
@@ -244,7 +246,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String?>(
-                    value: _businessId,
+                    key: ValueKey(_businessId ?? 'none'),
+                    initialValue: _businessId,
                     dropdownColor: fv.surface,
                     style: TextStyle(color: fv.primaryText),
                     decoration: InputDecoration(

@@ -129,9 +129,9 @@ class _EventPlannerScreenState extends State<EventPlannerScreen> {
               onApply: () async {
                 if (Supabase.instance.client.auth.currentUser == null) {
                   final signedIn = await ensureSignedIn(context);
-                  if (!signedIn || !mounted) return;
+                  if (!signedIn || !context.mounted) return;
                 }
-                if (!mounted) return;
+                if (!context.mounted) return;
                 await Navigator.push(
                   context,
                   FirstVuePageRoute(

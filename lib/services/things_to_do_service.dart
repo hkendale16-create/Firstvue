@@ -288,7 +288,7 @@ class ThingsToDoService {
       'event_at': eventAt?.toIso8601String(),
       'location_label': locationLabel?.trim(),
       'business_id': businessId,
-      if (status != null) 'status': status,
+      'status': ?status,
     };
 
     await _client
