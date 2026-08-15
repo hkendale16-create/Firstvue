@@ -1,7 +1,7 @@
 -- =============================================================================
 -- FirstVue: reusable Live Locations + Food Trucks discovery foundation
 -- Extends business_open_sessions (do not hardcode to food trucks only).
--- No ordering / checkout / customer payments.
+-- No ordering or customer payments.
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------

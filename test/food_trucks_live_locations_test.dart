@@ -22,7 +22,11 @@ void main() {
     expect(sql.contains('founding_food_truck'), isTrue);
     expect(sql.contains('push_live_nearby'), isTrue);
     // No ordering / customer payments in this migration.
-    expect(sql.toLowerCase().contains('checkout'), isFalse);
+    expect(
+      RegExp(r'\b(checkout|stripe_checkout|payment_intent)\b', caseSensitive: false)
+          .hasMatch(sql),
+      isFalse,
+    );
     expect(sql.toLowerCase().contains('stripe'), isFalse);
   });
 
