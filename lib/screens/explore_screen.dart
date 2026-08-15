@@ -12,6 +12,7 @@ import '../services/explore_feed_service.dart';
 import '../services/shoutout_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../utils/new_label.dart';
+import '../utils/scroll_load_more_gate.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/social_chrome.dart';
 import 'discovery_feed_screen.dart';
@@ -28,6 +29,7 @@ class ExploreScreen extends StatefulWidget {
 class _ExploreScreenState extends State<ExploreScreen> {
   final _scrollController = ScrollController();
   final _store = ExploreSectionStore(pageSize: ExploreFeedService.pageSize);
+  final _loadMoreGate = ScrollLoadMoreGate(thresholdPx: 720);
   ExploreSection _section = ExploreSection.people;
   String? _filterBusinessType;
 
@@ -51,11 +53,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     final snap = _snap;
-    if (snap.loadingMore || !snap.hasMore || snap.loading) return;
     final position = _scrollController.position;
-    if (position.pixels >= position.maxScrollExtent - 720) {
-      _loadMore();
-    }
+    final shouldLoad = _loadMoreGate.onScroll(
+      pixels: position.pixels,
+      maxScrollExtent: position.maxScrollExtent,
+      canLoadMore: !snap.loadingMore && snap.hasMore && !snap.loading,
+    );
+    if (shouldLoad) _loadMore();
   }
 
   Future<void> _loadSection(
@@ -93,6 +97,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   void _selectSection(ExploreSection section) {
     if (_section == section) return;
     setState(() => _section = section);
+    _loadMoreGate.reset();
     _loadSection(section);
   }
 
@@ -191,7 +196,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
         onRefresh: () => _loadSection(_section, refresh: true),
         child: ListView(
           controller: _scrollController,
-          physics: const AlwaysScrollableScrollPhysics(),
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: ClampingScrollPhysics(),
+          ),
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           children: [
             const SocialPageHeader(
