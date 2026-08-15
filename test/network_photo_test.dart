@@ -53,4 +53,23 @@ void main() {
 
     expect(find.byType(NetworkPhoto), findsOneWidget);
   });
+
+  testWidgets('NetworkPhoto with url paints a surface placeholder initially', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 48,
+            height: 48,
+            child: NetworkPhoto(url: 'https://example.com/a.jpg'),
+          ),
+        ),
+      ),
+    );
+
+    // VM tests do not use the visibility-gated HTML path; Image.network mounts.
+    expect(find.byType(Image), findsOneWidget);
+  });
 }

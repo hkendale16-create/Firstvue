@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import '../theme/firstvue_theme.dart';
+import '../utils/web_safari_media.dart';
 import 'network_photo.dart';
 
 /// Muted Explore-grid video preview with visibility-aware controller lifecycle.
@@ -13,6 +15,9 @@ import 'network_photo.dart';
 /// reliably supported by `video_player`, so previews use a seamless forward
 /// loop. Controllers are disposed when tiles leave the viewport so Explore does
 /// not keep unlimited players alive.
+///
+/// On Flutter web, previews stay poster-only — Safari OOMs when several
+/// CanvasKit video textures stay allocated in the Explore grid.
 class ExploreGridVideo extends StatefulWidget {
   final String url;
   final String? thumbnailUrl;
@@ -26,7 +31,7 @@ class ExploreGridVideo extends StatefulWidget {
   });
 
   /// Soft cap on simultaneously initialized Explore video controllers.
-  static const maxActiveControllers = 4;
+  static int get maxActiveControllers => kIsWeb ? 0 : 4;
 
   static int _activeControllers = 0;
   static final List<VoidCallback> _waitQueue = <VoidCallback>[];
@@ -142,6 +147,7 @@ class _ExploreGridVideoState extends State<ExploreGridVideo> {
   }
 
   void _requestController() {
+    if (webAvoidInlineVideoPreview) return;
     if (_controller != null || _loading || _failed || _holdsSlot) return;
     if (ExploreGridVideo._tryAcquire()) {
       _holdsSlot = true;

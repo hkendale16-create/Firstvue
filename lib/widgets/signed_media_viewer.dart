@@ -10,8 +10,9 @@ import 'network_photo.dart';
 
 /// Thumbnail for a signed network URL.
 ///
-/// On web, photos use an HTML `<img>` and clips use `<video playsinline>` so
-/// iPhone Safari can show Supabase media that CanvasKit `fetch()` blocks.
+/// On web, photos use an HTML `<img>`. Video thumbnails stay static (play
+/// chrome only) — embedding `<video>` platform views in grids OOMs iOS Safari.
+/// Full playback uses [HtmlVideoView] in the full-screen viewer.
 class SignedMediaThumbnail extends StatelessWidget {
   final String url;
   final bool isVideo;
@@ -38,12 +39,9 @@ class SignedMediaThumbnail extends StatelessWidget {
     Widget child;
     if (_treatAsVideo) {
       child = kIsWeb
-          ? Stack(
-              fit: StackFit.expand,
-              children: [
-                HtmlVideoView(key: ValueKey(url), url: url, fit: fit, muted: true),
-                const IgnorePointer(child: _PlayOverlay(compact: true)),
-              ],
+          ? const ColoredBox(
+              color: FirstVueColors.elevatedSurface,
+              child: IgnorePointer(child: _PlayOverlay(compact: true)),
             )
           : _IoVideoThumb(url: url, fit: fit);
     } else {
