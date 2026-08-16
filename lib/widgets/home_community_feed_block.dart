@@ -51,16 +51,16 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
   String? _error;
   String? _avatarUrl;
   String _displayName = 'you';
-  int _feedLimit = 20;
   /// Stable for this session so "load more" does not reshuffle the whole feed.
   late double _rankSeed;
   RealtimeChannel? _newsChannel;
   int _storiesRefresh = 0;
 
+  int get _pageSize => widget.maxPosts;
+
   @override
   void initState() {
     super.initState();
-    _feedLimit = widget.maxPosts;
     _rankSeed = DateTime.now().millisecondsSinceEpoch.toDouble();
     _bootstrap();
     _subscribeToNewsFeed();
@@ -71,7 +71,6 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.refreshToken != widget.refreshToken) {
       _rankSeed = DateTime.now().millisecondsSinceEpoch.toDouble();
-      _feedLimit = widget.maxPosts;
       _hasMore = true;
       _loadFeed();
     }
@@ -117,7 +116,7 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
   Future<void> _bootstrap() async {
     // Paint last persisted / session feed immediately, then revalidate.
     var cached = FeedPageCache.peekRanked(
-          limit: _feedLimit,
+          limit: _pageSize,
           seed: _rankSeed,
         ) ??
         const <CommunityNewsPost>[];
@@ -127,6 +126,10 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
     if (cached.isNotEmpty && mounted) {
       setState(() {
         _posts = cached;
+        _repostedPostIds = {
+          for (final post in cached)
+            if (post.repostedByMe) post.id,
+        };
         _loading = false;
       });
       for (final post in cached) {
@@ -174,34 +177,31 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
     }
     if (reshuffle) {
       _rankSeed = DateTime.now().millisecondsSinceEpoch.toDouble();
-      _feedLimit = widget.maxPosts;
       _hasMore = true;
     }
     try {
       // Ranked main Newsfeed: recency + unseen + relevance + controlled variety.
       // Seed is stable across load-more so scrolling does not reshuffle posts.
+      // Repost counts / my-reposts hydrate inside mapPostRows — no second wave.
       final posts = await CommunityNewsService.fetchRankedMainFeed(
-        limit: _feedLimit,
+        limit: _pageSize,
         seed: _rankSeed,
       );
-      final postIds = posts.map((p) => p.id).toList();
-      final reposted = await RepostService.fetchMyRepostedIds(postIds);
-      final repostCounts = await RepostService.fetchRepostCounts(postIds);
       if (!mounted) return;
-      final mapped = posts
-          .map((p) => p.copyWith(repostCount: repostCounts[p.id] ?? 0))
-          .toList(growable: false);
       FeedPageCache.putRanked(
-        limit: _feedLimit,
+        limit: _pageSize,
         seed: _rankSeed,
-        posts: mapped,
+        posts: posts,
       );
       setState(() {
-        _posts = mapped;
-        _repostedPostIds = reposted;
+        _posts = posts;
+        _repostedPostIds = {
+          for (final post in posts)
+            if (post.repostedByMe) post.id,
+        };
         _loading = false;
         _error = null;
-        _hasMore = posts.length >= _feedLimit;
+        _hasMore = posts.length >= _pageSize;
       });
     } catch (error) {
       CommunityNewsService.logFeedError(
@@ -270,12 +270,38 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
 
   Future<void> _loadMore() async {
     if (_loadingMore || _loading || !_hasMore) return;
-    setState(() {
-      _loadingMore = true;
-      _feedLimit += 20;
-    });
-    await _loadFeed(silent: true);
-    if (mounted) setState(() => _loadingMore = false);
+    setState(() => _loadingMore = true);
+    try {
+      final excludeIds = _posts.map((post) => post.id).toList(growable: false);
+      final more = await CommunityNewsService.fetchRankedMainFeed(
+        limit: _pageSize,
+        seed: _rankSeed,
+        excludeIds: excludeIds,
+      );
+      if (!mounted) return;
+      final existing = excludeIds.toSet();
+      final fresh = more.where((post) => existing.add(post.id)).toList();
+      setState(() {
+        _posts = [..._posts, ...fresh];
+        _repostedPostIds = {
+          ..._repostedPostIds,
+          for (final post in fresh)
+            if (post.repostedByMe) post.id,
+        };
+        _hasMore = more.length >= _pageSize;
+        _loadingMore = false;
+      });
+    } catch (error) {
+      CommunityNewsService.logFeedError(
+        error,
+        context: 'HomeCommunityFeedBlock.loadMore',
+      );
+      if (!mounted) return;
+      setState(() {
+        _loadingMore = false;
+        _hasMore = true;
+      });
+    }
   }
 
   Future<void> _sparkPost(int index) async {

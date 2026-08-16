@@ -90,15 +90,14 @@ class DiscoveryFeedService {
       return run().timeout(timeout, onTimeout: () => const []);
     }
 
-    // Exclude-based paging from the start of each source. Signed-URL cache
-    // makes re-reads cheap; independent DB offsets were skipping tiles that
-    // had been fetched then discarded by take(limit).
+    // Exclude-based paging from the start of each source. Cap the window so
+    // deep scrolls do not re-pull/sign hundreds of already-seen tiles.
     final already = excludeMediaIds.length;
-    final window = (limit + already + 12).clamp(limit, 180);
-    // Oversample business media: many DB rows point at missing storage objects.
-    // Fetch sources in parallel — sequential tripled VUE load latency/usage.
+    final window = (limit + already + 8).clamp(limit, 80);
+    // Mild oversample for missing storage objects — keep bounded vs window*2.
+    final businessWindow = (window * 3 ~/ 2).clamp(limit, 120);
     final sourced = await Future.wait([
-      safe(() => _fetchBusinessMedia(limit: window * 2, offset: 0)),
+      safe(() => _fetchBusinessMedia(limit: businessWindow, offset: 0)),
       safe(() => _fetchMemberProfileMedia(limit: window, offset: 0)),
       safe(() => _fetchVueNewsPosts(limit: window, offset: 0)),
     ]);

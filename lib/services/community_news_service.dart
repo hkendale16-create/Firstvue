@@ -10,6 +10,7 @@ import 'community_service.dart';
 import 'follow_service.dart';
 import 'post_metadata_service.dart';
 import 'profile_cards.dart';
+import 'repost_service.dart';
 import 'saved_items_service.dart';
 import '../models/publish_destination.dart';
 
@@ -88,6 +89,7 @@ class CommunityNewsPost {
   final String? entityHandle;
   final bool savedByMe;
   final int repostCount;
+  final bool repostedByMe;
   final String visibility;
   final String? backgroundColor;
   final PublishDestination publishDestination;
@@ -126,6 +128,7 @@ class CommunityNewsPost {
     this.entityHandle,
     required this.savedByMe,
     this.repostCount = 0,
+    this.repostedByMe = false,
     this.visibility = 'public',
     this.backgroundColor,
     this.publishDestination = PublishDestination.feed,
@@ -232,6 +235,7 @@ class CommunityNewsPost {
     Object? entityHandle = _unset,
     bool? savedByMe,
     int? repostCount,
+    bool? repostedByMe,
     String? visibility,
     String? backgroundColor,
     PublishDestination? publishDestination,
@@ -275,6 +279,7 @@ class CommunityNewsPost {
           : entityHandle as String?,
       savedByMe: savedByMe ?? this.savedByMe,
       repostCount: repostCount ?? this.repostCount,
+      repostedByMe: repostedByMe ?? this.repostedByMe,
       visibility: visibility ?? this.visibility,
       backgroundColor: backgroundColor ?? this.backgroundColor,
       publishDestination: publishDestination ?? this.publishDestination,
@@ -490,7 +495,7 @@ class CommunityNewsService {
     final fetchLimit = (profileType != null ||
             businessType != null ||
             configure != null)
-        ? limit * 3
+        ? limit * 2
         : limit;
     final posts = await fetchPosts(
       limit: fetchLimit,
@@ -527,39 +532,84 @@ class CommunityNewsService {
   }
 
   /// Ranked Home/main Newsfeed (recency + unseen + relevance + controlled variance).
+  ///
+  /// Pass [excludeIds] for append-style paging so load-more does not re-fetch
+  /// and re-hydrate posts already on screen (RPC max window is 100).
   static Future<List<CommunityNewsPost>> fetchRankedMainFeed({
     int limit = 30,
     double? seed,
+    Iterable<String> excludeIds = const [],
   }) async {
     final me = _client.auth.currentUser?.id;
+    final exclude = {
+      for (final id in excludeIds)
+        if (id.trim().isNotEmpty) id.trim(),
+    };
+    final requestLimit = exclude.isEmpty
+        ? limit
+        : (limit + exclude.length).clamp(limit, 100);
 
     try {
       final result = await _client.rpc(
         'fetch_ranked_main_feed',
-        params: {'p_limit': limit, 'p_seed': seed},
+        params: {'p_limit': requestLimit, 'p_seed': seed},
       );
       if (result is! List || result.isEmpty) {
         // Signed-in users previously got a hard empty feed when the RPC
         // returned []. Always fall back to chronological posts.
-        return await fetchPosts(limit: limit);
+        return pageAfterExclude(
+          await fetchPosts(limit: requestLimit),
+          excludeIds: exclude,
+          limit: limit,
+          homeOnly: true,
+        );
       }
       final mapped = await _mapPostRows(result, currentUserId: me);
-      final home = mapped
-          .where((post) => post.publishDestination.appearsOnHome)
-          .toList(growable: false);
-      if (home.isEmpty) {
-        final posts = await fetchPosts(limit: limit);
-        return posts
-            .where((post) => post.publishDestination.appearsOnHome)
-            .toList(growable: false);
+      final home = pageAfterExclude(
+        mapped,
+        excludeIds: exclude,
+        limit: limit,
+        homeOnly: true,
+      );
+      if (home.isEmpty && exclude.isEmpty) {
+        return pageAfterExclude(
+          await fetchPosts(limit: limit),
+          excludeIds: exclude,
+          limit: limit,
+          homeOnly: true,
+        );
       }
       return home;
     } catch (_) {
-      final posts = await fetchPosts(limit: limit);
-      return posts
-          .where((post) => post.publishDestination.appearsOnHome)
-          .toList(growable: false);
+      return pageAfterExclude(
+        await fetchPosts(limit: requestLimit),
+        excludeIds: exclude,
+        limit: limit,
+        homeOnly: true,
+      );
     }
+  }
+
+  /// Keep posts that are not in [excludeIds], optionally home-visible, up to [limit].
+  @visibleForTesting
+  static List<CommunityNewsPost> pageAfterExclude(
+    List<CommunityNewsPost> posts, {
+    required Iterable<String> excludeIds,
+    required int limit,
+    bool homeOnly = false,
+  }) {
+    final exclude = {
+      for (final id in excludeIds)
+        if (id.trim().isNotEmpty) id.trim(),
+    };
+    final out = <CommunityNewsPost>[];
+    for (final post in posts) {
+      if (exclude.contains(post.id)) continue;
+      if (homeOnly && !post.publishDestination.appearsOnHome) continue;
+      out.add(post);
+      if (out.length >= limit) break;
+    }
+    return out;
   }
 
   /// Chronological New feed (`created_at DESC`) with cursor pagination.
@@ -599,21 +649,33 @@ class CommunityNewsService {
   static Future<List<CommunityNewsPost>> fetchTrendingFeed({
     int limit = 20,
     int windowHours = 48,
+    Iterable<String> excludeIds = const [],
   }) async {
     final me = _client.auth.currentUser?.id;
+    final exclude = {
+      for (final id in excludeIds)
+        if (id.trim().isNotEmpty) id.trim(),
+    };
+    final requestLimit = exclude.isEmpty
+        ? limit
+        : (limit + exclude.length).clamp(limit, 80);
     try {
       final result = await _client.rpc(
         'fetch_trending_feed',
-        params: {'p_limit': limit, 'p_window_hours': windowHours},
+        params: {'p_limit': requestLimit, 'p_window_hours': windowHours},
       );
       if (result is List && result.isNotEmpty) {
-        return _dedupePosts(await _mapPostRows(result, currentUserId: me));
+        return pageAfterExclude(
+          _dedupePosts(await _mapPostRows(result, currentUserId: me)),
+          excludeIds: exclude,
+          limit: limit,
+        );
       }
     } catch (error) {
       logFeedError(error, context: 'fetchTrendingFeed');
     }
     // Fallback: recent posts ordered by spark count heuristic client-side.
-    final posts = await fetchPosts(limit: limit * 2);
+    final posts = await fetchPosts(limit: requestLimit);
     final sorted = [...posts]
       ..sort((a, b) {
         final scoreA = a.sparkCount * 1.0 + a.repostCount * 4.0;
@@ -622,30 +684,58 @@ class CommunityNewsService {
         if (cmp != 0) return cmp;
         return b.createdAt.compareTo(a.createdAt);
       });
-    return _dedupePosts(sorted.take(limit).toList());
+    return pageAfterExclude(
+      _dedupePosts(sorted),
+      excludeIds: exclude,
+      limit: limit,
+    );
   }
 
   /// Rule-based Recommended feed with cold-start fallback.
   static Future<List<CommunityNewsPost>> fetchRecommendedFeed({
     int limit = 20,
     double? seed,
+    Iterable<String> excludeIds = const [],
   }) async {
     final me = _client.auth.currentUser?.id;
+    final exclude = {
+      for (final id in excludeIds)
+        if (id.trim().isNotEmpty) id.trim(),
+    };
+    final requestLimit = exclude.isEmpty
+        ? limit
+        : (limit + exclude.length).clamp(limit, 80);
+    final resolvedSeed =
+        seed ?? DateTime.now().millisecondsSinceEpoch.toDouble();
     try {
       final result = await _client.rpc(
         'fetch_recommended_feed',
         params: {
-          'p_limit': limit,
-          'p_seed': seed ?? DateTime.now().millisecondsSinceEpoch.toDouble(),
+          'p_limit': requestLimit,
+          'p_seed': resolvedSeed,
         },
       );
       if (result is List && result.isNotEmpty) {
-        return _dedupePosts(await _mapPostRows(result, currentUserId: me));
+        return pageAfterExclude(
+          _dedupePosts(await _mapPostRows(result, currentUserId: me)),
+          excludeIds: exclude,
+          limit: limit,
+        );
       }
     } catch (error) {
       logFeedError(error, context: 'fetchRecommendedFeed');
     }
-    return _dedupePosts(await fetchRankedMainFeed(limit: limit, seed: seed));
+    return pageAfterExclude(
+      _dedupePosts(
+        await fetchRankedMainFeed(
+          limit: requestLimit,
+          seed: resolvedSeed,
+          excludeIds: exclude,
+        ),
+      ),
+      excludeIds: exclude,
+      limit: limit,
+    );
   }
 
   /// Aggregated Communities (hub) feed for all hubs the user can access.
@@ -666,11 +756,12 @@ class CommunityNewsService {
           .toList();
       if (hubIds.isEmpty) return const [];
 
-      final all = <CommunityNewsPost>[];
-      for (final hubId in hubIds.take(12)) {
-        final page = await fetchHubCommunityFeed(hubId, limit: 8);
-        all.addAll(page);
-      }
+      final pages = await Future.wait(
+        hubIds.take(12).map((hubId) => fetchHubCommunityFeed(hubId, limit: 8)),
+      );
+      final all = <CommunityNewsPost>[
+        for (final page in pages) ...page,
+      ];
       all.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return _dedupePosts(all.take(limit).toList());
     } catch (error) {
@@ -888,6 +979,10 @@ class CommunityNewsService {
             contentType: SavedContentType.newsPost,
             contentIds: postIds,
           );
+    final repostCountsFuture = RepostService.fetchRepostCounts(postIds);
+    final myRepostsFuture = currentUserId == null
+        ? Future.value(const <String>{})
+        : RepostService.fetchMyRepostedIds(postIds);
     final mediaByPostFuture =
         CommunityNewsMediaService.fetchMediaByPostIds(postIds);
     final followingAuthorsFuture = _followingAuthorIds(
@@ -918,6 +1013,8 @@ class CommunityNewsService {
     final sparkCounts = await sparkCountsFuture;
     final myReactions = await myReactionsFuture;
     final mySaves = await mySavesFuture;
+    final repostCounts = await repostCountsFuture;
+    final myReposts = await myRepostsFuture;
     final mediaByPost = await mediaByPostFuture;
     final followingAuthors = await followingAuthorsFuture;
     final entityHandles = await entityHandlesFuture;
@@ -1041,6 +1138,8 @@ class CommunityNewsService {
             entityHandle:
                 entityHandleKey == null ? null : entityHandles[entityHandleKey],
             savedByMe: mySaves.contains(id),
+            repostCount: repostCounts[id] ?? 0,
+            repostedByMe: myReposts.contains(id),
             visibility: visibility,
             backgroundColor: backgroundColor,
             publishDestination: publishDestination,

@@ -154,6 +154,7 @@ class FeedPageCache {
       'entity_handle': post.entityHandle,
       'saved_by_me': post.savedByMe,
       'repost_count': post.repostCount,
+      'reposted_by_me': post.repostedByMe,
       'visibility': post.visibility,
       'background_color': post.backgroundColor,
       'publish_destination': post.publishDestination.name,
@@ -240,6 +241,7 @@ class FeedPageCache {
       entityHandle: map['entity_handle'] as String?,
       savedByMe: map['saved_by_me'] as bool? ?? false,
       repostCount: (map['repost_count'] as num?)?.toInt() ?? 0,
+      repostedByMe: map['reposted_by_me'] as bool? ?? false,
       visibility: (map['visibility'] as String?) ?? 'public',
       backgroundColor: map['background_color'] as String?,
       publishDestination: PublishDestination.values.firstWhere(
