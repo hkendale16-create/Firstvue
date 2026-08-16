@@ -81,4 +81,10 @@ void main() {
     expect(shell, contains('FIRSTVUE_OAUTH_GOOGLE=true'));
     expect(shell, isNot(contains('FIRSTVUE_OAUTH_APPLE=true')));
   });
+
+  test('Continue with Google is offered on Create account as well as Sign in', () {
+    expect(authScreen, contains('(signIn || create) && (showApple || showGoogle)'));
+    expect(authScreen, contains('Continue with Google'));
+    expect(authScreen, contains('_oauthEnabled'));
+  });
 }

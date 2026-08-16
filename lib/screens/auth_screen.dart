@@ -427,8 +427,18 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  /// Social buttons stay available on Create account after Terms are accepted.
+  bool get _oauthEnabled =>
+      !_submitting && (_mode != AuthSheetMode.createAccount || _acceptedLegal);
+
   Future<void> _oauth(OAuthProvider provider) async {
     if (_submitting) return;
+    if (_mode == AuthSheetMode.createAccount && !_acceptedLegal) {
+      setState(
+        () => _formError = 'Accept the Terms and Privacy Policy to continue.',
+      );
+      return;
+    }
     setState(() {
       _submitting = true;
       _formError = null;
@@ -766,7 +776,7 @@ class _AuthScreenState extends State<AuthScreen> {
             child: const Text('Back to sign in'),
           ),
         ],
-        if (signIn && (showApple || showGoogle)) ...[
+        if ((signIn || create) && (showApple || showGoogle)) ...[
           const SizedBox(height: 24),
           Row(
             children: [
@@ -795,16 +805,18 @@ class _AuthScreenState extends State<AuthScreen> {
             _SocialAuthButton(
               label: 'Continue with Apple',
               icon: Icons.apple,
-              onPressed: _submitting ? null : () => _oauth(OAuthProvider.apple),
+              onPressed: _oauthEnabled
+                  ? () => _oauth(OAuthProvider.apple)
+                  : null,
             ),
           if (showApple && showGoogle) const SizedBox(height: 10),
           if (showGoogle)
             _SocialAuthButton(
               label: 'Continue with Google',
               icon: Icons.g_mobiledata_rounded,
-              onPressed: _submitting
-                  ? null
-                  : () => _oauth(OAuthProvider.google),
+              onPressed: _oauthEnabled
+                  ? () => _oauth(OAuthProvider.google)
+                  : null,
             ),
         ],
         if (signIn || create) ...[
