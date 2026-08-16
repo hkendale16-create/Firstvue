@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../auth/auth_link_handler.dart';
 import '../auth/auth_redirect.dart';
 import '../services/username_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -14,11 +15,13 @@ import '../widgets/fv_gold_button.dart';
 class AuthScreen extends StatefulWidget {
   final AuthSheetMode initialMode;
   final bool allowBack;
+  final String? initialError;
 
   const AuthScreen({
     super.key,
     this.initialMode = AuthSheetMode.signIn,
     this.allowBack = false,
+    this.initialError,
   });
 
   @override
@@ -49,6 +52,8 @@ class _AuthScreenState extends State<AuthScreen> {
   void initState() {
     super.initState();
     _mode = widget.initialMode;
+    // OAuth failures land on /auth/callback with ?error=…; show that once.
+    _formError = widget.initialError ?? AuthLinkHandler.takePendingError();
   }
 
   @override

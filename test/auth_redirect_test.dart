@@ -85,4 +85,10 @@ void main() {
     expect(kGenericAuthError.toLowerCase().contains('email'), isFalse);
     expect(kGenericResetMessage.toLowerCase().contains('sent to'), isFalse);
   });
+
+  test('OAuth callback error message stays generic', () {
+    expect(kOauthCallbackError.toLowerCase().contains('secret'), isFalse);
+    expect(kOauthCallbackError.toLowerCase().contains('client'), isFalse);
+    expect(kOauthCallbackError.toLowerCase(), contains('google'));
+  });
 }

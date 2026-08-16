@@ -143,6 +143,10 @@ class AuthIdentifier {
 const kGenericAuthError =
     'Unable to sign in. Check your details and try again.';
 
+/// Shown when Google/Apple OAuth redirects back without a usable session.
+const kOauthCallbackError =
+    'Google sign-in could not be completed. Try again, or use email.';
+
 const kGenericResetMessage =
     'If an account exists for that email, a reset link is on the way.';
 
