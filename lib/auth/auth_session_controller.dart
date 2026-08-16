@@ -95,6 +95,9 @@ class AuthSessionController extends ChangeNotifier {
         'ensure_user_profile',
         params: {'display_name': displayName},
       );
+      if (await AuthLocalState.consumePendingLegalAcceptance()) {
+        await Supabase.instance.client.rpc('accept_legal_terms');
+      }
     } catch (_) {
       // Retried by signed-in feature services when needed.
     }

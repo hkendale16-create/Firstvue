@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/auth_link_handler.dart';
+import '../auth/auth_local_state.dart';
 import '../auth/auth_redirect.dart';
 import '../services/username_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -421,15 +422,23 @@ class _AuthScreenState extends State<AuthScreen> {
         'ensure_user_profile',
         params: {'display_name': displayName},
       );
+      final metaUsername = user.userMetadata?['username']?.toString();
+      final normalized = UsernameService.normalize(metaUsername ?? '');
+      if (normalized != null) {
+        try {
+          await UsernameService.updateUsername(normalized);
+        } catch (_) {
+          // Trigger may already have set it, or handle is taken.
+        }
+      }
       await UsernameService.fetchUsername();
     } catch (_) {
       // Profile bootstrap is retried by signed-in feature services.
     }
   }
 
-  /// Social buttons stay available on Create account after Terms are accepted.
-  bool get _oauthEnabled =>
-      !_submitting && (_mode != AuthSheetMode.createAccount || _acceptedLegal);
+  /// Social buttons stay available on Create account; terms are checked on press.
+  bool get _oauthEnabled => !_submitting;
 
   Future<void> _oauth(OAuthProvider provider) async {
     if (_submitting) return;
@@ -444,11 +453,15 @@ class _AuthScreenState extends State<AuthScreen> {
       _formError = null;
     });
     try {
+      if (_mode == AuthSheetMode.createAccount && _acceptedLegal) {
+        await AuthLocalState.markPendingLegalAcceptance();
+      }
       await Supabase.instance.client.auth.signInWithOAuth(
         provider,
         redirectTo: approvedAuthCallbackUrl(),
       );
     } catch (_) {
+      await AuthLocalState.clearPendingLegalAcceptance();
       if (mounted) setState(() => _formError = kGenericAuthError);
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -764,7 +777,9 @@ class _AuthScreenState extends State<AuthScreen> {
               ? 'Create account'
               : 'Sign in',
           loading: _submitting,
-          enabled: !_submitting && (!create || _createReady),
+          // Always pressable so incomplete create forms show field errors
+          // instead of a dead disabled button.
+          enabled: !_submitting,
           onPressed: _submit,
         ),
         if (forgot) ...[
