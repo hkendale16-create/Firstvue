@@ -10,9 +10,10 @@ import 'network_photo.dart';
 
 /// Thumbnail for a signed network URL.
 ///
-/// On web, photos use an HTML `<img>`. Video thumbnails stay static (play
-/// chrome only) — embedding `<video>` platform views in grids OOMs iOS Safari.
-/// Full playback uses [HtmlVideoView] in the full-screen viewer.
+/// Photos use [NetworkPhoto]. Video *gallery* thumbs stay poster-first or
+/// static play chrome — never uncapped [VideoPlayerController] instances in
+/// grids (feed autoplay players are separate). Full playback uses the
+/// full-screen viewers.
 class SignedMediaThumbnail extends StatelessWidget {
   final String url;
   final bool isVideo;
@@ -34,16 +35,35 @@ class SignedMediaThumbnail extends StatelessWidget {
   bool get _treatAsVideo =>
       isVideo || mediaTypeFromMetadata(pathOrUrl: url) == 'video';
 
+  /// True when [url] itself is a video object (not an image poster/variant).
+  bool get _urlIsVideoObject =>
+      mediaTypeFromMetadata(pathOrUrl: url) == 'video';
+
   @override
   Widget build(BuildContext context) {
     Widget child;
     if (_treatAsVideo) {
-      child = kIsWeb
-          ? const ColoredBox(
-              color: FirstVueColors.elevatedSurface,
-              child: IgnorePointer(child: _PlayOverlay(compact: true)),
-            )
-          : _IoVideoThumb(url: url, fit: fit);
+      if (!_urlIsVideoObject && url.trim().isNotEmpty) {
+        // Poster / derived still — paint the image with play chrome.
+        child = Stack(
+          fit: StackFit.expand,
+          children: [
+            NetworkPhoto(
+              url: url,
+              width: width,
+              height: height,
+              fit: fit,
+            ),
+            const IgnorePointer(child: _PlayOverlay(compact: true)),
+          ],
+        );
+      } else {
+        // No poster available: static chrome only (web + native).
+        child = const ColoredBox(
+          color: FirstVueColors.elevatedSurface,
+          child: IgnorePointer(child: _PlayOverlay(compact: true)),
+        );
+      }
     } else {
       child = NetworkPhoto(
         url: url,
@@ -62,92 +82,6 @@ class SignedMediaThumbnail extends StatelessWidget {
     }
 
     return child;
-  }
-}
-
-class _IoVideoThumb extends StatefulWidget {
-  final String url;
-  final BoxFit fit;
-
-  const _IoVideoThumb({required this.url, required this.fit});
-
-  @override
-  State<_IoVideoThumb> createState() => _IoVideoThumbState();
-}
-
-class _IoVideoThumbState extends State<_IoVideoThumb> {
-  VideoPlayerController? _controller;
-  bool _ready = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _init();
-  }
-
-  @override
-  void didUpdateWidget(covariant _IoVideoThumb oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.url != widget.url) {
-      _controller?.dispose();
-      _controller = null;
-      _ready = false;
-      _init();
-    }
-  }
-
-  Future<void> _init() async {
-    final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
-    _controller = controller;
-    try {
-      await controller.initialize();
-      await controller.setVolume(0);
-      await controller.pause();
-      if (!mounted || _controller != controller) {
-        await controller.dispose();
-        return;
-      }
-      setState(() => _ready = true);
-    } catch (_) {
-      await controller.dispose();
-      if (mounted && _controller == controller) {
-        setState(() => _controller = null);
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_ready && _controller != null) {
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          FittedBox(
-            fit: widget.fit,
-            clipBehavior: Clip.hardEdge,
-            child: SizedBox(
-              width: _controller!.value.size.width,
-              height: _controller!.value.size.height,
-              child: VideoPlayer(_controller!),
-            ),
-          ),
-          const _PlayOverlay(compact: true),
-        ],
-      );
-    }
-
-    return const ColoredBox(
-      color: FirstVueColors.elevatedSurface,
-      child: Center(
-        child: Icon(Icons.play_circle_outline, color: Colors.white54, size: 36),
-      ),
-    );
   }
 }
 
@@ -312,7 +246,9 @@ class _SignedMediaViewerDialogState extends State<_SignedMediaViewerDialog> {
                     backgroundColor: FirstVueColors.teal,
                     foregroundColor: Colors.white,
                   ),
-                  icon: Icon(_playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                  icon: Icon(
+                    _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  ),
                   label: Text(_playing ? 'PAUSE' : 'PLAY'),
                 ),
               ),

@@ -41,6 +41,8 @@ class NetworkPhoto extends StatelessWidget {
           _broken();
     }
 
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+
     if (kIsWeb) {
       return _VisibilityGatedNetworkPhoto(
         url: url,
@@ -48,6 +50,8 @@ class NetworkPhoto extends StatelessWidget {
         height: height,
         fit: fit,
         errorBuilder: errorBuilder,
+        cacheWidth: _decodePx(width, dpr),
+        cacheHeight: _decodePx(height, dpr),
       );
     }
 
@@ -58,7 +62,14 @@ class NetworkPhoto extends StatelessWidget {
       fit: fit,
       errorBuilder: errorBuilder,
       useHtmlElement: false,
+      cacheWidth: _decodePx(width, dpr),
+      cacheHeight: _decodePx(height, dpr),
     );
+  }
+
+  static int? _decodePx(double? logical, double dpr) {
+    if (logical == null || !logical.isFinite || logical <= 0) return null;
+    return (logical * dpr).round().clamp(1, 4096);
   }
 
   static Widget _networkImage({
@@ -68,12 +79,16 @@ class NetworkPhoto extends StatelessWidget {
     required BoxFit fit,
     Widget Function(BuildContext, Object, StackTrace?)? errorBuilder,
     required bool useHtmlElement,
+    int? cacheWidth,
+    int? cacheHeight,
   }) {
     return Image.network(
       url,
       width: width,
       height: height,
       fit: fit,
+      cacheWidth: cacheWidth,
+      cacheHeight: cacheHeight,
       webHtmlElementStrategy: useHtmlElement
           ? WebHtmlElementStrategy.prefer
           : WebHtmlElementStrategy.never,
@@ -111,6 +126,8 @@ class _VisibilityGatedNetworkPhoto extends StatefulWidget {
   final double? height;
   final BoxFit fit;
   final Widget Function(BuildContext, Object, StackTrace?)? errorBuilder;
+  final int? cacheWidth;
+  final int? cacheHeight;
 
   const _VisibilityGatedNetworkPhoto({
     required this.url,
@@ -118,6 +135,8 @@ class _VisibilityGatedNetworkPhoto extends StatefulWidget {
     this.height,
     required this.fit,
     this.errorBuilder,
+    this.cacheWidth,
+    this.cacheHeight,
   });
 
   @override
@@ -167,6 +186,8 @@ class _VisibilityGatedNetworkPhotoState
               fit: widget.fit,
               errorBuilder: widget.errorBuilder,
               useHtmlElement: true,
+              cacheWidth: widget.cacheWidth,
+              cacheHeight: widget.cacheHeight,
             )
           : ColoredBox(
               color: FirstVueColors.elevatedSurface,

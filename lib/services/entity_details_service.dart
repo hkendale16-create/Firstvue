@@ -1,6 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../widgets/entity_details_form.dart';
+import 'cache/cache_ttls.dart';
+import 'cache/ttl_memory_cache.dart';
 
 /// Loads/saves `entity_details` jsonb (+ promoted columns when present).
 class EntityDetailsService {
@@ -8,7 +10,34 @@ class EntityDetailsService {
 
   static final _client = Supabase.instance.client;
 
-  static Future<Map<String, dynamic>> fetchBusinessDetails(String businessId) async {
+  static final _cache = TtlMemoryCache<Map<String, dynamic>>(
+    ttl: CacheTtls.entityDetails,
+    maxEntries: 120,
+    name: 'entity_details',
+  );
+
+  static void clearCache() => _cache.clear();
+
+  static Future<Map<String, dynamic>> fetchBusinessDetails(
+    String businessId, {
+    bool force = false,
+  }) async {
+    if (!force) {
+      final cached = _cache.getFresh(businessId);
+      if (cached != null) return Map<String, dynamic>.from(cached);
+      final stale = _cache.peek(businessId);
+      if (stale != null) {
+        // ignore: unawaited_futures
+        _loadBusinessDetails(businessId).then((_) {}, onError: (_) {});
+        return Map<String, dynamic>.from(stale);
+      }
+    }
+    return _loadBusinessDetails(businessId);
+  }
+
+  static Future<Map<String, dynamic>> _loadBusinessDetails(
+    String businessId,
+  ) async {
     try {
       final row = await _client
           .from('businesses')
@@ -28,6 +57,7 @@ class EntityDetailsService {
       put('website', row['website']);
       put('price_range', row['price_range']);
       put('service_area', row['service_area']);
+      _cache.put(businessId, details);
       return details;
     } catch (_) {
       try {
@@ -36,7 +66,9 @@ class EntityDetailsService {
             .select('entity_details')
             .eq('id', businessId)
             .maybeSingle();
-        return parseEntityDetails(row?['entity_details']);
+        final details = parseEntityDetails(row?['entity_details']);
+        _cache.put(businessId, details);
+        return details;
       } catch (_) {
         return {};
       }
@@ -48,6 +80,7 @@ class EntityDetailsService {
     Map<String, dynamic> details,
   ) async {
     final cleaned = _clean(details);
+    _cache.invalidate(businessId);
     final patch = <String, dynamic>{
       'entity_details': cleaned,
       'updated_at': DateTime.now().toUtc().toIso8601String(),

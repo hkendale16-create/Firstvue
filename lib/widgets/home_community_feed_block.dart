@@ -9,6 +9,7 @@ import '../screens/create_post_screen.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../screens/story_composer_screen.dart';
 import '../services/community_news_service.dart';
+import '../services/cache/feed_page_cache.dart';
 import '../services/feed_interaction_service.dart';
 import '../services/profile_media_service.dart';
 import '../services/repost_service.dart';
@@ -113,7 +114,32 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
   }
 
   Future<void> _bootstrap() async {
-    await Future.wait([_loadProfileHint(), _loadFeed()]);
+    // Paint last persisted / session feed immediately, then revalidate.
+    var cached = FeedPageCache.peekRanked(
+          limit: _pageSize,
+          seed: _rankSeed,
+        ) ??
+        const <CommunityNewsPost>[];
+    if (cached.isEmpty) {
+      cached = await FeedPageCache.loadPersistedMainFeed();
+    }
+    if (cached.isNotEmpty && mounted) {
+      setState(() {
+        _posts = cached;
+        _repostedPostIds = {
+          for (final post in cached)
+            if (post.repostedByMe) post.id,
+        };
+        _loading = false;
+      });
+      for (final post in cached) {
+        FeedPageCache.rememberViewed(post);
+      }
+    }
+    await Future.wait([
+      _loadProfileHint(),
+      _loadFeed(silent: cached.isNotEmpty),
+    ]);
   }
 
   Future<void> _loadProfileHint() async {
@@ -162,6 +188,11 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
         seed: _rankSeed,
       );
       if (!mounted) return;
+      FeedPageCache.putRanked(
+        limit: _pageSize,
+        seed: _rankSeed,
+        posts: posts,
+      );
       setState(() {
         _posts = posts;
         _repostedPostIds = {

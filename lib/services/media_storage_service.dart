@@ -47,8 +47,11 @@ class MediaStorageService {
   /// Signed URLs last 3600s; refresh earlier so tiles do not expire mid-scroll.
   static const _signedUrlTtl = Duration(minutes: 45);
   static const _maxConcurrentSigns = 4;
+  /// Cap memory growth during long scroll sessions.
+  static const _maxSignedUrlEntries = 400;
   static final Map<String, DateTime> _missingPaths = {};
   static final Map<String, ({String url, DateTime at})> _signedUrlCache = {};
+  static final List<String> _signedUrlLru = [];
   static int _inflightSigns = 0;
   static final List<Completer<void>> _signWaiters = [];
 
@@ -78,6 +81,7 @@ class MediaStorageService {
     final key = _cacheKey(bucket, path);
     _missingPaths[key] = DateTime.now();
     _signedUrlCache.remove(key);
+    _signedUrlLru.remove(key);
   }
 
   static String? _cachedSignedUrl(MediaBucket bucket, String path) {
@@ -86,24 +90,42 @@ class MediaStorageService {
     if (hit == null) return null;
     if (DateTime.now().difference(hit.at) > _signedUrlTtl) {
       _signedUrlCache.remove(key);
+      _signedUrlLru.remove(key);
       return null;
     }
+    _touchSignedUrl(key);
     return hit.url;
   }
 
   static void _rememberSignedUrl(MediaBucket bucket, String path, String url) {
     if (url.trim().isEmpty) return;
-    _signedUrlCache[_cacheKey(bucket, path)] = (
+    final key = _cacheKey(bucket, path);
+    _signedUrlCache[key] = (
       url: url,
       at: DateTime.now(),
     );
+    _touchSignedUrl(key);
+    while (_signedUrlCache.length > _maxSignedUrlEntries &&
+        _signedUrlLru.isNotEmpty) {
+      final oldest = _signedUrlLru.removeAt(0);
+      _signedUrlCache.remove(oldest);
+    }
+  }
+
+  static void _touchSignedUrl(String key) {
+    _signedUrlLru.remove(key);
+    _signedUrlLru.add(key);
+  }
+
+  /// Clears signed-URL and missing-path caches (logout / account switch).
+  static void clearCaches() {
+    _missingPaths.clear();
+    _signedUrlCache.clear();
+    _signedUrlLru.clear();
   }
 
   @visibleForTesting
-  static void clearMissingPathCache() {
-    _missingPaths.clear();
-    _signedUrlCache.clear();
-  }
+  static void clearMissingPathCache() => clearCaches();
 
   static bool _looksLikeMissingObject(Object error) {
     final text = error.toString().toLowerCase();
@@ -271,6 +293,51 @@ class MediaStorageService {
     );
   }
 
+  /// Upload bytes to an exact object path (used for image variants).
+  ///
+  /// Follows [providerHint] from the parent full object so variants stay on
+  /// the same backend as the source-of-truth file.
+  static Future<MediaUploadResult> uploadBytesAtPath({
+    required MediaBucket bucket,
+    required String path,
+    required Uint8List bytes,
+    required String contentType,
+    Map<String, String>? context,
+    MediaStorageProvider providerHint = MediaStorageProvider.supabase,
+    bool upsert = true,
+  }) async {
+    final trimmed = path.trim();
+    if (trimmed.isEmpty) {
+      throw const StorageException('Media path is required.');
+    }
+
+    if (providerHint == MediaStorageProvider.s3) {
+      return _awsUploadBytesAtPath(
+        bucket: bucket,
+        path: trimmed,
+        bytes: bytes,
+        contentType: contentType,
+        context: context,
+      );
+    }
+
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw const AuthException('Sign in before uploading media.');
+    }
+
+    await _client.storage.from(bucket.id).uploadBinary(
+          trimmed,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: upsert),
+        );
+
+    return MediaUploadResult(
+      path: trimmed,
+      provider: MediaStorageProvider.supabase,
+    );
+  }
+
   static Future<void> deleteObject({
     required MediaBucket bucket,
     required String path,
@@ -332,6 +399,42 @@ class MediaStorageService {
       if (subfolder != null && subfolder.isNotEmpty) 'subfolder': subfolder,
     });
 
+    return _putAwsUpload(
+      data: data,
+      bytes: bytes,
+      contentType: contentType,
+    );
+  }
+
+  static Future<MediaUploadResult> _awsUploadBytesAtPath({
+    required MediaBucket bucket,
+    required String path,
+    required Uint8List bytes,
+    required String contentType,
+    Map<String, String>? context,
+  }) async {
+    final data = await _invokeMediaStorage({
+      'action': 'upload-url',
+      'bucket': bucket.id,
+      'content_type': contentType,
+      'file_name': path.split('/').last,
+      'index': 0,
+      'path': path,
+      'context': context ?? {},
+    });
+
+    return _putAwsUpload(
+      data: data,
+      bytes: bytes,
+      contentType: contentType,
+    );
+  }
+
+  static Future<MediaUploadResult> _putAwsUpload({
+    required Map<String, dynamic> data,
+    required Uint8List bytes,
+    required String contentType,
+  }) async {
     final uploadUrl = data['upload_url'] as String?;
     final path = data['path'] as String?;
     if (uploadUrl == null || path == null) {

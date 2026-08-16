@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/media_config.dart';
 import 'media_storage_service.dart';
 import 'media_type_helpers.dart';
+import 'media_variant_uploader.dart';
+import 'media_variants.dart';
 import 'role_media_replace.dart';
 
 class ProfileMediaItem {
@@ -180,20 +182,33 @@ class ProfileMediaService {
     final provider = MediaStorageProvider.parse(
       row['storage_provider'] as String?,
     );
+    final mediaType = (row['media_type'] as String?) ?? 'image';
+    final mediaRole = (row['media_role'] as String?) ?? 'gallery';
+    final preferred = mediaRole == 'avatar'
+        ? MediaVariant.avatar128
+        : MediaVariant.feed;
     return ProfileMediaItem(
       id: row['id'] as String,
       storagePath: path,
       storageProvider: provider,
-      mediaType: (row['media_type'] as String?) ?? 'image',
+      mediaType: mediaType,
       featuredForTrending: (row['featured_for_trending'] as bool?) ?? false,
-      mediaRole: (row['media_role'] as String?) ?? 'gallery',
+      mediaRole: mediaRole,
       caption: row['caption'] as String?,
-      signedUrl: await MediaStorageService.createReadUrl(
-        bucket: MediaBucket.profile,
-        path: path,
-        provider: provider,
-        context: {'profile_id': userId},
-      ),
+      signedUrl: mediaType == 'video'
+          ? await MediaStorageService.createReadUrl(
+              bucket: MediaBucket.profile,
+              path: path,
+              provider: provider,
+              context: {'profile_id': userId},
+            )
+          : await MediaVariantUploader.createDisplayUrl(
+              bucket: MediaBucket.profile,
+              storagePath: path,
+              provider: provider,
+              context: {'profile_id': userId},
+              preferred: preferred,
+            ),
     );
   }
 
@@ -309,14 +324,16 @@ class ProfileMediaService {
       maxBytes: _maxMediaBytes,
       imagesOnly: true,
     );
-    final upload = await MediaStorageService.uploadBytes(
+    final upload = await MediaVariantUploader.uploadImageOrBytes(
       bucket: MediaBucket.profile,
       bytes: validated.bytes,
       contentType: validated.contentType,
       fileName: validated.fileName,
+      mediaType: validated.mediaType,
       index: 0,
       subfolder: subfolder,
       context: {'profile_id': userId},
+      includeAvatarSizes: role == 'avatar',
     );
 
     try {
@@ -335,11 +352,12 @@ class ProfileMediaService {
     } on PostgrestException catch (error) {
       // Only use delete+insert when the atomic RPC is missing.
       if (!RoleMediaReplace.isMissingRpc(error)) {
-        await MediaStorageService.deleteObject(
+        await MediaVariantUploader.deleteWithVariants(
           bucket: MediaBucket.profile,
-          path: upload.path,
+          storagePath: upload.path,
           provider: upload.provider,
           context: {'profile_id': userId},
+          explicitThumbnailPath: upload.thumbnailPath,
         );
         rethrow;
       }
@@ -354,25 +372,24 @@ class ProfileMediaService {
         mediaType: validated.mediaType,
       );
     } catch (error) {
-      await MediaStorageService.deleteObject(
+      await MediaVariantUploader.deleteWithVariants(
         bucket: MediaBucket.profile,
-        path: upload.path,
+        storagePath: upload.path,
         provider: upload.provider,
         context: {'profile_id': userId},
+        explicitThumbnailPath: upload.thumbnailPath,
       );
       rethrow;
     }
 
     for (final path in existingPaths) {
       if (path == upload.path) continue;
-      try {
-        await MediaStorageService.deleteObject(
-          bucket: MediaBucket.profile,
-          path: path,
-          provider: MediaStorageProvider.supabase,
-          context: {'profile_id': userId},
-        );
-      } catch (_) {}
+      await MediaVariantUploader.deleteWithVariants(
+        bucket: MediaBucket.profile,
+        storagePath: path,
+        provider: MediaStorageProvider.supabase,
+        context: {'profile_id': userId},
+      );
     }
   }
 
@@ -402,11 +419,12 @@ class ProfileMediaService {
       file,
       maxBytes: _maxMediaBytes,
     );
-    final upload = await MediaStorageService.uploadBytes(
+    final upload = await MediaVariantUploader.uploadImageOrBytes(
       bucket: MediaBucket.profile,
       bytes: validated.bytes,
       contentType: validated.contentType,
       fileName: validated.fileName,
+      mediaType: validated.mediaType,
       index: index,
       subfolder: subfolder,
       context: {'profile_id': userId},
@@ -436,11 +454,12 @@ class ProfileMediaService {
           return;
         } catch (_) {}
       }
-      await MediaStorageService.deleteObject(
+      await MediaVariantUploader.deleteWithVariants(
         bucket: MediaBucket.profile,
-        path: upload.path,
+        storagePath: upload.path,
         provider: upload.provider,
         context: {'profile_id': userId},
+        explicitThumbnailPath: upload.thumbnailPath,
       );
       rethrow;
     }
@@ -448,13 +467,11 @@ class ProfileMediaService {
 
   static Future<void> deleteMedia(ProfileMediaItem media) async {
     await _client.from('profile_media').delete().eq('id', media.id);
-    try {
-      await MediaStorageService.deleteObject(
-        bucket: MediaBucket.profile,
-        path: media.storagePath,
-        provider: media.storageProvider,
-      );
-    } catch (_) {}
+    await MediaVariantUploader.deleteWithVariants(
+      bucket: MediaBucket.profile,
+      storagePath: media.storagePath,
+      provider: media.storageProvider,
+    );
   }
 
   /// Deletes every photo/video on the signed-in profile so a prototype
@@ -501,11 +518,12 @@ class ProfileMediaService {
         );
         signJobs.add(() async {
           try {
-            final url = await MediaStorageService.createReadUrl(
+            final url = await MediaVariantUploader.createDisplayUrl(
               bucket: MediaBucket.profile,
-              path: path,
+              storagePath: path,
               provider: provider,
               context: {'profile_id': profileId},
+              preferred: MediaVariant.avatar128,
             );
             if (url.isNotEmpty) out[profileId] = url;
           } catch (_) {}

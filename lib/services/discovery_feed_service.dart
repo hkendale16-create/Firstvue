@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/media_config.dart';
 import 'media_storage_service.dart';
 import 'media_type_helpers.dart';
+import 'media_variant_uploader.dart';
+import 'media_variants.dart';
 import 'profile_cards.dart';
 import 'vue_feed_ranking.dart';
 
@@ -215,42 +217,59 @@ class DiscoveryFeedService {
             final provider = MediaStorageProvider.parse(
               row['storage_provider'] as String?,
             );
-            // Prefer stored thumbnails for grid rendering; never require
-            // full-resolution video just to paint the mosaic.
+            // Prefer stored thumbnails / derived variants for mosaic; never
+            // require full-resolution video just to paint the grid.
             final thumbPath =
                 thumbPathRaw ?? (mediaType == 'video' ? null : storagePath);
-            final mediaUrl = await MediaStorageService.createReadUrl(
-              bucket: MediaBucket.business,
-              path: storagePath,
-              provider: provider,
-              context: {'business_id': businessId},
-            ).timeout(const Duration(seconds: 8), onTimeout: () => '');
-            // Videos may still open full-screen from mediaUrl; mosaic needs a
-            // real image poster (or empty → placeholder). Never put a video
-            // object URL into Image.network.
-            if (mediaType != 'video' && mediaUrl.isEmpty) return null;
-            if (mediaType == 'video' &&
-                mediaUrl.isEmpty &&
-                (thumbPath == null || thumbPath.isEmpty)) {
-              return null;
-            }
+
+            String mediaUrl = '';
             String? thumbnailUrl;
-            if (thumbPath != null && thumbPath.isNotEmpty) {
-              if (thumbPath == storagePath && mediaType != 'video') {
-                thumbnailUrl = mediaUrl;
-              } else {
-                thumbnailUrl = await MediaStorageService.createReadUrl(
+
+            if (mediaType == 'video') {
+              if (thumbPath != null && thumbPath.isNotEmpty) {
+                thumbnailUrl = await MediaVariantUploader.createDisplayUrl(
                   bucket: MediaBucket.business,
-                  path: thumbPath,
+                  storagePath: storagePath,
                   provider: provider,
                   context: {'business_id': businessId},
+                  preferred: MediaVariant.thumb,
+                  explicitThumbnailPath: thumbPath,
                 ).timeout(const Duration(seconds: 8), onTimeout: () => '');
                 if (thumbnailUrl.isEmpty) thumbnailUrl = null;
               }
-            }
-            if (mediaType != 'video') {
-              thumbnailUrl ??= mediaUrl.isEmpty ? null : mediaUrl;
-              if ((thumbnailUrl ?? '').isEmpty) return null;
+              // Sign the full video only when opening playback later would
+              // need it; mosaic uses poster/chrome. Keep a signed URL when
+              // available so tap-to-play still works without a second round.
+              mediaUrl = await MediaStorageService.createReadUrl(
+                bucket: MediaBucket.business,
+                path: storagePath,
+                provider: provider,
+                context: {'business_id': businessId},
+              ).timeout(const Duration(seconds: 8), onTimeout: () => '');
+              if (mediaUrl.isEmpty &&
+                  (thumbnailUrl == null || thumbnailUrl.isEmpty)) {
+                return null;
+              }
+            } else {
+              thumbnailUrl = await MediaVariantUploader.createDisplayUrl(
+                bucket: MediaBucket.business,
+                storagePath: storagePath,
+                provider: provider,
+                context: {'business_id': businessId},
+                preferred: MediaVariant.thumb,
+                explicitThumbnailPath: thumbPathRaw,
+              ).timeout(const Duration(seconds: 8), onTimeout: () => '');
+              if (thumbnailUrl.isEmpty) return null;
+              // Detail/open uses full when available; mosaic uses thumb/feed.
+              mediaUrl = await MediaVariantUploader.createDisplayUrl(
+                bucket: MediaBucket.business,
+                storagePath: storagePath,
+                provider: provider,
+                context: {'business_id': businessId},
+                preferred: MediaVariant.feed,
+                explicitThumbnailPath: thumbPathRaw,
+              ).timeout(const Duration(seconds: 8), onTimeout: () => '');
+              if (mediaUrl.isEmpty) mediaUrl = thumbnailUrl;
             }
             final ownerId = (business['created_by'] as String?) ?? '';
             return DiscoveryFeedItem(
@@ -339,17 +358,18 @@ class DiscoveryFeedService {
             final provider = MediaStorageProvider.parse(
               row['storage_provider'] as String?,
             );
-            final mediaUrl = await MediaStorageService.createReadUrl(
-              bucket: MediaBucket.profile,
-              path: storagePath,
-              provider: provider,
-              context: {'profile_id': profileId},
-            );
-            if (mediaUrl.isEmpty) {
-              return null;
-            }
             // Never feed a video object URL into the mosaic image decoder.
             if (mediaType == 'video') {
+              return null;
+            }
+            final mediaUrl = await MediaVariantUploader.createDisplayUrl(
+              bucket: MediaBucket.profile,
+              storagePath: storagePath,
+              provider: provider,
+              context: {'profile_id': profileId},
+              preferred: MediaVariant.thumb,
+            );
+            if (mediaUrl.isEmpty) {
               return null;
             }
             final role = (row['media_role'] as String?) ?? 'gallery';
@@ -477,27 +497,38 @@ class DiscoveryFeedService {
           mediaType: (chosen['media_type'] as String?) ?? 'image',
           pathOrUrl: path,
         );
-        final url = await MediaStorageService.createReadUrl(
-          bucket: bucket,
-          path: path,
-          provider: provider,
-        );
-        if (url.isEmpty) continue;
+        final url = mediaType == 'video'
+            ? await MediaStorageService.createReadUrl(
+                bucket: bucket,
+                path: path,
+                provider: provider,
+              )
+            : await MediaVariantUploader.createDisplayUrl(
+                bucket: bucket,
+                storagePath: path,
+                provider: provider,
+                preferred: MediaVariant.thumb,
+              );
+        if (url.isEmpty && mediaType != 'video') continue;
         // If we chose a video, also try to surface any image as poster.
         String? thumbnailUrl;
         if (mediaType == 'video') {
           if (image != null) {
             final imagePath = image['storage_path'] as String?;
             if (imagePath != null) {
-              thumbnailUrl = await MediaStorageService.createReadUrl(
+              thumbnailUrl = await MediaVariantUploader.createDisplayUrl(
                 bucket: MediaBucket.fromId(image['storage_bucket'] as String?),
-                path: imagePath,
+                storagePath: imagePath,
                 provider: MediaStorageProvider.parse(
                   image['storage_provider'] as String?,
                 ),
+                preferred: MediaVariant.thumb,
               );
               if (thumbnailUrl.isEmpty) thumbnailUrl = null;
             }
+          }
+          if ((thumbnailUrl == null || thumbnailUrl.isEmpty) && url.isEmpty) {
+            continue;
           }
         } else {
           thumbnailUrl = url;
