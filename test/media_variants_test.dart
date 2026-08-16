@@ -20,6 +20,16 @@ void main() {
     );
   });
 
+  test('pathFor leaves remote demo URLs unchanged', () {
+    const remote = 'https://picsum.photos/seed/fvdemo_biz_1/1000/1200';
+    expect(MediaVariants.isRemoteUrl(remote), isTrue);
+    expect(MediaVariants.pathFor(remote, MediaVariant.thumb), remote);
+    expect(
+      MediaVariants.candidatePaths(remote, preferred: MediaVariant.thumb),
+      [remote],
+    );
+  });
+
   test('candidatePaths prefers explicit thumb then derived then full', () {
     expect(
       MediaVariants.candidatePaths(
