@@ -161,6 +161,7 @@ class _LiveMapSurfaceOsmState extends State<LiveMapSurface> {
                     color: _colorFor(pin),
                     live: pin.isLive,
                     selected: pin.id == selectedId,
+                    icon: pin.kind.icon,
                   ),
                 ),
               ),
@@ -175,9 +176,11 @@ class _GlowPin extends StatelessWidget {
   final Color color;
   final bool live;
   final bool selected;
+  final IconData icon;
   const _GlowPin({
     required this.color,
     required this.live,
+    required this.icon,
     this.selected = false,
   });
 
@@ -210,14 +213,20 @@ class _GlowPin extends StatelessWidget {
                 width: selected ? 2.2 : 1.5,
               ),
             ),
-            child: Text(
-              live ? 'LIVE' : '•',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: selected ? 9 : 8,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
+            child: live
+                ? Text(
+                    'LIVE',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: selected ? 9 : 8,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  )
+                : Icon(
+                    icon,
+                    size: selected ? 18 : 16,
+                    color: Colors.white,
+                  ),
           ),
           CustomPaint(
             size: const Size(10, 8),

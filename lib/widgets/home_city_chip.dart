@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../data/us_locations.dart';
 import '../services/user_preferences_service.dart';
 import '../theme/firstvue_theme.dart';
-import 'location_autocomplete_field.dart';
 
 class HomeCityChip extends StatefulWidget {
   final VoidCallback? onLocationChanged;
@@ -47,9 +46,7 @@ class HomeCityChipState extends State<HomeCityChip> {
 
     var browseEverywhere = prefs.browseEverywhere;
     var selectedState = prefs.locationState;
-    final cityController = TextEditingController(
-      text: prefs.locationCity ?? '',
-    );
+    var selectedCity = prefs.locationCity;
 
     final saved = await showModalBottomSheet<bool>(
       context: context,
@@ -59,8 +56,15 @@ class HomeCityChipState extends State<HomeCityChip> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheetContext) {
+        final fv = sheetContext.fv;
         return StatefulBuilder(
           builder: (context, setSheetState) {
+            final cityEnabled =
+                !browseEverywhere &&
+                selectedState != null &&
+                selectedState!.trim().isNotEmpty;
+            final citiesForState = UsLocations.citiesForState(selectedState);
+
             return Padding(
               padding: EdgeInsets.only(
                 left: 20,
@@ -73,20 +77,19 @@ class HomeCityChipState extends State<HomeCityChip> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
+                    Text(
                       'BROWSE LOCATION',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         letterSpacing: 1.2,
+                        color: fv.primaryText,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       'Choose everywhere or pick a US state and city.',
                       style: TextStyle(
-                        color: Theme.of(
-                          context,
-                        ).extension<FirstVuePalette>()?.secondaryText,
+                        color: fv.secondaryText,
                         fontSize: 13,
                       ),
                     ),
@@ -97,10 +100,13 @@ class HomeCityChipState extends State<HomeCityChip> {
                         browseEverywhere ? Icons.public : Icons.public_outlined,
                         color: FirstVueColors.teal,
                       ),
-                      title: const Text('Everywhere'),
-                      subtitle: const Text(
+                      title: Text(
+                        'Everywhere',
+                        style: TextStyle(color: fv.primaryText),
+                      ),
+                      subtitle: Text(
                         'Show content from all areas',
-                        style: TextStyle(fontSize: 12),
+                        style: TextStyle(fontSize: 12, color: fv.secondaryText),
                       ),
                       trailing: Switch(
                         value: browseEverywhere,
@@ -118,42 +124,123 @@ class HomeCityChipState extends State<HomeCityChip> {
                                 UsLocations.states.contains(selectedState)
                             ? selectedState
                             : null,
-                        dropdownColor: FirstVueColors.surface,
+                        dropdownColor: fv.elevatedSurface,
+                        style: TextStyle(color: fv.primaryText, fontSize: 16),
+                        iconEnabledColor: fv.secondaryText,
                         decoration: InputDecoration(
                           labelText: 'State',
+                          labelStyle: TextStyle(color: fv.secondaryText),
+                          hintText: 'Select a state',
+                          hintStyle: TextStyle(color: fv.tertiaryText),
                           filled: true,
-                          fillColor: FirstVueColors.elevatedSurface,
+                          fillColor: fv.inputFill,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide.none,
+                            borderSide: BorderSide(color: fv.borderSubtle),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide.none,
+                            borderSide: BorderSide(color: fv.borderSubtle),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide.none,
+                            borderSide: BorderSide(
+                              color: FirstVueColors.teal.withValues(alpha: .55),
+                            ),
                           ),
                         ),
-                        hint: const Text('Select a state'),
+                        hint: Text(
+                          'Select a state',
+                          style: TextStyle(color: fv.tertiaryText),
+                        ),
                         items: UsLocations.states
                             .map(
                               (state) => DropdownMenuItem(
                                 value: state,
-                                child: Text(state),
+                                child: Text(
+                                  state,
+                                  style: TextStyle(color: fv.primaryText),
+                                ),
                               ),
                             )
                             .toList(),
                         onChanged: (value) {
-                          setSheetState(() => selectedState = value);
+                          setSheetState(() {
+                            selectedState = value;
+                            // Dependent city must reset when state changes.
+                            if (selectedCity != null &&
+                                !UsLocations.citiesForState(value)
+                                    .contains(selectedCity)) {
+                              selectedCity = null;
+                            }
+                          });
                         },
                       ),
                       const SizedBox(height: 12),
-                      LocationAutocompleteField(
-                        controller: cityController,
-                        label: 'City',
-                        type: LocationFieldType.city,
+                      InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: !cityEnabled
+                            ? null
+                            : () async {
+                                final picked = await _pickCity(
+                                  sheetContext,
+                                  state: selectedState!,
+                                  current: selectedCity,
+                                  cities: citiesForState,
+                                );
+                                if (picked == null) return;
+                                setSheetState(() => selectedCity = picked);
+                              },
+                        child: InputDecorator(
+                          isEmpty: selectedCity == null ||
+                              selectedCity!.trim().isEmpty,
+                          decoration: InputDecoration(
+                            labelText: 'City',
+                            labelStyle: TextStyle(color: fv.secondaryText),
+                            helperText: cityEnabled
+                                ? 'Select a city for $selectedState'
+                                : 'Select a state first',
+                            helperStyle: TextStyle(
+                              color: fv.tertiaryText,
+                              fontSize: 11,
+                            ),
+                            filled: true,
+                            fillColor: fv.inputFill,
+                            enabled: cityEnabled,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: fv.borderSubtle),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: fv.borderSubtle),
+                            ),
+                            disabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color: fv.borderSubtle.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            suffixIcon: Icon(
+                              Icons.arrow_drop_down,
+                              color: cityEnabled
+                                  ? fv.secondaryText
+                                  : fv.tertiaryText,
+                            ),
+                          ),
+                          child: Text(
+                            (selectedCity == null || selectedCity!.isEmpty)
+                                ? 'Select a city'
+                                : selectedCity!,
+                            style: TextStyle(
+                              color: (selectedCity == null ||
+                                      selectedCity!.isEmpty)
+                                  ? fv.tertiaryText
+                                  : fv.primaryText,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                     const SizedBox(height: 20),
@@ -172,7 +259,7 @@ class HomeCityChipState extends State<HomeCityChip> {
                           return;
                         }
                         await UserPreferencesService.updateLocation(
-                          city: browseEverywhere ? null : cityController.text,
+                          city: browseEverywhere ? null : selectedCity,
                           state: browseEverywhere ? null : selectedState,
                           browseEverywhere: browseEverywhere,
                         );
@@ -196,12 +283,126 @@ class HomeCityChipState extends State<HomeCityChip> {
       },
     );
 
-    cityController.dispose();
-
     if (saved == true) {
       await reload();
       widget.onLocationChanged?.call();
     }
+  }
+
+  Future<String?> _pickCity(
+    BuildContext context, {
+    required String state,
+    required String? current,
+    required List<String> cities,
+  }) {
+    final fv = context.fv;
+    var filter = '';
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: fv.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final q = filter.trim().toLowerCase();
+            final visible = q.isEmpty
+                ? cities
+                : cities
+                    .where((c) => c.toLowerCase().contains(q))
+                    .toList(growable: false);
+            return SafeArea(
+              child: SizedBox(
+                height: MediaQuery.of(sheetContext).size.height * 0.62,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                      child: Text(
+                        'City · $state',
+                        style: TextStyle(
+                          color: fv.primaryText,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: TextField(
+                        autofocus: true,
+                        style: TextStyle(color: fv.primaryText),
+                        decoration: InputDecoration(
+                          hintText: 'Search cities',
+                          hintStyle: TextStyle(color: fv.tertiaryText),
+                          filled: true,
+                          fillColor: fv.inputFill,
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: fv.secondaryText,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: fv.borderSubtle),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: fv.borderSubtle),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color:
+                                  FirstVueColors.teal.withValues(alpha: .55),
+                            ),
+                          ),
+                        ),
+                        onChanged: (value) =>
+                            setModalState(() => filter = value),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: visible.isEmpty
+                          ? Center(
+                              child: Text(
+                                'No cities match that search.',
+                                style: TextStyle(color: fv.secondaryText),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: visible.length,
+                              itemBuilder: (context, index) {
+                                final city = visible[index];
+                                final selected = city == current;
+                                return ListTile(
+                                  title: Text(
+                                    city,
+                                    style: TextStyle(color: fv.primaryText),
+                                  ),
+                                  trailing: selected
+                                      ? Icon(
+                                          Icons.check,
+                                          color: FirstVueColors.teal,
+                                        )
+                                      : null,
+                                  onTap: () =>
+                                      Navigator.pop(sheetContext, city),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override

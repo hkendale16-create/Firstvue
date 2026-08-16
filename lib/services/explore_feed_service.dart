@@ -73,10 +73,12 @@ class ExploreFeedService {
           const ExplorePageResult(items: [], hasMore: false),
       };
     } catch (error, stack) {
-      debugPrint('ExploreFeedService.fetchPage(${section.name}) failed: $error\n$stack');
-      // Soft-fail so the Explore shell never sticks on the hard error state when
-      // one backend dependency throws. Callers still get an empty page.
-      return ExplorePageResult(items: const [], hasMore: false);
+      debugPrint(
+        'ExploreFeedService.fetchPage(${section.name}) failed: $error\n$stack',
+      );
+      // Let ExploreSectionStore surface Loading → Error + Retry for this
+      // section only. Sibling sections keep their own independent state.
+      rethrow;
     }
   }
 
@@ -571,9 +573,12 @@ class ExploreFeedService {
         break;
       }
     }
+    // Post keyset pagination requires a post cursor. Entity-only pages used to
+    // keep hasMore=true with a null cursor, so loadMore re-fetched page 1.
+    final canPaginatePosts = cursorId != null && cursorCreatedAt != null;
     return ExplorePageResult(
       items: page,
-      hasMore: deduped.length >= limit,
+      hasMore: canPaginatePosts && deduped.length >= limit,
       cursorCreatedAt: cursorCreatedAt,
       cursorId: cursorId,
     );

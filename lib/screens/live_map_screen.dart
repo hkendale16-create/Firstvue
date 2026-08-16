@@ -264,6 +264,13 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                       final f = _filters[index];
                       final selected = f == _filter;
                       return ChoiceChip(
+                        avatar: Icon(
+                          f.icon,
+                          size: 16,
+                          color: selected
+                              ? LiveTokens.happyHour
+                              : fv.secondaryText,
+                        ),
                         label: Text(f.label),
                         selected: selected,
                         onSelected: (_) => _setFilter(f),
