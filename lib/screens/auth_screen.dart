@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../auth/auth_link_handler.dart';
+import '../auth/auth_local_state.dart';
 import '../auth/auth_redirect.dart';
 import '../services/username_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -14,11 +16,13 @@ import '../widgets/fv_gold_button.dart';
 class AuthScreen extends StatefulWidget {
   final AuthSheetMode initialMode;
   final bool allowBack;
+  final String? initialError;
 
   const AuthScreen({
     super.key,
     this.initialMode = AuthSheetMode.signIn,
     this.allowBack = false,
+    this.initialError,
   });
 
   @override
@@ -49,6 +53,8 @@ class _AuthScreenState extends State<AuthScreen> {
   void initState() {
     super.initState();
     _mode = widget.initialMode;
+    // OAuth failures land on /auth/callback with ?error=…; show that once.
+    _formError = widget.initialError ?? AuthLinkHandler.takePendingError();
   }
 
   @override
@@ -416,24 +422,46 @@ class _AuthScreenState extends State<AuthScreen> {
         'ensure_user_profile',
         params: {'display_name': displayName},
       );
+      final metaUsername = user.userMetadata?['username']?.toString();
+      final normalized = UsernameService.normalize(metaUsername ?? '');
+      if (normalized != null) {
+        try {
+          await UsernameService.updateUsername(normalized);
+        } catch (_) {
+          // Trigger may already have set it, or handle is taken.
+        }
+      }
       await UsernameService.fetchUsername();
     } catch (_) {
       // Profile bootstrap is retried by signed-in feature services.
     }
   }
 
+  /// Social buttons stay available on Create account; terms are checked on press.
+  bool get _oauthEnabled => !_submitting;
+
   Future<void> _oauth(OAuthProvider provider) async {
     if (_submitting) return;
+    if (_mode == AuthSheetMode.createAccount && !_acceptedLegal) {
+      setState(
+        () => _formError = 'Accept the Terms and Privacy Policy to continue.',
+      );
+      return;
+    }
     setState(() {
       _submitting = true;
       _formError = null;
     });
     try {
+      if (_mode == AuthSheetMode.createAccount && _acceptedLegal) {
+        await AuthLocalState.markPendingLegalAcceptance();
+      }
       await Supabase.instance.client.auth.signInWithOAuth(
         provider,
         redirectTo: approvedAuthCallbackUrl(),
       );
     } catch (_) {
+      await AuthLocalState.clearPendingLegalAcceptance();
       if (mounted) setState(() => _formError = kGenericAuthError);
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -749,7 +777,9 @@ class _AuthScreenState extends State<AuthScreen> {
               ? 'Create account'
               : 'Sign in',
           loading: _submitting,
-          enabled: !_submitting && (!create || _createReady),
+          // Always pressable so incomplete create forms show field errors
+          // instead of a dead disabled button.
+          enabled: !_submitting,
           onPressed: _submit,
         ),
         if (forgot) ...[
@@ -761,7 +791,7 @@ class _AuthScreenState extends State<AuthScreen> {
             child: const Text('Back to sign in'),
           ),
         ],
-        if (signIn && (showApple || showGoogle)) ...[
+        if ((signIn || create) && (showApple || showGoogle)) ...[
           const SizedBox(height: 24),
           Row(
             children: [
@@ -790,16 +820,18 @@ class _AuthScreenState extends State<AuthScreen> {
             _SocialAuthButton(
               label: 'Continue with Apple',
               icon: Icons.apple,
-              onPressed: _submitting ? null : () => _oauth(OAuthProvider.apple),
+              onPressed: _oauthEnabled
+                  ? () => _oauth(OAuthProvider.apple)
+                  : null,
             ),
           if (showApple && showGoogle) const SizedBox(height: 10),
           if (showGoogle)
             _SocialAuthButton(
               label: 'Continue with Google',
               icon: Icons.g_mobiledata_rounded,
-              onPressed: _submitting
-                  ? null
-                  : () => _oauth(OAuthProvider.google),
+              onPressed: _oauthEnabled
+                  ? () => _oauth(OAuthProvider.google)
+                  : null,
             ),
         ],
         if (signIn || create) ...[

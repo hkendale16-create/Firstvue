@@ -100,7 +100,8 @@ void main() {
     final createButton = tester.widget<FvGoldButton>(
       find.widgetWithText(FvGoldButton, 'Create account'),
     );
-    expect(createButton.enabled, isFalse);
+    // Keep Create account pressable so incomplete forms show validation errors.
+    expect(createButton.enabled, isTrue);
 
     await _tapVisible(
       tester,
@@ -159,6 +160,39 @@ void main() {
     expect(find.text('Terms'), findsOneWidget);
     expect(find.text('Privacy Policy'), findsOneWidget);
     expect(find.byKey(const ValueKey('auth-legal-checkbox')), findsOneWidget);
+  });
+
+  testWidgets('incomplete Create account still submits and shows validation', (
+    tester,
+  ) async {
+    const size = Size(390, 900);
+    await tester.binding.setSurfaceSize(size);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(size: size),
+        child: _wrap(const AuthScreen()),
+      ),
+    );
+    await tester.pump();
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('auth-segment-Create account')),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('auth-primary-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Enter a valid email address.'), findsOneWidget);
+    expect(
+      find.text('Accept the Terms and Privacy Policy to continue.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('password visibility toggle is accessible', (tester) async {

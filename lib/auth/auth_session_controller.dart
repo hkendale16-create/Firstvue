@@ -81,8 +81,26 @@ class AuthSessionController extends ChangeNotifier {
       _pendingDeepLink = null;
       _pendingRoute = null;
       onSessionCleared?.call();
+    } else if (data.event == AuthChangeEvent.signedIn && data.session != null) {
+      // Password sign-in also calls ensure_user_profile; OAuth only lands here.
+      unawaited(_ensureProfile(data.session!.user));
     }
     notifyListeners();
+  }
+
+  Future<void> _ensureProfile(User user) async {
+    final displayName = user.email?.split('@').first;
+    try {
+      await Supabase.instance.client.rpc(
+        'ensure_user_profile',
+        params: {'display_name': displayName},
+      );
+      if (await AuthLocalState.consumePendingLegalAcceptance()) {
+        await Supabase.instance.client.rpc('accept_legal_terms');
+      }
+    } catch (_) {
+      // Retried by signed-in feature services when needed.
+    }
   }
 
   void rememberDeepLink(DeepLinkTarget? target) {

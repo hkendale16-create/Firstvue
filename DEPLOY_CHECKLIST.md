@@ -24,6 +24,23 @@ Dashboard → **Authentication → URL Configuration**
 | Site URL | `https://YOUR-SITE.netlify.app` |
 | Redirect URLs | `https://YOUR-SITE.netlify.app/**` |
 
+**Google “Continue with Google”** (required for OAuth to finish):
+
+Dashboard → **Authentication → Providers → Google**
+
+| Field | Value |
+|-------|--------|
+| Enabled | On |
+| Client ID | Web client ID from Google Cloud Console |
+| Client Secret | Matching Web client secret (must be current) |
+
+Also in [Google Auth Platform → Clients](https://console.cloud.google.com/auth/clients):
+
+1. Authorized JavaScript origins: `https://firstvue.app`, `https://www.firstvue.app`, `https://firstvapp.netlify.app`
+2. Authorized redirect URIs: `https://sdssshegqdwobjelxzkp.supabase.co/auth/v1/callback`
+
+If Auth logs show `invalid_client` / `Unable to exchange external code`, the Client Secret in Supabase is wrong or was rotated — paste the current secret from Google Cloud and save.
+
 ---
 
 ## Step 2 — Supabase SQL (run in order)
