@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'business_social_links_service.dart';
+
 class PendingBusinessSubmission {
   final String businessId;
   final String name;
@@ -48,6 +50,16 @@ class BusinessSubmissionService {
     required String contactEmail,
     List<String> services = const [],
     String? industrySlug,
+    String? businessPhone,
+    String? businessEmail,
+    String? website,
+    String? addressLine1,
+    String? addressLine2,
+    String? city,
+    String? state,
+    String? zip,
+    String? contactPreference,
+    List<({String platform, String url})> socialLinks = const [],
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) {
@@ -76,6 +88,19 @@ class BusinessSubmissionService {
       }
     }
 
+    final phone = businessPhone?.trim();
+    final site = website?.trim();
+    final publicEmail = businessEmail?.trim();
+    final preference = contactPreference?.trim();
+
+    final entityDetails = <String, dynamic>{};
+    if (publicEmail != null && publicEmail.isNotEmpty) {
+      entityDetails['public_email'] = publicEmail;
+    }
+    if (preference != null && preference.isNotEmpty) {
+      entityDetails['contact_preference'] = preference;
+    }
+
     final payload = <String, dynamic>{
       'name': name,
       'business_type': businessType,
@@ -84,6 +109,9 @@ class BusinessSubmissionService {
       'verification_status': 'pending',
       if (services.isNotEmpty) 'services': services,
       'primary_industry_id': ?primaryIndustryId,
+      if (phone != null && phone.isNotEmpty) 'phone': phone,
+      if (site != null && site.isNotEmpty) 'website': site,
+      if (entityDetails.isNotEmpty) 'entity_details': entityDetails,
     };
 
     final business = await _client
@@ -100,6 +128,35 @@ class BusinessSubmissionService {
         'contact_name': contactName,
         'contact_email': contactEmail,
       });
+
+      final hasLocation =
+          (addressLine1?.trim().isNotEmpty ?? false) ||
+          (city?.trim().isNotEmpty ?? false) ||
+          (state?.trim().isNotEmpty ?? false) ||
+          (zip?.trim().isNotEmpty ?? false);
+      if (hasLocation) {
+        await _client.from('business_locations').insert({
+          'business_id': businessId,
+          'address_line_1': addressLine1?.trim() ?? '',
+          if (addressLine2 != null && addressLine2.trim().isNotEmpty)
+            'address_line_2': addressLine2.trim(),
+          'city': city?.trim() ?? '',
+          'state': state?.trim() ?? '',
+          'postal_code': zip?.trim() ?? '',
+          'country_code': 'US',
+        });
+      }
+
+      final cleanedSocials = socialLinks
+          .where((l) => l.url.trim().isNotEmpty)
+          .map((l) => (platform: l.platform, url: l.url.trim()))
+          .toList();
+      if (cleanedSocials.isNotEmpty) {
+        await BusinessSocialLinksService.replaceLinks(
+          businessId: businessId,
+          links: cleanedSocials,
+        );
+      }
     } catch (_) {
       await _client.from('businesses').delete().eq('id', businessId);
       rethrow;

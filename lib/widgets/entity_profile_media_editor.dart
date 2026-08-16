@@ -10,13 +10,16 @@ Future<String?> showEntityPhotoActionSheet(
   required bool hasPhoto,
 }) {
   final changeLabel = hasPhoto ? 'Change $photoLabel' : 'Add $photoLabel';
+  final fv = context.fv;
   return showModalBottomSheet<String>(
     context: context,
-    backgroundColor: const Color(0xFF10151B),
+    backgroundColor: fv.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (ctx) => SafeArea(
+    builder: (ctx) {
+      final sheetFv = ctx.fv;
+      return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -27,7 +30,7 @@ Future<String?> showEntityPhotoActionSheet(
             ),
             title: Text(
               changeLabel,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: sheetFv.primaryText),
             ),
             onTap: () => Navigator.pop(ctx, 'change'),
           ),
@@ -39,22 +42,23 @@ Future<String?> showEntityPhotoActionSheet(
               ),
               title: Text(
                 'View $photoLabel',
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: sheetFv.primaryText),
               ),
               onTap: () => Navigator.pop(ctx, 'view'),
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.white54),
+              leading: Icon(Icons.delete_outline, color: sheetFv.secondaryText),
               title: Text(
                 'Remove $photoLabel',
-                style: const TextStyle(color: Colors.white70),
+                style: TextStyle(color: sheetFv.secondaryText),
               ),
               onTap: () => Navigator.pop(ctx, 'remove'),
             ),
           ],
         ],
       ),
-    ),
+    );
+    },
   );
 }
 

@@ -663,7 +663,7 @@ class _BarberResultsScreenState extends State<BarberResultsScreen> {
   Future<void> _openLocationFilters() async {
     final filters = await showModalBottomSheet<_LocationFilters>(
       context: context,
-      backgroundColor: const Color(0xFF10151B),
+      backgroundColor: context.fv.surface,
       isScrollControlled: true,
       builder: (_) => _LocationFiltersSheet(
         initialFilters: _LocationFilters(
@@ -706,6 +706,7 @@ class _BarberResultsScreenState extends State<BarberResultsScreen> {
   @override
   Widget build(BuildContext context) {
     final businesses = _visibleBusinesses;
+    final fv = context.fv;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -713,14 +714,14 @@ class _BarberResultsScreenState extends State<BarberResultsScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: fv.icon),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           widget.category.title,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'CormorantGaramond',
-            color: Colors.white,
+            color: fv.primaryText,
             fontSize: 20,
             letterSpacing: 1.2,
           ),
@@ -969,10 +970,11 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Container(
       height: 56,
       decoration: BoxDecoration(
-        color: Theme.of(context).extension<FirstVuePalette>()?.elevatedSurface ?? FirstVueColors.elevatedSurface,
+        color: fv.elevatedSurface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: const Color(0xFFD8B56A).withValues(alpha: .22),
@@ -987,13 +989,13 @@ class _SearchField extends StatelessWidget {
       child: TextField(
         controller: controller,
         onChanged: onChanged,
-        style: TextStyle(color: Colors.white),
+        style: TextStyle(color: fv.primaryText),
         decoration: InputDecoration(
           hintText: 'Search name, city, state, or ZIP...',
-          hintStyle: TextStyle(color: Colors.white38),
-          prefixIcon: Icon(Icons.search, color: Color(0xFFD8B56A)),
+          hintStyle: TextStyle(color: fv.tertiaryText),
+          prefixIcon: const Icon(Icons.search, color: Color(0xFFD8B56A)),
           border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(vertical: 17),
+          contentPadding: const EdgeInsets.symmetric(vertical: 17),
         ),
       ),
     );
@@ -1019,19 +1021,19 @@ class _EmptySearchResults extends StatelessWidget {
               size: 44,
             ),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               'NO MATCHES FOUND',
               style: TextStyle(
-                color: Colors.white,
+                color: context.fv.primaryText,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.4,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Try a different search or reset your location filters.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white54),
+              style: TextStyle(color: context.fv.secondaryText),
             ),
             const SizedBox(height: 18),
             OutlinedButton.icon(
@@ -1065,12 +1067,13 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return OutlinedButton.icon(
       onPressed: onPressed,
       icon: Icon(icon, size: 16),
       label: Text(label),
       style: OutlinedButton.styleFrom(
-        foregroundColor: selected ? const Color(0xFFD8B56A) : Colors.white70,
+        foregroundColor: selected ? const Color(0xFFD8B56A) : fv.secondaryText,
         side: BorderSide(
           color: selected
               ? const Color(0xFFD8B56A)
@@ -1078,7 +1081,7 @@ class _FilterChip extends StatelessWidget {
         ),
         backgroundColor: selected
             ? const Color(0xFFD8B56A).withValues(alpha: .10)
-            : const Color(0xFF151B22),
+            : fv.inputFill,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
@@ -1098,6 +1101,7 @@ class _ApprovedProfessionalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     final location = [
       profile.city,
       profile.state,
@@ -1110,7 +1114,7 @@ class _ApprovedProfessionalCard extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
+            color: fv.surface,
             borderRadius: BorderRadius.circular(21),
             border: Border.all(
               color: const Color(0xFFD8B56A).withValues(alpha: .4),
@@ -1123,7 +1127,7 @@ class _ApprovedProfessionalCard extends StatelessWidget {
                 height: 62,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Theme.of(context).extension<FirstVuePalette>()?.elevatedSurface ?? FirstVueColors.elevatedSurface,
+                  color: fv.elevatedSurface,
                   border: Border.all(
                     color: const Color(0xFFD8B56A).withValues(alpha: .65),
                   ),
@@ -1142,8 +1146,8 @@ class _ApprovedProfessionalCard extends StatelessWidget {
                             profile.displayName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: fv.primaryText,
                               fontSize: 17,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1163,8 +1167,8 @@ class _ApprovedProfessionalCard extends StatelessWidget {
                           : profile.services.take(3).join(' • '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white60,
+                      style: TextStyle(
+                        color: fv.secondaryText,
                         fontSize: 12,
                       ),
                     ),
@@ -1172,8 +1176,8 @@ class _ApprovedProfessionalCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         location,
-                        style: const TextStyle(
-                          color: Colors.white38,
+                        style: TextStyle(
+                          color: fv.tertiaryText,
                           fontSize: 11,
                         ),
                       ),
@@ -1200,6 +1204,7 @@ class _ApprovedBusinessCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1208,7 +1213,7 @@ class _ApprovedBusinessCard extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
+            color: fv.surface,
             borderRadius: BorderRadius.circular(21),
             border: Border.all(
               color: const Color(0xFFD8B56A).withValues(alpha: .34),
@@ -1247,8 +1252,8 @@ class _ApprovedBusinessCard extends StatelessWidget {
                             business.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: fv.primaryText,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -1264,7 +1269,7 @@ class _ApprovedBusinessCard extends StatelessWidget {
                     const SizedBox(height: 7),
                     Text(
                       business.businessType,
-                      style: const TextStyle(color: Colors.white70),
+                      style: TextStyle(color: fv.secondaryText),
                     ),
                     const SizedBox(height: 5),
                     const Text(
@@ -1345,6 +1350,7 @@ class _LocationFiltersSheetState extends State<_LocationFiltersSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(
@@ -1357,19 +1363,19 @@ class _LocationFiltersSheetState extends State<_LocationFiltersSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'LOCATION FILTERS',
               style: TextStyle(
-                color: Colors.white,
+                color: fv.primaryText,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.5,
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Filters apply to prototype location data only.',
-              style: TextStyle(color: Colors.white54),
+              style: TextStyle(color: fv.secondaryText),
             ),
             const SizedBox(height: 18),
             _LocationTextField(controller: _cityController, label: 'City'),
@@ -1433,15 +1439,16 @@ class _LocationTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(color: fv.primaryText),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white54),
+        labelStyle: TextStyle(color: fv.secondaryText),
         filled: true,
-        fillColor: const Color(0xFF151B22),
+        fillColor: fv.inputFill,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
@@ -1463,6 +1470,7 @@ class _BarberCardState extends State<_BarberCard> {
   @override
   Widget build(BuildContext context) {
     final business = widget.business;
+    final fv = context.fv;
     const cyan = Color(0xFFD8B56A);
 
     return GestureDetector(
@@ -1481,10 +1489,10 @@ class _BarberCardState extends State<_BarberCard> {
           decoration: BoxDecoration(
             color: _pressed
                 ? cyan.withValues(alpha: .11)
-                : const Color(0xFF10151B),
+                : fv.elevatedSurface,
             borderRadius: BorderRadius.circular(21),
             border: Border.all(
-              color: _pressed ? cyan : Colors.white.withValues(alpha: .08),
+              color: _pressed ? cyan : fv.divider,
               width: _pressed ? 1.5 : 1,
             ),
             boxShadow: _pressed
@@ -1503,10 +1511,10 @@ class _BarberCardState extends State<_BarberCard> {
                 height: 78,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(
+                  gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Color(0xFF2A241B), Color(0xFF151B22)],
+                    colors: [fv.surface, fv.inputFill],
                   ),
                 ),
                 child: Icon(widget.icon, color: cyan, size: 34),
@@ -1523,8 +1531,8 @@ class _BarberCardState extends State<_BarberCard> {
                             business.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: fv.primaryText,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -1548,14 +1556,14 @@ class _BarberCardState extends State<_BarberCard> {
                         const SizedBox(width: 4),
                         Text(
                           '${business.rating}',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: fv.primaryText,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
                           ' (${business.reviews})',
-                          style: const TextStyle(color: Colors.white54),
+                          style: TextStyle(color: fv.secondaryText),
                         ),
                         const Spacer(),
                         const Icon(
@@ -1566,7 +1574,7 @@ class _BarberCardState extends State<_BarberCard> {
                         const SizedBox(width: 3),
                         Text(
                           widget.distanceLabel,
-                          style: const TextStyle(color: Colors.white54),
+                          style: TextStyle(color: fv.secondaryText),
                         ),
                       ],
                     ),
@@ -1575,16 +1583,16 @@ class _BarberCardState extends State<_BarberCard> {
                       business.specialty,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white54,
+                      style: TextStyle(
+                        color: fv.secondaryText,
                         fontSize: 12,
                       ),
                     ),
                     const SizedBox(height: 5),
                     Text(
                       '${business.city}, ${business.state} ${business.zipCode}',
-                      style: const TextStyle(
-                        color: Colors.white38,
+                      style: TextStyle(
+                        color: fv.tertiaryText,
                         fontSize: 11,
                       ),
                     ),

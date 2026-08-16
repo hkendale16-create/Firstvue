@@ -482,7 +482,17 @@ class _SettingsTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
-              Icon(icon, color: FirstVueColors.gold, size: 22),
+              Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: fv.elevatedSurface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: fv.borderSubtle),
+                ),
+                child: Icon(icon, color: FirstVueColors.gold, size: 20),
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(

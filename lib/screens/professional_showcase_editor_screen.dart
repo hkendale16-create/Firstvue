@@ -383,9 +383,9 @@ class _CatalogImage extends StatelessWidget {
         errorBuilder: (_, _, _) => SizedBox(
           width: size,
           height: size,
-          child: const ColoredBox(
-            color: Color(0xFF151B22),
-            child: Icon(Icons.broken_image_outlined),
+          child: ColoredBox(
+            color: context.fv.inputFill,
+            child: const Icon(Icons.broken_image_outlined),
           ),
         ),
       ),
@@ -399,14 +399,17 @@ class _EmptyShowcase extends StatelessWidget {
   const _EmptyShowcase(this.message);
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) {
+    final fv = context.fv;
+    return Container(
     padding: const EdgeInsets.all(15),
     decoration: BoxDecoration(
-      color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
+      color: fv.surface,
       borderRadius: BorderRadius.circular(16),
     ),
-    child: Text(message, style: const TextStyle(color: Colors.white54)),
+    child: Text(message, style: TextStyle(color: fv.secondaryText)),
   );
+  }
 }
 
 IconData _platformIcon(SocialPlatform platform) => switch (platform) {
@@ -686,7 +689,7 @@ class _PlatformDropdown extends StatelessWidget {
     return DropdownButtonFormField<SocialPlatform>(
       initialValue: value,
       decoration: const InputDecoration(labelText: 'Platform'),
-      dropdownColor: const Color(0xFF151B22),
+      dropdownColor: context.fv.elevatedSurface,
       items: platforms
           .map(
             (platform) =>

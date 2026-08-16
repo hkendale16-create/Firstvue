@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../data/us_locations.dart';
 import '../services/user_preferences_service.dart';
 import '../services/interaction_preferences_service.dart';
 import '../theme/firstvue_theme.dart';
-import '../widgets/location_autocomplete_field.dart';
+import '../widgets/fv_ui.dart';
 
 class SettingsPreferencesScreen extends StatefulWidget {
   const SettingsPreferencesScreen({super.key});
@@ -14,12 +15,14 @@ class SettingsPreferencesScreen extends StatefulWidget {
 }
 
 class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
-  final _cityController = TextEditingController();
-  final _stateController = TextEditingController();
   UserPreferences _prefs = const UserPreferences();
   bool _loading = true;
   bool _saving = false;
   bool _interactionSounds = true;
+  String? _state;
+  String? _city;
+  bool _stateFocused = false;
+  bool _cityFocused = false;
 
   @override
   void initState() {
@@ -27,33 +30,99 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
     _load();
   }
 
-  @override
-  void dispose() {
-    _cityController.dispose();
-    _stateController.dispose();
-    super.dispose();
-  }
-
   Future<void> _load() async {
     setState(() => _loading = true);
     final prefs = await UserPreferencesService.fetch();
     final sounds = await InteractionPreferencesService.interactionSoundsEnabled();
     if (!mounted) return;
-    _cityController.text = prefs.locationCity ?? '';
-    _stateController.text = prefs.locationState ?? '';
     setState(() {
       _prefs = prefs;
+      _state = prefs.locationState?.trim().isEmpty ?? true
+          ? null
+          : prefs.locationState!.trim();
+      _city = prefs.locationCity?.trim().isEmpty ?? true
+          ? null
+          : prefs.locationCity!.trim();
+      // Drop city if it doesn't belong to the saved state.
+      if (_state != null &&
+          _city != null &&
+          !UsLocations.citiesForState(_state).contains(_city)) {
+        // Keep free-text legacy cities that aren't in the catalog.
+      }
       _interactionSounds = sounds;
       _loading = false;
     });
   }
 
-  Future<void> _saveLocation() async {
-    setState(() => _saving = true);
-    await UserPreferencesService.updateLocation(
-      city: _cityController.text,
-      state: _stateController.text,
+  Future<void> _pickState() async {
+    setState(() => _stateFocused = true);
+    final selected = await showFvSearchablePicker(
+      context: context,
+      title: 'Preferred state',
+      searchHint: 'Search states',
+      selectedId: _state,
+      options: [
+        for (final state in UsLocations.states)
+          FvPickerOption(id: state, label: state, icon: Icons.map_outlined),
+      ],
     );
+    if (!mounted) return;
+    setState(() {
+      _stateFocused = false;
+      if (selected == null) return;
+      final next = selected.id;
+      if (next != _state) {
+        _state = next;
+        _city = null;
+      }
+    });
+  }
+
+  Future<void> _pickCity() async {
+    if (_state == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a state first.')),
+      );
+      return;
+    }
+    setState(() => _cityFocused = true);
+    final cities = UsLocations.citiesForState(_state);
+    final selected = await showFvSearchablePicker(
+      context: context,
+      title: 'Preferred city',
+      searchHint: 'Search cities in $_state',
+      selectedId: _city,
+      options: [
+        for (final city in cities)
+          FvPickerOption(
+            id: city,
+            label: city,
+            icon: Icons.location_city_outlined,
+          ),
+      ],
+    );
+    if (!mounted) return;
+    setState(() {
+      _cityFocused = false;
+      if (selected != null) _city = selected.id;
+    });
+  }
+
+  Future<void> _saveLocation() async {
+    if (_state == null || _state!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a state to save location.')),
+      );
+      return;
+    }
+    if (_city == null || _city!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a city to save location.')),
+      );
+      return;
+    }
+    setState(() => _saving = true);
+    await UserPreferencesService.updateLocation(city: _city!, state: _state!);
     if (!mounted) return;
     setState(() => _saving = false);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -93,11 +162,13 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
         title: const Text('Preferences'),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: FirstVueColors.teal))
+          ? const Center(
+              child: CircularProgressIndicator(color: FirstVueColors.teal),
+            )
           : ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
               children: [
-                const Text(
+                Text(
                   'LOCATION',
                   style: TextStyle(
                     color: FirstVueColors.gold,
@@ -107,28 +178,37 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                LocationAutocompleteField(
-                  controller: _cityController,
-                  label: 'Preferred city',
-                  type: LocationFieldType.city,
-                ),
-                const SizedBox(height: 16),
-                LocationAutocompleteField(
-                  controller: _stateController,
+                FvSelectorField(
                   label: 'Preferred state',
-                  type: LocationFieldType.state,
+                  value: _state,
+                  hint: 'Select state',
+                  icon: Icons.map_outlined,
+                  focused: _stateFocused,
+                  onTap: _pickState,
+                ),
+                const SizedBox(height: 14),
+                FvSelectorField(
+                  label: 'Preferred city',
+                  value: _city,
+                  hint: _state == null
+                      ? 'Select a state first'
+                      : 'Select city in $_state',
+                  icon: Icons.location_city_outlined,
+                  focused: _cityFocused,
+                  onTap: _pickCity,
                 ),
                 const SizedBox(height: 12),
-                FilledButton(
+                FilledButton.icon(
                   onPressed: _saving ? null : _saveLocation,
                   style: FilledButton.styleFrom(
                     backgroundColor: FirstVueColors.teal,
                     foregroundColor: Colors.white,
                   ),
-                  child: Text(_saving ? 'Saving…' : 'Save location'),
+                  icon: const Icon(Icons.save_outlined, size: 18),
+                  label: Text(_saving ? 'Saving…' : 'Save location'),
                 ),
                 const SizedBox(height: 28),
-                const Text(
+                Text(
                   'NOTIFICATIONS',
                   style: TextStyle(
                     color: FirstVueColors.gold,
@@ -140,6 +220,10 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                 const SizedBox(height: 8),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
+                  secondary: Icon(
+                    Icons.notifications_outlined,
+                    color: FirstVueColors.gold,
+                  ),
                   title: Text(
                     'Push notifications',
                     style: TextStyle(color: fv.primaryText),
@@ -154,6 +238,10 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
+                  secondary: Icon(
+                    Icons.near_me_outlined,
+                    color: FirstVueColors.gold,
+                  ),
                   title: Text(
                     'Live nearby alerts',
                     style: TextStyle(color: fv.primaryText),
@@ -173,7 +261,7 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                   },
                 ),
                 const SizedBox(height: 28),
-                const Text(
+                Text(
                   'INTERACTIONS',
                   style: TextStyle(
                     color: FirstVueColors.gold,
@@ -185,6 +273,10 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                 const SizedBox(height: 8),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
+                  secondary: Icon(
+                    Icons.volume_up_outlined,
+                    color: FirstVueColors.gold,
+                  ),
                   title: Text(
                     'App Sounds',
                     style: TextStyle(color: fv.primaryText),
@@ -198,7 +290,7 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                   onChanged: _toggleInteractionSounds,
                 ),
                 const SizedBox(height: 28),
-                const Text(
+                Text(
                   'MESSAGES BUBBLE',
                   style: TextStyle(
                     color: FirstVueColors.gold,
@@ -210,6 +302,10 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                 const SizedBox(height: 8),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    Icons.chat_bubble_outline,
+                    color: FirstVueColors.gold,
+                  ),
                   title: Text(
                     'Floating messages bubble',
                     style: TextStyle(color: fv.primaryText),
@@ -221,8 +317,14 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                     style: TextStyle(color: fv.secondaryText, fontSize: 12),
                   ),
                   trailing: _prefs.floatingBubbleVisible
-                      ? const Icon(Icons.check_circle, color: FirstVueColors.teal)
-                      : Icon(Icons.visibility_off_outlined, color: fv.tertiaryText),
+                      ? const Icon(
+                          Icons.check_circle,
+                          color: FirstVueColors.teal,
+                        )
+                      : Icon(
+                          Icons.visibility_off_outlined,
+                          color: fv.tertiaryText,
+                        ),
                 ),
                 if (!_prefs.floatingBubbleVisible)
                   OutlinedButton.icon(
@@ -231,7 +333,9 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                     label: const Text('Restore floating bubble'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: FirstVueColors.teal,
-                      side: BorderSide(color: FirstVueColors.teal.withValues(alpha: .45)),
+                      side: BorderSide(
+                        color: FirstVueColors.teal.withValues(alpha: .45),
+                      ),
                     ),
                   ),
               ],

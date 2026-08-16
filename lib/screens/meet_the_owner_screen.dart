@@ -100,6 +100,7 @@ class _MeetTheOwnerScreenState extends State<MeetTheOwnerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     final topLevel = _commentsFuture.then(
       (comments) => comments.where((c) => c.parentId == null).toList(),
     );
@@ -117,22 +118,22 @@ class _MeetTheOwnerScreenState extends State<MeetTheOwnerScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
+              color: fv.surface,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white12),
+              border: Border.all(color: fv.divider),
             ),
             child: Column(
               children: [
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 36,
-                  backgroundColor: Color(0xFF241D22),
-                  child: Icon(Icons.person, color: Color(0xFFD8B56A), size: 36),
+                  backgroundColor: fv.elevatedSurface,
+                  child: const Icon(Icons.person, color: Color(0xFFD8B56A), size: 36),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   widget.ownerName,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: fv.primaryText,
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
                   ),
@@ -140,7 +141,7 @@ class _MeetTheOwnerScreenState extends State<MeetTheOwnerScreen> {
                 const SizedBox(height: 4),
                 Text(
                   'Owner of ${widget.businessName}',
-                  style: const TextStyle(color: Colors.white54),
+                  style: TextStyle(color: fv.secondaryText),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
@@ -170,9 +171,9 @@ class _MeetTheOwnerScreenState extends State<MeetTheOwnerScreen> {
             builder: (context, snapshot) {
               final comments = snapshot.data ?? const [];
               if (comments.isEmpty) {
-                return const Text(
+                return Text(
                   'Say hello to the owner.',
-                  style: TextStyle(color: Colors.white54),
+                  style: TextStyle(color: fv.secondaryText),
                 );
               }
               return Column(
@@ -200,12 +201,12 @@ class _MeetTheOwnerScreenState extends State<MeetTheOwnerScreen> {
               Expanded(
                 child: TextField(
                   controller: _replyController,
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: fv.primaryText),
                   decoration: InputDecoration(
                     hintText: 'Leave a comment...',
-                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: .35)),
+                    hintStyle: TextStyle(color: fv.tertiaryText),
                     filled: true,
-                    fillColor: const Color(0xFF151B22),
+                    fillColor: fv.inputFill,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(18),
                       borderSide: BorderSide.none,
@@ -239,11 +240,12 @@ class _OwnerCommentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Theme.of(context).extension<FirstVuePalette>()?.elevatedSurface ?? FirstVueColors.elevatedSurface,
+        color: fv.elevatedSurface,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -258,7 +260,7 @@ class _OwnerCommentCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(comment.body, style: const TextStyle(color: Colors.white)),
+          Text(comment.body, style: TextStyle(color: fv.primaryText)),
           const SizedBox(height: 8),
           Row(
             children: [

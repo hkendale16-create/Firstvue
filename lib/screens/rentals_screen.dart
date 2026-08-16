@@ -70,20 +70,21 @@ class _RentalsScreenState extends State<RentalsScreen> {
       return _RentalAccessGate(onAgree: _agreeToAccess);
     }
 
+    final fv = context.fv;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: fv.icon),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'AVAILABLE RENTALS',
           style: TextStyle(
             fontFamily: 'CormorantGaramond',
-            color: Colors.white,
+            color: fv.primaryText,
             fontSize: 22,
             fontWeight: FontWeight.w600,
             letterSpacing: 1.2,
@@ -109,13 +110,13 @@ class _RentalsScreenState extends State<RentalsScreen> {
         stream: RentalsStore.watchListings(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
+                padding: const EdgeInsets.all(24),
                 child: Text(
                   'Unable to load rentals right now. Please try again.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white54),
+                  style: TextStyle(color: fv.secondaryText),
                 ),
               ),
             );
@@ -133,11 +134,11 @@ class _RentalsScreenState extends State<RentalsScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
                 child: TextField(
                   onChanged: (value) => setState(() => _query = value),
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: fv.primaryText),
+                  decoration: InputDecoration(
                     hintText: 'Search rentals by city or workspace...',
-                    hintStyle: TextStyle(color: Colors.white38),
-                    prefixIcon: Icon(Icons.search, color: Color(0xFFD8B56A)),
+                    hintStyle: TextStyle(color: fv.tertiaryText),
+                    prefixIcon: const Icon(Icons.search, color: Color(0xFFD8B56A)),
                     border: InputBorder.none,
                   ),
                 ),
@@ -174,10 +175,10 @@ class _RentalsScreenState extends State<RentalsScreen> {
               ),
               Expanded(
                 child: visibleListings.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Text(
                           'No approved rentals match your search.',
-                          style: TextStyle(color: Colors.white54),
+                          style: TextStyle(color: fv.secondaryText),
                         ),
                       )
                     : ListView.separated(
@@ -186,10 +187,10 @@ class _RentalsScreenState extends State<RentalsScreen> {
                         separatorBuilder: (_, _) => const SizedBox(height: 14),
                         itemBuilder: (context, index) {
                           if (index == 0) {
-                            return const Text(
+                            return Text(
                               'Live rental opportunities for owners, barbers, stylists, and other beauty professionals.',
                               style: TextStyle(
-                                color: Colors.white54,
+                                color: fv.secondaryText,
                                 height: 1.4,
                               ),
                             );
@@ -221,17 +222,18 @@ class _RentalFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return OutlinedButton(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
-        foregroundColor: selected ? const Color(0xFFD8B56A) : Colors.white70,
+        foregroundColor: selected ? const Color(0xFFD8B56A) : fv.secondaryText,
         backgroundColor: selected
             ? const Color(0xFFD8B56A).withValues(alpha: .1)
-            : const Color(0xFF151B22),
+            : fv.inputFill,
         side: BorderSide(
           color: selected
               ? const Color(0xFFD8B56A)
-              : Colors.white.withValues(alpha: .15),
+              : fv.divider,
         ),
       ),
       child: Text(label),
@@ -260,13 +262,14 @@ class _RentalAccessGateState extends State<_RentalAccessGate> {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: fv.icon),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -282,20 +285,20 @@ class _RentalAccessGateState extends State<_RentalAccessGate> {
                 size: 54,
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'AVAILABLE RENTALS',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: fv.primaryText,
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.4,
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'This space is designed for owners and service professionals seeking booth or suite rentals. Customers must opt in before viewing rental information.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white54, height: 1.5),
+                style: TextStyle(color: fv.secondaryText, height: 1.5),
               ),
               const SizedBox(height: 20),
               CheckboxListTile(
@@ -303,10 +306,10 @@ class _RentalAccessGateState extends State<_RentalAccessGate> {
                 activeColor: const Color(0xFFD8B56A),
                 checkColor: Colors.black,
                 contentPadding: EdgeInsets.zero,
-                title: const Text(
+                title: Text(
                   'I agree to view rental opportunities intended for service professionals.',
                   style: TextStyle(
-                    color: Colors.white70,
+                    color: fv.secondaryText,
                     fontSize: 13,
                     height: 1.35,
                   ),
@@ -363,25 +366,28 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
   }
 
   Future<void> _selectMedia() async {
+    final fv = context.fv;
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF10151B),
-      builder: (sheetContext) => Padding(
+      backgroundColor: fv.surface,
+      builder: (sheetContext) {
+        final sheetFv = sheetContext.fv;
+        return Padding(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               'ADD RENTAL MEDIA',
               style: TextStyle(
-                color: Colors.white,
+                color: sheetFv.primaryText,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Choose photos or a video from your device. Each file can be up to 50 MB.',
-              style: TextStyle(color: Colors.white54),
+              style: TextStyle(color: sheetFv.secondaryText),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 14),
@@ -390,9 +396,9 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
                 Icons.photo_library_outlined,
                 color: Color(0xFFD8B56A),
               ),
-              title: const Text(
+              title: Text(
                 'Add photos',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: sheetFv.primaryText),
               ),
               onTap: () async {
                 Navigator.pop(sheetContext);
@@ -408,9 +414,9 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
                 Icons.videocam_outlined,
                 color: Color(0xFF78B9BE),
               ),
-              title: const Text(
+              title: Text(
                 'Add a video',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: sheetFv.primaryText),
               ),
               onTap: () async {
                 Navigator.pop(sheetContext);
@@ -423,7 +429,8 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
             ),
           ],
         ),
-      ),
+      );
+      },
     );
   }
 
@@ -482,6 +489,7 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -492,9 +500,9 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const Text(
+          Text(
             'Create a rental listing for a booth, suite, or workspace. New listings require approval before other users can view them.',
-            style: TextStyle(color: Colors.white54, height: 1.4),
+            style: TextStyle(color: fv.secondaryText, height: 1.4),
           ),
           const SizedBox(height: 20),
           _RentalField(controller: _titleController, label: 'Rental title'),
@@ -549,14 +557,14 @@ class _PostRentalScreenState extends State<PostRentalScreen> {
             ..._mediaFiles.map(
               (file) => Text(
                 file.name,
-                style: const TextStyle(color: Colors.white54, fontSize: 12),
+                style: TextStyle(color: fv.secondaryText, fontSize: 12),
               ),
             ),
           ],
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Media is stored privately and is visible to signed-in users only after this rental is approved.',
-            style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.4),
+            style: TextStyle(color: fv.tertiaryText, fontSize: 12, height: 1.4),
           ),
           const SizedBox(height: 24),
           ElevatedButton(
@@ -590,16 +598,17 @@ class _RentalField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return TextField(
       controller: controller,
       maxLines: maxLines,
       keyboardType: numeric ? TextInputType.number : TextInputType.text,
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(color: fv.primaryText),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white54),
+        labelStyle: TextStyle(color: fv.secondaryText),
         filled: true,
-        fillColor: const Color(0xFF151B22),
+        fillColor: fv.inputFill,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
@@ -620,6 +629,7 @@ class MyRentalListingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -631,10 +641,10 @@ class MyRentalListingsScreen extends StatelessWidget {
         stream: RentalsStore.watchMyListings(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return const Center(
+            return Center(
               child: Text(
                 'Unable to load your rentals.',
-                style: TextStyle(color: Colors.white54),
+                style: TextStyle(color: fv.secondaryText),
               ),
             );
           }
@@ -645,13 +655,13 @@ class MyRentalListingsScreen extends StatelessWidget {
           }
           final listings = snapshot.data!;
           if (listings.isEmpty) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(28),
+                padding: const EdgeInsets.all(28),
                 child: Text(
                   'You have not posted a rental yet. New listings are reviewed before being visible to other users.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white54, height: 1.45),
+                  style: TextStyle(color: fv.secondaryText, height: 1.45),
                 ),
               ),
             );
@@ -662,9 +672,9 @@ class MyRentalListingsScreen extends StatelessWidget {
             separatorBuilder: (_, _) => const SizedBox(height: 14),
             itemBuilder: (context, index) {
               if (index == 0) {
-                return const Text(
+                return Text(
                   'Your rentals update live. Pending listings are visible only to you and FirstVue administrators.',
-                  style: TextStyle(color: Colors.white54, height: 1.4),
+                  style: TextStyle(color: fv.secondaryText, height: 1.4),
                 );
               }
               return _RentalCard(
@@ -687,10 +697,11 @@ class _RentalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
+        color: fv.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: const Color(0xFFD8B56A).withValues(alpha: .16),
@@ -704,8 +715,11 @@ class _RentalCard extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF28221A), Color(0xFF151B22)],
+              gradient: LinearGradient(
+                colors: [
+                  fv.elevatedSurface,
+                  fv.inputFill,
+                ],
               ),
             ),
             child: _RentalMediaPreview(media: listing.media),
@@ -713,20 +727,20 @@ class _RentalCard extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             listing.title,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: fv.primaryText,
               fontSize: 17,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 5),
-          Text(listing.location, style: const TextStyle(color: Colors.white54)),
+          Text(listing.location, style: TextStyle(color: fv.secondaryText)),
           const SizedBox(height: 10),
           _RentalStatusBadge(status: listing.status),
           const SizedBox(height: 10),
           Text(
             listing.description,
-            style: const TextStyle(color: Colors.white60, height: 1.35),
+            style: TextStyle(color: fv.secondaryText, height: 1.35),
           ),
           const SizedBox(height: 13),
           Wrap(
@@ -763,29 +777,32 @@ class _RentalCard extends StatelessWidget {
 
   void _showInquiry(BuildContext context, RentalListing listing) {
     final messageController = TextEditingController();
+    final fv = context.fv;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF10151B),
-      builder: (sheetContext) => Padding(
+      backgroundColor: fv.surface,
+      builder: (sheetContext) {
+        final sheetFv = sheetContext.fv;
+        return Padding(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               'INQUIRE: ${listing.title}',
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: sheetFv.primaryText,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 14),
             TextField(
               controller: messageController,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: sheetFv.primaryText),
               maxLines: 3,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Message to the rental owner',
-                labelStyle: TextStyle(color: Colors.white54),
+                labelStyle: TextStyle(color: sheetFv.secondaryText),
               ),
             ),
             const SizedBox(height: 16),
@@ -834,7 +851,8 @@ class _RentalCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
+      );
+      },
     ).whenComplete(messageController.dispose);
   }
 

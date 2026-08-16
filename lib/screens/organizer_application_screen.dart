@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/organizer_application_service.dart';
+import '../theme/firstvue_theme.dart';
 
 class OrganizerApplicationScreen extends StatefulWidget {
   const OrganizerApplicationScreen({super.key});
@@ -58,6 +59,7 @@ class _OrganizerApplicationScreenState extends State<OrganizerApplicationScreen>
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -68,9 +70,9 @@ class _OrganizerApplicationScreenState extends State<OrganizerApplicationScreen>
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const Text(
+          Text(
             'Apply to post events and things to do after FirstVue approves you.',
-            style: TextStyle(color: Color(0xFF5A5668), height: 1.4),
+            style: TextStyle(color: fv.secondaryText, height: 1.4),
           ),
           const SizedBox(height: 20),
           _field(_name, 'Your name'),
@@ -93,15 +95,16 @@ class _OrganizerApplicationScreenState extends State<OrganizerApplicationScreen>
   }
 
   Widget _field(TextEditingController controller, String label, {int lines = 1}) {
+    final fv = context.fv;
     return TextField(
       controller: controller,
       maxLines: lines,
-      style: const TextStyle(color: Color(0xFF16131F)),
+      style: TextStyle(color: fv.primaryText),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Color(0xFF5A5668)),
+        labelStyle: TextStyle(color: fv.secondaryText),
         filled: true,
-        fillColor: const Color(0xFF151B22),
+        fillColor: fv.inputFill,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
