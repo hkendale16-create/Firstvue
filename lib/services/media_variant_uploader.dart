@@ -141,6 +141,17 @@ class MediaVariantUploader {
     MediaVariant preferred = MediaVariant.feed,
     String? explicitThumbnailPath,
   }) async {
+    // External/demo absolute URLs have no Storage siblings — return as-is.
+    if (provider == MediaStorageProvider.external ||
+        MediaVariants.isRemoteUrl(storagePath)) {
+      return MediaStorageService.createReadUrl(
+        bucket: bucket,
+        path: storagePath,
+        provider: provider,
+        context: context,
+      );
+    }
+
     final candidates = MediaVariants.candidatePaths(
       storagePath,
       preferred: preferred,
