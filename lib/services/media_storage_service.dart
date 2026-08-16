@@ -117,12 +117,15 @@ class MediaStorageService {
     _signedUrlLru.add(key);
   }
 
-  @visibleForTesting
-  static void clearMissingPathCache() {
+  /// Clears signed-URL and missing-path caches (logout / account switch).
+  static void clearCaches() {
     _missingPaths.clear();
     _signedUrlCache.clear();
     _signedUrlLru.clear();
   }
+
+  @visibleForTesting
+  static void clearMissingPathCache() => clearCaches();
 
   static bool _looksLikeMissingObject(Object error) {
     final text = error.toString().toLowerCase();

@@ -14,7 +14,7 @@ class DeviceCacheHub {
     ApprovedBusinessesService.clearCache();
     EntityDetailsService.clearCache();
     FeedPageCache.clear();
-    MediaStorageService.clearMissingPathCache();
+    MediaStorageService.clearCaches();
   }
 }
 
