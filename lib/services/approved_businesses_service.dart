@@ -1,5 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'cache/cache_ttls.dart';
+import 'cache/ttl_memory_cache.dart';
+
 class ApprovedBusiness {
   final String id;
   final String name;
@@ -41,6 +44,14 @@ class PublicBusinessDetails {
 class ApprovedBusinessesService {
   ApprovedBusinessesService._();
 
+  static final _cache = TtlMemoryCache<PublicBusinessDetails>(
+    ttl: CacheTtls.business,
+    maxEntries: 120,
+    name: 'businesses',
+  );
+
+  static void clearCache() => _cache.clear();
+
   static Stream<List<ApprovedBusiness>> watchApprovedBusinesses() {
     return Supabase.instance.client
         .from('businesses')
@@ -51,8 +62,23 @@ class ApprovedBusinessesService {
   }
 
   static Future<PublicBusinessDetails> fetchPublicBusiness(
-    String businessId,
-  ) async {
+    String businessId, {
+    bool force = false,
+  }) async {
+    if (!force) {
+      final cached = _cache.getFresh(businessId);
+      if (cached != null) return cached;
+      final stale = _cache.peek(businessId);
+      if (stale != null) {
+        // ignore: unawaited_futures
+        _fetchAndCache(businessId).then((_) {}, onError: (_) {});
+        return stale;
+      }
+    }
+    return _fetchAndCache(businessId);
+  }
+
+  static Future<PublicBusinessDetails> _fetchAndCache(String businessId) async {
     final client = Supabase.instance.client;
     final business = await client
         .from('businesses')
@@ -72,7 +98,7 @@ class ApprovedBusinessesService {
       location?['postal_code'] as String?,
     ].whereType<String>().where((part) => part.isNotEmpty);
 
-    return PublicBusinessDetails(
+    final details = PublicBusinessDetails(
       id: business['id'] as String,
       name: business['name'] as String,
       businessType:
@@ -81,5 +107,7 @@ class ApprovedBusinessesService {
       address: locationParts.isEmpty ? null : locationParts.join(', '),
       services: List<String>.from((business['services'] as List?) ?? const []),
     );
+    _cache.put(businessId, details);
+    return details;
   }
 }

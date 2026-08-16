@@ -1,5 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/cache/device_cache_hub.dart';
+
 /// Clears signed-in-only local caches so a later guest cannot restore them.
 class AuthLocalState {
   AuthLocalState._();
@@ -10,15 +12,18 @@ class AuthLocalState {
     'firstvue_recent_categories',
     'firstvue_follow_suggest',
     'firstvue_interaction',
+    'firstvue_feed_page_',
   ];
 
   static const _protectedKeys = {
     'firstvue_post_identity_key',
     'firstvue_show_email_on_profile',
     'firstvue_vue_feed_tab',
+    'firstvue_feed_page_main_v1',
   };
 
   static Future<void> clearProtected() async {
+    DeviceCacheHub.clearAll();
     final prefs = await SharedPreferences.getInstance();
     final keys = prefs.getKeys().toList();
     for (final key in keys) {
