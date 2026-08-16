@@ -79,7 +79,16 @@ void main() {
   test('production web builds enable only verified Google OAuth', () {
     final shell = File('scripts/build-web.sh').readAsStringSync();
     expect(shell, contains('FIRSTVUE_OAUTH_GOOGLE=true'));
+    expect(shell, contains('FIRSTVUE_GOOGLE_WEB_CLIENT_ID='));
     expect(shell, isNot(contains('FIRSTVUE_OAUTH_APPLE=true')));
+    expect(
+      File('lib/screens/auth_screen.dart').readAsStringSync(),
+      contains('signInWithIdToken'),
+    );
+    expect(
+      File('lib/auth/google_id_token_sign_in.dart').existsSync(),
+      isTrue,
+    );
   });
 
   test('Continue with Google is offered on Create account as well as Sign in', () {

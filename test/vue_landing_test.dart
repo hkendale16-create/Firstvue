@@ -4,6 +4,7 @@ import 'package:firstvue/auth/auth_session_controller.dart';
 import 'package:firstvue/main.dart';
 import 'package:firstvue/screens/auth_screen.dart';
 import 'package:firstvue/services/deep_link_service.dart';
+import 'package:firstvue/services/onboarding_store.dart';
 import 'package:firstvue/widgets/firstvue_bottom_nav.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,8 +28,9 @@ Session _fakeSession() {
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({
-      'firstvue_welcome_v2_seen': true,
-      'firstvue_tutorial_v2_completed': true,
+      'firstvue_welcome_v3_seen': true,
+      'firstvue_tips_v3_opt_out': true,
+      'firstvue_tutorial_content_version': OnboardingStore.contentVersion,
     });
   });
 

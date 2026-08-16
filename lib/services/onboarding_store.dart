@@ -10,8 +10,23 @@ enum TutorialSection {
   settings,
 }
 
+/// Why the first-launch / tips flow should run for this session.
+enum TutorialPromptKind {
+  /// Brand-new device / first signed-in visit.
+  welcome,
+
+  /// Returning user after a shipped feature/tutorial update.
+  whatsNew,
+}
+
 class OnboardingStore {
   OnboardingStore._();
+
+  /// Bump when shipping tutorial copy or feature updates so tips show again.
+  ///
+  /// New users always get [TutorialPromptKind.welcome]. Existing users who
+  /// already finished tips see [TutorialPromptKind.whatsNew] when this rises.
+  static const contentVersion = 3;
 
   /// Welcome dialog (v3 copy — contextual tips, no slide chooser).
   static const _welcomeKey = 'firstvue_welcome_v3_seen';
@@ -23,22 +38,73 @@ class OnboardingStore {
   static const _legacyTutorialV2Key = 'firstvue_tutorial_v2_completed';
   static const _legacyTutorialV1Key = 'firstvue_tutorial_v1_completed';
 
+  static const _seenContentVersionKey = 'firstvue_tutorial_content_version';
+  static const _pendingWhatsNewKey = 'firstvue_tutorial_whats_new_pending';
+
   static String _tipKey(TutorialSection section) =>
       'firstvue_tip_v3_${section.name}_seen';
 
+  /// Call once per signed-in home session before showing tips.
+  ///
+  /// Applies content-version bumps (re-enable tips + What's new) and migrates
+  /// legacy slide-tutorial completion into the versioned tip system.
+  static Future<void> prepareForSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getInt(_seenContentVersionKey);
+
+    if (seen == contentVersion) return;
+
+    if (seen != null && seen < contentVersion) {
+      // Feature/tutorial update for someone already on the versioned system.
+      await _clearTipProgress(prefs);
+      await prefs.setBool(_pendingWhatsNewKey, true);
+      await prefs.setInt(_seenContentVersionKey, contentVersion);
+      return;
+    }
+
+    // First time on the versioned tip system (seen == null).
+    final legacyWelcome = (prefs.getBool(_legacyWelcomeV2Key) ?? false) ||
+        (prefs.getBool(_legacyWelcomeV1Key) ?? false);
+    final legacyTutorial = (prefs.getBool(_legacyTutorialV2Key) ?? false) ||
+        (prefs.getBool(_legacyTutorialV1Key) ?? false);
+
+    if (legacyWelcome && !(prefs.getBool(_welcomeKey) ?? false)) {
+      await prefs.setBool(_welcomeKey, true);
+    }
+
+    if (legacyTutorial) {
+      // Treat the old slide tour as completed for a prior version, then
+      // re-offer contextual tips as an update — not a brand-new welcome.
+      await prefs.remove(_legacyTutorialV2Key);
+      await prefs.remove(_legacyTutorialV1Key);
+      await _clearTipProgress(prefs);
+      await prefs.setBool(_pendingWhatsNewKey, true);
+      if (!(prefs.getBool(_welcomeKey) ?? false)) {
+        await prefs.setBool(_welcomeKey, true);
+      }
+    }
+
+    await prefs.setInt(_seenContentVersionKey, contentVersion);
+  }
+
   static Future<bool> shouldShowWelcome() async {
+    await prepareForSession();
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getBool(_welcomeKey) ?? false) return false;
-    // Respect prior first-launch completion so returning devices are not nudged.
-    if (prefs.getBool(_legacyWelcomeV2Key) ?? false) {
-      await prefs.setBool(_welcomeKey, true);
-      return false;
-    }
-    if (prefs.getBool(_legacyWelcomeV1Key) ?? false) {
-      await prefs.setBool(_welcomeKey, true);
-      return false;
-    }
     return true;
+  }
+
+  static Future<bool> shouldShowWhatsNew() async {
+    await prepareForSession();
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_pendingWhatsNewKey) ?? false;
+  }
+
+  /// Prefer welcome for brand-new users; What's new after updates.
+  static Future<TutorialPromptKind?> pendingPrompt() async {
+    if (await shouldShowWelcome()) return TutorialPromptKind.welcome;
+    if (await shouldShowWhatsNew()) return TutorialPromptKind.whatsNew;
+    return null;
   }
 
   static Future<void> markWelcomeSeen() async {
@@ -46,17 +112,22 @@ class OnboardingStore {
     await prefs.setBool(_welcomeKey, true);
   }
 
+  static Future<void> markWhatsNewSeen() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_pendingWhatsNewKey, false);
+  }
+
   /// Whether contextual tips may still appear for any section.
   static Future<bool> tipsEnabled() async {
+    await prepareForSession();
     final prefs = await SharedPreferences.getInstance();
-    await _migrateLegacyTutorial(prefs);
     if (prefs.getBool(_tipsOptOutKey) ?? false) return false;
     return true;
   }
 
   static Future<bool> shouldShowTip(TutorialSection section) async {
+    await prepareForSession();
     final prefs = await SharedPreferences.getInstance();
-    await _migrateLegacyTutorial(prefs);
     if (prefs.getBool(_tipsOptOutKey) ?? false) return false;
     return !(prefs.getBool(_tipKey(section)) ?? false);
   }
@@ -78,15 +149,13 @@ class OnboardingStore {
       await prefs.setBool(_tipKey(s), true);
     }
     await prefs.setBool(_tipsOptOutKey, true);
+    await prefs.setBool(_pendingWhatsNewKey, false);
   }
 
   /// Clears tip progress so tips can appear again (Settings → App tutorial).
   static Future<void> resetTips() async {
     final prefs = await SharedPreferences.getInstance();
-    for (final s in TutorialSection.values) {
-      await prefs.remove(_tipKey(s));
-    }
-    await prefs.remove(_tipsOptOutKey);
+    await _clearTipProgress(prefs);
     await prefs.remove(_legacyTutorialV2Key);
     await prefs.remove(_legacyTutorialV1Key);
   }
@@ -97,18 +166,15 @@ class OnboardingStore {
     await prefs.remove(_welcomeKey);
     await prefs.remove(_legacyWelcomeV2Key);
     await prefs.remove(_legacyWelcomeV1Key);
+    await prefs.remove(_seenContentVersionKey);
+    await prefs.remove(_pendingWhatsNewKey);
     await resetTips();
   }
 
-  /// Users who finished the old slide tutorial should not see tips again.
-  static Future<void> _migrateLegacyTutorial(SharedPreferences prefs) async {
-    if (prefs.containsKey(_tipsOptOutKey)) return;
-    final legacyDone = (prefs.getBool(_legacyTutorialV2Key) ?? false) ||
-        (prefs.getBool(_legacyTutorialV1Key) ?? false);
-    if (!legacyDone) return;
+  static Future<void> _clearTipProgress(SharedPreferences prefs) async {
     for (final s in TutorialSection.values) {
-      await prefs.setBool(_tipKey(s), true);
+      await prefs.remove(_tipKey(s));
     }
-    await prefs.setBool(_tipsOptOutKey, true);
+    await prefs.remove(_tipsOptOutKey);
   }
 }

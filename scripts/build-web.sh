@@ -19,6 +19,7 @@ flutter precache --web
 flutter pub get
 
 DART_DEFINE="--dart-define=FIRSTVUE_OAUTH_GOOGLE=true"
+DART_DEFINE="$DART_DEFINE --dart-define=FIRSTVUE_GOOGLE_WEB_CLIENT_ID=232279155211-ilegqngbve9fr34o5ajjq7396c48n877.apps.googleusercontent.com"
 if [ -n "${URL:-}" ]; then
   DART_DEFINE="$DART_DEFINE --dart-define=FIRSTVUE_WEB_URL=${URL}"
 elif [ -n "${DEPLOY_PRIME_URL:-}" ]; then

@@ -8,17 +8,28 @@ const _kDialogBg = Color(0xFF10151B);
 const _kGold = Color(0xFFD8B56A);
 const _kTeal = Color(0xFF3DD9C9);
 
-/// First signed-in visit: welcome, then short tips appear as each section opens.
+/// First signed-in visit or post-update session: welcome / what's new, then tips.
 Future<void> showFirstLaunchExperience(
   BuildContext context, {
   TutorialSection? initialSection,
 }) async {
   var tipsOn = false;
 
-  if (await OnboardingStore.shouldShowWelcome()) {
+  final prompt = await OnboardingStore.pendingPrompt();
+  if (prompt == TutorialPromptKind.welcome) {
     if (!context.mounted) return;
     final takeTour = await FirstVueWelcomeDialog.show(context);
     if (!context.mounted) return;
+    if (takeTour != true) {
+      await OnboardingStore.markAllTipsSeen();
+      return;
+    }
+    tipsOn = true;
+  } else if (prompt == TutorialPromptKind.whatsNew) {
+    if (!context.mounted) return;
+    final takeTour = await FirstVueWhatsNewDialog.show(context);
+    if (!context.mounted) return;
+    await OnboardingStore.markWhatsNewSeen();
     if (takeTour != true) {
       await OnboardingStore.markAllTipsSeen();
       return;
@@ -131,6 +142,92 @@ class FirstVueWelcomeDialog extends StatelessWidget {
                 onPressed: () => _finish(context, takeTour: false),
                 child: const Text(
                   'Maybe later — I\'ll explore',
+                  style: TextStyle(color: Colors.white60),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── What's new (after updates) ──────────────────────────────────────────────
+
+class FirstVueWhatsNewDialog extends StatelessWidget {
+  const FirstVueWhatsNewDialog({super.key});
+
+  static Future<bool?> show(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const FirstVueWhatsNewDialog(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: _kDialogBg,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const FirstVueEmblem(size: 56),
+              const SizedBox(height: 18),
+              const Text(
+                'What\'s new',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'CormorantGaramond',
+                  color: _kGold,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'A quicker tour of FirstVue',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'CormorantGaramond',
+                  color: _kTeal,
+                  fontSize: 18,
+                  fontStyle: FontStyle.italic,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'We added short tips that appear when you open each section — '
+                'Home, VUE & LIVE, Feeds, Explore, Messages, and Settings — '
+                'so new updates are easier to find.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, height: 1.45),
+              ),
+              const SizedBox(height: 22),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _kGold,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text('Show me the tips'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text(
+                  'Not now',
                   style: TextStyle(color: Colors.white60),
                 ),
               ),

@@ -41,6 +41,12 @@ Also in [Google Auth Platform → Clients](https://console.cloud.google.com/auth
 
 If Auth logs show `invalid_client` / `Unable to exchange external code`, the Client Secret in Supabase is wrong or was rotated — paste the current secret from Google Cloud and save.
 
+**Web also uses Google Identity Services (ID token)** so Continue with Google can succeed even when the Client Secret is wrong. That path needs:
+
+1. Authorized JavaScript origins above (including `https://firstvapp.netlify.app`)
+2. The same Web Client ID in Supabase Google provider settings
+3. Netlify CSP allowing `https://accounts.google.com` (already in `netlify.toml`)
+
 ---
 
 ## Step 2 — Supabase SQL (run in order)
