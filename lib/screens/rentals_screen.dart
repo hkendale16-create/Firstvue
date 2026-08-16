@@ -110,13 +110,13 @@ class _RentalsScreenState extends State<RentalsScreen> {
         stream: RentalsStore.watchListings(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
+                padding: const EdgeInsets.all(24),
                 child: Text(
                   'Unable to load rentals right now. Please try again.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white54),
+                  style: TextStyle(color: fv.secondaryText),
                 ),
               ),
             );
@@ -175,10 +175,10 @@ class _RentalsScreenState extends State<RentalsScreen> {
               ),
               Expanded(
                 child: visibleListings.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Text(
                           'No approved rentals match your search.',
-                          style: TextStyle(color: Colors.white54),
+                          style: TextStyle(color: fv.secondaryText),
                         ),
                       )
                     : ListView.separated(
@@ -187,10 +187,10 @@ class _RentalsScreenState extends State<RentalsScreen> {
                         separatorBuilder: (_, _) => const SizedBox(height: 14),
                         itemBuilder: (context, index) {
                           if (index == 0) {
-                            return const Text(
+                            return Text(
                               'Live rental opportunities for owners, barbers, stylists, and other beauty professionals.',
                               style: TextStyle(
-                                color: Colors.white54,
+                                color: fv.secondaryText,
                                 height: 1.4,
                               ),
                             );
@@ -629,6 +629,7 @@ class MyRentalListingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -640,10 +641,10 @@ class MyRentalListingsScreen extends StatelessWidget {
         stream: RentalsStore.watchMyListings(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return const Center(
+            return Center(
               child: Text(
                 'Unable to load your rentals.',
-                style: TextStyle(color: Colors.white54),
+                style: TextStyle(color: fv.secondaryText),
               ),
             );
           }
@@ -654,13 +655,13 @@ class MyRentalListingsScreen extends StatelessWidget {
           }
           final listings = snapshot.data!;
           if (listings.isEmpty) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(28),
+                padding: const EdgeInsets.all(28),
                 child: Text(
                   'You have not posted a rental yet. New listings are reviewed before being visible to other users.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white54, height: 1.45),
+                  style: TextStyle(color: fv.secondaryText, height: 1.45),
                 ),
               ),
             );
@@ -671,9 +672,9 @@ class MyRentalListingsScreen extends StatelessWidget {
             separatorBuilder: (_, _) => const SizedBox(height: 14),
             itemBuilder: (context, index) {
               if (index == 0) {
-                return const Text(
+                return Text(
                   'Your rentals update live. Pending listings are visible only to you and FirstVue administrators.',
-                  style: TextStyle(color: Colors.white54, height: 1.4),
+                  style: TextStyle(color: fv.secondaryText, height: 1.4),
                 );
               }
               return _RentalCard(

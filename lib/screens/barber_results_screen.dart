@@ -1021,19 +1021,19 @@ class _EmptySearchResults extends StatelessWidget {
               size: 44,
             ),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               'NO MATCHES FOUND',
               style: TextStyle(
-                color: Colors.white,
+                color: context.fv.primaryText,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.4,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Try a different search or reset your location filters.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white54),
+              style: TextStyle(color: context.fv.secondaryText),
             ),
             const SizedBox(height: 18),
             OutlinedButton.icon(
@@ -1101,6 +1101,7 @@ class _ApprovedProfessionalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     final location = [
       profile.city,
       profile.state,
@@ -1113,7 +1114,7 @@ class _ApprovedProfessionalCard extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
+            color: fv.surface,
             borderRadius: BorderRadius.circular(21),
             border: Border.all(
               color: const Color(0xFFD8B56A).withValues(alpha: .4),
@@ -1126,7 +1127,7 @@ class _ApprovedProfessionalCard extends StatelessWidget {
                 height: 62,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Theme.of(context).extension<FirstVuePalette>()?.elevatedSurface ?? FirstVueColors.elevatedSurface,
+                  color: fv.elevatedSurface,
                   border: Border.all(
                     color: const Color(0xFFD8B56A).withValues(alpha: .65),
                   ),
@@ -1145,8 +1146,8 @@ class _ApprovedProfessionalCard extends StatelessWidget {
                             profile.displayName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: fv.primaryText,
                               fontSize: 17,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1166,8 +1167,8 @@ class _ApprovedProfessionalCard extends StatelessWidget {
                           : profile.services.take(3).join(' • '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white60,
+                      style: TextStyle(
+                        color: fv.secondaryText,
                         fontSize: 12,
                       ),
                     ),
@@ -1175,8 +1176,8 @@ class _ApprovedProfessionalCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         location,
-                        style: const TextStyle(
-                          color: Colors.white38,
+                        style: TextStyle(
+                          color: fv.tertiaryText,
                           fontSize: 11,
                         ),
                       ),
@@ -1203,6 +1204,7 @@ class _ApprovedBusinessCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1211,7 +1213,7 @@ class _ApprovedBusinessCard extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
+            color: fv.surface,
             borderRadius: BorderRadius.circular(21),
             border: Border.all(
               color: const Color(0xFFD8B56A).withValues(alpha: .34),
@@ -1250,8 +1252,8 @@ class _ApprovedBusinessCard extends StatelessWidget {
                             business.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: fv.primaryText,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -1267,7 +1269,7 @@ class _ApprovedBusinessCard extends StatelessWidget {
                     const SizedBox(height: 7),
                     Text(
                       business.businessType,
-                      style: const TextStyle(color: Colors.white70),
+                      style: TextStyle(color: fv.secondaryText),
                     ),
                     const SizedBox(height: 5),
                     const Text(
