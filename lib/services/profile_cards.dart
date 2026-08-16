@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'cache/device_cache_hub.dart';
+
 /// Directory reads for other members. After 20260916, `profiles` table SELECT
 /// is own-row + admin only. Public identity lives on `profile_public_cards`
 /// (no phone, birthday, coordinates, or other PII).
@@ -19,25 +21,74 @@ class ProfileCards {
     return error is PostgrestException && error.code == 'PGRST205';
   }
 
+  static void clearCache() => DeviceCaches.profiles.clear();
+
+  static String _rowCacheKey(String id, String select) => '$select|$id';
+
   static Future<List<Map<String, dynamic>>> listByIds(
     List<String> ids, {
     String select = nameColumns,
   }) async {
     if (ids.isEmpty) return const [];
+
+    final unique = ids.toSet().toList();
+    final cachedRows = <Map<String, dynamic>>[];
+    final missing = <String>[];
+    for (final id in unique) {
+      final hit = DeviceCaches.profiles.getFresh(_rowCacheKey(id, select));
+      if (hit != null) {
+        cachedRows.add(Map<String, dynamic>.from(hit));
+      } else {
+        missing.add(id);
+      }
+    }
+
+    if (missing.isEmpty) return cachedRows;
+
     Future<List<Map<String, dynamic>>> run(String table) async {
-      final rows = await _client.from(table).select(select).inFilter('id', ids);
+      final rows =
+          await _client.from(table).select(select).inFilter('id', missing);
       return List<Map<String, dynamic>>.from(rows as List);
     }
 
+    List<Map<String, dynamic>> fetched = const [];
     try {
-      return await run(relation);
+      fetched = await run(relation);
     } catch (_) {
       try {
-        return await run('profiles');
+        fetched = await run('profiles');
       } catch (_) {
-        return const [];
+        fetched = const [];
       }
     }
+
+    for (final row in fetched) {
+      final id = row['id'] as String?;
+      if (id == null) continue;
+      DeviceCaches.profiles.put(_rowCacheKey(id, select), row);
+      // Also seed the common nameColumns key when a wider select was used.
+      if (select != nameColumns &&
+          row.containsKey('display_name') &&
+          row.containsKey('username')) {
+        DeviceCaches.profiles.put(
+          _rowCacheKey(id, nameColumns),
+          {
+            'id': id,
+            'display_name': row['display_name'],
+            'username': row['username'],
+          },
+        );
+      }
+    }
+
+    final byId = {
+      for (final row in [...cachedRows, ...fetched])
+        if (row['id'] is String) row['id'] as String: row,
+    };
+    return [
+      for (final id in unique)
+        if (byId[id] != null) Map<String, dynamic>.from(byId[id]!),
+    ];
   }
 
   static Future<Map<String, dynamic>?> fetchById(
@@ -45,6 +96,10 @@ class ProfileCards {
     String select = nameColumns,
   }) async {
     if (id.trim().isEmpty) return null;
+    final key = _rowCacheKey(id, select);
+    final cached = DeviceCaches.profiles.getFresh(key);
+    if (cached != null) return Map<String, dynamic>.from(cached);
+
     Future<Map<String, dynamic>?> run(String table) async {
       return await _client
           .from(table)
@@ -53,15 +108,18 @@ class ProfileCards {
           .maybeSingle();
     }
 
+    Map<String, dynamic>? row;
     try {
-      return await run(relation);
+      row = await run(relation);
     } catch (_) {
       try {
-        return await run('profiles');
+        row = await run('profiles');
       } catch (_) {
-        return null;
+        row = null;
       }
     }
+    if (row != null) DeviceCaches.profiles.put(key, row);
+    return row;
   }
 
   static Future<Map<String, String>> displayNames(List<String> ids) async {

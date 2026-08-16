@@ -6,6 +6,7 @@ import '../models/share_payload.dart';
 import '../auth/ensure_signed_in.dart';
 import '../screens/boost_post_sheet.dart';
 import '../screens/member_public_profile_screen.dart';
+import '../services/cache/feed_page_cache.dart';
 import '../services/community_news_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/community_news_post_card.dart';
@@ -36,26 +37,36 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialPost != null) {
-      _post = widget.initialPost;
+    final seeded =
+        widget.initialPost ?? FeedPageCache.getViewed(widget.postId);
+    if (seeded != null) {
+      _post = seeded;
       _loading = false;
+      FeedPageCache.rememberViewed(seeded);
+      // Revalidate in background when we painted from cache.
+      if (widget.initialPost == null) {
+        _loadPost(silent: true);
+      }
     } else {
       _loadPost();
     }
   }
 
-  Future<void> _loadPost() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _loadPost({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final post = await CommunityNewsService.fetchPostById(widget.postId);
       if (!mounted) return;
+      if (post != null) FeedPageCache.rememberViewed(post);
       setState(() {
-        _post = post;
+        _post = post ?? _post;
         _loading = false;
-        _error = post == null ? 'Post not found.' : null;
+        _error = post == null && _post == null ? 'Post not found.' : null;
       });
       if (post != null) {
         WebSeoService.update(
@@ -70,7 +81,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Unable to load this post.';
+        if (_post == null) {
+          _error = 'Unable to load this post.';
+        }
       });
     }
   }

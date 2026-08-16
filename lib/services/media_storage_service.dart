@@ -47,8 +47,11 @@ class MediaStorageService {
   /// Signed URLs last 3600s; refresh earlier so tiles do not expire mid-scroll.
   static const _signedUrlTtl = Duration(minutes: 45);
   static const _maxConcurrentSigns = 4;
+  /// Cap memory growth during long scroll sessions.
+  static const _maxSignedUrlEntries = 400;
   static final Map<String, DateTime> _missingPaths = {};
   static final Map<String, ({String url, DateTime at})> _signedUrlCache = {};
+  static final List<String> _signedUrlLru = [];
   static int _inflightSigns = 0;
   static final List<Completer<void>> _signWaiters = [];
 
@@ -78,6 +81,7 @@ class MediaStorageService {
     final key = _cacheKey(bucket, path);
     _missingPaths[key] = DateTime.now();
     _signedUrlCache.remove(key);
+    _signedUrlLru.remove(key);
   }
 
   static String? _cachedSignedUrl(MediaBucket bucket, String path) {
@@ -86,23 +90,38 @@ class MediaStorageService {
     if (hit == null) return null;
     if (DateTime.now().difference(hit.at) > _signedUrlTtl) {
       _signedUrlCache.remove(key);
+      _signedUrlLru.remove(key);
       return null;
     }
+    _touchSignedUrl(key);
     return hit.url;
   }
 
   static void _rememberSignedUrl(MediaBucket bucket, String path, String url) {
     if (url.trim().isEmpty) return;
-    _signedUrlCache[_cacheKey(bucket, path)] = (
+    final key = _cacheKey(bucket, path);
+    _signedUrlCache[key] = (
       url: url,
       at: DateTime.now(),
     );
+    _touchSignedUrl(key);
+    while (_signedUrlCache.length > _maxSignedUrlEntries &&
+        _signedUrlLru.isNotEmpty) {
+      final oldest = _signedUrlLru.removeAt(0);
+      _signedUrlCache.remove(oldest);
+    }
+  }
+
+  static void _touchSignedUrl(String key) {
+    _signedUrlLru.remove(key);
+    _signedUrlLru.add(key);
   }
 
   @visibleForTesting
   static void clearMissingPathCache() {
     _missingPaths.clear();
     _signedUrlCache.clear();
+    _signedUrlLru.clear();
   }
 
   static bool _looksLikeMissingObject(Object error) {

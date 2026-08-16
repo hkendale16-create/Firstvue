@@ -1,4 +1,5 @@
 import '../models/explore_section.dart';
+import '../services/cache/cache_ttls.dart';
 import '../services/community_news_service.dart';
 import '../utils/new_label.dart';
 
@@ -173,6 +174,7 @@ class ExploreSectionSnapshot {
   final DateTime? cursorCreatedAt;
   final String? cursorId;
   final Set<String> seenIds;
+  final DateTime? fetchedAt;
 
   const ExploreSectionSnapshot({
     this.items = const [],
@@ -183,7 +185,14 @@ class ExploreSectionSnapshot {
     this.cursorCreatedAt,
     this.cursorId,
     this.seenIds = const {},
+    this.fetchedAt,
   });
+
+  bool get isFresh {
+    final at = fetchedAt;
+    if (at == null) return false;
+    return DateTime.now().difference(at) <= CacheTtls.exploreSection;
+  }
 
   ExploreSectionSnapshot copyWith({
     List<ExploreItem>? items,
@@ -195,6 +204,7 @@ class ExploreSectionSnapshot {
     DateTime? cursorCreatedAt,
     String? cursorId,
     Set<String>? seenIds,
+    DateTime? fetchedAt,
   }) {
     return ExploreSectionSnapshot(
       items: items ?? this.items,
@@ -205,6 +215,7 @@ class ExploreSectionSnapshot {
       cursorCreatedAt: cursorCreatedAt ?? this.cursorCreatedAt,
       cursorId: cursorId ?? this.cursorId,
       seenIds: seenIds ?? this.seenIds,
+      fetchedAt: fetchedAt ?? this.fetchedAt,
     );
   }
 }
@@ -240,14 +251,25 @@ class ExploreSectionStore {
   }) async {
     final current = of(section);
     if (current.loading) return;
-    if (!refresh && current.items.isNotEmpty && current.error == null) {
+    // Fresh in-memory section: skip network unless explicit refresh.
+    if (!refresh &&
+        current.items.isNotEmpty &&
+        current.error == null &&
+        current.isFresh) {
       return;
     }
-    _pages[section] = current.copyWith(
-      loading: true,
-      clearError: true,
-      hasMore: true,
-    );
+    // Stale-while-revalidate: keep showing items, refresh quietly.
+    final swr = !refresh &&
+        current.items.isNotEmpty &&
+        current.error == null &&
+        !current.isFresh;
+    if (!swr) {
+      _pages[section] = current.copyWith(
+        loading: true,
+        clearError: true,
+        hasMore: true,
+      );
+    }
     try {
       final page = await fetcher(
         section: section,
@@ -266,6 +288,7 @@ class ExploreSectionStore {
         cursorCreatedAt: page.cursorCreatedAt,
         cursorId: page.cursorId,
         seenIds: seen,
+        fetchedAt: DateTime.now(),
       );
     } catch (error, stack) {
       assert(() {
@@ -309,6 +332,7 @@ class ExploreSectionStore {
         cursorCreatedAt: page.cursorCreatedAt ?? current.cursorCreatedAt,
         cursorId: page.cursorId ?? current.cursorId,
         seenIds: seen,
+        fetchedAt: current.fetchedAt ?? DateTime.now(),
       );
     } catch (_) {
       // Stop near-bottom retry loops; user can pull-to-refresh or change tabs.
