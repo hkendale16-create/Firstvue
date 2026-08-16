@@ -5,6 +5,9 @@ import '../config/media_config.dart';
 import 'admin_auth_service.dart';
 import 'activity_notifications_service.dart';
 import 'media_storage_service.dart';
+import 'media_variant_uploader.dart';
+import 'media_variants.dart';
+import 'role_media_replace.dart';
 
 class RentalMedia {
   final String mediaType;
@@ -262,17 +265,26 @@ class RentalsStore {
         data['storage_provider'] as String?,
       );
       final rentalId = data['rental_id'] as String;
-      final signedUrl = await MediaStorageService.createReadUrl(
-        bucket: MediaBucket.rental,
-        path: path,
-        provider: provider,
-        context: {'rental_id': rentalId},
-      );
+      final mediaType = data['media_type'] as String;
+      final signedUrl = mediaType == 'video'
+          ? await MediaStorageService.createReadUrl(
+              bucket: MediaBucket.rental,
+              path: path,
+              provider: provider,
+              context: {'rental_id': rentalId},
+            )
+          : await MediaVariantUploader.createDisplayUrl(
+              bucket: MediaBucket.rental,
+              storagePath: path,
+              provider: provider,
+              context: {'rental_id': rentalId},
+              preferred: MediaVariant.feed,
+            );
       mediaByRental
           .putIfAbsent(rentalId, () => [])
           .add(
             RentalMedia(
-              mediaType: data['media_type'] as String,
+              mediaType: mediaType,
               signedUrl: signedUrl,
             ),
           );
@@ -339,23 +351,21 @@ class RentalsStore {
         .single();
 
     final rentalId = rental['id'] as String;
-    final uploadedObjects = <MediaUploadResult>[];
+    final uploadedObjects = <MediaVariantUpload>[];
     try {
       for (var index = 0; index < mediaFiles.length; index++) {
         final file = mediaFiles[index];
-        final bytes = await file.readAsBytes();
-        if (bytes.length > _maxMediaBytes) {
-          throw const StorageException(
-            'Each photo or video must be 50 MB or smaller.',
-          );
-        }
+        final validated = await RoleMediaReplace.readValidatedBytes(
+          file,
+          maxBytes: _maxMediaBytes,
+        );
 
-        final mediaType = _mediaTypeFor(file);
-        final upload = await MediaStorageService.uploadBytes(
+        final upload = await MediaVariantUploader.uploadImageOrBytes(
           bucket: MediaBucket.rental,
-          bytes: bytes,
-          contentType: _mimeTypeFor(file, mediaType),
-          fileName: file.name,
+          bytes: validated.bytes,
+          contentType: validated.contentType,
+          fileName: validated.fileName,
+          mediaType: validated.mediaType,
           index: index,
           context: {'rental_id': rentalId},
         );
@@ -364,17 +374,18 @@ class RentalsStore {
           'rental_id': rentalId,
           'storage_path': upload.path,
           'storage_provider': upload.provider.value,
-          'media_type': mediaType,
+          'media_type': validated.mediaType,
           'sort_order': index,
         });
       }
     } catch (_) {
       for (final upload in uploadedObjects) {
-        await MediaStorageService.deleteObject(
+        await MediaVariantUploader.deleteWithVariants(
           bucket: MediaBucket.rental,
-          path: upload.path,
+          storagePath: upload.path,
           provider: upload.provider,
           context: {'rental_id': rentalId},
+          explicitThumbnailPath: upload.thumbnailPath,
         );
       }
       await _client.from('rentals').delete().eq('id', rentalId);
@@ -416,28 +427,6 @@ class RentalsStore {
     }
 
     return ownerId;
-  }
-
-  static String _mediaTypeFor(XFile file) {
-    final mimeType = file.mimeType?.toLowerCase() ?? '';
-    if (mimeType.startsWith('video/')) return 'video';
-    if (mimeType.startsWith('image/')) return 'image';
-    final extension = file.name.split('.').last.toLowerCase();
-    return ['mp4', 'mov'].contains(extension) ? 'video' : 'image';
-  }
-
-  static String _mimeTypeFor(XFile file, String mediaType) {
-    if (file.mimeType != null && file.mimeType!.isNotEmpty) {
-      return file.mimeType!;
-    }
-    final extension = file.name.split('.').last.toLowerCase();
-    return switch (extension) {
-      'png' => 'image/png',
-      'webp' => 'image/webp',
-      'mp4' => 'video/mp4',
-      'mov' => 'video/quicktime',
-      _ => mediaType == 'video' ? 'video/mp4' : 'image/jpeg',
-    };
   }
 
   static int? _priceToCents(String? price) {

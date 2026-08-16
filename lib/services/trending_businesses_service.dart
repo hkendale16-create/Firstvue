@@ -2,7 +2,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/media_config.dart';
-import 'media_storage_service.dart';
+import 'media_variant_uploader.dart';
+import 'media_variants.dart';
 
 import 'location_service.dart';
 import 'user_preferences_service.dart';
@@ -343,17 +344,17 @@ class TrendingBusinessesService {
       final mediaType = (fallbackMediaRow['media_type'] as String?) ?? 'image';
       featuredIsVideo = mediaType == 'video';
       if (!featuredIsVideo) {
-        final displayPath =
-            (fallbackMediaRow['thumbnail_path'] as String?) ??
-            fallbackMediaRow['storage_path'] as String;
         final provider = MediaStorageProvider.parse(
           fallbackMediaRow['storage_provider'] as String?,
         );
-        imageUrl = await MediaStorageService.createReadUrl(
+        imageUrl = await MediaVariantUploader.createDisplayUrl(
           bucket: MediaBucket.business,
-          path: displayPath,
+          storagePath: fallbackMediaRow['storage_path'] as String,
           provider: provider,
           context: {'business_id': businessId},
+          preferred: MediaVariant.thumb,
+          explicitThumbnailPath:
+              fallbackMediaRow['thumbnail_path'] as String?,
         );
       }
     }

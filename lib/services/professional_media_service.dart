@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/media_config.dart';
 import 'media_storage_service.dart';
 import 'media_type_helpers.dart';
+import 'media_variant_uploader.dart';
+import 'media_variants.dart';
 import 'role_media_replace.dart';
 
 class ProfessionalMediaItem {
@@ -122,19 +124,32 @@ class ProfessionalMediaService {
     final provider = MediaStorageProvider.parse(
       row['storage_provider'] as String?,
     );
+    final mediaType = (row['media_type'] as String?) ?? 'image';
+    final mediaRole = (row['media_role'] as String?) ?? 'gallery';
+    final preferred = mediaRole == 'avatar'
+        ? MediaVariant.avatar128
+        : MediaVariant.feed;
     return ProfessionalMediaItem(
       id: row['id'] as String,
       storagePath: path,
       storageProvider: provider,
-      mediaType: (row['media_type'] as String?) ?? 'image',
+      mediaType: mediaType,
       featuredForTrending: (row['featured_for_trending'] as bool?) ?? false,
-      mediaRole: (row['media_role'] as String?) ?? 'gallery',
-      signedUrl: await MediaStorageService.createReadUrl(
-        bucket: MediaBucket.professional,
-        path: path,
-        provider: provider,
-        context: {'professional_profile_id': professionalProfileId},
-      ),
+      mediaRole: mediaRole,
+      signedUrl: mediaType == 'video'
+          ? await MediaStorageService.createReadUrl(
+              bucket: MediaBucket.professional,
+              path: path,
+              provider: provider,
+              context: {'professional_profile_id': professionalProfileId},
+            )
+          : await MediaVariantUploader.createDisplayUrl(
+              bucket: MediaBucket.professional,
+              storagePath: path,
+              provider: provider,
+              context: {'professional_profile_id': professionalProfileId},
+              preferred: preferred,
+            ),
     );
   }
 
@@ -243,14 +258,16 @@ class ProfessionalMediaService {
       maxBytes: _maxMediaBytes,
       imagesOnly: true,
     );
-    final upload = await MediaStorageService.uploadBytes(
+    final upload = await MediaVariantUploader.uploadImageOrBytes(
       bucket: MediaBucket.professional,
       bytes: validated.bytes,
       contentType: validated.contentType,
       fileName: validated.fileName,
+      mediaType: validated.mediaType,
       index: 0,
       subfolder: subfolder,
       context: {'professional_profile_id': professionalProfileId},
+      includeAvatarSizes: role == 'avatar',
     );
 
     try {
@@ -268,11 +285,12 @@ class ProfessionalMediaService {
       );
     } on PostgrestException catch (error) {
       if (!RoleMediaReplace.isMissingRpc(error)) {
-        await MediaStorageService.deleteObject(
+        await MediaVariantUploader.deleteWithVariants(
           bucket: MediaBucket.professional,
-          path: upload.path,
+          storagePath: upload.path,
           provider: upload.provider,
           context: {'professional_profile_id': professionalProfileId},
+          explicitThumbnailPath: upload.thumbnailPath,
         );
         rethrow;
       }
@@ -287,25 +305,24 @@ class ProfessionalMediaService {
         mediaType: validated.mediaType,
       );
     } catch (_) {
-      await MediaStorageService.deleteObject(
+      await MediaVariantUploader.deleteWithVariants(
         bucket: MediaBucket.professional,
-        path: upload.path,
+        storagePath: upload.path,
         provider: upload.provider,
         context: {'professional_profile_id': professionalProfileId},
+        explicitThumbnailPath: upload.thumbnailPath,
       );
       rethrow;
     }
 
     for (final path in existingPaths) {
       if (path == upload.path) continue;
-      try {
-        await MediaStorageService.deleteObject(
-          bucket: MediaBucket.professional,
-          path: path,
-          provider: MediaStorageProvider.supabase,
-          context: {'professional_profile_id': professionalProfileId},
-        );
-      } catch (_) {}
+      await MediaVariantUploader.deleteWithVariants(
+        bucket: MediaBucket.professional,
+        storagePath: path,
+        provider: MediaStorageProvider.supabase,
+        context: {'professional_profile_id': professionalProfileId},
+      );
     }
   }
 
@@ -321,11 +338,12 @@ class ProfessionalMediaService {
       file,
       maxBytes: _maxMediaBytes,
     );
-    final upload = await MediaStorageService.uploadBytes(
+    final upload = await MediaVariantUploader.uploadImageOrBytes(
       bucket: MediaBucket.professional,
       bytes: validated.bytes,
       contentType: validated.contentType,
       fileName: validated.fileName,
+      mediaType: validated.mediaType,
       index: index,
       subfolder: subfolder,
       context: {'professional_profile_id': professionalProfileId},
@@ -343,11 +361,12 @@ class ProfessionalMediaService {
     try {
       await _client.from('professional_media').insert(insertPayload);
     } catch (_) {
-      await MediaStorageService.deleteObject(
+      await MediaVariantUploader.deleteWithVariants(
         bucket: MediaBucket.professional,
-        path: upload.path,
+        storagePath: upload.path,
         provider: upload.provider,
         context: {'professional_profile_id': professionalProfileId},
+        explicitThumbnailPath: upload.thumbnailPath,
       );
       rethrow;
     }
@@ -355,13 +374,11 @@ class ProfessionalMediaService {
 
   static Future<void> deleteMedia(ProfessionalMediaItem media) async {
     await _client.from('professional_media').delete().eq('id', media.id);
-    try {
-      await MediaStorageService.deleteObject(
-        bucket: MediaBucket.professional,
-        path: media.storagePath,
-        provider: media.storageProvider,
-      );
-    } catch (_) {}
+    await MediaVariantUploader.deleteWithVariants(
+      bucket: MediaBucket.professional,
+      storagePath: media.storagePath,
+      provider: media.storageProvider,
+    );
   }
 
   static Future<void> setFeaturedForTrending({

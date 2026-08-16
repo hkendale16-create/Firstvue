@@ -293,6 +293,51 @@ class MediaStorageService {
     );
   }
 
+  /// Upload bytes to an exact object path (used for image variants).
+  ///
+  /// Follows [providerHint] from the parent full object so variants stay on
+  /// the same backend as the source-of-truth file.
+  static Future<MediaUploadResult> uploadBytesAtPath({
+    required MediaBucket bucket,
+    required String path,
+    required Uint8List bytes,
+    required String contentType,
+    Map<String, String>? context,
+    MediaStorageProvider providerHint = MediaStorageProvider.supabase,
+    bool upsert = true,
+  }) async {
+    final trimmed = path.trim();
+    if (trimmed.isEmpty) {
+      throw const StorageException('Media path is required.');
+    }
+
+    if (providerHint == MediaStorageProvider.s3) {
+      return _awsUploadBytesAtPath(
+        bucket: bucket,
+        path: trimmed,
+        bytes: bytes,
+        contentType: contentType,
+        context: context,
+      );
+    }
+
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw const AuthException('Sign in before uploading media.');
+    }
+
+    await _client.storage.from(bucket.id).uploadBinary(
+          trimmed,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: upsert),
+        );
+
+    return MediaUploadResult(
+      path: trimmed,
+      provider: MediaStorageProvider.supabase,
+    );
+  }
+
   static Future<void> deleteObject({
     required MediaBucket bucket,
     required String path,
@@ -354,6 +399,42 @@ class MediaStorageService {
       if (subfolder != null && subfolder.isNotEmpty) 'subfolder': subfolder,
     });
 
+    return _putAwsUpload(
+      data: data,
+      bytes: bytes,
+      contentType: contentType,
+    );
+  }
+
+  static Future<MediaUploadResult> _awsUploadBytesAtPath({
+    required MediaBucket bucket,
+    required String path,
+    required Uint8List bytes,
+    required String contentType,
+    Map<String, String>? context,
+  }) async {
+    final data = await _invokeMediaStorage({
+      'action': 'upload-url',
+      'bucket': bucket.id,
+      'content_type': contentType,
+      'file_name': path.split('/').last,
+      'index': 0,
+      'path': path,
+      'context': context ?? {},
+    });
+
+    return _putAwsUpload(
+      data: data,
+      bytes: bytes,
+      contentType: contentType,
+    );
+  }
+
+  static Future<MediaUploadResult> _putAwsUpload({
+    required Map<String, dynamic> data,
+    required Uint8List bytes,
+    required String contentType,
+  }) async {
     final uploadUrl = data['upload_url'] as String?;
     final path = data['path'] as String?;
     if (uploadUrl == null || path == null) {

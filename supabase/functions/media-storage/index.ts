@@ -93,7 +93,21 @@ serve(async (req) => {
           return json({ error: "You do not have permission to upload here." }, 403);
         }
 
-        const path = buildStoragePath(user.id, index, fileName);
+        // Optional exact path for derived variants (must stay under the user).
+        const requestedPath =
+          typeof body.path === "string" ? body.path.trim() : "";
+        let path: string;
+        if (requestedPath) {
+          if (
+            requestedPath.includes("..") ||
+            !requestedPath.startsWith(`${user.id}/`)
+          ) {
+            return json({ error: "Invalid upload path." }, 400);
+          }
+          path = requestedPath;
+        } else {
+          path = buildStoragePath(user.id, index, fileName);
+        }
         const key = objectKey(bucket, path);
         const uploadUrl = await getSignedUrl(
           s3,

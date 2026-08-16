@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/media_config.dart';
 import 'media_type_helpers.dart';
 import 'media_storage_service.dart';
+import 'media_variant_uploader.dart';
+import 'media_variants.dart';
 import 'role_media_replace.dart';
 
 class BusinessMediaItem {
@@ -44,7 +46,7 @@ class BusinessMediaService {
   static final _client = Supabase.instance.client;
 
   static const _selectColumns =
-      'id, storage_path, storage_provider, media_type, featured_for_trending, media_role';
+      'id, storage_path, thumbnail_path, storage_provider, media_type, featured_for_trending, media_role';
 
   static Future<List<BusinessMediaItem>> fetchMedia(String businessId) =>
       fetchGalleryMedia(businessId);
@@ -115,19 +117,36 @@ class BusinessMediaService {
     final provider = MediaStorageProvider.parse(
       row['storage_provider'] as String?,
     );
+    final mediaType = (row['media_type'] as String?) ?? 'image';
+    final mediaRole = (row['media_role'] as String?) ?? 'gallery';
+    final thumbPath = row['thumbnail_path'] as String?;
+    final preferred = mediaRole == 'avatar'
+        ? MediaVariant.avatar128
+        : mediaType == 'video'
+            ? MediaVariant.thumb
+            : MediaVariant.feed;
     return BusinessMediaItem(
       id: row['id'] as String,
       storagePath: path,
       storageProvider: provider,
-      mediaType: (row['media_type'] as String?) ?? 'image',
+      mediaType: mediaType,
       featuredForTrending: (row['featured_for_trending'] as bool?) ?? false,
-      mediaRole: (row['media_role'] as String?) ?? 'gallery',
-      signedUrl: await MediaStorageService.createReadUrl(
-        bucket: MediaBucket.business,
-        path: path,
-        provider: provider,
-        context: {'business_id': businessId},
-      ),
+      mediaRole: mediaRole,
+      signedUrl: mediaType == 'video' && (thumbPath == null || thumbPath.isEmpty)
+          ? await MediaStorageService.createReadUrl(
+              bucket: MediaBucket.business,
+              path: path,
+              provider: provider,
+              context: {'business_id': businessId},
+            )
+          : await MediaVariantUploader.createDisplayUrl(
+              bucket: MediaBucket.business,
+              storagePath: path,
+              provider: provider,
+              context: {'business_id': businessId},
+              preferred: preferred,
+              explicitThumbnailPath: thumbPath,
+            ),
     );
   }
 
@@ -233,14 +252,16 @@ class BusinessMediaService {
       maxBytes: _maxMediaBytes,
       imagesOnly: true,
     );
-    final upload = await MediaStorageService.uploadBytes(
+    final upload = await MediaVariantUploader.uploadImageOrBytes(
       bucket: MediaBucket.business,
       bytes: validated.bytes,
       contentType: validated.contentType,
       fileName: validated.fileName,
+      mediaType: validated.mediaType,
       index: 0,
       subfolder: subfolder,
       context: {'business_id': businessId},
+      includeAvatarSizes: role == 'avatar',
     );
 
     try {
@@ -256,13 +277,24 @@ class BusinessMediaService {
           'p_media_type': validated.mediaType,
         },
       );
+      final thumb = upload.thumbnailPath;
+      if (thumb != null && thumb.isNotEmpty) {
+        try {
+          await _client
+              .from('business_media')
+              .update({'thumbnail_path': thumb})
+              .eq('business_id', businessId)
+              .eq('media_role', role);
+        } catch (_) {}
+      }
     } on PostgrestException catch (error) {
       if (!RoleMediaReplace.isMissingRpc(error)) {
-        await MediaStorageService.deleteObject(
+        await MediaVariantUploader.deleteWithVariants(
           bucket: MediaBucket.business,
-          path: upload.path,
+          storagePath: upload.path,
           provider: upload.provider,
           context: {'business_id': businessId},
+          explicitThumbnailPath: upload.thumbnailPath,
         );
         rethrow;
       }
@@ -276,26 +308,35 @@ class BusinessMediaService {
         storageProvider: upload.provider.value,
         mediaType: validated.mediaType,
       );
+      final thumb = upload.thumbnailPath;
+      if (thumb != null && thumb.isNotEmpty) {
+        try {
+          await _client
+              .from('business_media')
+              .update({'thumbnail_path': thumb})
+              .eq('business_id', businessId)
+              .eq('media_role', role);
+        } catch (_) {}
+      }
     } catch (_) {
-      await MediaStorageService.deleteObject(
+      await MediaVariantUploader.deleteWithVariants(
         bucket: MediaBucket.business,
-        path: upload.path,
+        storagePath: upload.path,
         provider: upload.provider,
         context: {'business_id': businessId},
+        explicitThumbnailPath: upload.thumbnailPath,
       );
       rethrow;
     }
 
     for (final path in existingPaths) {
       if (path == upload.path) continue;
-      try {
-        await MediaStorageService.deleteObject(
-          bucket: MediaBucket.business,
-          path: path,
-          provider: MediaStorageProvider.supabase,
-          context: {'business_id': businessId},
-        );
-      } catch (_) {}
+      await MediaVariantUploader.deleteWithVariants(
+        bucket: MediaBucket.business,
+        storagePath: path,
+        provider: MediaStorageProvider.supabase,
+        context: {'business_id': businessId},
+      );
     }
   }
 
@@ -311,33 +352,43 @@ class BusinessMediaService {
       file,
       maxBytes: _maxMediaBytes,
     );
-    final upload = await MediaStorageService.uploadBytes(
+    final upload = await MediaVariantUploader.uploadImageOrBytes(
       bucket: MediaBucket.business,
       bytes: validated.bytes,
       contentType: validated.contentType,
       fileName: validated.fileName,
+      mediaType: validated.mediaType,
       index: index,
       subfolder: subfolder,
       context: {'business_id': businessId},
     );
 
-    final insertPayload = {
+    final insertPayload = <String, dynamic>{
       'business_id': businessId,
       'storage_path': upload.path,
       'storage_provider': upload.provider.value,
       'media_type': validated.mediaType,
       'sort_order': sortOrder,
       'media_role': mediaRole,
+      if (upload.thumbnailPath != null) 'thumbnail_path': upload.thumbnailPath,
     };
 
     try {
       await _client.from('business_media').insert(insertPayload);
     } catch (_) {
-      await MediaStorageService.deleteObject(
+      if (upload.thumbnailPath != null) {
+        try {
+          insertPayload.remove('thumbnail_path');
+          await _client.from('business_media').insert(insertPayload);
+          return;
+        } catch (_) {}
+      }
+      await MediaVariantUploader.deleteWithVariants(
         bucket: MediaBucket.business,
-        path: upload.path,
+        storagePath: upload.path,
         provider: upload.provider,
         context: {'business_id': businessId},
+        explicitThumbnailPath: upload.thumbnailPath,
       );
       rethrow;
     }
@@ -345,13 +396,11 @@ class BusinessMediaService {
 
   static Future<void> deleteMedia(BusinessMediaItem media) async {
     await _client.from('business_media').delete().eq('id', media.id);
-    try {
-      await MediaStorageService.deleteObject(
-        bucket: MediaBucket.business,
-        path: media.storagePath,
-        provider: media.storageProvider,
-      );
-    } catch (_) {}
+    await MediaVariantUploader.deleteWithVariants(
+      bucket: MediaBucket.business,
+      storagePath: media.storagePath,
+      provider: media.storageProvider,
+    );
   }
 
   static Future<void> setFeaturedForTrending({
