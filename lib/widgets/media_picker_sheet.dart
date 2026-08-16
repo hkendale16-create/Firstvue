@@ -18,16 +18,10 @@ Future<List<XFile>?> showMediaPickerSheet(
 Future<List<XFile>?> showImagePickerSheet(BuildContext context) {
   final picker = ImagePicker();
   final fv = context.fv;
-  // Media overlays stay intentionally dark for contrast over imagery.
-  final sheetBg = context.isDarkTheme
-      ? fv.surface
-      : const Color(0xFF10151B);
-  final titleColor =
-      context.isDarkTheme ? fv.primaryText : FirstVuePalette.dark.primaryText;
-  final subtitleColor =
-      context.isDarkTheme ? fv.secondaryText : FirstVuePalette.dark.secondaryText;
-  final labelColor =
-      context.isDarkTheme ? fv.primaryText : FirstVuePalette.dark.primaryText;
+  final sheetBg = fv.surface;
+  final titleColor = fv.primaryText;
+  final subtitleColor = fv.secondaryText;
+  final labelColor = fv.primaryText;
 
   return showModalBottomSheet<List<XFile>>(
     context: context,
@@ -103,15 +97,10 @@ Future<List<XFile>?> showImagePickerSheet(BuildContext context) {
 Future<List<XFile>?> _showFullMediaPicker(BuildContext context) {
   final picker = ImagePicker();
   final fv = context.fv;
-  final sheetBg = context.isDarkTheme
-      ? fv.surface
-      : const Color(0xFF10151B);
-  final titleColor =
-      context.isDarkTheme ? fv.primaryText : FirstVuePalette.dark.primaryText;
-  final subtitleColor =
-      context.isDarkTheme ? fv.secondaryText : FirstVuePalette.dark.secondaryText;
-  final labelColor =
-      context.isDarkTheme ? fv.primaryText : FirstVuePalette.dark.primaryText;
+  final sheetBg = fv.surface;
+  final titleColor = fv.primaryText;
+  final subtitleColor = fv.secondaryText;
+  final labelColor = fv.primaryText;
 
   return showModalBottomSheet<List<XFile>>(
     context: context,

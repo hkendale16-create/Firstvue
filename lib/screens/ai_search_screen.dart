@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../services/smart_search_service.dart';
+import '../theme/firstvue_theme.dart';
 import 'firstvue_business_profile_screen.dart';
 
 class AiSearchScreen extends StatefulWidget {
@@ -33,7 +34,9 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    final fv = context.fv;
+    return Scaffold(
     backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(
       title: const Text('ASK FIRSTVUE'),
@@ -44,31 +47,31 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Describe exactly what you need',
             style: TextStyle(
-              color: Colors.white,
+              color: fv.primaryText,
               fontSize: 20,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 7),
-          const Text(
+          Text(
             'FirstVue searches its own approved business data first.',
-            style: TextStyle(color: Colors.white54),
+            style: TextStyle(color: fv.secondaryText),
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _controller,
             onSubmitted: (_) => _run(),
             maxLines: 3,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: fv.primaryText),
             decoration: InputDecoration(
               hintText:
                   'Barber good with fades, available today, under \$50, rated 4.5+',
-              hintStyle: const TextStyle(color: Colors.white38),
+              hintStyle: TextStyle(color: fv.tertiaryText),
               filled: true,
-              fillColor: const Color(0xFF151B22),
+              fillColor: fv.inputFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
                 borderSide: BorderSide.none,
@@ -99,10 +102,10 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
                         );
                       }
                       if (snapshot.data!.isEmpty) {
-                        return const Center(
+                        return Center(
                           child: Text(
                             'No strong matches yet. Try a broader request.',
-                            style: TextStyle(color: Colors.white54),
+                            style: TextStyle(color: fv.secondaryText),
                           ),
                         );
                       }
@@ -123,7 +126,7 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
                                 ),
                               ),
                             ),
-                            tileColor: const Color(0xFF10151B),
+                            tileColor: fv.elevatedSurface,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(18),
                             ),
@@ -138,18 +141,18 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
                             ),
                             title: Text(
                               item.name,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: fv.primaryText,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             subtitle: Text(
                               '${item.rating == 0 ? 'New' : '★ ${item.rating}'} • ${item.availableToday ? 'Available today' : 'Check availability'}$price\n${item.services.take(3).join(' • ')}',
-                              style: const TextStyle(color: Colors.white60),
+                              style: TextStyle(color: fv.secondaryText),
                             ),
-                            trailing: const Icon(
+                            trailing: Icon(
                               Icons.chevron_right,
-                              color: Colors.white38,
+                              color: fv.tertiaryText,
                             ),
                           );
                         },
@@ -161,22 +164,26 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
       ),
     ),
   );
+  }
 }
 
 class _Suggestions extends StatelessWidget {
   const _Suggestions();
   @override
-  Widget build(BuildContext context) => ListView(
-    children: const [
-      Text(
+  Widget build(BuildContext context) {
+    final fv = context.fv;
+    return ListView(
+    children: [
+      const Text(
         'TRY ASKING',
         style: TextStyle(color: Color(0xFFD8B56A), fontWeight: FontWeight.bold),
       ),
-      SizedBox(height: 12),
+      const SizedBox(height: 12),
       Text(
         '“Good date-night restaurant within 15 minutes, outdoor seating, under \$100 for two.”\n\n“Find a barber good with fades, available today, under \$50, rated 4.5 or better.”',
-        style: TextStyle(color: Colors.white60, height: 1.5),
+        style: TextStyle(color: fv.secondaryText, height: 1.5),
       ),
     ],
   );
+  }
 }

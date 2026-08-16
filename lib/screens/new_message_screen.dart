@@ -96,6 +96,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -106,7 +107,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
           controller: _tabController,
           indicatorColor: const Color(0xFFD8B56A),
           labelColor: const Color(0xFFD8B56A),
-          unselectedLabelColor: Colors.white54,
+          unselectedLabelColor: fv.secondaryText,
           tabs: const [
             Tab(text: 'FIND USER'),
             Tab(text: 'BUSINESS OWNERS'),
@@ -152,19 +153,20 @@ class _UserSearchTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
           child: TextField(
             controller: controller,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: fv.primaryText),
             decoration: InputDecoration(
               hintText: 'Search by name or email',
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: .38)),
+              hintStyle: TextStyle(color: fv.tertiaryText),
               prefixIcon: const Icon(Icons.search, color: Color(0xFFD8B56A)),
               filled: true,
-              fillColor: const Color(0xFF10151B),
+              fillColor: fv.inputFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
@@ -173,22 +175,22 @@ class _UserSearchTab extends StatelessWidget {
             onChanged: onChanged,
           ),
         ),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
               'Enter at least 2 characters to search members.',
-              style: TextStyle(color: Colors.white38, fontSize: 12),
+              style: TextStyle(color: fv.tertiaryText, fontSize: 12),
             ),
           ),
         ),
         Expanded(
           child: searchFuture == null
-              ? const Center(
+              ? Center(
                   child: Text(
                     'Find someone to message.',
-                    style: TextStyle(color: Colors.white54),
+                    style: TextStyle(color: fv.secondaryText),
                   ),
                 )
               : FutureBuilder<List<MessageRecipient>>(
@@ -202,19 +204,19 @@ class _UserSearchTab extends StatelessWidget {
                       );
                     }
                     if (snapshot.hasError) {
-                      return const Center(
+                      return Center(
                         child: Text(
                           'Unable to search right now.',
-                          style: TextStyle(color: Colors.white54),
+                          style: TextStyle(color: fv.secondaryText),
                         ),
                       );
                     }
                     final results = snapshot.data ?? const [];
                     if (results.isEmpty) {
-                      return const Center(
+                      return Center(
                         child: Text(
                           'No matching members found.',
-                          style: TextStyle(color: Colors.white54),
+                          style: TextStyle(color: fv.secondaryText),
                         ),
                       );
                     }
@@ -266,20 +268,21 @@ class _BusinessOwnersTabState extends State<_BusinessOwnersTab> {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
           child: TextField(
             controller: _filterController,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: fv.primaryText),
             decoration: InputDecoration(
               hintText: 'Filter verified businesses',
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: .38)),
+              hintStyle: TextStyle(color: fv.tertiaryText),
               prefixIcon: const Icon(Icons.storefront_outlined,
                   color: Color(0xFFD8B56A)),
               filled: true,
-              fillColor: const Color(0xFF10151B),
+              fillColor: fv.inputFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
@@ -298,19 +301,19 @@ class _BusinessOwnersTabState extends State<_BusinessOwnersTab> {
                 );
               }
               if (snapshot.hasError) {
-                return const Center(
+                return Center(
                   child: Text(
                     'Unable to load business owners.',
-                    style: TextStyle(color: Colors.white54),
+                    style: TextStyle(color: fv.secondaryText),
                   ),
                 );
               }
               final owners = snapshot.data ?? const [];
               if (owners.isEmpty) {
-                return const Center(
+                return Center(
                   child: Text(
                     'No verified business owners found.',
-                    style: TextStyle(color: Colors.white54),
+                    style: TextStyle(color: fv.secondaryText),
                   ),
                 );
               }
@@ -363,7 +366,7 @@ class _RecipientTile extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
+            color: context.fv.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: const Color(0xFFD8B56A).withValues(alpha: .2),
@@ -372,7 +375,7 @@ class _RecipientTile extends StatelessWidget {
           child: Row(
             children: [
               CircleAvatar(
-                backgroundColor: const Color(0xFF241D22),
+                backgroundColor: context.fv.elevatedSurface,
                 child: Icon(
                   recipient.businessName != null
                       ? Icons.storefront_outlined
@@ -387,23 +390,23 @@ class _RecipientTile extends StatelessWidget {
                   children: [
                     Text(
                       recipient.displayName,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: context.fv.primaryText,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        color: Colors.white54,
+                      style: TextStyle(
+                        color: context.fv.secondaryText,
                         fontSize: 12,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Colors.white38),
+              Icon(Icons.chevron_right, color: context.fv.tertiaryText),
             ],
           ),
         ),

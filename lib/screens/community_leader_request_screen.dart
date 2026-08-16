@@ -86,11 +86,12 @@ class _CommunityLeaderRequestScreenState
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.white,
+        foregroundColor: fv.primaryText,
         title: const Text('Community Leader Access'),
       ),
       body: _loading
@@ -104,33 +105,33 @@ class _CommunityLeaderRequestScreenState
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: FirstVueColors.surface,
+                      color: fv.surface,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Your Community Leader request is pending review. '
                       'You will be able to create Communities once approved.',
-                      style: TextStyle(color: Colors.white70, height: 1.4),
+                      style: TextStyle(color: fv.secondaryText, height: 1.4),
                     ),
                   ),
                 ] else if (_existing?.isApproved == true) ...[
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: FirstVueColors.surface,
+                      color: fv.surface,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Text(
+                    child: Text(
                       'You are an approved Community Leader. '
                       'You can create Communities from Home or Communities.',
-                      style: TextStyle(color: Colors.white70, height: 1.4),
+                      style: TextStyle(color: fv.secondaryText, height: 1.4),
                     ),
                   ),
                 ] else ...[
-                  const Text(
+                  Text(
                     'Creating a Community requires Community Leader approval. '
                     'Tell us about the city and why you want to lead.',
-                    style: TextStyle(color: Colors.white54, height: 1.4),
+                    style: TextStyle(color: fv.secondaryText, height: 1.4),
                   ),
                   const SizedBox(height: 20),
                   LocationAutocompleteField(
@@ -181,15 +182,16 @@ class _CommunityLeaderRequestScreenState
     String label, {
     int lines = 1,
   }) {
+    final fv = context.fv;
     return TextField(
       controller: controller,
       maxLines: lines,
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(color: fv.primaryText),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white54),
+        labelStyle: TextStyle(color: fv.secondaryText),
         filled: true,
-        fillColor: FirstVueColors.surface,
+        fillColor: fv.inputFill,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -203,16 +205,18 @@ class _CommunityLeaderRequestScreenState
 Future<void> showCommunityLeaderRequiredDialog(BuildContext context) async {
   final action = await showDialog<String>(
     context: context,
-    builder: (context) => AlertDialog(
-      backgroundColor: FirstVueColors.surface,
-      title: const Text(
+    builder: (context) {
+      final fv = context.fv;
+      return AlertDialog(
+      backgroundColor: fv.surface,
+      title: Text(
         'Community Leader Approval Required',
-        style: TextStyle(color: Colors.white),
+        style: TextStyle(color: fv.primaryText),
       ),
-      content: const Text(
+      content: Text(
         'Creating a Community requires Community Leader approval. '
         'You can submit a request to become a Community Leader.',
-        style: TextStyle(color: Colors.white70, height: 1.4),
+        style: TextStyle(color: fv.secondaryText, height: 1.4),
       ),
       actions: [
         TextButton(
@@ -224,7 +228,8 @@ Future<void> showCommunityLeaderRequiredDialog(BuildContext context) async {
           child: const Text('Request Access'),
         ),
       ],
-    ),
+    );
+    },
   );
 
   if (action == 'request' && context.mounted) {

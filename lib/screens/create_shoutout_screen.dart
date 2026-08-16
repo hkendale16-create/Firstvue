@@ -128,12 +128,13 @@ class _CreateShoutoutScreenState extends State<CreateShoutoutScreen> {
   Widget build(BuildContext context) {
     final selected = _selected;
     final message = _messageController.text.trim();
+    final fv = context.fv;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF080B0F),
-        foregroundColor: Colors.white,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        foregroundColor: fv.primaryText,
         title: const Text('Create Shoutout'),
       ),
       body: ListView(
@@ -155,11 +156,11 @@ class _CreateShoutoutScreenState extends State<CreateShoutoutScreen> {
           const SizedBox(height: 10),
           TextField(
             controller: _searchController,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: fv.primaryText),
             decoration: InputDecoration(
               hintText: 'Search name, @handle, business, event…',
-              hintStyle: const TextStyle(color: Colors.white38),
-              prefixIcon: const Icon(Icons.search, color: Colors.white38),
+              hintStyle: TextStyle(color: fv.tertiaryText),
+              prefixIcon: Icon(Icons.search, color: fv.tertiaryText),
               suffixIcon: _searching
                   ? const Padding(
                       padding: EdgeInsets.all(12),
@@ -171,7 +172,7 @@ class _CreateShoutoutScreenState extends State<CreateShoutoutScreen> {
                     )
                   : null,
               filled: true,
-              fillColor: FirstVueColors.surface,
+              fillColor: fv.inputFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -183,13 +184,13 @@ class _CreateShoutoutScreenState extends State<CreateShoutoutScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: FirstVueColors.elevatedSurface,
+                color: fv.elevatedSurface,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
                   CircleAvatar(
-                    backgroundColor: FirstVueColors.surface,
+                    backgroundColor: fv.surface,
                     child: Text(
                       _typeLabel(selected.type)[0],
                       style: const TextStyle(color: FirstVueColors.gold),
@@ -202,8 +203,8 @@ class _CreateShoutoutScreenState extends State<CreateShoutoutScreen> {
                       children: [
                         Text(
                           selected.label,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: fv.primaryText,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -212,8 +213,8 @@ class _CreateShoutoutScreenState extends State<CreateShoutoutScreen> {
                               (selected.subtitle == null
                                   ? ''
                                   : ' · ${selected.subtitle}'),
-                          style: const TextStyle(
-                            color: Colors.white54,
+                          style: TextStyle(
+                            color: fv.secondaryText,
                             fontSize: 12,
                           ),
                         ),
@@ -227,7 +228,7 @@ class _CreateShoutoutScreenState extends State<CreateShoutoutScreen> {
                         _showPreview = false;
                       });
                     },
-                    icon: const Icon(Icons.close, color: Colors.white54),
+                    icon: Icon(Icons.close, color: fv.secondaryText),
                   ),
                 ],
               ),
@@ -238,7 +239,7 @@ class _CreateShoutoutScreenState extends State<CreateShoutoutScreen> {
               (result) => ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(
-                  backgroundColor: FirstVueColors.elevatedSurface,
+                  backgroundColor: fv.elevatedSurface,
                   child: Text(
                     _typeLabel(result.type)[0],
                     style: const TextStyle(color: FirstVueColors.teal),
@@ -246,12 +247,12 @@ class _CreateShoutoutScreenState extends State<CreateShoutoutScreen> {
                 ),
                 title: Text(
                   result.label,
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: fv.primaryText),
                 ),
                 subtitle: Text(
                   _typeLabel(result.type) +
                       (result.subtitle == null ? '' : ' · ${result.subtitle}'),
-                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  style: TextStyle(color: fv.secondaryText, fontSize: 12),
                 ),
                 onTap: () {
                   setState(() {
@@ -276,15 +277,15 @@ class _CreateShoutoutScreenState extends State<CreateShoutoutScreen> {
           const SizedBox(height: 10),
           TextField(
             controller: _messageController,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: fv.primaryText),
             maxLines: 4,
             maxLength: 280,
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               hintText: 'Share what makes them great…',
-              hintStyle: const TextStyle(color: Colors.white38),
+              hintStyle: TextStyle(color: fv.tertiaryText),
               filled: true,
-              fillColor: FirstVueColors.surface,
+              fillColor: fv.inputFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -297,8 +298,8 @@ class _CreateShoutoutScreenState extends State<CreateShoutoutScreen> {
                 ? null
                 : () => setState(() => _showPreview = !_showPreview),
             style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: BorderSide(color: Colors.white.withValues(alpha: .2)),
+              foregroundColor: fv.primaryText,
+              side: BorderSide(color: fv.divider),
             ),
             child: Text(_showPreview ? 'Hide preview' : 'Preview'),
           ),
@@ -308,7 +309,7 @@ class _CreateShoutoutScreenState extends State<CreateShoutoutScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: FirstVueColors.surface,
+                color: fv.surface,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
@@ -325,7 +326,7 @@ class _CreateShoutoutScreenState extends State<CreateShoutoutScreen> {
                   const SizedBox(height: 8),
                   Text(
                     message,
-                    style: const TextStyle(color: Colors.white70, height: 1.35),
+                    style: TextStyle(color: fv.secondaryText, height: 1.35),
                   ),
                 ],
               ),

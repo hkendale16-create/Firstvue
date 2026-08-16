@@ -29,7 +29,7 @@ class FirstVueShareSheet extends StatelessWidget {
   }) {
     return showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF10151B),
+      backgroundColor: context.fv.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -122,6 +122,7 @@ class FirstVueShareSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -134,7 +135,7 @@ class FirstVueShareSheet extends StatelessWidget {
                 width: 42,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: fv.divider,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -154,7 +155,7 @@ class FirstVueShareSheet extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: .72),
+                color: fv.secondaryText,
                 fontSize: 13,
               ),
             ),
@@ -217,6 +218,7 @@ class _ShareOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fv = context.fv;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -230,7 +232,7 @@ class _ShareOption extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).extension<FirstVuePalette>()?.elevatedSurface ?? FirstVueColors.elevatedSurface,
+                  color: fv.elevatedSurface,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: FirstVueColors.gold, size: 22),
@@ -242,8 +244,8 @@ class _ShareOption extends StatelessWidget {
                   children: [
                     Text(
                       label,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: fv.primaryText,
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                       ),
@@ -251,7 +253,7 @@ class _ShareOption extends StatelessWidget {
                     Text(
                       subtitle,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: .45),
+                        color: fv.tertiaryText,
                         fontSize: 12,
                       ),
                     ),
@@ -260,7 +262,7 @@ class _ShareOption extends StatelessWidget {
               ),
               Icon(
                 Icons.chevron_right_rounded,
-                color: Colors.white.withValues(alpha: .35),
+                color: fv.tertiaryText,
               ),
             ],
           ),

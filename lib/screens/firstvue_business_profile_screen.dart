@@ -816,7 +816,7 @@ class _BusinessReviewsSectionState extends State<_BusinessReviewsSection> {
     final submitted = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF10151B),
+      backgroundColor: context.fv.surface,
       builder: (_) => _ReviewSheet(businessId: widget.businessId),
     );
     if (submitted == true && mounted) {
@@ -852,8 +852,8 @@ class _BusinessReviewsSectionState extends State<_BusinessReviewsSection> {
                 const SizedBox(width: 5),
                 Text(
                   average.toStringAsFixed(1),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: context.fv.primaryText,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -953,7 +953,9 @@ class _ReviewSheetState extends State<_ReviewSheet> {
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
+  Widget build(BuildContext context) {
+    final fv = context.fv;
+    return Padding(
     padding: EdgeInsets.fromLTRB(
       20,
       20,
@@ -965,10 +967,10 @@ class _ReviewSheetState extends State<_ReviewSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'WRITE A REVIEW',
             style: TextStyle(
-              color: Colors.white,
+              color: fv.primaryText,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.4,
             ),
@@ -995,21 +997,21 @@ class _ReviewSheetState extends State<_ReviewSheet> {
             minLines: 3,
             maxLines: 6,
             maxLength: 2000,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: fv.primaryText),
             decoration: InputDecoration(
               hintText: 'Share your experience...',
-              hintStyle: const TextStyle(color: Colors.white38),
+              hintStyle: TextStyle(color: fv.tertiaryText),
               filled: true,
-              fillColor: const Color(0xFF151B22),
+              fillColor: fv.inputFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Reviews appear publicly only after FirstVue approval.',
-            style: TextStyle(color: Color(0xFF5A5668), fontSize: 12),
+            style: TextStyle(color: fv.secondaryText, fontSize: 12),
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -1027,6 +1029,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
       ),
     ),
   );
+  }
 }
 
 class _ReviewCard extends StatelessWidget {
@@ -1035,15 +1038,15 @@ class _ReviewCard extends StatelessWidget {
   const _ReviewCard({required this.review});
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) {
+    final fv = context.fv;
+    return Container(
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color:
-          Theme.of(context).extension<FirstVuePalette>()?.surface ??
-          FirstVueColors.surface,
+      color: fv.surface,
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: Colors.white.withValues(alpha: .08)),
+      border: Border.all(color: fv.divider),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1064,18 +1067,19 @@ class _ReviewCard extends StatelessWidget {
                 if (review.reviewerName != null) review.reviewerName!,
                 '${review.createdAt.month}/${review.createdAt.day}/${review.createdAt.year}',
               ].join(' · '),
-              style: const TextStyle(color: Colors.white38, fontSize: 11),
+              style: TextStyle(color: fv.tertiaryText, fontSize: 11),
             ),
           ],
         ),
         const SizedBox(height: 10),
         Text(
           review.body,
-          style: const TextStyle(color: Colors.white70, height: 1.4),
+          style: TextStyle(color: fv.secondaryText, height: 1.4),
         ),
       ],
     ),
   );
+  }
 }
 
 class _BusinessEntityDetailsSection extends StatefulWidget {
@@ -1177,8 +1181,10 @@ class _BusinessMediaGalleryState extends State<_BusinessMediaGallery> {
                 if (item.isVideo) {
                   showDialog<void>(
                     context: context,
-                    builder: (_) => Dialog(
-                      backgroundColor: const Color(0xFF10151B),
+                    builder: (dialogContext) {
+                      final dialogFv = dialogContext.fv;
+                      return Dialog(
+                      backgroundColor: dialogFv.surface,
                       child: Padding(
                         padding: const EdgeInsets.all(24),
                         child: Column(
@@ -1190,18 +1196,18 @@ class _BusinessMediaGalleryState extends State<_BusinessMediaGallery> {
                               size: 48,
                             ),
                             const SizedBox(height: 12),
-                            const Text(
+                            Text(
                               'Video',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: dialogFv.primaryText,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               item.signedUrl,
-                              style: const TextStyle(
-                                color: Colors.white54,
+                              style: TextStyle(
+                                color: dialogFv.secondaryText,
                                 fontSize: 11,
                               ),
                               maxLines: 2,
@@ -1210,7 +1216,8 @@ class _BusinessMediaGalleryState extends State<_BusinessMediaGallery> {
                           ],
                         ),
                       ),
-                    ),
+                    );
+                    },
                   );
                   return;
                 }
@@ -1239,16 +1246,16 @@ class _BusinessMediaGalleryState extends State<_BusinessMediaGallery> {
                               FirstVueColors.surface,
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(
+                            children: [
+                              const Icon(
                                 Icons.videocam_outlined,
                                 color: Color(0xFF78B9BE),
                                 size: 40,
                               ),
-                              SizedBox(height: 8),
+                              const SizedBox(height: 8),
                               Text(
                                 'VIDEO',
-                                style: TextStyle(color: Colors.white54),
+                                style: TextStyle(color: context.fv.secondaryText),
                               ),
                             ],
                           ),
@@ -1259,13 +1266,13 @@ class _BusinessMediaGalleryState extends State<_BusinessMediaGallery> {
                         width: 250,
                         height: 190,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => const SizedBox(
+                        errorBuilder: (_, _, _) => SizedBox(
                           width: 250,
                           child: ColoredBox(
-                            color: Color(0xFF10151B),
+                            color: context.fv.inputFill,
                             child: Icon(
                               Icons.broken_image_outlined,
-                              color: Colors.white38,
+                              color: context.fv.tertiaryText,
                             ),
                           ),
                         ),

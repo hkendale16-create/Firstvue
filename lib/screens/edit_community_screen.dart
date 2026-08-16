@@ -196,21 +196,22 @@ class _EditCommunityScreenState extends State<EditCommunityScreen> {
   }
 
   Widget _previewAvatar() {
-    const placeholder = Icon(
+    final fv = context.fv;
+    final placeholder = Icon(
       Icons.add_a_photo_outlined,
       color: FirstVueColors.teal,
     );
     if (_newImageBytes != null) {
       return CircleAvatar(
         radius: 46,
-        backgroundColor: FirstVueColors.elevatedSurface,
+        backgroundColor: fv.elevatedSurface,
         backgroundImage: MemoryImage(_newImageBytes!),
       );
     }
     if (_removeImage) {
-      return const NetworkCircleAvatar(
+      return NetworkCircleAvatar(
         radius: 46,
-        backgroundColor: FirstVueColors.elevatedSurface,
+        backgroundColor: fv.elevatedSurface,
         placeholder: placeholder,
       );
     }
@@ -218,7 +219,7 @@ class _EditCommunityScreenState extends State<EditCommunityScreen> {
     return NetworkCircleAvatar(
       imageUrl: (url != null && url.isNotEmpty) ? url : null,
       radius: 46,
-      backgroundColor: FirstVueColors.elevatedSurface,
+      backgroundColor: fv.elevatedSurface,
       placeholder: placeholder,
     );
   }
@@ -226,11 +227,12 @@ class _EditCommunityScreenState extends State<EditCommunityScreen> {
   @override
   Widget build(BuildContext context) {
     final busy = _saving || _deleting;
+    final fv = context.fv;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.white,
+        foregroundColor: fv.primaryText,
         title: const Text('Edit Group'),
         actions: [
           TextButton(
@@ -330,15 +332,16 @@ class _EditCommunityScreenState extends State<EditCommunityScreen> {
     String label, {
     int lines = 1,
   }) {
+    final fv = context.fv;
     return TextField(
       controller: controller,
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(color: fv.primaryText),
       maxLines: lines,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white54),
+        labelStyle: TextStyle(color: fv.secondaryText),
         filled: true,
-        fillColor: FirstVueColors.surface,
+        fillColor: fv.inputFill,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
