@@ -236,10 +236,16 @@ class _FeedsTabBody extends StatelessWidget {
           source: tab.source,
           emptyTitle: 'Nothing trending yet',
           emptySubtitle: 'Engage with posts to build momentum here.',
-          loader: ({int limit = 20, CommunityNewsPost? cursor}) {
+          useCursor: true,
+          loader: ({
+            int limit = 20,
+            CommunityNewsPost? cursor,
+            Iterable<String> excludeIds = const [],
+          }) {
             return CommunityNewsService.fetchTrendingFeed(
               limit: limit,
               windowHours: FeedRankingConfig.trendingWindow.inHours,
+              excludeIds: excludeIds,
             );
           },
         ),
@@ -249,7 +255,11 @@ class _FeedsTabBody extends StatelessWidget {
           emptyTitle: 'No new posts',
           emptySubtitle: 'Fresh posts will appear here in order.',
           useCursor: true,
-          loader: ({int limit = 20, CommunityNewsPost? cursor}) {
+          loader: ({
+            int limit = 20,
+            CommunityNewsPost? cursor,
+            Iterable<String> excludeIds = const [],
+          }) {
             return CommunityNewsService.fetchNewFeed(
               limit: limit,
               beforeCreatedAt: cursor?.createdAt,
@@ -263,8 +273,16 @@ class _FeedsTabBody extends StatelessWidget {
           emptyTitle: 'No recommendations yet',
           emptySubtitle:
               'Follow people, join groups, and interact to personalize this feed.',
-          loader: ({int limit = 20, CommunityNewsPost? cursor}) {
-            return CommunityNewsService.fetchRecommendedFeed(limit: limit);
+          useCursor: true,
+          loader: ({
+            int limit = 20,
+            CommunityNewsPost? cursor,
+            Iterable<String> excludeIds = const [],
+          }) {
+            return CommunityNewsService.fetchRecommendedFeed(
+              limit: limit,
+              excludeIds: excludeIds,
+            );
           },
         ),
     };
@@ -274,6 +292,7 @@ class _FeedsTabBody extends StatelessWidget {
 typedef FeedsLoader = Future<List<CommunityNewsPost>> Function({
   int limit,
   CommunityNewsPost? cursor,
+  Iterable<String> excludeIds,
 });
 
 class FeedsPostsList extends StatefulWidget {
@@ -335,22 +354,19 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
     });
     try {
       final posts = await widget.loader(limit: FeedRankingConfig.defaultPageSize);
-      final ids = posts.map((p) => p.id).toList();
-      final reposted = await RepostService.fetchMyRepostedIds(ids);
-      final counts = await RepostService.fetchRepostCounts(ids);
       final boosted = await PostBoostService.fetchActiveBoostedPostIds();
       if (!mounted) return;
       setState(() {
         _posts
           ..clear()
-          ..addAll([
-            for (final p in posts)
-              p.copyWith(repostCount: counts[p.id] ?? p.repostCount),
-          ]);
+          ..addAll(posts);
         _seenIds
           ..clear()
           ..addAll(posts.map((p) => p.id));
-        _reposted = reposted;
+        _reposted = {
+          for (final post in posts)
+            if (post.repostedByMe) post.id,
+        };
         _boostedIds = boosted;
         _loading = false;
         _hasMore = posts.length >= FeedRankingConfig.defaultPageSize;
@@ -375,21 +391,18 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
       final more = await widget.loader(
         limit: FeedRankingConfig.defaultPageSize,
         cursor: cursor,
+        excludeIds: _seenIds,
       );
       final fresh = more.where((p) => _seenIds.add(p.id)).toList();
-      final ids = fresh.map((p) => p.id).toList();
-      final reposted = await RepostService.fetchMyRepostedIds(ids);
-      final counts = await RepostService.fetchRepostCounts(ids);
       if (!mounted) return;
       setState(() {
-        _posts.addAll([
-          for (final p in fresh)
-            p.copyWith(repostCount: counts[p.id] ?? p.repostCount),
-        ]);
-        _reposted = {..._reposted, ...reposted};
-        _hasMore = widget.useCursor
-            ? more.length >= FeedRankingConfig.defaultPageSize
-            : false;
+        _posts.addAll(fresh);
+        _reposted = {
+          ..._reposted,
+          for (final post in fresh)
+            if (post.repostedByMe) post.id,
+        };
+        _hasMore = more.length >= FeedRankingConfig.defaultPageSize;
         _loadingMore = false;
       });
     } catch (_) {
@@ -773,7 +786,11 @@ class _CommunitiesDirectoryAndFeedState
       source: FeedRankingConfig.sourceCommunities,
       emptyTitle: 'No community posts yet',
       emptySubtitle: 'Join communities to see their shared feeds here.',
-      loader: ({int limit = 20, CommunityNewsPost? cursor}) {
+      loader: ({
+        int limit = 20,
+        CommunityNewsPost? cursor,
+        Iterable<String> excludeIds = const [],
+      }) {
         return CommunityNewsService.fetchAllCommunitiesFeed(limit: limit);
       },
       header: Column(
@@ -955,7 +972,11 @@ class _GroupsDirectoryAndFeedState extends State<_GroupsDirectoryAndFeed> {
       source: FeedRankingConfig.sourceGroups,
       emptyTitle: 'No group posts yet',
       emptySubtitle: 'Join or follow groups to fill this feed.',
-      loader: ({int limit = 20, CommunityNewsPost? cursor}) {
+      loader: ({
+        int limit = 20,
+        CommunityNewsPost? cursor,
+        Iterable<String> excludeIds = const [],
+      }) {
         return CommunityNewsService.fetchCommunityFeed(limit: limit);
       },
       header: Column(
