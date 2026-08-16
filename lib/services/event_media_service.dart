@@ -3,7 +3,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/media_config.dart';
 import 'media_storage_service.dart';
-import 'media_type_helpers.dart';
+import 'media_variant_uploader.dart';
+import 'media_variants.dart';
+import 'role_media_replace.dart';
 
 class EventMediaService {
   EventMediaService._();
@@ -17,11 +19,12 @@ class EventMediaService {
     String? storageProvider,
   }) async {
     if (storagePath == null || storagePath.trim().isEmpty) return null;
-    return MediaStorageService.createReadUrl(
+    return MediaVariantUploader.createDisplayUrl(
       bucket: MediaBucket.event,
-      path: storagePath,
+      storagePath: storagePath,
       provider: MediaStorageProvider.parse(storageProvider),
       context: {'event_id': eventId},
+      preferred: MediaVariant.feed,
     );
   }
 
@@ -32,14 +35,6 @@ class EventMediaService {
     final user = _client.auth.currentUser;
     if (user == null) {
       throw const AuthException('Sign in before adding an event photo.');
-    }
-
-    final bytes = await file.readAsBytes();
-    if (bytes.isEmpty) {
-      throw const StorageException('Selected file is empty.');
-    }
-    if (bytes.length > _maxBytes) {
-      throw const StorageException('Event photos must be 10 MB or smaller.');
     }
 
     final existing = await _client
@@ -59,12 +54,17 @@ class EventMediaService {
       existing['cover_storage_provider'] as String?,
     );
 
-    final contentType = mimeTypeForFile(file, 'image');
-    final upload = await MediaStorageService.uploadBytes(
+    final validated = await RoleMediaReplace.readValidatedBytes(
+      file,
+      maxBytes: _maxBytes,
+      imagesOnly: true,
+    );
+    final upload = await MediaVariantUploader.uploadImageOrBytes(
       bucket: MediaBucket.event,
-      bytes: bytes,
-      contentType: contentType,
-      fileName: file.name,
+      bytes: validated.bytes,
+      contentType: validated.contentType,
+      fileName: validated.fileName,
+      mediaType: validated.mediaType,
       index: 0,
       subfolder: 'cover',
       context: {'event_id': eventId},
@@ -76,24 +76,23 @@ class EventMediaService {
         'cover_storage_provider': upload.provider.value,
       }).eq('id', eventId);
     } catch (_) {
-      await MediaStorageService.deleteObject(
+      await MediaVariantUploader.deleteWithVariants(
         bucket: MediaBucket.event,
-        path: upload.path,
+        storagePath: upload.path,
         provider: upload.provider,
         context: {'event_id': eventId},
+        explicitThumbnailPath: upload.thumbnailPath,
       );
       rethrow;
     }
 
     if (oldPath != null && oldPath.isNotEmpty) {
-      try {
-        await MediaStorageService.deleteObject(
-          bucket: MediaBucket.event,
-          path: oldPath,
-          provider: oldProvider,
-          context: {'event_id': eventId},
-        );
-      } catch (_) {}
+      await MediaVariantUploader.deleteWithVariants(
+        bucket: MediaBucket.event,
+        storagePath: oldPath,
+        provider: oldProvider,
+        context: {'event_id': eventId},
+      );
     }
   }
 
@@ -126,14 +125,12 @@ class EventMediaService {
     }).eq('id', eventId);
 
     if (oldPath != null && oldPath.isNotEmpty) {
-      try {
-        await MediaStorageService.deleteObject(
-          bucket: MediaBucket.event,
-          path: oldPath,
-          provider: oldProvider,
-          context: {'event_id': eventId},
-        );
-      } catch (_) {}
+      await MediaVariantUploader.deleteWithVariants(
+        bucket: MediaBucket.event,
+        storagePath: oldPath,
+        provider: oldProvider,
+        context: {'event_id': eventId},
+      );
     }
   }
 }

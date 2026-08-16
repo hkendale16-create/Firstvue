@@ -6,6 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/media_config.dart';
 import 'media_type_helpers.dart';
 import 'media_storage_service.dart';
+import 'media_variant_uploader.dart';
+import 'media_variants.dart';
 import 'role_media_replace.dart';
 
 class CommunityNewsMediaItem {
@@ -106,18 +108,28 @@ class CommunityNewsMediaService {
       row['storage_provider'] as String?,
     );
     final bucket = MediaBucket.fromId(row['storage_bucket'] as String?);
+    final mediaType = (row['media_type'] as String?) ?? 'image';
+    final signedUrl = mediaType == 'video'
+        ? await MediaStorageService.createReadUrl(
+            bucket: bucket,
+            path: path,
+            provider: provider,
+            context: {'post_id': postId},
+          )
+        : await MediaVariantUploader.createDisplayUrl(
+            bucket: bucket,
+            storagePath: path,
+            provider: provider,
+            context: {'post_id': postId},
+            preferred: MediaVariant.feed,
+          );
     return CommunityNewsMediaItem(
       id: row['id'] as String,
       storagePath: path,
       storageProvider: provider,
-      mediaType: (row['media_type'] as String?) ?? 'image',
+      mediaType: mediaType,
       storageBucket: bucket,
-      signedUrl: await MediaStorageService.createReadUrl(
-        bucket: bucket,
-        path: path,
-        provider: provider,
-        context: {'post_id': postId},
-      ),
+      signedUrl: signedUrl,
     );
   }
 
@@ -142,6 +154,7 @@ class CommunityNewsMediaService {
         bytes: validated.bytes,
         contentType: validated.contentType,
         fileName: validated.fileName,
+        mediaType: validated.mediaType,
         index: index,
       );
 
@@ -183,20 +196,29 @@ class CommunityNewsMediaService {
             storageProvider: uploadResult.upload.provider,
             mediaType: validated.mediaType,
             storageBucket: uploadResult.bucket,
-            signedUrl: await MediaStorageService.createReadUrl(
-              bucket: uploadResult.bucket,
-              path: uploadResult.upload.path,
-              provider: uploadResult.upload.provider,
-              context: {'post_id': postId},
-            ),
+            signedUrl: validated.mediaType == 'video'
+                ? await MediaStorageService.createReadUrl(
+                    bucket: uploadResult.bucket,
+                    path: uploadResult.upload.path,
+                    provider: uploadResult.upload.provider,
+                    context: {'post_id': postId},
+                  )
+                : await MediaVariantUploader.createDisplayUrl(
+                    bucket: uploadResult.bucket,
+                    storagePath: uploadResult.upload.path,
+                    provider: uploadResult.upload.provider,
+                    context: {'post_id': postId},
+                    preferred: MediaVariant.feed,
+                  ),
           ),
         );
       } catch (_) {
-        await MediaStorageService.deleteObject(
+        await MediaVariantUploader.deleteWithVariants(
           bucket: uploadResult.bucket,
-          path: uploadResult.upload.path,
+          storagePath: uploadResult.upload.path,
           provider: uploadResult.upload.provider,
           context: {'post_id': postId},
+          explicitThumbnailPath: uploadResult.thumbnailPath,
         );
         rethrow;
       }
@@ -204,35 +226,50 @@ class CommunityNewsMediaService {
     return items;
   }
 
-  static Future<({MediaUploadResult upload, MediaBucket bucket})>
-      _uploadWithFallback({
+  static Future<
+      ({
+        MediaUploadResult upload,
+        MediaBucket bucket,
+        String? thumbnailPath,
+      })> _uploadWithFallback({
     required String postId,
     required Uint8List bytes,
     required String contentType,
     required String fileName,
+    required String mediaType,
     required int index,
   }) async {
     try {
-      final upload = await MediaStorageService.uploadBytes(
+      final upload = await MediaVariantUploader.uploadImageOrBytes(
         bucket: MediaBucket.communityNews,
         bytes: bytes,
         contentType: contentType,
         fileName: fileName,
+        mediaType: mediaType,
         index: index,
         context: {'post_id': postId},
       );
-      return (upload: upload, bucket: MediaBucket.communityNews);
+      return (
+        upload: upload.full,
+        bucket: MediaBucket.communityNews,
+        thumbnailPath: upload.thumbnailPath,
+      );
     } catch (_) {
-      final upload = await MediaStorageService.uploadBytes(
+      final upload = await MediaVariantUploader.uploadImageOrBytes(
         bucket: MediaBucket.profile,
         bytes: bytes,
         contentType: contentType,
         fileName: fileName,
+        mediaType: mediaType,
         index: index,
         subfolder: 'news/$postId',
         context: {'post_id': postId},
       );
-      return (upload: upload, bucket: MediaBucket.profile);
+      return (
+        upload: upload.full,
+        bucket: MediaBucket.profile,
+        thumbnailPath: upload.thumbnailPath,
+      );
     }
   }
 }
