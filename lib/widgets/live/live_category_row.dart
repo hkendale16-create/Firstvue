@@ -20,11 +20,13 @@ extension LiveDiscoveryCategoryX on LiveDiscoveryCategory {
         LiveDiscoveryCategory.businesses => 'Businesses',
       };
 
+  /// Prefer widely-supported Material glyphs — some outlined variants
+  /// (e.g. nightlife / people_alt) render blank on Flutter web builds.
   IconData get icon => switch (this) {
-        LiveDiscoveryCategory.people => Icons.people_alt_outlined,
-        LiveDiscoveryCategory.events => Icons.confirmation_number_outlined,
+        LiveDiscoveryCategory.people => Icons.groups_outlined,
+        LiveDiscoveryCategory.events => Icons.event_outlined,
         LiveDiscoveryCategory.food => Icons.restaurant_outlined,
-        LiveDiscoveryCategory.nightlife => Icons.nightlife_outlined,
+        LiveDiscoveryCategory.nightlife => Icons.local_bar_outlined,
         LiveDiscoveryCategory.businesses => Icons.storefront_outlined,
       };
 }

@@ -32,59 +32,74 @@ class UsLocations {
     'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming', 'DC': 'District of Columbia',
   };
 
-  static const cities = <String>[
-    'New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix', 'Philadelphia',
-    'San Antonio', 'San Diego', 'Dallas', 'San Jose', 'Austin', 'Jacksonville',
-    'Fort Worth', 'Columbus', 'Charlotte', 'Indianapolis', 'San Francisco',
-    'Seattle', 'Denver', 'Washington', 'Boston', 'El Paso', 'Nashville',
-    'Detroit', 'Oklahoma City', 'Portland', 'Las Vegas', 'Memphis', 'Louisville',
-    'Baltimore', 'Milwaukee', 'Albuquerque', 'Tucson', 'Fresno', 'Sacramento',
-    'Atlanta', 'Miami', 'Oakland', 'Minneapolis', 'Tampa', 'New Orleans',
-    'Cleveland', 'Honolulu', 'Anaheim', 'Orlando', 'St. Louis', 'Riverside',
-    'Corpus Christi', 'Lexington', 'Pittsburgh', 'Anchorage', 'Stockton',
-    'Cincinnati', 'St. Paul', 'Toledo', 'Newark', 'Greensboro', 'Plano',
-    'Henderson', 'Lincoln', 'Buffalo', 'Fort Wayne', 'Jersey City', 'St. Petersburg',
-    'Chula Vista', 'Norfolk', 'Orlando', 'Chandler', 'Laredo', 'Madison',
-    'Durham', 'Lubbock', 'Winston-Salem', 'Garland', 'Glendale', 'Hialeah',
-    'Reno', 'Baton Rouge', 'Irvine', 'Chesapeake', 'Irving', 'Scottsdale',
-    'North Las Vegas', 'Fremont', 'Gilbert', 'San Bernardino', 'Boise',
-    'Birmingham', 'Richmond', 'Spokane', 'Rochester', 'Des Moines', 'Modesto',
-    'Fayetteville', 'Tacoma', 'Oxnard', 'Fontana', 'Columbus', 'Montgomery',
-    'Moreno Valley', 'Shreveport', 'Aurora', 'Yonkers', 'Akron', 'Huntington Beach',
-    'Little Rock', 'Augusta', 'Amarillo', 'Mobile', 'Grand Rapids', 'Salt Lake City',
-    'Tallahassee', 'Huntsville', 'Grand Prairie', 'Knoxville', 'Worcester',
-    'Newport News', 'Brownsville', 'Overland Park', 'Santa Clarita', 'Providence',
-    'Garden Grove', 'Chattanooga', 'Oceanside', 'Jackson', 'Fort Lauderdale',
-    'Santa Rosa', 'Rancho Cucamonga', 'Port St. Lucie', 'Tempe', 'Ontario',
-    'Vancouver', 'Cape Coral', 'Sioux Falls', 'Springfield', 'Peoria', 'Pembroke Pines',
-    'Elk Grove', 'Salem', 'Lancaster', 'Corona', 'Eugene', 'Palmdale', 'Salinas',
-    'Springfield', 'Pasadena', 'Fort Collins', 'Hayward', 'Pomona', 'Cary',
-    'Rockford', 'Alexandria', 'Escondido', 'McKinney', 'Kansas City', 'Joliet',
-    'Sunnyvale', 'Torrance', 'Bridgeport', 'Lakewood', 'Hollywood', 'Paterson',
-    'Naperville', 'Syracuse', 'Mesquite', 'Dayton', 'Savannah', 'Clarksville',
-    'Orange', 'Pasadena', 'Fullerton', 'Killeen', 'Frisco', 'Hampton', 'McAllen',
-    'Warren', 'Bellevue', 'West Valley City', 'Columbia', 'Olathe', 'Sterling Heights',
-    'New Haven', 'Miramar', 'Waco', 'Thousand Oaks', 'Cedar Rapids', 'Charleston',
-    'Visalia', 'Topeka', 'Elizabeth', 'Gainesville', 'Thornton', 'Roseville',
-    'Carrollton', 'Coral Springs', 'Stamford', 'Simi Valley', 'Concord', 'Hartford',
-    'Kent', 'Lafayette', 'Midland', 'Surprise', 'Denton', 'Victorville', 'Evansville',
-    'Santa Clara', 'Abilene', 'Athens', 'Vallejo', 'Allentown', 'Norman', 'Beaumont',
-    'Independence', 'Murfreesboro', 'Ann Arbor', 'Springfield', 'Berkeley', 'Peoria',
-    'Provo', 'El Monte', 'Columbia', 'Lansing', 'Fargo', 'Downey', 'Costa Mesa',
-    'Wilmington', 'Arvada', 'Inglewood', 'Miami Gardens', 'Carlsbad', 'Westminster',
-    'Rochester', 'Odessa', 'Manchester', 'Elgin', 'West Jordan', 'Round Rock',
-    'Clearwater', 'Waterbury', 'Gresham', 'Fairfield', 'Billings', 'Lowell',
-    'San Buenaventura', 'Pueblo', 'High Point', 'West Covina', 'Richmond',
-    'Murrieta', 'Cambridge', 'Antioch', 'Temecula', 'Norwalk', 'Centennial',
-    'Everett', 'Palm Bay', 'Wichita Falls', 'Green Bay', 'Daly City', 'Burbank',
-    'Richardson', 'Pompano Beach', 'North Charleston', 'Broken Arrow', 'Boulder',
-    'West Palm Beach', 'Santa Maria', 'El Cajon', 'Davenport', 'Rialto', 'Las Cruces',
-    'San Mateo', 'Lewisville', 'South Bend', 'Lakeland', 'Erie', 'Tyler', 'Pearland',
-    'College Station', 'Kenosha', 'Sandy Springs', 'Clovis', 'Flint', 'Roanoke',
-    'Albany', 'Jurupa Valley', 'Compton', 'San Angelo', 'Hillsboro', 'Lawton',
-    'Renton', 'Vista', 'Davie', 'Greeley', 'Mission Viejo', 'Portsmouth',
-    'Dearborn', 'South Gate', 'Tuscaloosa', 'Livonia', 'New Bedford', 'Vacaville',
-  ];
+  /// Local US city catalog keyed by state. No Supabase — in-memory only.
+  static const citiesByState = <String, List<String>>{
+    'Alabama': ['Birmingham', 'Montgomery', 'Mobile', 'Huntsville', 'Tuscaloosa'],
+    'Alaska': ['Anchorage', 'Fairbanks', 'Juneau'],
+    'Arizona': ['Phoenix', 'Tucson', 'Mesa', 'Chandler', 'Gilbert', 'Glendale', 'Scottsdale', 'Tempe', 'Peoria', 'Surprise'],
+    'Arkansas': ['Little Rock', 'Fayetteville', 'Fort Smith', 'Jonesboro'],
+    'California': ['Los Angeles', 'San Diego', 'San Jose', 'San Francisco', 'Fresno', 'Sacramento', 'Long Beach', 'Oakland', 'Bakersfield', 'Anaheim', 'Santa Ana', 'Riverside', 'Stockton', 'Irvine', 'Chula Vista', 'Fremont', 'San Bernardino', 'Modesto', 'Fontana', 'Oxnard', 'Moreno Valley', 'Huntington Beach', 'Glendale', 'Santa Clarita', 'Garden Grove', 'Oceanside', 'Rancho Cucamonga', 'Santa Rosa', 'Ontario', 'Elk Grove', 'Corona', 'Lancaster', 'Palmdale', 'Salinas', 'Hayward', 'Pomona', 'Escondido', 'Sunnyvale', 'Torrance', 'Pasadena', 'Orange', 'Fullerton', 'Thousand Oaks', 'Visalia', 'Simi Valley', 'Concord', 'Roseville', 'Santa Clara', 'Vallejo', 'Berkeley', 'El Monte', 'Downey', 'Costa Mesa', 'Inglewood', 'Carlsbad', 'San Buenaventura', 'West Covina', 'Norwalk', 'Murrieta', 'Antioch', 'Temecula', 'Daly City', 'Burbank', 'Santa Maria', 'El Cajon', 'Rialto', 'San Mateo', 'Clovis', 'Compton', 'Jurupa Valley', 'Vista', 'Mission Viejo', 'South Gate', 'Vacaville'],
+    'Colorado': ['Denver', 'Colorado Springs', 'Aurora', 'Fort Collins', 'Lakewood', 'Thornton', 'Arvada', 'Westminster', 'Pueblo', 'Centennial', 'Boulder', 'Greeley'],
+    'Connecticut': ['Bridgeport', 'New Haven', 'Stamford', 'Hartford', 'Waterbury', 'Norwalk', 'Danbury'],
+    'Delaware': ['Wilmington', 'Dover', 'Newark'],
+    'District of Columbia': ['Washington'],
+    'Florida': ['Jacksonville', 'Miami', 'Tampa', 'Orlando', 'St. Petersburg', 'Hialeah', 'Tallahassee', 'Fort Lauderdale', 'Port St. Lucie', 'Cape Coral', 'Pembroke Pines', 'Hollywood', 'Miramar', 'Gainesville', 'Coral Springs', 'Clearwater', 'Miami Gardens', 'Palm Bay', 'Pompano Beach', 'West Palm Beach', 'Lakeland', 'Davie'],
+    'Georgia': ['Atlanta', 'Augusta', 'Columbus', 'Macon', 'Savannah', 'Athens', 'Sandy Springs', 'Roswell', 'Johns Creek', 'Albany'],
+    'Hawaii': ['Honolulu', 'Hilo', 'Kailua'],
+    'Idaho': ['Boise', 'Meridian', 'Nampa', 'Idaho Falls'],
+    'Illinois': ['Chicago', 'Aurora', 'Naperville', 'Joliet', 'Rockford', 'Elgin', 'Peoria', 'Springfield'],
+    'Indiana': ['Indianapolis', 'Fort Wayne', 'Evansville', 'South Bend', 'Carmel', 'Bloomington'],
+    'Iowa': ['Des Moines', 'Cedar Rapids', 'Davenport', 'Sioux City', 'Iowa City'],
+    'Kansas': ['Wichita', 'Overland Park', 'Kansas City', 'Olathe', 'Topeka'],
+    'Kentucky': ['Louisville', 'Lexington', 'Bowling Green', 'Owensboro'],
+    'Louisiana': ['New Orleans', 'Baton Rouge', 'Shreveport', 'Lafayette', 'Lake Charles'],
+    'Maine': ['Portland', 'Lewiston', 'Bangor'],
+    'Maryland': ['Baltimore', 'Frederick', 'Rockville', 'Gaithersburg', 'Bowie'],
+    'Massachusetts': ['Boston', 'Worcester', 'Springfield', 'Cambridge', 'Lowell', 'New Bedford', 'Brockton'],
+    'Michigan': ['Detroit', 'Grand Rapids', 'Warren', 'Sterling Heights', 'Ann Arbor', 'Lansing', 'Flint', 'Dearborn', 'Livonia'],
+    'Minnesota': ['Minneapolis', 'St. Paul', 'Rochester', 'Duluth', 'Bloomington'],
+    'Mississippi': ['Jackson', 'Gulfport', 'Southaven', 'Hattiesburg'],
+    'Missouri': ['Kansas City', 'St. Louis', 'Springfield', 'Columbia', 'Independence'],
+    'Montana': ['Billings', 'Missoula', 'Great Falls', 'Bozeman'],
+    'Nebraska': ['Omaha', 'Lincoln', 'Bellevue', 'Grand Island'],
+    'Nevada': ['Las Vegas', 'Henderson', 'Reno', 'North Las Vegas', 'Sparks', 'Carson City'],
+    'New Hampshire': ['Manchester', 'Nashua', 'Concord'],
+    'New Jersey': ['Newark', 'Jersey City', 'Paterson', 'Elizabeth', 'Lakewood', 'Edison', 'Woodbridge'],
+    'New Mexico': ['Albuquerque', 'Las Cruces', 'Rio Rancho', 'Santa Fe'],
+    'New York': ['New York', 'Buffalo', 'Rochester', 'Yonkers', 'Syracuse', 'Albany', 'New Rochelle'],
+    'North Carolina': ['Charlotte', 'Raleigh', 'Greensboro', 'Durham', 'Winston-Salem', 'Fayetteville', 'Cary', 'Wilmington', 'High Point', 'Concord', 'Asheville'],
+    'North Dakota': ['Fargo', 'Bismarck', 'Grand Forks', 'Minot'],
+    'Ohio': ['Columbus', 'Cleveland', 'Cincinnati', 'Toledo', 'Akron', 'Dayton'],
+    'Oklahoma': ['Oklahoma City', 'Tulsa', 'Norman', 'Broken Arrow', 'Lawton', 'Edmond'],
+    'Oregon': ['Portland', 'Eugene', 'Salem', 'Gresham', 'Hillsboro', 'Beaverton'],
+    'Pennsylvania': ['Philadelphia', 'Pittsburgh', 'Allentown', 'Erie', 'Reading', 'Scranton'],
+    'Rhode Island': ['Providence', 'Warwick', 'Cranston', 'Pawtucket'],
+    'South Carolina': ['Charleston', 'Columbia', 'North Charleston', 'Mount Pleasant', 'Rock Hill', 'Greenville'],
+    'South Dakota': ['Sioux Falls', 'Rapid City', 'Aberdeen'],
+    'Tennessee': ['Nashville', 'Memphis', 'Knoxville', 'Chattanooga', 'Clarksville', 'Murfreesboro'],
+    'Texas': ['Houston', 'San Antonio', 'Dallas', 'Austin', 'Fort Worth', 'El Paso', 'Arlington', 'Corpus Christi', 'Plano', 'Laredo', 'Lubbock', 'Garland', 'Irving', 'Amarillo', 'Grand Prairie', 'Brownsville', 'McKinney', 'Frisco', 'McAllen', 'Waco', 'Carrollton', 'Midland', 'Denton', 'Abilene', 'Beaumont', 'Round Rock', 'Odessa', 'Wichita Falls', 'Lewisville', 'Tyler', 'Pearland', 'College Station', 'San Angelo', 'Mesquite', 'Killeen'],
+    'Utah': ['Salt Lake City', 'West Valley City', 'Provo', 'West Jordan', 'Orem', 'Sandy'],
+    'Vermont': ['Burlington', 'South Burlington', 'Rutland'],
+    'Virginia': ['Virginia Beach', 'Norfolk', 'Chesapeake', 'Richmond', 'Newport News', 'Alexandria', 'Hampton', 'Roanoke', 'Portsmouth', 'Suffolk'],
+    'Washington': ['Seattle', 'Spokane', 'Tacoma', 'Vancouver', 'Bellevue', 'Kent', 'Everett', 'Renton', 'Spokane Valley', 'Federal Way'],
+    'West Virginia': ['Charleston', 'Huntington', 'Morgantown', 'Parkersburg'],
+    'Wisconsin': ['Milwaukee', 'Madison', 'Green Bay', 'Kenosha', 'Racine', 'Appleton'],
+    'Wyoming': ['Cheyenne', 'Casper', 'Laramie', 'Gillette'],
+  };
+
+  /// Flat city list for forms without a selected state (derived once).
+  static final List<String> cities = () {
+    final list = <String>{
+      for (final entries in citiesByState.values) ...entries,
+    }.toList();
+    list.sort();
+    return List<String>.unmodifiable(list);
+  }();
+
+  static List<String> citiesForState(String? state) {
+    if (state == null || state.trim().isEmpty) return const [];
+    return citiesByState[state] ?? const [];
+  }
 
   static List<String> matchingStates(String query) {
     final normalized = query.trim().toLowerCase();
@@ -95,12 +110,20 @@ class UsLocations {
         .toList();
   }
 
+  /// When [stateHint] is set, only that state's cities are searched and the
+  /// 3-character minimum is waived so the dependent city dropdown can open.
   static List<String> matchingCities(String query, {String? stateHint}) {
+    final pool = citiesForState(stateHint);
+    final source = pool.isNotEmpty ? pool : cities;
     final normalized = query.trim().toLowerCase();
-    if (normalized.length < minQueryLength) return const [];
-    return cities
+    final scoped = pool.isNotEmpty;
+    if (!scoped && normalized.length < minQueryLength) return const [];
+    if (scoped && normalized.isEmpty) {
+      return source.take(60).toList(growable: false);
+    }
+    return source
         .where((city) => city.toLowerCase().contains(normalized))
-        .take(8)
+        .take(scoped ? 40 : 8)
         .toList();
   }
 
@@ -118,3 +141,4 @@ class UsLocations {
         .toList();
   }
 }
+

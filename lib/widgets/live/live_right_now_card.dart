@@ -43,7 +43,9 @@ class LiveRightNowCard extends StatelessWidget {
                 ColoredBox(
                   color: LiveTokens.surface,
                   child: Icon(
-                    Icons.event_outlined,
+                    item.kind == LiveRightNowKind.business
+                        ? Icons.storefront_outlined
+                        : Icons.event_outlined,
                     color: fv.mutedIcon,
                     size: 36,
                   ),

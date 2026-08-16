@@ -15,6 +15,7 @@ import '../services/things_to_do_service.dart';
 import '../services/trending_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'firstvue_share_sheet.dart';
+import 'feed_comments_sheet.dart';
 import 'home_communities_section.dart';
 import 'social_chrome.dart';
 
@@ -394,6 +395,14 @@ class _InteractiveBusinessCardState extends State<_InteractiveBusinessCard> {
     );
   }
 
+  Future<void> _openComments() async {
+    await FeedCommentsSheet.show(
+      context,
+      mediaId: 'business:${widget.business.id}',
+      businessName: widget.business.name,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final business = widget.business;
@@ -416,7 +425,7 @@ class _InteractiveBusinessCardState extends State<_InteractiveBusinessCard> {
       onProfileTap: _openProfile,
       onTap: _openProfile,
       onLike: _toggleLike,
-      onComment: _openProfile,
+      onComment: _openComments,
       onShare: _share,
       onSave: _toggleSave,
       followBusinessId: business.id,

@@ -265,7 +265,14 @@ class _MapboxSurfaceState extends State<_MapboxSurface> {
           geometry: mb.Point(
             coordinates: mb.Position(pin.point.longitude, pin.point.latitude),
           ),
-          textField: pin.isLive ? 'LIVE' : '•',
+          textField: pin.isLive
+              ? 'LIVE'
+              : switch (pin.kind) {
+                  LiveMapPinKind.event => 'E',
+                  LiveMapPinKind.foodTruck => 'F',
+                  LiveMapPinKind.nightlife => 'N',
+                  LiveMapPinKind.market => 'M',
+                },
           textSize: selected ? 13 : 11,
           textColor: 0xFFFFFFFF,
           textHaloColor: color,

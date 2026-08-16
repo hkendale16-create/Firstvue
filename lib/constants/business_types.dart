@@ -66,7 +66,7 @@ IconData iconForIndustrySlug(String slug) {
   return switch (slug) {
     'beauty-grooming' => Icons.content_cut,
     'food-dining' => Icons.restaurant,
-    'nightlife' => Icons.nightlife,
+    'nightlife' => Icons.local_bar,
     'events' => Icons.event,
     'rentals' => Icons.key_outlined,
     'activities' => Icons.hiking,

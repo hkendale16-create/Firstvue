@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -26,6 +27,14 @@ extension LiveMapFilterX on LiveMapFilter {
         LiveMapFilter.markets => 'Markets',
       };
 
+  IconData get icon => switch (this) {
+        LiveMapFilter.liveNow => Icons.sensors_outlined,
+        LiveMapFilter.events => Icons.event_outlined,
+        LiveMapFilter.foodTrucks => Icons.local_shipping_outlined,
+        LiveMapFilter.nightlife => Icons.local_bar_outlined,
+        LiveMapFilter.markets => Icons.storefront_outlined,
+      };
+
   /// Empty-state copy for the active tab.
   String get emptyNearbyMessage => switch (this) {
         LiveMapFilter.liveNow =>
@@ -38,6 +47,15 @@ extension LiveMapFilterX on LiveMapFilter {
           'No nightlife spots with map locations nearby yet.',
         LiveMapFilter.markets =>
           'No markets with map locations nearby yet.',
+      };
+}
+
+extension LiveMapPinKindX on LiveMapPinKind {
+  IconData get icon => switch (this) {
+        LiveMapPinKind.event => Icons.event_outlined,
+        LiveMapPinKind.foodTruck => Icons.local_shipping_outlined,
+        LiveMapPinKind.nightlife => Icons.local_bar_outlined,
+        LiveMapPinKind.market => Icons.storefront_outlined,
       };
 }
 
