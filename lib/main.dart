@@ -30,6 +30,7 @@ import 'theme/firstvue_theme.dart';
 import 'utils/web_safari_media.dart';
 import 'widgets/firstvue_bottom_nav.dart';
 import 'widgets/firstvue_onboarding.dart';
+import 'widgets/firstvue_section_tip.dart';
 import 'widgets/early_access_feedback_prompt.dart';
 import 'widgets/firstvue_refresh_scaffold.dart';
 import 'widgets/firstvue_settings_drawer.dart';
@@ -40,6 +41,7 @@ import 'widgets/home_discovery_section.dart';
 import 'widgets/network_photo.dart';
 import 'widgets/social_chrome.dart';
 import 'services/early_access_prompt_service.dart';
+import 'services/onboarding_store.dart';
 import 'services/profile_media_service.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -167,12 +169,33 @@ class _FirstVueHomeState extends State<FirstVueHome> {
     _refreshNotificationBadge();
     ActivityNotificationsService.listenForPushDelivery();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) showFirstLaunchExperience(context);
+      if (mounted) {
+        showFirstLaunchExperience(
+          context,
+          initialSection: _tutorialSectionForTab(selectedIndex),
+        );
+      }
       // Leftover ?msg= from Messages (or a Safari crash reload) must not linger
       // on Home/Feeds/VUE — repeated history writes + video decode OOM Safari.
       if (kIsWeb) clearMessagingUrl();
       unawaited(_maybeShowEarlyAccessPrompt());
     });
+  }
+
+  TutorialSection? _tutorialSectionForTab(int index) {
+    return switch (index) {
+      FirstVueBottomNav.homeIndex => TutorialSection.home,
+      FirstVueBottomNav.feedsIndex => TutorialSection.feeds,
+      FirstVueBottomNav.vueIndex => TutorialSection.vue,
+      FirstVueBottomNav.exploreIndex => TutorialSection.explore,
+      _ => null,
+    };
+  }
+
+  void _maybeShowTabTip(int index) {
+    final section = _tutorialSectionForTab(index);
+    if (section == null || !mounted) return;
+    unawaited(maybeShowSectionTip(context, section));
   }
 
   /// Soft Early Access prompt after a few signed-in sessions — never on first launch.
@@ -521,6 +544,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
               if (!firstOpen) _profileRefreshToken++;
             }
           });
+          _maybeShowTabTip(index);
         },
       ),
     );

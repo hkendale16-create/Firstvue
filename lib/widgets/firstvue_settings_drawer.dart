@@ -33,6 +33,9 @@ import '../services/admin_auth_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'early_access_badge.dart';
 import 'firstvue_onboarding.dart';
+import 'firstvue_section_tip.dart';
+import 'tutorial_targets.dart';
+import '../services/onboarding_store.dart';
 
 typedef FirstVueSettingsOpen = void Function(Widget screen);
 
@@ -61,6 +64,9 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
   void initState() {
     super.initState();
     _loadAdmin();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybeShowSectionTip(context, TutorialSection.settings);
+    });
   }
 
   Future<void> _loadAdmin() async {
@@ -162,6 +168,7 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                         : () => _open(const PrivacySettingsScreen()),
                   ),
                   _SettingsTile(
+                    key: TutorialTargets.settingsVerified,
                     icon: Icons.how_to_reg_outlined,
                     title: 'Get verified',
                     subtitle: 'Business owner, professional, or organizer',
@@ -208,6 +215,7 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                 ],
               ),
               _SettingsGroup(
+                key: TutorialTargets.settingsMonetization,
                 title: 'Monetization',
                 children: [
                   _SettingsTile(
@@ -287,7 +295,7 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                   _SettingsTile(
                     icon: Icons.menu_book_outlined,
                     title: 'App tutorial',
-                    subtitle: 'Sections tour or opening a business entity',
+                    subtitle: 'Short tips as you open each section',
                     onTap: () => showOnboardingTourReplay(context),
                   ),
                 ],
@@ -400,6 +408,7 @@ class _SettingsGroup extends StatelessWidget {
   final List<Widget> children;
 
   const _SettingsGroup({
+    super.key,
     required this.title,
     required this.children,
     this.titleColor,
@@ -454,6 +463,7 @@ class _SettingsTile extends StatelessWidget {
   final VoidCallback? onTap;
 
   const _SettingsTile({
+    super.key,
     required this.icon,
     required this.title,
     this.subtitle,

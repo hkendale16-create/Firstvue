@@ -18,6 +18,7 @@ import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/fv_ui.dart';
 import '../widgets/social_rich_text.dart';
+import '../widgets/tutorial_targets.dart';
 import '../widgets/vue_live_mode_switch.dart';
 import '../widgets/vue_mosaic_layout.dart';
 import '../widgets/vue_mosaic_view.dart';
@@ -350,9 +351,12 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                       alignment: Alignment.center,
                       children: [
                         if (showLiveSwitch)
-                          VueLiveModeSwitch(
-                            mode: _experienceMode,
-                            onChanged: _setExperienceMode,
+                          KeyedSubtree(
+                            key: TutorialTargets.vueLiveSwitch,
+                            child: VueLiveModeSwitch(
+                              mode: _experienceMode,
+                              onChanged: _setExperienceMode,
+                            ),
                           )
                         else
                           Text(
