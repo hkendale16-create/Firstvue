@@ -103,10 +103,13 @@ class UsLocations {
 
   static List<String> matchingStates(String query) {
     final normalized = query.trim().toLowerCase();
-    if (normalized.length < minQueryLength) return const [];
+    // Empty query returns the full list so searchable dropdowns can open.
+    if (normalized.isEmpty) {
+      return List<String>.from(states, growable: false);
+    }
     return states
         .where((state) => state.toLowerCase().contains(normalized))
-        .take(8)
+        .take(normalized.length < minQueryLength ? 20 : 12)
         .toList();
   }
 

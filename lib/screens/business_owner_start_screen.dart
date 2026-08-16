@@ -7,8 +7,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../constants/business_types.dart';
+import '../data/us_locations.dart';
 import '../services/business_media_service.dart';
 import '../services/business_submission_service.dart';
+import '../utils/form_validators.dart';
 import '../widgets/fv_ui.dart';
 import '../widgets/media_picker_sheet.dart';
 import '../auth/ensure_signed_in.dart';
@@ -283,6 +285,7 @@ class _NewBusinessScreen extends StatefulWidget {
 
 class _NewBusinessScreenState extends State<_NewBusinessScreen> {
   final _businessController = TextEditingController();
+  final _customTypeController = TextEditingController();
   final _industries = primaryIndustryOptions();
   late BusinessIndustryOption _industry;
   BusinessTypeOption? _businessType;
@@ -306,6 +309,7 @@ class _NewBusinessScreenState extends State<_NewBusinessScreen> {
   @override
   void dispose() {
     _businessController.dispose();
+    _customTypeController.dispose();
     super.dispose();
   }
 
@@ -378,6 +382,9 @@ class _NewBusinessScreenState extends State<_NewBusinessScreen> {
     if (selected == null) return;
     setState(() {
       _businessType = types.firstWhere((t) => t.slug == selected.id);
+      if (!(_businessType?.isOther ?? false)) {
+        _customTypeController.clear();
+      }
     });
   }
 
@@ -452,13 +459,21 @@ class _NewBusinessScreenState extends State<_NewBusinessScreen> {
       );
       return;
     }
+    final customType = _customTypeController.text.trim();
+    if (_businessType!.isOther && customType.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter your custom business type.')),
+      );
+      return;
+    }
+    final typeLabel = _businessType!.isOther ? customType : _businessType!.label;
     Navigator.push(
       context,
       FirstVuePageRoute(
         builder: (_) => _VerificationFormScreen(
           businessName: name,
-          businessType: _businessType!.label,
-          industrySlug: _businessType!.slug,
+          businessType: typeLabel,
+          industrySlug: _industry.slug,
           services: List<String>.from(_services),
           avatarFile: _avatarFile,
           isClaim: false,
@@ -524,6 +539,15 @@ class _NewBusinessScreenState extends State<_NewBusinessScreen> {
                   focused: _typeFocused,
                   onTap: _pickBusinessType,
                 ),
+                if (_businessType?.isOther ?? false) ...[
+                  const SizedBox(height: 14),
+                  FvCompactField(
+                    label: 'Custom business type',
+                    hint: 'Describe your business type',
+                    controller: _customTypeController,
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ],
                 const SizedBox(height: 18),
                 Text(
                   'Additional services (optional)',
@@ -585,21 +609,150 @@ class _VerificationFormScreen extends StatefulWidget {
 class _VerificationFormScreenState extends State<_VerificationFormScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _businessPhoneController = TextEditingController();
+  final _businessEmailController = TextEditingController();
+  final _websiteController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _address2Controller = TextEditingController();
+  final _cityController = TextEditingController();
+  final _zipController = TextEditingController();
+  final _instagramController = TextEditingController();
+  final _facebookController = TextEditingController();
+  final _tiktokController = TextEditingController();
+  final _xController = TextEditingController();
+  final _youtubeController = TextEditingController();
+
+  String? _state;
+  String? _contactPreference;
   bool _isSubmitting = false;
+  bool _stateFocused = false;
+  bool _cityFocused = false;
+  bool _preferenceFocused = false;
+
+  static const _preferences = <String>[
+    'Phone',
+    'Email',
+    'Website',
+    'Message in app',
+  ];
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _businessPhoneController.dispose();
+    _businessEmailController.dispose();
+    _websiteController.dispose();
+    _addressController.dispose();
+    _address2Controller.dispose();
+    _cityController.dispose();
+    _zipController.dispose();
+    _instagramController.dispose();
+    _facebookController.dispose();
+    _tiktokController.dispose();
+    _xController.dispose();
+    _youtubeController.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _pickState() async {
+    setState(() => _stateFocused = true);
+    final selected = await showFvSearchablePicker(
+      context: context,
+      title: 'Select state',
+      searchHint: 'Search states',
+      selectedId: _state,
+      options: [
+        for (final state in UsLocations.states)
+          FvPickerOption(id: state, label: state, icon: Icons.map_outlined),
+      ],
+    );
+    if (!mounted) return;
+    setState(() {
+      _stateFocused = false;
+      if (selected != null) {
+        _state = selected.id;
+        _cityController.clear();
+      }
+    });
+  }
+
+  Future<void> _pickCity() async {
+    if (_state == null || _state!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a state first.')),
+      );
+      return;
+    }
+    setState(() => _cityFocused = true);
+    final cities = UsLocations.citiesForState(_state);
+    final selected = await showFvSearchablePicker(
+      context: context,
+      title: 'Select city',
+      searchHint: 'Search cities in $_state',
+      selectedId: _cityController.text.trim().isEmpty
+          ? null
+          : _cityController.text.trim(),
+      options: [
+        for (final city in cities)
+          FvPickerOption(
+            id: city,
+            label: city,
+            icon: Icons.location_city_outlined,
+          ),
+      ],
+    );
+    if (!mounted) return;
+    setState(() {
+      _cityFocused = false;
+      if (selected != null) _cityController.text = selected.id;
+    });
+  }
+
+  Future<void> _pickPreference() async {
+    setState(() => _preferenceFocused = true);
+    final selected = await showFvSearchablePicker(
+      context: context,
+      title: 'Public contact preference',
+      searchHint: 'Search',
+      selectedId: _contactPreference,
+      options: [
+        for (final pref in _preferences)
+          FvPickerOption(id: pref, label: pref, icon: Icons.contact_page_outlined),
+      ],
+    );
+    if (!mounted) return;
+    setState(() {
+      _preferenceFocused = false;
+      if (selected != null) _contactPreference = selected.id;
+    });
+  }
+
+  String? _validationError() {
     if (_nameController.text.trim().isEmpty ||
         _emailController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter your name and email to continue.')),
-      );
+      return 'Enter your name and email to continue.';
+    }
+    if (!FormValidators.isEmail(_emailController.text)) {
+      return 'Enter a valid verification email.';
+    }
+    final phoneErr = FormValidators.optionalPhone(_businessPhoneController.text);
+    if (phoneErr != null) return phoneErr;
+    final bizEmailErr = FormValidators.optionalEmail(
+      _businessEmailController.text,
+    );
+    if (bizEmailErr != null) return bizEmailErr;
+    final webErr = FormValidators.optionalWebsite(_websiteController.text);
+    if (webErr != null) return webErr;
+    final zipErr = FormValidators.optionalUsZip(_zipController.text);
+    if (zipErr != null) return zipErr;
+    return null;
+  }
+
+  Future<void> _submit() async {
+    final error = _validationError();
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
       return;
     }
     if (!widget.isClaim && Supabase.instance.client.auth.currentUser == null) {
@@ -610,6 +763,35 @@ class _VerificationFormScreenState extends State<_VerificationFormScreen> {
     setState(() => _isSubmitting = true);
     try {
       if (!widget.isClaim) {
+        final socials = <({String platform, String url})>[
+          if (_instagramController.text.trim().isNotEmpty)
+            (
+              platform: 'instagram',
+              url: FormValidators.normalizeWebsite(_instagramController.text),
+            ),
+          if (_facebookController.text.trim().isNotEmpty)
+            (
+              platform: 'facebook',
+              url: FormValidators.normalizeWebsite(_facebookController.text),
+            ),
+          if (_tiktokController.text.trim().isNotEmpty)
+            (
+              platform: 'tiktok',
+              url: FormValidators.normalizeWebsite(_tiktokController.text),
+            ),
+          if (_xController.text.trim().isNotEmpty)
+            (
+              platform: 'x',
+              url: FormValidators.normalizeWebsite(_xController.text),
+            ),
+          if (_youtubeController.text.trim().isNotEmpty)
+            (
+              platform: 'youtube',
+              url: FormValidators.normalizeWebsite(_youtubeController.text),
+            ),
+        ];
+
+        final websiteRaw = _websiteController.text.trim();
         final businessId = await BusinessSubmissionService.submitNewBusiness(
           name: widget.businessName,
           businessType: widget.businessType ?? 'Other',
@@ -617,6 +799,18 @@ class _VerificationFormScreenState extends State<_VerificationFormScreen> {
           contactEmail: _emailController.text.trim(),
           services: widget.services,
           industrySlug: widget.industrySlug,
+          businessPhone: _businessPhoneController.text.trim(),
+          businessEmail: _businessEmailController.text.trim(),
+          website: websiteRaw.isEmpty
+              ? null
+              : FormValidators.normalizeWebsite(websiteRaw),
+          addressLine1: _addressController.text.trim(),
+          addressLine2: _address2Controller.text.trim(),
+          city: _cityController.text.trim(),
+          state: _state,
+          zip: _zipController.text.trim(),
+          contactPreference: _contactPreference,
+          socialLinks: socials,
         );
         if (widget.avatarFile != null) {
           try {
@@ -700,6 +894,136 @@ class _VerificationFormScreenState extends State<_VerificationFormScreen> {
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                 ),
+                const SizedBox(height: 28),
+                Text(
+                  'CONTACT INFORMATION',
+                  style: TextStyle(
+                    color: FirstVueColors.gold,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Optional for the public profile — add what customers should use.',
+                  style: TextStyle(color: fv.tertiaryText, fontSize: 12),
+                ),
+                const SizedBox(height: 14),
+                FvCompactField(
+                  label: 'Business phone',
+                  hint: '(555) 555-5555',
+                  controller: _businessPhoneController,
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 14),
+                FvCompactField(
+                  label: 'Business email',
+                  hint: 'hello@business.com',
+                  controller: _businessEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 14),
+                FvCompactField(
+                  label: 'Website',
+                  hint: 'https://',
+                  controller: _websiteController,
+                  keyboardType: TextInputType.url,
+                ),
+                const SizedBox(height: 14),
+                FvCompactField(
+                  label: 'Address',
+                  hint: 'Street address',
+                  controller: _addressController,
+                ),
+                const SizedBox(height: 14),
+                FvCompactField(
+                  label: 'Address line 2 (optional)',
+                  hint: 'Suite, unit, floor',
+                  controller: _address2Controller,
+                ),
+                const SizedBox(height: 14),
+                FvSelectorField(
+                  label: 'State',
+                  value: _state,
+                  hint: 'Select state',
+                  icon: Icons.map_outlined,
+                  focused: _stateFocused,
+                  onTap: _pickState,
+                ),
+                const SizedBox(height: 14),
+                FvSelectorField(
+                  label: 'City',
+                  value: _cityController.text.trim().isEmpty
+                      ? null
+                      : _cityController.text.trim(),
+                  hint: _state == null ? 'Select a state first' : 'Select city',
+                  icon: Icons.location_city_outlined,
+                  focused: _cityFocused,
+                  onTap: _pickCity,
+                ),
+                const SizedBox(height: 14),
+                FvCompactField(
+                  label: 'ZIP / postal code',
+                  hint: '30301',
+                  controller: _zipController,
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 14),
+                FvSelectorField(
+                  label: 'Public contact preference (optional)',
+                  value: _contactPreference,
+                  hint: 'How should customers reach you?',
+                  icon: Icons.contact_page_outlined,
+                  focused: _preferenceFocused,
+                  onTap: _pickPreference,
+                ),
+                const SizedBox(height: 28),
+                Text(
+                  'SOCIAL LINKS (OPTIONAL)',
+                  style: TextStyle(
+                    color: FirstVueColors.gold,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                FvCompactField(
+                  label: 'Instagram',
+                  hint: 'instagram.com/…',
+                  controller: _instagramController,
+                  keyboardType: TextInputType.url,
+                ),
+                const SizedBox(height: 14),
+                FvCompactField(
+                  label: 'Facebook',
+                  hint: 'facebook.com/…',
+                  controller: _facebookController,
+                  keyboardType: TextInputType.url,
+                ),
+                const SizedBox(height: 14),
+                FvCompactField(
+                  label: 'TikTok',
+                  hint: 'tiktok.com/@…',
+                  controller: _tiktokController,
+                  keyboardType: TextInputType.url,
+                ),
+                const SizedBox(height: 14),
+                FvCompactField(
+                  label: 'X',
+                  hint: 'x.com/…',
+                  controller: _xController,
+                  keyboardType: TextInputType.url,
+                ),
+                const SizedBox(height: 14),
+                FvCompactField(
+                  label: 'YouTube',
+                  hint: 'youtube.com/…',
+                  controller: _youtubeController,
+                  keyboardType: TextInputType.url,
+                ),
+                const SizedBox(height: 16),
               ],
             ),
           ),

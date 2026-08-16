@@ -789,7 +789,21 @@ class FvSettingsRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 10),
             child: Row(
               children: [
-                Icon(icon, size: 22, color: iconColor ?? FirstVueColors.gold),
+                Container(
+                  width: 36,
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: fv.elevatedSurface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: fv.borderSubtle),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 20,
+                    color: iconColor ?? FirstVueColors.gold,
+                  ),
+                ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(

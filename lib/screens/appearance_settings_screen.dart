@@ -50,9 +50,25 @@ class AppearanceSettingsScreen extends StatelessWidget {
               const SizedBox(height: 16),
               ..._options.map((mode) {
                 final active = selected == mode;
+                final icon = switch (mode) {
+                  ThemeMode.system => Icons.brightness_auto_outlined,
+                  ThemeMode.light => Icons.light_mode_outlined,
+                  ThemeMode.dark => Icons.dark_mode_outlined,
+                };
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
                   onTap: () => appThemeController.setThemeMode(mode),
+                  leading: Container(
+                    width: 36,
+                    height: 36,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: fv.elevatedSurface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: fv.borderSubtle),
+                    ),
+                    child: Icon(icon, color: FirstVueColors.gold, size: 20),
+                  ),
                   title: Text(
                     ThemePreferenceService.label(mode),
                     style: TextStyle(
