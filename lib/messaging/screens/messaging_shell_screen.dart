@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../../navigation/firstvue_page_route.dart';
 import '../../auth/ensure_signed_in.dart';
+import '../../services/onboarding_store.dart';
 import '../../theme/firstvue_theme.dart';
+import '../../widgets/firstvue_section_tip.dart';
+import '../../widgets/tutorial_targets.dart';
 import '../models/messaging_models.dart';
 import '../routing/messaging_history.dart';
 import '../services/fv_messaging_service.dart';
@@ -98,6 +101,9 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
         _identity = selected;
         _unreads = unreads;
         _offline = false;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) maybeShowSectionTip(context, TutorialSection.messages);
       });
       await _reloadList();
       if (widget.initialConversationId != null) {
@@ -301,12 +307,15 @@ class _MessagingShellScreenState extends State<MessagingShellScreen> {
                     );
                   },
                 ),
-                FvUnderlineTabs(
-                  labels: const ['Messages', 'Events'],
-                  selectedIndex: _mode == FvMode.messages ? 0 : 1,
-                  badges: [0, _eventUnread],
-                  onSelected: (i) =>
-                      _setMode(i == 0 ? FvMode.messages : FvMode.events),
+                KeyedSubtree(
+                  key: TutorialTargets.messagesTabs,
+                  child: FvUnderlineTabs(
+                    labels: const ['Messages', 'Events'],
+                    selectedIndex: _mode == FvMode.messages ? 0 : 1,
+                    badges: [0, _eventUnread],
+                    onSelected: (i) =>
+                        _setMode(i == 0 ? FvMode.messages : FvMode.events),
+                  ),
                 ),
                 FvFilledSearch(
                   controller: _search,

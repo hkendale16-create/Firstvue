@@ -12,12 +12,15 @@ import '../screens/post_detail_screen.dart';
 import '../screens/food_trucks_discovery_screen.dart';
 import '../screens/rentals_screen.dart';
 import '../services/explore_feed_service.dart';
+import '../services/onboarding_store.dart';
 import '../services/shoutout_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../utils/new_label.dart';
 import '../utils/scroll_load_more_gate.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/firstvue_section_tip.dart';
 import '../widgets/social_chrome.dart';
+import '../widgets/tutorial_targets.dart';
 import 'discovery_feed_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -41,6 +44,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
     super.initState();
     _scrollController.addListener(_onScroll);
     _loadSection(_section);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybeShowSectionTip(context, TutorialSection.explore);
+    });
   }
 
   @override
@@ -308,9 +314,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
               filterActive: _filterBusinessType != null,
             ),
             const SizedBox(height: 20),
-            _ExploreSectionHeader(
-              selected: _section,
-              onSelected: _selectSection,
+            KeyedSubtree(
+              key: TutorialTargets.exploreSections,
+              child: _ExploreSectionHeader(
+                selected: _section,
+                onSelected: _selectSection,
+              ),
             ),
             const SizedBox(height: 16),
             if (snap.loading && snap.items.isEmpty)

@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:flutter/foundation.dart';
+
 import '../auth/auth_link_handler.dart';
 import '../auth/auth_local_state.dart';
 import '../auth/auth_redirect.dart';
+import '../auth/google_id_token_sign_in.dart';
 import '../services/username_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_emblem.dart';
@@ -456,15 +459,43 @@ class _AuthScreenState extends State<AuthScreen> {
       if (_mode == AuthSheetMode.createAccount && _acceptedLegal) {
         await AuthLocalState.markPendingLegalAcceptance();
       }
+      // Web Google: prefer GIS ID-token sign-in so a wrong Client Secret in
+      // Supabase cannot block Continue with Google (OAuth code exchange).
+      if (provider == OAuthProvider.google && kIsWeb) {
+        final signedIn = await _signInWithGoogleIdToken();
+        if (signedIn) return;
+      }
       await Supabase.instance.client.auth.signInWithOAuth(
         provider,
         redirectTo: approvedAuthCallbackUrl(),
       );
     } catch (_) {
       await AuthLocalState.clearPendingLegalAcceptance();
-      if (mounted) setState(() => _formError = kGenericAuthError);
+      if (mounted) {
+        setState(
+          () => _formError = provider == OAuthProvider.google
+              ? kOauthCallbackError
+              : kGenericAuthError,
+        );
+      }
     } finally {
       if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  /// Returns true when a session was established via Google ID token.
+  Future<bool> _signInWithGoogleIdToken() async {
+    try {
+      final result = await requestGoogleIdToken();
+      if (result == null) return false;
+      await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: result.idToken,
+        nonce: result.nonce,
+      );
+      return Supabase.instance.client.auth.currentSession != null;
+    } catch (_) {
+      return false;
     }
   }
 

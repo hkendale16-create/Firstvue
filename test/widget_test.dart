@@ -2,6 +2,7 @@ import 'package:firstvue/auth/auth_session_controller.dart';
 import 'package:firstvue/config/supabase_config.dart';
 import 'package:firstvue/main.dart';
 import 'package:firstvue/screens/auth_screen.dart';
+import 'package:firstvue/services/onboarding_store.dart';
 import 'package:firstvue/widgets/fv_gold_button.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,8 +12,9 @@ void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     SharedPreferences.setMockInitialValues({
-      'firstvue_welcome_v2_seen': true,
-      'firstvue_tutorial_v2_completed': true,
+      'firstvue_welcome_v3_seen': true,
+      'firstvue_tips_v3_opt_out': true,
+      'firstvue_tutorial_content_version': OnboardingStore.contentVersion,
     });
     await Supabase.initialize(
       url: SupabaseConfig.url,
