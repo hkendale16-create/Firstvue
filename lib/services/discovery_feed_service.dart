@@ -251,6 +251,7 @@ class DiscoveryFeedService {
                 return null;
               }
             } else {
+              // One mosaic URL is enough — avoid a second variant probe/sign.
               thumbnailUrl = await MediaVariantUploader.createDisplayUrl(
                 bucket: MediaBucket.business,
                 storagePath: storagePath,
@@ -260,16 +261,7 @@ class DiscoveryFeedService {
                 explicitThumbnailPath: thumbPathRaw,
               ).timeout(const Duration(seconds: 8), onTimeout: () => '');
               if (thumbnailUrl.isEmpty) return null;
-              // Detail/open uses full when available; mosaic uses thumb/feed.
-              mediaUrl = await MediaVariantUploader.createDisplayUrl(
-                bucket: MediaBucket.business,
-                storagePath: storagePath,
-                provider: provider,
-                context: {'business_id': businessId},
-                preferred: MediaVariant.feed,
-                explicitThumbnailPath: thumbPathRaw,
-              ).timeout(const Duration(seconds: 8), onTimeout: () => '');
-              if (mediaUrl.isEmpty) mediaUrl = thumbnailUrl;
+              mediaUrl = thumbnailUrl;
             }
             final ownerId = (business['created_by'] as String?) ?? '';
             return DiscoveryFeedItem(

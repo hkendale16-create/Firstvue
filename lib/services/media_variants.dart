@@ -31,6 +31,12 @@ class MediaVariants {
 
   static const _marker = '__v_';
 
+  /// Absolute http(s) demo/external URLs cannot have Storage sibling variants.
+  static bool isRemoteUrl(String path) {
+    final trimmed = path.trim().toLowerCase();
+    return trimmed.startsWith('https://') || trimmed.startsWith('http://');
+  }
+
   static String suffix(MediaVariant variant) => switch (variant) {
         MediaVariant.avatar64 => 'a64',
         MediaVariant.avatar128 => 'a128',
@@ -56,10 +62,13 @@ class MediaVariants {
       };
 
   /// Returns a sibling path for [variant], or [storagePath] for [MediaVariant.full].
+  ///
+  /// Remote absolute URLs are returned unchanged — inventing `__v_*` siblings
+  /// for picsum/demo links produces broken URLs that still look "signed".
   static String pathFor(String storagePath, MediaVariant variant) {
     final trimmed = storagePath.trim();
     if (trimmed.isEmpty || variant == MediaVariant.full) return trimmed;
-    if (trimmed.contains(_marker)) return trimmed;
+    if (isRemoteUrl(trimmed) || trimmed.contains(_marker)) return trimmed;
 
     final slash = trimmed.lastIndexOf('/');
     final dir = slash >= 0 ? trimmed.substring(0, slash + 1) : '';
@@ -82,6 +91,14 @@ class MediaVariants {
       final p = path?.trim() ?? '';
       if (p.isEmpty || out.contains(p)) return;
       out.add(p);
+    }
+
+    // External/demo assets: never invent Storage sibling paths.
+    if (isRemoteUrl(full)) {
+      final explicit = explicitThumbnailPath?.trim() ?? '';
+      if (explicit.isNotEmpty && isRemoteUrl(explicit)) add(explicit);
+      add(full);
+      return out;
     }
 
     add(explicitThumbnailPath);
