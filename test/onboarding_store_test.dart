@@ -91,4 +91,68 @@ void main() {
     expect(await OnboardingStore.tipsEnabled(), isTrue);
     expect(await OnboardingStore.shouldShowTip(TutorialSection.home), isTrue);
   });
+
+  test('content version bump never re-shows Welcome for an already-welcomed '
+      'user, even when the welcome storage key is renamed', () async {
+    // Simulate a returning user who finished onboarding on the previous
+    // versioned welcome key before this version's key existed.
+    SharedPreferences.setMockInitialValues({
+      'firstvue_welcome_v3_seen': true,
+      'firstvue_tips_v3_opt_out': true,
+      'firstvue_tutorial_content_version': OnboardingStore.contentVersion - 1,
+    });
+
+    expect(await OnboardingStore.shouldShowWelcome(), isFalse);
+    expect(await OnboardingStore.pendingPrompt(), TutorialPromptKind.whatsNew);
+    expect(await OnboardingStore.tipsEnabled(), isTrue);
+  });
+
+  test('does not re-show the tour on a routine app open at the same content '
+      'version (tutorial should not appear every login)', () async {
+    await OnboardingStore.markWelcomeSeen();
+    await OnboardingStore.markAllTipsSeen();
+
+    // Re-entering the app repeatedly at the same content version must not
+    // resurface welcome, what's new, or tips.
+    for (var i = 0; i < 3; i++) {
+      expect(await OnboardingStore.shouldShowWelcome(), isFalse);
+      expect(await OnboardingStore.shouldShowWhatsNew(), isFalse);
+      expect(await OnboardingStore.tipsEnabled(), isFalse);
+      expect(await OnboardingStore.pendingPrompt(), isNull);
+    }
+  });
+
+  test('new profile and theme tutorial sections behave like other sections',
+      () async {
+    expect(
+      await OnboardingStore.shouldShowTip(TutorialSection.profile),
+      isTrue,
+    );
+    expect(
+      await OnboardingStore.shouldShowTip(TutorialSection.theme),
+      isTrue,
+    );
+
+    await OnboardingStore.markTipSeen(TutorialSection.profile);
+    expect(
+      await OnboardingStore.shouldShowTip(TutorialSection.profile),
+      isFalse,
+    );
+    // Other sections remain unaffected until every section is individually
+    // marked seen.
+    expect(await OnboardingStore.shouldShowTip(TutorialSection.theme), isTrue);
+    expect(await OnboardingStore.tipsEnabled(), isTrue);
+  });
+
+  test('opt-out only triggers once every section — including profile and '
+      'theme — has been marked seen', () async {
+    for (final section in TutorialSection.values) {
+      if (section == TutorialSection.theme) continue;
+      await OnboardingStore.markTipSeen(section);
+    }
+    expect(await OnboardingStore.tipsEnabled(), isTrue);
+
+    await OnboardingStore.markTipSeen(TutorialSection.theme);
+    expect(await OnboardingStore.tipsEnabled(), isFalse);
+  });
 }

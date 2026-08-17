@@ -60,10 +60,22 @@ class BusinessSubmissionService {
     String? zip,
     String? contactPreference,
     List<({String platform, String url})> socialLinks = const [],
+    double? latitude,
+    double? longitude,
+    String? placeId,
+    String? formattedAddress,
+    String? countryCode,
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) {
       throw const AuthException('Sign in before submitting a business.');
+    }
+
+    if ((addressLine1?.trim().isEmpty ?? true) ||
+        (city?.trim().isEmpty ?? true) ||
+        (state?.trim().isEmpty ?? true) ||
+        (zip?.trim().isEmpty ?? true)) {
+      throw const AuthException('A complete business address is required.');
     }
 
     await _client.from('profiles').upsert({
@@ -129,23 +141,24 @@ class BusinessSubmissionService {
         'contact_email': contactEmail,
       });
 
-      final hasLocation =
-          (addressLine1?.trim().isNotEmpty ?? false) ||
-          (city?.trim().isNotEmpty ?? false) ||
-          (state?.trim().isNotEmpty ?? false) ||
-          (zip?.trim().isNotEmpty ?? false);
-      if (hasLocation) {
-        await _client.from('business_locations').insert({
-          'business_id': businessId,
-          'address_line_1': addressLine1?.trim() ?? '',
-          if (addressLine2 != null && addressLine2.trim().isNotEmpty)
-            'address_line_2': addressLine2.trim(),
-          'city': city?.trim() ?? '',
-          'state': state?.trim() ?? '',
-          'postal_code': zip?.trim() ?? '',
-          'country_code': 'US',
-        });
-      }
+      await _client.from('business_locations').insert({
+        'business_id': businessId,
+        'address_line_1': addressLine1?.trim() ?? '',
+        if (addressLine2 != null && addressLine2.trim().isNotEmpty)
+          'address_line_2': addressLine2.trim(),
+        'city': city?.trim() ?? '',
+        'state': state?.trim() ?? '',
+        'postal_code': zip?.trim() ?? '',
+        'country_code': (countryCode?.trim().isEmpty ?? true)
+            ? 'US'
+            : countryCode!.trim(),
+        if (formattedAddress != null && formattedAddress.trim().isNotEmpty)
+          'formatted_address': formattedAddress.trim(),
+        if (placeId != null && placeId.trim().isNotEmpty)
+          'place_id': placeId.trim(),
+        'latitude': ?latitude,
+        'longitude': ?longitude,
+      });
 
       final cleanedSocials = socialLinks
           .where((l) => l.url.trim().isNotEmpty)

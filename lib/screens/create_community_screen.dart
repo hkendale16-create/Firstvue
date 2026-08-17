@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/community_hub_service.dart';
 import '../services/community_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../utils/entity_address_requirements.dart';
 import '../widgets/create_entity_form_chrome.dart';
 import '../widgets/location_autocomplete_field.dart';
 import '../widgets/media_picker_sheet.dart';
@@ -94,6 +95,15 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       setState(() => _error = 'Group name is required.');
+      return;
+    }
+    final locationError = EntityAddressRequirements.validateCityState(
+      city: _cityController.text,
+      state: _stateController.text,
+      kind: EntityAddressKind.group,
+    );
+    if (locationError != null) {
+      setState(() => _error = locationError);
       return;
     }
 

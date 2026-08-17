@@ -21,9 +21,11 @@ import '../services/profile_cards.dart';
 import '../widgets/social_platform_icon.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/entity_details_form.dart';
+import '../widgets/entity_distance_chip.dart';
 import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/entity_profile_tab_bar.dart';
+import '../widgets/profile_section_nav.dart';
 import '../widgets/social_chrome.dart';
 import '../widgets/entity_follow_button.dart';
 import '../widgets/shoutout_card.dart';
@@ -458,56 +460,88 @@ class _BusinessProfileContentState extends State<_BusinessProfileContent> {
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         SliverToBoxAdapter(
-          child: SocialProfileHeader(
-            name: details.name,
-            handle:
-                '${socialHandleFromName(details.name)} • ${details.businessType}${details.address != null && details.address!.isNotEmpty ? ' • ${details.address}' : ''}',
-            bio:
-                details.description ??
-                (details.services.isEmpty
-                    ? null
-                    : details.services.take(4).join(', ')),
-            avatarImageUrl: _profileImages.avatar?.signedUrl,
-            coverImageUrl: _profileImages.cover?.signedUrl,
-            verified: isApproved,
-            stats: [
-              ProfileStatItem(
-                label: 'posts',
-                value: details.services.isEmpty
-                    ? '—'
-                    : '${details.services.length}',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SocialProfileHeader(
+                name: details.name,
+                handle:
+                    '${socialHandleFromName(details.name)} • ${details.businessType}${details.address != null && details.address!.isNotEmpty ? ' • ${details.address}' : ''}',
+                bio:
+                    details.description ??
+                    (details.services.isEmpty
+                        ? null
+                        : details.services.take(4).join(', ')),
+                avatarImageUrl: _profileImages.avatar?.signedUrl,
+                coverImageUrl: _profileImages.cover?.signedUrl,
+                verified: isApproved,
+                stats: [
+                  ProfileStatItem(
+                    label: 'posts',
+                    value: details.services.isEmpty
+                        ? '—'
+                        : '${details.services.length}',
+                  ),
+                  ProfileStatItem(label: 'followers', value: '$_followerCount'),
+                  ProfileStatItem(label: 'rating', value: '4.9'),
+                ],
+                actions: [
+                  if (isApproved && !isOwnerPreview) ...[
+                    EntityFollowButton(
+                      kind: FollowTargetKind.business,
+                      targetId: details.id,
+                      compact: false,
+                      onChanged: (_) => _loadFollowerCount(),
+                    ),
+                    SocialFollowButton(
+                      label: 'Message',
+                      filled: false,
+                      onPressed: _openOwnerMessage,
+                    ),
+                    SocialFollowButton(
+                      label: 'Book',
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              details.address == null ||
+                                      details.address!.isEmpty
+                                  ? 'Message ${details.name} to book.'
+                                  : 'Book at ${details.address}.',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ],
               ),
-              ProfileStatItem(label: 'followers', value: '$_followerCount'),
-              ProfileStatItem(label: 'rating', value: '4.9'),
-            ],
-            actions: [
-              if (isApproved && !isOwnerPreview) ...[
-                EntityFollowButton(
-                  kind: FollowTargetKind.business,
-                  targetId: details.id,
-                  compact: false,
-                  onChanged: (_) => _loadFollowerCount(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    EntityDistanceChip(
+                      entityId: details.id,
+                      latitude: details.latitude,
+                      longitude: details.longitude,
+                      fallbackCityState: details.cityStateLabel,
+                    ),
+                    const SizedBox(height: 10),
+                    ProfileSectionNav(
+                      sections: [
+                        for (final label in tabs)
+                          ProfileSectionItem(id: label, label: label),
+                      ],
+                      selectedId: selectedLabel,
+                      onSelected: (id) {
+                        final index = tabs.indexOf(id);
+                        if (index >= 0) setState(() => _selectedTab = index);
+                      },
+                    ),
+                  ],
                 ),
-                SocialFollowButton(
-                  label: 'Message',
-                  filled: false,
-                  onPressed: _openOwnerMessage,
-                ),
-                SocialFollowButton(
-                  label: 'Book',
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          details.address == null || details.address!.isEmpty
-                              ? 'Message ${details.name} to book.'
-                              : 'Book at ${details.address}.',
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
+              ),
             ],
           ),
         ),

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../services/onboarding_store.dart';
+import '../services/theme_preference_service.dart';
+import '../theme/app_theme_controller.dart';
+import '../theme/firstvue_theme.dart';
 import 'tutorial_targets.dart';
 
 const _kDialogBg = Color(0xFF10151B);
@@ -69,6 +72,27 @@ _TipContent _contentFor(TutorialSection section) {
             'Monetization & Plans is where growth plans, boosts, and creator '
             'earnings live.',
         target: () => TutorialTargets.settingsVerified,
+      ),
+    TutorialSection.profile => _TipContent(
+        title: 'Your profile',
+        body:
+            'Your personal profile has a photo, cover, name, @username, bio, '
+            'location, and privacy controls — plus who you follow. Running a '
+            'business, shop, or service? Add a separate business/entity '
+            'profile from Settings → Get verified — it gets its own photo, '
+            'cover, name, and location, kept apart from your personal one.',
+        target: () => null,
+      ),
+    // Shown via the interactive theme preview dialog (maybeShowThemeTip),
+    // not the spotlight overlay — this entry only keeps the switch exhaustive
+    // for any generic caller.
+    TutorialSection.theme => _TipContent(
+        title: 'Appearance',
+        body:
+            'Choose Light, Dark, or System Default in Settings → Appearance. '
+            'Your choice applies across FirstVue immediately and is saved to '
+            'this device.',
+        target: () => null,
       ),
   };
 }
@@ -317,4 +341,280 @@ class _SpotlightPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _SpotlightPainter oldDelegate) =>
       oldDelegate.hole != hole;
+}
+
+// ─── Appearance / theme tip ──────────────────────────────────────────────────
+
+/// Shows the one-time Appearance tip with tappable Light/Dark/System previews
+/// (real FirstVue colors) the first time a signed-in user opens Appearance
+/// settings. Picking a preview saves it via [ThemePreferenceService]
+/// immediately, the same as the Appearance settings screen itself.
+Future<void> maybeShowThemeTip(BuildContext context) async {
+  if (_tipShowing) return;
+  if (!await OnboardingStore.shouldShowTip(TutorialSection.theme)) return;
+  if (!context.mounted) return;
+
+  await Future<void>.delayed(const Duration(milliseconds: 200));
+  if (!context.mounted) return;
+  if (!await OnboardingStore.shouldShowTip(TutorialSection.theme)) return;
+  if (_tipShowing || !context.mounted) return;
+
+  _tipShowing = true;
+  try {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => const _ThemeTipDialog(),
+    );
+    await OnboardingStore.markTipSeen(TutorialSection.theme);
+  } finally {
+    _tipShowing = false;
+  }
+}
+
+class _ThemeTipDialog extends StatelessWidget {
+  const _ThemeTipDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: _kDialogBg,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Pick your look',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'CormorantGaramond',
+                  color: _kGold,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Tap a preview to switch instantly. Your choice is saved to '
+                'this device and applies everywhere in FirstVue.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, height: 1.4, fontSize: 13),
+              ),
+              const SizedBox(height: 18),
+              ListenableBuilder(
+                listenable: appThemeController,
+                builder: (context, _) {
+                  final selected = appThemeController.themeMode;
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: _ThemePreviewCard(
+                          mode: ThemeMode.light,
+                          selected: selected == ThemeMode.light,
+                          onTap: () =>
+                              appThemeController.setThemeMode(ThemeMode.light),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _ThemePreviewCard(
+                          mode: ThemeMode.dark,
+                          selected: selected == ThemeMode.dark,
+                          onTap: () =>
+                              appThemeController.setThemeMode(ThemeMode.dark),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _ThemePreviewCard(
+                          mode: ThemeMode.system,
+                          selected: selected == ThemeMode.system,
+                          onTap: () => appThemeController.setThemeMode(
+                            ThemeMode.system,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _kGold,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                  ),
+                  child: const Text('Got it'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Miniature mock UI using real FirstVue light/dark palette colors — not
+/// generic placeholder swatches — so the preview matches what users get.
+class _ThemePreviewCard extends StatelessWidget {
+  final ThemeMode mode;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ThemePreviewCard({
+    required this.mode,
+    required this.selected,
+    required this.onTap,
+  });
+
+  FirstVuePalette get _palette => switch (mode) {
+        ThemeMode.dark => FirstVuePalette.dark,
+        ThemeMode.light => FirstVuePalette.light,
+        // System preview splits the card between both palettes below.
+        ThemeMode.system => FirstVuePalette.light,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = _palette;
+    final borderColor = selected ? _kTeal : Colors.white24;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          AspectRatio(
+            aspectRatio: 0.82,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: borderColor, width: selected ? 2 : 1),
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                          color: _kTeal.withValues(alpha: 0.35),
+                          blurRadius: 10,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(13),
+                child: mode == ThemeMode.system
+                    ? Row(
+                        children: [
+                          Expanded(
+                            child: _ThemeMockup(
+                              palette: FirstVuePalette.light,
+                            ),
+                          ),
+                          Expanded(
+                            child: _ThemeMockup(palette: FirstVuePalette.dark),
+                          ),
+                        ],
+                      )
+                    : _ThemeMockup(palette: palette),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (selected)
+                const Padding(
+                  padding: EdgeInsets.only(right: 4),
+                  child: Icon(Icons.check_circle, color: _kTeal, size: 14),
+                ),
+              Text(
+                ThemePreferenceService.label(mode),
+                style: TextStyle(
+                  color: selected ? _kTeal : Colors.white70,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Tiny mock screen: nav bar strip, gold "avatar" dot, and two content
+/// lines — enough to show background/surface/text/accent relationships.
+class _ThemeMockup extends StatelessWidget {
+  final FirstVuePalette palette;
+
+  const _ThemeMockup({required this.palette});
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: palette.background,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: const BoxDecoration(
+                    color: FirstVueColors.gold,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Container(height: 4, color: palette.primaryText),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              height: 20,
+              decoration: BoxDecoration(
+                color: palette.surface,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: palette.borderSubtle),
+              ),
+            ),
+            const SizedBox(height: 5),
+            Container(
+              width: 28,
+              height: 4,
+              color: palette.secondaryText,
+            ),
+            const Spacer(),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Container(
+                width: 20,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: FirstVueColors.teal,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

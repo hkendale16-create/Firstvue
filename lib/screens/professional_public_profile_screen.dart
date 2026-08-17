@@ -7,11 +7,13 @@ import '../services/portfolio_album_service.dart';
 import '../services/professional_media_service.dart';
 import '../services/professional_profiles_service.dart';
 import '../services/professional_showcase_service.dart';
+import '../widgets/entity_distance_chip.dart';
 import '../widgets/facebook_style_profile_header.dart';
 import '../widgets/social_chrome.dart';
 import '../widgets/entity_follow_button.dart';
 import '../widgets/entity_profile_feed_section.dart';
 import '../widgets/portfolio_albums_section.dart';
+import '../widgets/profile_section_nav.dart';
 import '../widgets/signed_media_viewer.dart';
 import '../widgets/shoutout_card.dart';
 import '../widgets/network_photo.dart';
@@ -36,6 +38,15 @@ class ProfessionalPublicProfileScreen extends StatefulWidget {
 class _ProfessionalPublicProfileScreenState
     extends State<ProfessionalPublicProfileScreen> {
   ProfessionalImageSet _profileImages = const ProfessionalImageSet();
+  String _selectedSection = 'overview';
+
+  static const _sections = [
+    ProfileSectionItem(id: 'overview', label: 'Overview'),
+    ProfileSectionItem(id: 'feed', label: 'Posts'),
+    ProfileSectionItem(id: 'portfolio', label: 'Portfolio'),
+    ProfileSectionItem(id: 'services', label: 'Services'),
+    ProfileSectionItem(id: 'shoutouts', label: 'Shout-Outs'),
+  ];
 
   @override
   void initState() {
@@ -69,60 +80,95 @@ class _ProfessionalPublicProfileScreenState
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(
-            child: SocialProfileHeader(
-              name: profile.displayName,
-              handle:
-                  '${socialHandleFromName(profile.displayName)} • ${profile.type.label}${location.isNotEmpty ? ' • $location' : ''}',
-              bio: profile.bio.isEmpty ? null : profile.bio,
-              avatarImageUrl: _profileImages.avatar?.signedUrl,
-              coverImageUrl: _profileImages.cover?.signedUrl,
-              avatarIcon: widget.icon,
-              verified: profile.status == 'approved',
-              stats: [
-                ProfileStatItem(
-                  label: 'services',
-                  value: '${profile.services.length}',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SocialProfileHeader(
+                  name: profile.displayName,
+                  handle:
+                      '${socialHandleFromName(profile.displayName)} • ${profile.type.label}${location.isNotEmpty ? ' • $location' : ''}',
+                  bio: profile.bio.isEmpty ? null : profile.bio,
+                  avatarImageUrl: _profileImages.avatar?.signedUrl,
+                  coverImageUrl: _profileImages.cover?.signedUrl,
+                  avatarIcon: widget.icon,
+                  verified: profile.status == 'approved',
+                  stats: [
+                    ProfileStatItem(
+                      label: 'services',
+                      value: '${profile.services.length}',
+                    ),
+                    const ProfileStatItem(label: 'followers', value: '—'),
+                    ProfileStatItem(
+                      label: 'clients',
+                      value: profile.acceptsNewClients ? 'Open' : 'Waitlist',
+                    ),
+                  ],
+                  actions: [
+                    EntityFollowButton(
+                      kind: FollowTargetKind.profile,
+                      targetId: profile.profileId,
+                      compact: false,
+                    ),
+                    SocialFollowButton(
+                      label: 'Message',
+                      filled: false,
+                      onPressed: () {
+                        openMemberProfile(
+                          context,
+                          profileId: profile.profileId,
+                          displayName: profile.displayName,
+                        );
+                      },
+                    ),
+                    SocialFollowButton(
+                      label: 'Book',
+                      onPressed: () async {
+                        final url = profile.bookingUrl.trim();
+                        if (url.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'No booking link yet. Message to book.',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+                        final uri = Uri.tryParse(
+                          url.startsWith('http') ? url : 'https://$url',
+                        );
+                        if (uri == null) return;
+                        await launchUrl(
+                          uri,
+                          mode: LaunchMode.externalApplication,
+                        );
+                      },
+                    ),
+                  ],
                 ),
-                const ProfileStatItem(label: 'followers', value: '—'),
-                ProfileStatItem(
-                  label: 'clients',
-                  value: profile.acceptsNewClients ? 'Open' : 'Waitlist',
-                ),
-              ],
-              actions: [
-                EntityFollowButton(
-                  kind: FollowTargetKind.profile,
-                  targetId: profile.profileId,
-                  compact: false,
-                ),
-                SocialFollowButton(
-                  label: 'Message',
-                  filled: false,
-                  onPressed: () {
-                    openMemberProfile(
-                      context,
-                      profileId: profile.profileId,
-                      displayName: profile.displayName,
-                    );
-                  },
-                ),
-                SocialFollowButton(
-                  label: 'Book',
-                  onPressed: () async {
-                    final url = profile.bookingUrl.trim();
-                    if (url.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('No booking link yet. Message to book.'),
-                        ),
-                      );
-                      return;
-                    }
-                    final uri = Uri.tryParse(url);
-                    if (uri != null) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    }
-                  },
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      EntityDistanceChip(
+                        entityId: profile.id,
+                        latitude: profile.latitude,
+                        longitude: profile.longitude,
+                        fallbackCityState: [
+                          profile.city,
+                          profile.state,
+                        ].where((p) => p.trim().isNotEmpty).join(', '),
+                      ),
+                      const SizedBox(height: 10),
+                      ProfileSectionNav(
+                        sections: _sections,
+                        selectedId: _selectedSection,
+                        onSelected: (id) =>
+                            setState(() => _selectedSection = id),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

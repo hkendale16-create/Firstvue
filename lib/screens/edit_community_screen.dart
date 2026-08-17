@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/community_service.dart';
 import '../services/entity_deletion_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../utils/entity_address_requirements.dart';
 import '../widgets/location_autocomplete_field.dart';
 import '../widgets/media_picker_sheet.dart';
 import '../widgets/network_photo.dart';
@@ -84,6 +85,15 @@ class _EditCommunityScreenState extends State<EditCommunityScreen> {
   }
 
   Future<void> _save() async {
+    final locationError = EntityAddressRequirements.validateCityState(
+      city: _cityController.text,
+      state: _stateController.text,
+      kind: EntityAddressKind.group,
+    );
+    if (locationError != null) {
+      setState(() => _error = locationError);
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;

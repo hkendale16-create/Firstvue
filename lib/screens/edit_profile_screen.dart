@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../navigation/firstvue_page_route.dart';
+import '../services/onboarding_store.dart';
 import '../services/user_profile_service.dart';
 import '../services/username_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
+import '../widgets/firstvue_section_tip.dart';
 import '../widgets/location_autocomplete_field.dart';
 import '../widgets/username_handle_field.dart';
 import '../widgets/profile_affiliations_section.dart';
@@ -50,6 +52,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void initState() {
     super.initState();
     _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybeShowSectionTip(context, TutorialSection.profile);
+    });
   }
 
   @override

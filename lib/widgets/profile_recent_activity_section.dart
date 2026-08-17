@@ -35,12 +35,23 @@ class ProfileRecentActivitySection extends StatefulWidget {
 
 class _ProfileRecentActivitySectionState
     extends State<ProfileRecentActivitySection> {
-  late Future<List<ProfileActivityItem>> _activityFuture;
+  static const _pageSize = 20;
+
+  List<ProfileActivityItem> _items = const [];
+  bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  ProfileActivityFilter _filter = ProfileActivityFilter.all;
+
+  /// Saves/shares filtering only makes sense for a viewer's own activity —
+  /// entity (business/professional/event) activity has no likes/saves/shares
+  /// concept and keeps its existing unfiltered behavior.
+  bool get _filterable => widget.scope == ProfileActivityScope.user;
 
   @override
   void initState() {
     super.initState();
-    _activityFuture = _loadActivity();
+    _load();
   }
 
   @override
@@ -51,34 +62,90 @@ class _ProfileRecentActivitySectionState
         oldWidget.professionalProfileId != widget.professionalProfileId ||
         oldWidget.eventId != widget.eventId ||
         oldWidget.scope != widget.scope) {
-      _activityFuture = _loadActivity();
+      _load();
     }
   }
 
-  Future<List<ProfileActivityItem>> _loadActivity() {
+  Future<List<ProfileActivityItem>> _fetchPage(int offset) {
     return switch (widget.scope) {
       ProfileActivityScope.business => widget.businessId == null
           ? Future.value(const [])
-          : ProfileActivityService.fetchBusinessActivity(widget.businessId!),
+          : ProfileActivityService.fetchBusinessActivity(
+              widget.businessId!,
+              limit: _pageSize,
+              offset: offset,
+            ),
       ProfileActivityScope.professional =>
         widget.professionalProfileId == null
             ? Future.value(const [])
             : ProfileActivityService.fetchProfessionalActivity(
                 widget.professionalProfileId!,
+                limit: _pageSize,
+                offset: offset,
               ),
       ProfileActivityScope.event => widget.eventId == null
           ? Future.value(const [])
-          : ProfileActivityService.fetchEventActivity(widget.eventId!),
-      ProfileActivityScope.user => ProfileActivityService.fetchUserActivity(),
+          : ProfileActivityService.fetchEventActivity(
+              widget.eventId!,
+              limit: _pageSize,
+              offset: offset,
+            ),
+      ProfileActivityScope.user => ProfileActivityService.fetchUserActivity(
+          limit: _pageSize,
+          offset: offset,
+          filter: _filter,
+        ),
     };
   }
 
-  Future<void> _refresh() async {
-    setState(() => _activityFuture = _loadActivity());
-    await _activityFuture;
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _items = const [];
+      _hasMore = true;
+    });
+    final page = await _fetchPage(0);
+    if (!mounted) return;
+    setState(() {
+      _items = page;
+      _hasMore = page.length >= _pageSize;
+      _loading = false;
+    });
+  }
+
+  Future<void> _refresh() => _load();
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore || _loading) return;
+    setState(() => _loadingMore = true);
+    final more = await _fetchPage(_items.length);
+    if (!mounted) return;
+    setState(() {
+      _items = [..._items, ...more];
+      _hasMore = more.length >= _pageSize;
+      _loadingMore = false;
+    });
+  }
+
+  void _setFilter(ProfileActivityFilter filter) {
+    if (filter == _filter) return;
+    setState(() => _filter = filter);
+    _load();
   }
 
   String get _emptyMessage {
+    if (_filterable) {
+      switch (_filter) {
+        case ProfileActivityFilter.likes:
+          return 'No likes yet. Spark a post to see it here.';
+        case ProfileActivityFilter.saves:
+          return 'No saved items yet. Save a post to find it here later.';
+        case ProfileActivityFilter.shares:
+          return 'No shares yet. Share a post to see it here.';
+        case ProfileActivityFilter.all:
+          break;
+      }
+    }
     return switch (widget.scope) {
       ProfileActivityScope.business =>
         'No recent updates yet. Post news, add photos, or get reviews — they show here.',
@@ -131,107 +198,132 @@ class _ProfileRecentActivitySectionState
                 ],
               ),
             ),
-          FutureBuilder<List<ProfileActivityItem>>(
-            future: _activityFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return _ActivityContainer(
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 28),
-                    child: Center(
-                      child: SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Color(0xFFD8B56A),
-                        ),
-                      ),
+          if (_filterable)
+            Padding(
+              padding: EdgeInsets.only(bottom: 10, left: embedded ? 0 : 4),
+              child: _ActivityFilterBar(
+                selected: _filter,
+                onSelected: _setFilter,
+              ),
+            ),
+          if (_loading)
+            _ActivityContainer(
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 28),
+                child: Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFFD8B56A),
                     ),
                   ),
-                );
-              }
-
-              final items = snapshot.data ?? const [];
-              if (items.isEmpty) {
-                return embedded
-                    ? Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 36),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.history,
-                              color: Colors.white.withValues(alpha: .25),
-                              size: 40,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
+                ),
+              ),
+            )
+          else if (_items.isEmpty)
+            embedded
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 36),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.history,
+                          color: Colors.white.withValues(alpha: .25),
+                          size: 40,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _emptyMessage,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            height: 1.45,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : _ActivityContainer(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 22,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.history,
+                            color: Colors.white.withValues(alpha: .35),
+                            size: 28,
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Text(
                               _emptyMessage,
-                              textAlign: TextAlign.center,
                               style: const TextStyle(
                                 color: Colors.white54,
-                                height: 1.45,
+                                height: 1.4,
                                 fontSize: 13,
                               ),
                             ),
-                          ],
-                        ),
-                      )
-                    : _ActivityContainer(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 22,
                           ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.history,
-                                color: Colors.white.withValues(alpha: .35),
-                                size: 28,
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Text(
-                                  _emptyMessage,
-                                  style: const TextStyle(
-                                    color: Colors.white54,
-                                    height: 1.4,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-              }
-
-              final listChildren = [
-                for (var i = 0; i < items.length; i++) ...[
-                  _ActivityTile(
-                    item: items[i],
-                    onTap: () => _handleActivityTap(context, items[i]),
-                    onLinkTap: items[i].linkUrl == null
-                        ? null
-                        : () => _openLink(context, items[i].linkUrl!),
-                  ),
-                  if (i < items.length - 1)
-                    Divider(
-                      height: 1,
-                      indent: embedded ? 0 : 56,
-                      color: Colors.white.withValues(alpha: .08),
+                        ],
+                      ),
                     ),
-                ],
-              ];
+                  )
+          else
+            Builder(
+              builder: (context) {
+                final listChildren = [
+                  for (var i = 0; i < _items.length; i++) ...[
+                    _ActivityTile(
+                      item: _items[i],
+                      onTap: () => _handleActivityTap(context, _items[i]),
+                      onLinkTap: _items[i].linkUrl == null
+                          ? null
+                          : () => _openLink(context, _items[i].linkUrl!),
+                    ),
+                    if (i < _items.length - 1)
+                      Divider(
+                        height: 1,
+                        indent: embedded ? 0 : 56,
+                        color: Colors.white.withValues(alpha: .08),
+                      ),
+                  ],
+                ];
 
-              if (embedded) {
-                return Column(children: listChildren);
-              }
+                final list = embedded
+                    ? Column(children: listChildren)
+                    : _ActivityContainer(child: Column(children: listChildren));
 
-              return _ActivityContainer(child: Column(children: listChildren));
-            },
-          ),
+                if (!_hasMore) return list;
+
+                return Column(
+                  children: [
+                    list,
+                    const SizedBox(height: 10),
+                    Center(
+                      child: _loadingMore
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFFD8B56A),
+                              ),
+                            )
+                          : TextButton(
+                              onPressed: _loadMore,
+                              child: const Text('Load more'),
+                            ),
+                    ),
+                  ],
+                );
+              },
+            ),
         ],
       ),
     );
@@ -283,6 +375,11 @@ class _ProfileRecentActivitySectionState
       case ProfileActivityType.reviewWritten:
       case ProfileActivityType.reviewReceived:
         _showReviewDialog(context, item);
+      case ProfileActivityType.savedItem:
+      case ProfileActivityType.sharedPost:
+        final postId = item.referenceId;
+        if (postId == null || postId.isEmpty) return;
+        CommunityNewsPostDetailSheet.show(context, postId: postId);
     }
   }
 
@@ -451,6 +548,52 @@ class _ActivityTile extends StatelessWidget {
       ProfileActivityType.sparkReceived => Icons.bolt_rounded,
       ProfileActivityType.reviewWritten => Icons.rate_review_outlined,
       ProfileActivityType.reviewReceived => Icons.star_outline,
+      ProfileActivityType.savedItem => Icons.bookmark_outline,
+      ProfileActivityType.sharedPost => Icons.repeat_outlined,
     };
+  }
+}
+
+/// All | Likes | Saves | Shares filter for a viewer's own Recent Activity.
+class _ActivityFilterBar extends StatelessWidget {
+  final ProfileActivityFilter selected;
+  final ValueChanged<ProfileActivityFilter> onSelected;
+
+  const _ActivityFilterBar({required this.selected, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (final filter in ProfileActivityFilter.values)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(filter.label),
+                selected: selected == filter,
+                onSelected: (_) => onSelected(filter),
+                labelStyle: TextStyle(
+                  color: selected == filter
+                      ? Colors.black
+                      : Colors.white.withValues(alpha: .8),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12.5,
+                ),
+                selectedColor: FirstVueColors.gold,
+                backgroundColor: Colors.white.withValues(alpha: .06),
+                side: BorderSide(
+                  color: selected == filter
+                      ? FirstVueColors.gold
+                      : Colors.white.withValues(alpha: .14),
+                ),
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }

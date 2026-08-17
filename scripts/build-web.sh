@@ -25,6 +25,9 @@ if [ -n "${URL:-}" ]; then
 elif [ -n "${DEPLOY_PRIME_URL:-}" ]; then
   DART_DEFINE="$DART_DEFINE --dart-define=FIRSTVUE_WEB_URL=${DEPLOY_PRIME_URL}"
 fi
+if [ -n "${FIRSTVUE_GOOGLE_PLACES_API_KEY:-}" ]; then
+  DART_DEFINE="$DART_DEFINE --dart-define=FIRSTVUE_GOOGLE_PLACES_API_KEY=${FIRSTVUE_GOOGLE_PLACES_API_KEY}"
+fi
 
 # shellcheck disable=SC2086
 # Local CanvasKit so the app still boots if the gstatic CDN is blocked by CSP.

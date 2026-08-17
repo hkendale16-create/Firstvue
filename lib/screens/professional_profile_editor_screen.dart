@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import '../navigation/firstvue_page_route.dart';
+import '../widgets/confirm_delete_entity_dialog.dart';
 import '../widgets/editable_media_grid.dart';
 import '../widgets/entity_details_form.dart';
 import '../widgets/entity_profile_media_editor.dart';
 import '../widgets/media_picker_sheet.dart';
 
+import '../services/entity_deletion_service.dart';
 import '../services/entity_details_service.dart';
 import '../services/professional_media_service.dart';
 import '../services/professional_profiles_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../utils/entity_address_requirements.dart';
+import '../widgets/smart_address_field.dart';
 import 'professional_showcase_editor_screen.dart';
 
 class ProfessionalProfileEditorScreen extends StatefulWidget {
@@ -24,6 +28,7 @@ class _ProfessionalProfileEditorScreenState
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _bioController = TextEditingController();
+  final _streetController = TextEditingController();
   final _cityController = TextEditingController();
   final _stateController = TextEditingController();
   final _postalCodeController = TextEditingController();
@@ -41,6 +46,9 @@ class _ProfessionalProfileEditorScreenState
   ProfessionalImageSet _profileImages = const ProfessionalImageSet();
   Future<List<ProfessionalMediaItem>> _media = Future.value(const []);
   Map<String, dynamic> _entityDetails = {};
+  double? _latitude;
+  double? _longitude;
+  String? _placeId;
 
   @override
   void initState() {
@@ -56,6 +64,7 @@ class _ProfessionalProfileEditorScreenState
       if (profile != null) {
         _nameController.text = profile.displayName;
         _bioController.text = profile.bio;
+        _streetController.text = profile.addressLine1 ?? '';
         _cityController.text = profile.city;
         _stateController.text = profile.state;
         _postalCodeController.text = profile.postalCode;
@@ -64,6 +73,9 @@ class _ProfessionalProfileEditorScreenState
         _bookingUrlController.text = profile.bookingUrl;
         _acceptsNewClients = profile.acceptsNewClients;
         _type = profile.type;
+        _latitude = profile.latitude;
+        _longitude = profile.longitude;
+        _placeId = profile.placeId;
         _media = ProfessionalMediaService.fetchMedia(profile.id);
         _profileImages =
             await ProfessionalMediaService.fetchProfileImages(profile.id);
@@ -82,8 +94,35 @@ class _ProfessionalProfileEditorScreenState
     }
   }
 
+  void _onAddressSelected(AddressResult result) {
+    setState(() {
+      _latitude = result.lat;
+      _longitude = result.lng;
+      _placeId = result.placeId;
+      if (result.city.isNotEmpty) _cityController.text = result.city;
+      if (result.state.isNotEmpty) _stateController.text = result.state;
+      if (result.zip.isNotEmpty) _postalCodeController.text = result.zip;
+    });
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate() || _saving) return;
+    final addressError = EntityAddressRequirements.validate(
+      AddressResult(
+        street: _streetController.text.trim(),
+        city: _cityController.text.trim(),
+        state: _stateController.text.trim(),
+        zip: _postalCodeController.text.trim(),
+        lat: _latitude,
+        lng: _longitude,
+        placeId: _placeId,
+      ),
+      kind: EntityAddressKind.professional,
+    );
+    if (addressError != null) {
+      _showMessage(addressError);
+      return;
+    }
     final services = _servicesController.text
         .split(',')
         .map((service) => service.trim())
@@ -104,6 +143,10 @@ class _ProfessionalProfileEditorScreenState
         acceptsNewClients: _acceptsNewClients,
         availabilityNote: _availabilityController.text.trim(),
         bookingUrl: _bookingUrlController.text.trim(),
+        addressLine1: _streetController.text.trim(),
+        latitude: _latitude,
+        longitude: _longitude,
+        placeId: _placeId,
       );
       final saved = await ProfessionalProfilesService.fetchMine();
       if (saved != null) {
@@ -244,10 +287,39 @@ class _ProfessionalProfileEditorScreenState
     await _deletePhoto(media);
   }
 
+  Future<void> _confirmDelete() async {
+    final profile = _existing;
+    if (profile == null || _saving) return;
+
+    final confirmed = await confirmDeleteEntity(
+      context,
+      entityLabel: 'professional profile',
+      detail:
+          'This permanently deletes ${profile.displayName}, its portfolio '
+          'media, social links, and catalog. Your personal FirstVue account '
+          'is not affected.',
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() => _saving = true);
+    try {
+      await EntityDeletionService.deleteOwnedProfessional(profile.id);
+      if (!mounted) return;
+      _showMessage('${profile.displayName} was permanently deleted.');
+      Navigator.of(context).maybePop();
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage(error.toString());
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
     _bioController.dispose();
+    _streetController.dispose();
     _cityController.dispose();
     _stateController.dispose();
     _postalCodeController.dispose();
@@ -436,41 +508,14 @@ class _ProfessionalProfileEditorScreenState
                     ),
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _cityController,
-                    decoration: const InputDecoration(labelText: 'City'),
-                    validator: (value) => (value?.trim().isEmpty ?? true)
-                        ? 'Enter your city.'
-                        : null,
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _stateController,
-                          textCapitalization: TextCapitalization.characters,
-                          maxLength: 2,
-                          decoration: const InputDecoration(
-                            labelText: 'State',
-                            counterText: '',
-                          ),
-                          validator: (value) => value?.trim().length != 2
-                              ? 'Use 2 letters.'
-                              : null,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _postalCodeController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'ZIP code',
-                          ),
-                        ),
-                      ),
-                    ],
+                  SmartAddressField(
+                    streetController: _streetController,
+                    cityController: _cityController,
+                    stateController: _stateController,
+                    zipController: _postalCodeController,
+                    showUnitField: false,
+                    streetLabel: 'Street address (optional)',
+                    onSelected: _onAddressSelected,
                   ),
                   const SizedBox(height: 24),
                   const Text(
@@ -632,6 +677,20 @@ class _ProfessionalProfileEditorScreenState
                       height: 1.4,
                     ),
                   ),
+                  if (_existing != null) ...[
+                    const SizedBox(height: 28),
+                    const Divider(),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _saving ? null : _confirmDelete,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFB33A3A),
+                        side: const BorderSide(color: Color(0xFFB33A3A)),
+                      ),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('DELETE THIS PROFESSIONAL PROFILE'),
+                    ),
+                  ],
                 ],
               ),
             ),
