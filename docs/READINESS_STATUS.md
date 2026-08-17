@@ -62,8 +62,8 @@ Not **READY FOR PRODUCTION** until closed-test gate (12×14 days on personal acc
 | Android API 36 | **PASS** |
 | applicationId `app.firstvue.mobile` | **PASS** |
 | Console setup guide | **PASS** (`docs/GOOGLE_CONSOLE_SETUP.md`) |
-| Release signing | **FAIL** until keystore |
-| AAB generated | **FAIL** here (no Android SDK in cloud agent); build locally |
+| Release signing / signed AAB | **PASS** — `FirstVue-1.0.1+2-release.aab` built (agent artifacts) |
+| Upload key fingerprints | **PASS** (`docs/ANDROID_UPLOAD_KEY_FINGERPRINTS.md`) |
 | Privacy policy page in repo | **PASS** (`web/privacy.html`) |
 | Privacy URL live on domain | **FAIL** until you deploy domain |
 | Data Safety worksheet | **PASS** (`docs/DATA_SAFETY.md`) |
@@ -72,12 +72,12 @@ Not **READY FOR PRODUCTION** until closed-test gate (12×14 days on personal acc
 | Account deletion | **PASS** |
 | Payments disabled | **PASS** |
 | Google Client Secret in Supabase | **CHECK** (paste current secret from Cloud Console) |
-| Closed testing ready | **FAIL** until AAB + assets + testers |
+| Internal testing upload | **READY** — upload AAB in Play Console |
+| Closed testing ready | **FAIL** until testers + listing assets |
 
 ### Exact next step
-1. Follow `docs/GOOGLE_CONSOLE_SETUP.md` Part A (create Play app) + Part B1 (sync Google Client Secret → Supabase).  
-2. Deploy/publish web so `https://firstvue.app/privacy.html` loads.  
-3. Create upload keystore + `android/key.properties`; run `scripts/print_android_signing_fingerprints.sh`.  
-4. Replace launcher icon art.  
-5. `flutter build appbundle --release`  
-6. Upload to Play **Internal testing**, then promote to **Closed testing**.  
+1. Download agent artifacts `firstvue-play/` (AAB parts + keystore) and reassemble per `UPLOAD_TO_PLAY.md`.
+2. Create Play app → Internal testing → upload AAB.
+3. Add Android OAuth client with SHA-1 from `docs/ANDROID_UPLOAD_KEY_FINGERPRINTS.md`.
+4. Sync Google Client Secret → Supabase.
+5. Deploy `https://firstvue.app/.well-known/assetlinks.json` + privacy page.
