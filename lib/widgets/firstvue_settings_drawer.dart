@@ -34,6 +34,7 @@ import '../theme/firstvue_theme.dart';
 import 'early_access_badge.dart';
 import 'firstvue_onboarding.dart';
 import 'firstvue_section_tip.dart';
+import 'invite_friends_sheet.dart';
 import 'tutorial_targets.dart';
 import '../services/onboarding_store.dart';
 
@@ -204,6 +205,14 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                     onTap: user == null
                         ? _handleAccount
                         : () => _open(const EventPlannerScreen()),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.person_add_alt_1_outlined,
+                    title: 'Invite friends',
+                    subtitle: 'Share FirstVue with people you know',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => InviteFriendsSheet.show(context),
                   ),
                   _SettingsTile(
                     icon: Icons.chat_bubble_outline,

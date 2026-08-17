@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import '../theme/firstvue_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-
 import '../auth/ensure_signed_in.dart';
+import '../models/growth_prompt.dart';
+import '../services/growth_prompt_catalog.dart';
+import '../services/growth_prompt_service.dart';
+import '../services/product_analytics_service.dart';
 import '../services/profile_media_service.dart';
 import 'editable_media_grid.dart';
+import 'growth_prompt.dart';
 import 'media_caption_editor.dart';
 import 'media_picker_sheet.dart';
 
@@ -67,6 +71,13 @@ class _ProfileMediaSectionState extends State<ProfileMediaSection> {
       await ProfileMediaService.uploadMedia(
         captioned.map((e) => e.file).toList(),
         captions: captioned.map((e) => e.caption).toList(),
+      );
+      await GrowthPromptService.markCompleted(
+        GrowthCompletedAction.uploadMedia,
+      );
+      await ProductAnalyticsService.recordEvent(
+        'media_uploaded',
+        screen: 'profile',
       );
       await _refresh();
       if (mounted) {
@@ -245,14 +256,10 @@ class _ProfileMediaSectionState extends State<ProfileMediaSection> {
                               size: 40,
                             ),
                             const SizedBox(height: 12),
-                            const Text(
-                              'Your photo grid is empty. Add shots from cuts, events, or behind the scenes.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.white54,
-                                height: 1.45,
-                                fontSize: 13,
-                              ),
+                            GrowthPrompt(
+                              spec: GrowthPromptCatalog.emptyProfilePhotos(),
+                              variant: GrowthPromptVariant.empty,
+                              onAction: _addMedia,
                             ),
                           ],
                         ),

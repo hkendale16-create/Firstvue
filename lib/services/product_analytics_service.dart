@@ -36,6 +36,14 @@ class ProductAnalyticsService {
     'early_access_prompt_shown',
     'early_access_prompt_dismissed',
     'pmf_survey_answered',
+    'growth_prompt_seen',
+    'growth_prompt_clicked',
+    'post_started',
+    'post_completed',
+    'media_uploaded',
+    'event_explored',
+    'invite_started',
+    'invite_shared',
   };
 
   static const _sensitiveKeys = <String>{

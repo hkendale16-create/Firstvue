@@ -31,6 +31,27 @@ class AppConfig {
     return '$webBaseUrl/?event=$eventId';
   }
 
+  static String inviteShareUrl(String code) {
+    return '$webBaseUrl/invite/${code.trim()}';
+  }
+
+  static String? initialInviteCodeFromUri() {
+    if (!kIsWeb) return null;
+    return inviteCodeFromUri(Uri.base);
+  }
+
+  static String? inviteCodeFromUri(Uri? uri) {
+    if (uri == null) return null;
+    final query = uri.queryParameters['invite']?.trim();
+    if (query != null && query.isNotEmpty) return query;
+    final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+    if (segments.length >= 2 && segments.first.toLowerCase() == 'invite') {
+      final code = segments[1].trim();
+      if (code.isNotEmpty) return code;
+    }
+    return null;
+  }
+
   static String? initialBusinessIdFromUri() {
     if (!kIsWeb) return null;
     final id = Uri.base.queryParameters['business'];

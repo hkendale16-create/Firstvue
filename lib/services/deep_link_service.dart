@@ -55,6 +55,23 @@ class DeepLinkService {
       return DeepLinkTarget(type: 'post', id: postId);
     }
 
+    final invite = inviteCodeFromUri(uri);
+    if (invite != null) {
+      return DeepLinkTarget(type: 'invite', id: invite);
+    }
+
+    return null;
+  }
+
+  static String? inviteCodeFromUri(Uri? uri) {
+    if (uri == null) return null;
+    final query = uri.queryParameters['invite']?.trim();
+    if (query != null && query.isNotEmpty) return query;
+    final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+    if (segments.length >= 2 && segments.first.toLowerCase() == 'invite') {
+      final code = segments[1].trim();
+      if (code.isNotEmpty) return code;
+    }
     return null;
   }
 

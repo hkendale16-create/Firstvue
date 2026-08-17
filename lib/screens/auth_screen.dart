@@ -11,6 +11,7 @@ import '../auth/auth_local_state.dart';
 import '../auth/auth_redirect.dart';
 import '../auth/google_id_token_sign_in.dart';
 import '../services/demo_accounts_service.dart';
+import '../services/invite_friends_service.dart';
 import '../services/username_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_emblem.dart';
@@ -338,6 +339,7 @@ class _AuthScreenState extends State<AuthScreen> {
         });
       } else {
         await _ensureProfile(response.user);
+        await InviteFriendsService.consumePendingIfSignedIn();
         if (mounted) {
           setState(() => _infoMessage = 'Account created successfully.');
         }

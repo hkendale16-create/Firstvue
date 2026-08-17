@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/business_submission_service.dart';
+import '../services/growth_prompt_service.dart';
+import '../models/growth_prompt.dart';
 import '../services/location_service.dart';
 import '../services/things_to_do_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -186,6 +188,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
             coverPhoto: _coverPhoto,
           );
         }
+      }
+      if (!mounted) return;
+      if (widget.mode != EditEventMode.edit && publish) {
+        await GrowthPromptService.markCompleted(
+          GrowthCompletedAction.createEvent,
+        );
       }
       if (!mounted) return;
       Navigator.pop(context, true);

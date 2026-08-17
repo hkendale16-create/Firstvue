@@ -4,6 +4,7 @@ import '../config/feature_flags.dart';
 import '../constants/business_types.dart';
 import '../models/explore_item.dart';
 import '../models/explore_section.dart';
+import '../models/growth_prompt.dart';
 import '../navigation/entity_navigation.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../screens/bounty_discovery_screen.dart';
@@ -12,13 +13,17 @@ import '../screens/post_detail_screen.dart';
 import '../screens/food_trucks_discovery_screen.dart';
 import '../screens/rentals_screen.dart';
 import '../services/explore_feed_service.dart';
+import '../services/growth_prompt_catalog.dart';
+import '../services/growth_prompt_service.dart';
 import '../services/onboarding_store.dart';
 import '../services/shoutout_service.dart';
+import '../services/user_preferences_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../utils/new_label.dart';
 import '../utils/scroll_load_more_gate.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/firstvue_section_tip.dart';
+import '../widgets/growth_prompt.dart';
 import '../widgets/social_chrome.dart';
 import '../widgets/tutorial_targets.dart';
 import 'discovery_feed_screen.dart';
@@ -38,14 +43,36 @@ class _ExploreScreenState extends State<ExploreScreen> {
   final _loadMoreGate = ScrollLoadMoreGate(thresholdPx: 720);
   ExploreSection _section = ExploreSection.people;
   String? _filterBusinessType;
+  String? _city;
+  GrowthPromptSpec? _contributionSpec;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
     _loadSection(_section);
+    _loadGrowth();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) maybeShowSectionTip(context, TutorialSection.explore);
+    });
+  }
+
+  Future<void> _loadGrowth() async {
+    final city = await UserPreferencesService.localCity();
+    final spec = await GrowthPromptService.nextInlinePrompt(
+      GrowthPromptContext.explore,
+      city: city,
+    );
+    if (!mounted) return;
+    if (spec != null) {
+      await GrowthPromptService.markShown(spec, surface: 'inline');
+    }
+    if (!mounted) return;
+    setState(() {
+      _city = city;
+      _contributionSpec = spec == null
+          ? null
+          : GrowthPromptCatalog.exploreContribution(city: city);
     });
   }
 
@@ -322,6 +349,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
             ),
             const SizedBox(height: 16),
+            if (_contributionSpec != null && items.isNotEmpty) ...[
+              GrowthPrompt(
+                spec: _contributionSpec!,
+                variant: GrowthPromptVariant.banner,
+                onDismiss: () => setState(() => _contributionSpec = null),
+              ),
+              const SizedBox(height: 16),
+            ],
             if (snap.loading && snap.items.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 48),
@@ -347,13 +382,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 ),
               )
             else if (items.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 36),
-                child: Text(
-                  'No results in ${_section.label} yet.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: fv.secondaryText),
+              GrowthPrompt(
+                spec: GrowthPromptCatalog.emptyExplore(
+                  sectionLabel: _section.label,
+                  city: _city,
                 ),
+                variant: GrowthPromptVariant.empty,
               )
             else ...[
               GridView.builder(

@@ -130,6 +130,15 @@ class UserPreferencesService {
     return _fetchFromLocal();
   }
 
+  /// City/metro from local prefs only — no Supabase round-trip.
+  static Future<String?> localCity() async {
+    final prefs = await _fetchFromLocal();
+    if (prefs.browseEverywhere) return null;
+    final city = prefs.locationCity?.trim();
+    if (city == null || city.isEmpty) return null;
+    return city;
+  }
+
   static Future<UserPreferences> _fetchFromLocal() async {
     try {
       final sp = await SharedPreferences.getInstance();

@@ -6,9 +6,13 @@ import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../auth/ensure_signed_in.dart';
 import '../screens/create_post_screen.dart';
+import '../screens/event_planner_screen.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../screens/story_composer_screen.dart';
+import '../models/growth_prompt.dart';
 import '../services/community_news_service.dart';
+import '../services/growth_prompt_catalog.dart';
+import '../services/growth_prompt_service.dart';
 import '../services/cache/feed_page_cache.dart';
 import '../services/feed_interaction_service.dart';
 import '../services/profile_media_service.dart';
@@ -20,6 +24,7 @@ import 'community_news_post_card.dart';
 import 'community_news_post_detail_sheet.dart';
 import 'feed_comments_sheet.dart';
 import 'feed_impression_tracker.dart';
+import 'growth_prompt.dart';
 import 'profile_avatar_thumbnail.dart';
 import 'stories_tray.dart';
 
@@ -55,6 +60,7 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
   late double _rankSeed;
   RealtimeChannel? _newsChannel;
   int _storiesRefresh = 0;
+  GrowthPromptSpec? _inlineSpec;
 
   int get _pageSize => widget.maxPosts;
 
@@ -64,6 +70,17 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
     _rankSeed = DateTime.now().millisecondsSinceEpoch.toDouble();
     _bootstrap();
     _subscribeToNewsFeed();
+    _loadInlinePrompt();
+  }
+
+  Future<void> _loadInlinePrompt() async {
+    final spec = await GrowthPromptService.nextInlinePrompt(
+      GrowthPromptContext.home,
+    );
+    if (!mounted || spec == null) return;
+    await GrowthPromptService.markShown(spec, surface: 'composer');
+    if (!mounted) return;
+    setState(() => _inlineSpec = spec);
   }
 
   @override
@@ -254,6 +271,15 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
           if (post.id != created.id) post,
       ];
     });
+  }
+
+  Future<void> _openCreateEvent() async {
+    await _ensureSignedIn();
+    if (Supabase.instance.client.auth.currentUser == null || !mounted) return;
+    await Navigator.push(
+      context,
+      FirstVuePageRoute(builder: (_) => const EventPlannerScreen()),
+    );
   }
 
   Future<void> _openStoryComposer() async {
@@ -470,7 +496,7 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
                             vertical: 12,
                           ),
                           child: Text(
-                            "What's on your mind, $_displayName?",
+                            "What's happening?",
                             style: TextStyle(
                               color: fv.tertiaryText,
                               fontSize: 14,
@@ -487,23 +513,37 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  _ComposerAction(
-                    icon: Icons.photo_library_outlined,
-                    label: 'Photo',
-                    color: FirstVueColors.teal,
-                    onTap: _openCreatePost,
+                  Expanded(
+                    child: _ComposerAction(
+                      icon: Icons.photo_library_outlined,
+                      label: 'Photo',
+                      color: FirstVueColors.teal,
+                      onTap: _openCreatePost,
+                    ),
                   ),
-                  _ComposerAction(
-                    icon: Icons.videocam_outlined,
-                    label: 'Video',
-                    color: FirstVueColors.coral,
-                    onTap: _openCreatePost,
+                  Expanded(
+                    child: _ComposerAction(
+                      icon: Icons.videocam_outlined,
+                      label: 'Video',
+                      color: FirstVueColors.coral,
+                      onTap: _openCreatePost,
+                    ),
                   ),
-                  _ComposerAction(
-                    icon: Icons.auto_awesome_motion_outlined,
-                    label: 'Story',
-                    color: FirstVueColors.gold,
-                    onTap: _openStoryComposer,
+                  Expanded(
+                    child: _ComposerAction(
+                      icon: Icons.auto_awesome_motion_outlined,
+                      label: 'Story',
+                      color: FirstVueColors.gold,
+                      onTap: _openStoryComposer,
+                    ),
+                  ),
+                  Expanded(
+                    child: _ComposerAction(
+                      icon: Icons.event_outlined,
+                      label: 'Event',
+                      color: FirstVueColors.gold,
+                      onTap: _openCreateEvent,
+                    ),
                   ),
                 ],
               ),
@@ -558,9 +598,10 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
             onAction: () => _loadFeed(reshuffle: true),
           )
         else if (_posts.isEmpty)
-          const _EmptyFeedState(
-            title: 'No community posts yet',
-            subtitle: 'Be the first to share something with your community.',
+          GrowthPrompt(
+            spec: GrowthPromptCatalog.emptyHome(),
+            variant: GrowthPromptVariant.empty,
+            onAction: _openCreatePost,
           )
         else
           Column(
@@ -612,6 +653,15 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
                     repostedByMe: _repostedPostIds.contains(_posts[index].id),
                   ),
                 ),
+                if (index == 0 && _inlineSpec != null) ...[
+                  const SizedBox(height: 10),
+                  GrowthPrompt(
+                    spec: _inlineSpec!,
+                    variant: GrowthPromptVariant.composer,
+                    onAction: _openCreatePost,
+                    onDismiss: () => setState(() => _inlineSpec = null),
+                  ),
+                ],
               ],
               if (_hasMore && _posts.length >= 8) ...[
                 const SizedBox(height: 12),
@@ -670,13 +720,11 @@ class _ComposerAction extends StatelessWidget {
 class _EmptyFeedState extends StatelessWidget {
   const _EmptyFeedState({
     required this.title,
-    this.subtitle,
     this.actionLabel,
     this.onAction,
   });
 
   final String title;
-  final String? subtitle;
   final String? actionLabel;
   final VoidCallback? onAction;
 
@@ -707,18 +755,6 @@ class _EmptyFeedState extends StatelessWidget {
               fontSize: 14,
             ),
           ),
-          if (subtitle != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              subtitle!,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: FirstVueColors.ivory.withValues(alpha: 0.54),
-                fontSize: 12,
-                height: 1.35,
-              ),
-            ),
-          ],
           if (actionLabel != null && onAction != null) ...[
             const SizedBox(height: 12),
             TextButton(onPressed: onAction, child: Text(actionLabel!)),
