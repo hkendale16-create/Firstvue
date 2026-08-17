@@ -1,23 +1,30 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/ensure_signed_in.dart';
-import '../models/post_identity.dart';
 import '../models/publish_destination.dart';
 import '../services/community_news_service.dart';
+import '../services/composer_draft_service.dart';
+import '../services/firstvue_feedback_sounds.dart';
 import '../services/post_identity_service.dart';
 import '../services/post_identity_store.dart';
+import '../services/post_metadata_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../theme/social_text_field_style.dart';
+import '../utils/safe_url.dart';
+import '../widgets/composer_link_dialog.dart';
 import '../widgets/create_post_settings_bar.dart';
 import '../widgets/local_media_thumbnail.dart';
-import '../widgets/mention_autocomplete_field.dart';
 import '../widgets/profile_composer_media_actions.dart';
+import '../widgets/social_text_field.dart';
+import '../models/post_identity.dart';
+import 'media_prep_editor_screen.dart';
 
-/// Universal feed post composer (Option 4): compact settings, large writing area.
-///
-/// Used by Home/Feeds, VUE, Community, Group, Business/Professional/Event feeds.
-/// Publishing, permissions, media upload, mentions, and hashtags are unchanged.
+/// Universal feed post composer with shared social text styling, drafts,
+/// optional link/location, and lightweight media prep before upload.
 class CreatePostScreen extends StatefulWidget {
   final String? initialBody;
   final String? businessId;
@@ -64,6 +71,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   final _body = TextEditingController();
   final _bodyFocus = FocusNode();
+  final _location = TextEditingController();
   List<XFile> _attachedMedia = const [];
   List<PostIdentityOption> _identityOptions = const [];
   PostIdentityOption? _selectedIdentity;
@@ -73,6 +81,16 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool _publishing = false;
   bool _toolsExpanded = false;
   String? _error;
+  String? _linkUrl;
+  String? _linkLabel;
+  Timer? _draftTimer;
+
+  String get _draftScope => ComposerDraftService.postScope(
+        businessId: widget.businessId,
+        professionalProfileId: widget.professionalProfileId,
+        communityId: widget.communityId,
+        eventId: widget.eventId,
+      );
 
   @override
   void initState() {
@@ -81,11 +99,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       _body.text = widget.initialBody!;
     }
     _bodyFocus.addListener(_onBodyFocusChanged);
+    _body.addListener(_scheduleDraftSave);
     _destination = widget.initialDestination ??
         (_hasLockedEntityScope
             ? PublishDestination.entityOnly
             : PublishDestination.feed);
     _loadIdentities();
+    _restoreDraft();
   }
 
   void _onBodyFocusChanged() {
@@ -106,10 +126,54 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   @override
   void dispose() {
+    _draftTimer?.cancel();
     _bodyFocus.removeListener(_onBodyFocusChanged);
+    _body.removeListener(_scheduleDraftSave);
     _bodyFocus.dispose();
     _body.dispose();
+    _location.dispose();
     super.dispose();
+  }
+
+  void _scheduleDraftSave() {
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(milliseconds: 500), _saveDraft);
+  }
+
+  Future<void> _saveDraft() async {
+    await ComposerDraftService.savePostDraft(
+      scopeKey: _draftScope,
+      payload: {
+        'body': _body.text,
+        'visibility': _visibility,
+        'backgroundColor': _backgroundColor,
+        'destination': _destination.value,
+        'location': _location.text,
+        'linkUrl': _linkUrl,
+        'linkLabel': _linkLabel,
+      },
+    );
+  }
+
+  Future<void> _restoreDraft() async {
+    if (widget.initialBody != null && widget.initialBody!.trim().isNotEmpty) {
+      return;
+    }
+    final draft = await ComposerDraftService.loadPostDraft(_draftScope);
+    if (!mounted || draft == null) return;
+    setState(() {
+      _body.text = (draft['body'] as String?) ?? _body.text;
+      _visibility = (draft['visibility'] as String?) ?? _visibility;
+      _backgroundColor =
+          (draft['backgroundColor'] as String?) ?? _backgroundColor;
+      _location.text = (draft['location'] as String?) ?? '';
+      _linkUrl = draft['linkUrl'] as String?;
+      _linkLabel = draft['linkLabel'] as String?;
+      final dest = draft['destination'] as String?;
+      if (dest != null) {
+        _destination = PublishDestination.parse(dest);
+      }
+    });
   }
 
   Future<void> _loadIdentities() async {
@@ -147,7 +211,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           _selectedIdentity = options.first;
         }
       }
-      // Never silently replace a locked entity identity with personal.
       if (widget.lockIdentity &&
           locked == null &&
           options.isNotEmpty &&
@@ -155,7 +218,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           options.any((o) => !o.isPersonal)) {
         _selectedIdentity = options.firstWhere((o) => !o.isPersonal);
       }
-      // Entity-only destination is only valid for non-personal identities.
       if (_destination == PublishDestination.entityOnly &&
           (_selectedIdentity == null || _selectedIdentity!.isPersonal)) {
         _destination = PublishDestination.feed;
@@ -167,6 +229,31 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     return CommunityNewsPost.backgroundFill(key);
   }
 
+  Future<void> _attachLink() async {
+    final result = await showComposerLinkDialog(
+      context,
+      initialUrl: _linkUrl,
+      initialLabel: _linkLabel,
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _linkUrl = result.url;
+      _linkLabel = result.label;
+    });
+    _scheduleDraftSave();
+  }
+
+  Future<void> _prepMedia(XFile file, int index) async {
+    final prepared = await MediaPrepEditorScreen.open(context, file: file);
+    if (prepared == null || !mounted) return;
+    setState(() {
+      _attachedMedia = [
+        for (var i = 0; i < _attachedMedia.length; i++)
+          if (i == index) prepared else _attachedMedia[i],
+      ];
+    });
+  }
+
   Future<void> _publish() async {
     if (Supabase.instance.client.auth.currentUser == null) {
       await ensureSignedIn(context);
@@ -176,6 +263,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final text = _body.text.trim();
     if ((text.isEmpty && _attachedMedia.isEmpty) || _publishing) return;
 
+    final link = SafeUrl.sanitize(_linkUrl);
+    if (_linkUrl != null && _linkUrl!.trim().isNotEmpty && link == null) {
+      setState(() => _error = 'Remove or fix the attached link.');
+      return;
+    }
+
     setState(() {
       _publishing = true;
       _error = null;
@@ -184,6 +277,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     try {
       final identity = _selectedIdentity;
       final bg = _backgroundColor == 'none' ? null : _backgroundColor;
+      final locationLabel = _location.text.trim();
       CommunityNewsPost post;
       try {
         post = await CommunityNewsService.createPost(
@@ -197,6 +291,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           backgroundColor: bg,
           visibility: _visibility,
           publishDestination: _destination,
+          locationLabel: locationLabel.isEmpty ? null : locationLabel,
+          linkUrl: link,
+          linkLabel: _linkLabel,
         );
       } on CommunityNewsMediaUploadException catch (error) {
         post = error.post;
@@ -210,6 +307,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           );
         }
       }
+      await ComposerDraftService.clearPostDraft(_draftScope);
+      await FirstVueFeedbackSounds.playPublishSuccess();
       if (!mounted) return;
       Navigator.pop(context, post);
     } catch (error) {
@@ -219,8 +318,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         _error = error is AuthException
             ? 'Sign in to post.'
             : error is ArgumentError
-            ? (error.message ?? 'Unable to publish.')
-            : 'Unable to publish. Try again.';
+                ? (error.message ?? 'Unable to publish.')
+                : 'Unable to publish. Try again.';
       });
     }
   }
@@ -290,9 +389,14 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               });
               PostIdentityStore.saveSelected(value);
             },
-            onVisibilityChanged: (value) => setState(() => _visibility = value),
-            onDestinationChanged: (value) =>
-                setState(() => _destination = value),
+            onVisibilityChanged: (value) {
+              setState(() => _visibility = value);
+              _scheduleDraftSave();
+            },
+            onDestinationChanged: (value) {
+              setState(() => _destination = value);
+              _scheduleDraftSave();
+            },
           ),
           Expanded(
             child: ListView(
@@ -302,56 +406,16 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   Text(_error!, style: TextStyle(color: fv.error)),
                   const SizedBox(height: 10),
                 ],
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  constraints: const BoxConstraints(minHeight: 220),
-                  padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-                  decoration: BoxDecoration(
-                    // Soft fill (stronger while focused) marks the writing
-                    // zone without a hard border — more seamless composer.
-                    color: preview ??
-                        (_bodyFocus.hasFocus
-                            ? fv.elevatedSurface
-                            : Color.alphaBlend(
-                                fv.elevatedSurface.withValues(alpha: 0.42),
-                                fv.background,
-                              )),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Theme(
-                    data: Theme.of(context).copyWith(
-                      textSelectionTheme: TextSelectionThemeData(
-                        cursorColor: FirstVueColors.teal,
-                        selectionColor:
-                            FirstVueColors.teal.withValues(alpha: 0.28),
-                        selectionHandleColor: FirstVueColors.teal,
-                      ),
-                    ),
-                    child: MentionAutocompleteField(
-                      controller: _body,
-                      focusNode: _bodyFocus,
-                      minLines: 8,
-                      maxLines: null,
-                      hintText: 'Share news… Use #hashtags and @handles.',
-                      style: TextStyle(
-                        color: fv.primaryText,
-                        fontSize: 16,
-                        height: 1.35,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Share news… Use #hashtags and @handles.',
-                        hintStyle:
-                            TextStyle(color: fv.tertiaryText, fontSize: 16),
-                        filled: true,
-                        fillColor: Colors.transparent,
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
+                SocialWritingZone(
+                  focused: _bodyFocus.hasFocus,
+                  backgroundOverride: preview,
+                  child: SocialTextField(
+                    controller: _body,
+                    focusNode: _bodyFocus,
+                    minLines: 8,
+                    maxLines: null,
+                    hintText: 'Share news… Use #hashtags and @handles.',
+                    onChanged: (_) => setState(() {}),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -370,10 +434,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                             LocalMediaThumbnail(
                               file: file,
                               size: 72,
-                              onTap: () => LocalMediaThumbnail.previewLocalFile(
-                                context,
-                                file,
-                              ),
+                              onTap: () => _prepMedia(file, index),
                             ),
                             Positioned(
                               top: -6,
@@ -404,7 +465,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 8),
+                    child: Text(
+                      'Tap a photo to rotate before posting.',
+                      style: TextStyle(color: fv.tertiaryText, fontSize: 12),
+                    ),
+                  ),
                 ],
                 ProfileComposerMediaActions(
                   enabled: !_publishing,
@@ -414,6 +481,44 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       () => _attachedMedia = [..._attachedMedia, ...files],
                     );
                   },
+                ),
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      ComposerToolChip(
+                        icon: Icons.link_rounded,
+                        label: _linkUrl == null ? 'Link' : 'Edit link',
+                        selected: _linkUrl != null,
+                        onTap: _publishing ? null : _attachLink,
+                      ),
+                      if (_linkUrl != null) ...[
+                        const SizedBox(width: 8),
+                        ComposerToolChip(
+                          icon: Icons.link_off_rounded,
+                          label: 'Remove',
+                          onTap: () {
+                            setState(() {
+                              _linkUrl = null;
+                              _linkLabel = null;
+                            });
+                            _scheduleDraftSave();
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SocialTextField(
+                  controller: _location,
+                  hintText: 'Location (optional) — city or place name',
+                  minLines: 1,
+                  maxLines: 1,
+                  showUnderline: true,
+                  enableMentions: false,
+                  onChanged: (_) => _scheduleDraftSave(),
                 ),
                 const SizedBox(height: 8),
                 _ToolsToggle(
@@ -429,8 +534,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     selectedBackground: _backgroundColor,
                     previewColor: _previewColor,
                     onTemplate: _applyTemplate,
-                    onBackground: (key) =>
-                        setState(() => _backgroundColor = key),
+                    onBackground: (key) {
+                      setState(() => _backgroundColor = key);
+                      _scheduleDraftSave();
+                    },
                   ),
                   crossFadeState: _toolsExpanded
                       ? CrossFadeState.showSecond
@@ -448,15 +555,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 onPressed: _canPublish ? _publish : null,
                 style: FilledButton.styleFrom(
                   backgroundColor: FirstVueColors.coral,
-                  disabledBackgroundColor:
-                      FirstVueColors.coral.withValues(alpha: 0.35),
                   foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(44),
+                  minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                child: Text(_publishing ? 'Publishing…' : 'Publish post'),
+                child: Text(_publishing ? 'Posting…' : 'Post'),
               ),
             ),
           ),
@@ -479,14 +584,11 @@ class _ToolsToggle extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
             Icon(
-              expanded
-                  ? Icons.keyboard_arrow_up_rounded
-                  : Icons.keyboard_arrow_down_rounded,
-              size: 18,
+              expanded ? Icons.expand_less : Icons.expand_more,
               color: fv.secondaryText,
             ),
             const SizedBox(width: 4),
@@ -494,7 +596,6 @@ class _ToolsToggle extends StatelessWidget {
               expanded ? 'Hide templates & backgrounds' : 'Templates & backgrounds',
               style: TextStyle(
                 color: fv.secondaryText,
-                fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -528,110 +629,54 @@ class _ToolsPanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final entry in templates)
+              ActionChip(
+                avatar: Icon(entry.$1, size: 16, color: FirstVueColors.teal),
+                label: Text(entry.$2),
+                onPressed: () => onTemplate(entry.$2),
+                backgroundColor: fv.elevatedSurface,
+                labelStyle: TextStyle(color: fv.primaryText, fontSize: 12),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
         Text(
-          'TEMPLATES',
-          style: TextStyle(
-            color: FirstVueColors.gold,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.1,
-            fontSize: 11,
-          ),
+          'Background',
+          style: TextStyle(color: fv.secondaryText, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
-        SizedBox(
-          height: 64,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: templates.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
-            itemBuilder: (context, index) {
-              final (icon, label) = templates[index];
-              return Material(
-                color: fv.elevatedSurface,
-                borderRadius: BorderRadius.circular(12),
-                child: InkWell(
-                  onTap: () => onTemplate(label),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    width: 118,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: fv.borderSubtle.withValues(alpha: 0.7),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(icon, size: 16, color: FirstVueColors.teal),
-                        const Spacer(),
-                        Text(
-                          label,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: fv.primaryText,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            height: 1.15,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 14),
-        Text(
-          'BACKGROUNDS',
-          style: TextStyle(
-            color: FirstVueColors.gold,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.1,
-            fontSize: 11,
-          ),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 34,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: backgroundKeys.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
-            itemBuilder: (context, index) {
-              final key = backgroundKeys[index];
-              final selected = key == selectedBackground;
-              final fill = previewColor(key) ?? fv.elevatedSurface;
-              return GestureDetector(
+        Wrap(
+          spacing: 8,
+          children: [
+            for (final key in backgroundKeys)
+              GestureDetector(
                 onTap: () => onBackground(key),
                 child: Container(
-                  width: 34,
-                  height: 34,
-                  alignment: Alignment.center,
+                  width: 28,
+                  height: 28,
                   decoration: BoxDecoration(
-                    color: fill,
+                    color: key == 'none'
+                        ? fv.elevatedSurface
+                        : previewColor(key) ?? fv.elevatedSurface,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: selected ? FirstVueColors.gold : fv.borderSubtle,
-                      width: selected ? 2 : 1,
+                      color: selectedBackground == key
+                          ? FirstVueColors.teal
+                          : fv.borderSubtle,
+                      width: selectedBackground == key ? 2 : 1,
                     ),
                   ),
                   child: key == 'none'
-                      ? Icon(Icons.block, size: 14, color: fv.mutedIcon)
+                      ? Icon(Icons.block, size: 14, color: fv.tertiaryText)
                       : null,
                 ),
-              );
-            },
-          ),
+              ),
+          ],
         ),
-        const SizedBox(height: 8),
       ],
     );
   }

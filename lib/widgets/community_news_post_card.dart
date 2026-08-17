@@ -32,6 +32,7 @@ class CommunityNewsPostCard extends StatefulWidget {
   final VoidCallback? onShare;
   final VoidCallback? onDelete;
   final VoidCallback? onBoost;
+  final VoidCallback? onEdit;
   final bool repostedByMe;
   final bool compact;
   final bool isPromoted;
@@ -50,6 +51,7 @@ class CommunityNewsPostCard extends StatefulWidget {
     this.onShare,
     this.onDelete,
     this.onBoost,
+    this.onEdit,
     this.repostedByMe = false,
     this.compact = false,
     this.isPromoted = false,
@@ -262,7 +264,9 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
             ],
           ),
         ),
-        if (widget.onDelete != null || widget.onBoost != null)
+        if (widget.onDelete != null ||
+            widget.onBoost != null ||
+            widget.onEdit != null)
           PopupMenuButton<String>(
             tooltip: 'Post options',
             icon: Icon(Icons.more_horiz, color: context.fv.secondaryText),
@@ -270,11 +274,18 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
             onSelected: (value) {
               if (value == 'boost') {
                 widget.onBoost?.call();
+              } else if (value == 'edit') {
+                widget.onEdit?.call();
               } else if (value == 'delete') {
                 widget.onDelete?.call();
               }
             },
             itemBuilder: (context) => [
+              if (widget.onEdit != null)
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Text('Edit'),
+                ),
               if (widget.onBoost != null)
                 const PopupMenuItem(
                   value: 'boost',

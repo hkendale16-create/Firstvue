@@ -11,6 +11,7 @@ import 'community_news_post_detail_sheet.dart';
 import 'feed_comments_sheet.dart';
 import 'firstvue_share_sheet.dart';
 import '../screens/boost_post_sheet.dart';
+import '../screens/edit_post_screen.dart';
 
 class ProfileMyPostsSection extends StatefulWidget {
   final int refreshToken;
@@ -240,6 +241,16 @@ class _ProfileMyPostsSectionState extends State<ProfileMyPostsSection> {
                 businessName: _posts[index].authorName,
               ),
               onDelete: _posts[index].isMine ? () => _deletePost(index) : null,
+              onEdit: _posts[index].isMine
+                  ? () async {
+                      final updated = await EditPostScreen.open(
+                        context,
+                        post: _posts[index],
+                      );
+                      if (updated == null || !mounted) return;
+                      setState(() => _posts[index] = updated);
+                    }
+                  : null,
               onBoost: _posts[index].isMine
                   ? () => openBoostPostFlow(context, _posts[index])
                   : null,

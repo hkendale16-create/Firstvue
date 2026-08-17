@@ -9,6 +9,7 @@ import '../services/post_metadata_service.dart';
 import '../services/profile_activity_service.dart';
 import '../services/username_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../utils/safe_url.dart';
 
 /// Renders post body text with tappable #hashtags, @mentions, and URLs.
 class SocialRichText extends StatelessWidget {
@@ -47,7 +48,27 @@ class SocialRichText extends StatelessWidget {
   }
 
   Future<void> _openUrl(BuildContext context, String url) async {
-    final uri = Uri.tryParse(url);
+    final sanitized = SafeUrl.sanitize(url);
+    if (sanitized == null) return;
+
+    // Prefer in-app hashtag deep links already handled elsewhere; for other
+    // internal routes, surface a safe no-op rather than opening an external tab.
+    if (sanitized.startsWith('/')) {
+      if (sanitized.startsWith('/hashtag/')) {
+        final tag = sanitized.substring('/hashtag/'.length).split('?').first;
+        if (tag.isNotEmpty && context.mounted) {
+          Navigator.push(
+            context,
+            FirstVuePageRoute(
+              builder: (_) => HashtagPostsScreen(tag: tag.toLowerCase()),
+            ),
+          );
+        }
+      }
+      return;
+    }
+
+    final uri = Uri.tryParse(sanitized);
     if (uri == null) return;
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (!context.mounted) return;

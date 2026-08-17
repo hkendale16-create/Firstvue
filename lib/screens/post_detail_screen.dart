@@ -5,6 +5,7 @@ import '../config/app_config.dart';
 import '../models/share_payload.dart';
 import '../auth/ensure_signed_in.dart';
 import '../screens/boost_post_sheet.dart';
+import '../screens/edit_post_screen.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../services/cache/feed_page_cache.dart';
 import '../services/community_news_service.dart';
@@ -222,6 +223,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           onSetReaction: _setReaction,
                           onSave: _toggleSave,
                           onDelete: _post!.isMine ? _deletePost : null,
+                          onEdit: _post!.isMine
+                              ? () async {
+                                  final updated = await EditPostScreen.open(
+                                    context,
+                                    post: _post!,
+                                  );
+                                  if (updated == null || !mounted) return;
+                                  setState(() => _post = updated);
+                                }
+                              : null,
                           onBoost: _post!.isMine
                               ? () => openBoostPostFlow(context, _post!)
                               : null,

@@ -6,6 +6,7 @@ import '../services/feed_comments_service.dart';
 import '../auth/ensure_signed_in.dart';
 import '../utils/app_environment.dart';
 import 'social_rich_text.dart';
+import 'social_text_field.dart';
 
 class FeedCommentsSheet extends StatefulWidget {
   final String mediaId;
@@ -344,25 +345,16 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
                       Row(
                         children: [
                           Expanded(
-                            child: TextField(
+                            child: SocialTextField(
                               controller: _controller,
                               focusNode: _inputFocus,
-                              style: TextStyle(color: context.fv.primaryText),
-                              decoration: InputDecoration(
-                                hintText: _replyParentId == null
-                                    ? 'Add a comment...'
-                                    : 'Write a reply...',
-                                hintStyle: TextStyle(
-                                  color: context.fv.tertiaryText,
-                                ),
-                                filled: true,
-                                fillColor: context.fv.inputFill,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                  borderSide: BorderSide.none,
-                                ),
-                              ),
-                              onSubmitted: (_) => _post(),
+                              hintText: _replyParentId == null
+                                  ? 'Add a comment...'
+                                  : 'Write a reply...',
+                              minLines: 1,
+                              maxLines: 4,
+                              showUnderline: true,
+                              enableMentions: true,
                             ),
                           ),
                           const SizedBox(width: 8),

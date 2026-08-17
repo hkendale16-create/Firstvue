@@ -101,6 +101,11 @@ class CommunityNewsPost {
   final String? offeringType;
   final String? eventType;
   final String? originalSourceLabel;
+  final String? locationLabel;
+  final String? locationCity;
+  final String? locationState;
+  final String? linkUrl;
+  final String? linkLabel;
 
   const CommunityNewsPost({
     required this.id,
@@ -140,6 +145,11 @@ class CommunityNewsPost {
     this.offeringType,
     this.eventType,
     this.originalSourceLabel,
+    this.locationLabel,
+    this.locationCity,
+    this.locationState,
+    this.linkUrl,
+    this.linkLabel,
   });
 
   String get commentsMediaId => 'news-post:$id';
@@ -247,6 +257,11 @@ class CommunityNewsPost {
     String? offeringType,
     String? eventType,
     String? originalSourceLabel,
+    Object? locationLabel = _unset,
+    Object? locationCity = _unset,
+    Object? locationState = _unset,
+    Object? linkUrl = _unset,
+    Object? linkLabel = _unset,
   }) {
     return CommunityNewsPost(
       id: id ?? this.id,
@@ -292,6 +307,18 @@ class CommunityNewsPost {
       offeringType: offeringType ?? this.offeringType,
       eventType: eventType ?? this.eventType,
       originalSourceLabel: originalSourceLabel ?? this.originalSourceLabel,
+      locationLabel: identical(locationLabel, _unset)
+          ? this.locationLabel
+          : locationLabel as String?,
+      locationCity: identical(locationCity, _unset)
+          ? this.locationCity
+          : locationCity as String?,
+      locationState: identical(locationState, _unset)
+          ? this.locationState
+          : locationState as String?,
+      linkUrl: identical(linkUrl, _unset) ? this.linkUrl : linkUrl as String?,
+      linkLabel:
+          identical(linkLabel, _unset) ? this.linkLabel : linkLabel as String?,
     );
   }
 }
@@ -391,26 +418,36 @@ class CommunityNewsService {
     try {
       return await attempt(insertPayload, _postColumnsWithBackground);
     } catch (_) {
-      final withoutBg = Map<String, dynamic>.from(insertPayload)
-        ..remove('background_color')
-        ..remove('publish_destination');
+      final withoutExtras = Map<String, dynamic>.from(insertPayload)
+        ..remove('location_label')
+        ..remove('location_city')
+        ..remove('location_state')
+        ..remove('link_url')
+        ..remove('link_label');
       try {
-        return await attempt(withoutBg, _postColumns);
+        return await attempt(withoutExtras, _postColumnsWithBackground);
       } catch (_) {
-        final fallback = Map<String, dynamic>.from(withoutBg)
-          ..remove('author_profile_type')
-          ..remove('author_profile_id')
-          ..remove('visibility');
+        final withoutBg = Map<String, dynamic>.from(withoutExtras)
+          ..remove('background_color')
+          ..remove('publish_destination');
         try {
-          return await attempt(
-            Map<String, dynamic>.from(withoutBg)
-              ..remove('author_profile_type')
-              ..remove('author_profile_id'),
-            'id, body, created_at, author_id, business_id, community_id, '
-            'visibility, professional_profile_id, event_id',
-          );
+          return await attempt(withoutBg, _postColumns);
         } catch (_) {
-          return await attempt(fallback, _postColumnsBase);
+          final fallback = Map<String, dynamic>.from(withoutBg)
+            ..remove('author_profile_type')
+            ..remove('author_profile_id')
+            ..remove('visibility');
+          try {
+            return await attempt(
+              Map<String, dynamic>.from(withoutBg)
+                ..remove('author_profile_type')
+                ..remove('author_profile_id'),
+              'id, body, created_at, author_id, business_id, community_id, '
+              'visibility, professional_profile_id, event_id',
+            );
+          } catch (_) {
+            return await attempt(fallback, _postColumnsBase);
+          }
         }
       }
     }
@@ -1671,6 +1708,11 @@ class CommunityNewsService {
     String? backgroundColor,
     String? visibility,
     PublishDestination publishDestination = PublishDestination.feed,
+    String? locationLabel,
+    String? locationCity,
+    String? locationState,
+    String? linkUrl,
+    String? linkLabel,
   }) async {
     final me = _client.auth.currentUser;
     if (me == null) throw const AuthException('Sign in to post.');
@@ -1726,6 +1768,23 @@ class CommunityNewsService {
       insertPayload['background_color'] = bg;
     }
     insertPayload['publish_destination'] = publishDestination.value;
+    final loc = locationLabel?.trim();
+    if (loc != null && loc.isNotEmpty) {
+      insertPayload['location_label'] = loc;
+    }
+    if (locationCity != null && locationCity.trim().isNotEmpty) {
+      insertPayload['location_city'] = locationCity.trim();
+    }
+    if (locationState != null && locationState.trim().isNotEmpty) {
+      insertPayload['location_state'] = locationState.trim();
+    }
+    final safeLink = linkUrl?.trim();
+    if (safeLink != null && safeLink.isNotEmpty) {
+      insertPayload['link_url'] = safeLink;
+      if (linkLabel != null && linkLabel.trim().isNotEmpty) {
+        insertPayload['link_label'] = linkLabel.trim();
+      }
+    }
 
     final row = await _insertPostReturning(insertPayload);
 
@@ -1812,6 +1871,15 @@ class CommunityNewsService {
         row['publish_destination'] as String? ?? publishDestination.value,
       ),
       media: media,
+      locationLabel: loc,
+      locationCity: locationCity?.trim().isEmpty == true
+          ? null
+          : locationCity?.trim(),
+      locationState: locationState?.trim().isEmpty == true
+          ? null
+          : locationState?.trim(),
+      linkUrl: safeLink,
+      linkLabel: linkLabel?.trim().isEmpty == true ? null : linkLabel?.trim(),
     );
 
     if (mediaError != null && files.isNotEmpty && media.isEmpty) {
