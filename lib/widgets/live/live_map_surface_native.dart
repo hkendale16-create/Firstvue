@@ -112,15 +112,22 @@ class _MapboxSurfaceState extends State<_MapboxSurface> {
   mb.CircleAnnotationManager? _circles;
   mb.PointAnnotationManager? _points;
   Timer? _debounce;
+  Timer? _pulseTimer;
   bool _tokenReady = false;
   final Map<String, LiveMapPin> _annotationPins = {};
   int _syncGen = 0;
+  double _pulseT = 0;
+  List<_GlowCircleRef> _glowRefs = const [];
+  bool _updatingGlow = false;
 
   @override
   void initState() {
     super.initState();
     mb.MapboxOptions.setAccessToken(MapboxConfig.accessToken);
     _tokenReady = true;
+    _syncPulseTimer(
+      widget.pins.any((p) => p.isLive) || widget.selected != null,
+    );
   }
 
   @override
@@ -130,6 +137,22 @@ class _MapboxSurfaceState extends State<_MapboxSurface> {
     final selectedChanged = oldWidget.selected?.id != widget.selected?.id;
     if (pinsChanged || selectedChanged) {
       unawaited(_syncAnnotations());
+    }
+    _syncPulseTimer(
+      widget.pins.any((p) => p.isLive) || widget.selected != null,
+    );
+  }
+
+  void _syncPulseTimer(bool shouldPulse) {
+    if (shouldPulse) {
+      _pulseTimer ??= Timer.periodic(const Duration(milliseconds: 80), (_) {
+        _pulseT = (_pulseT + 0.045) % 1.0;
+        unawaited(_applyGlowPulse());
+      });
+    } else {
+      _pulseTimer?.cancel();
+      _pulseTimer = null;
+      _pulseT = 0;
     }
   }
 
@@ -145,8 +168,31 @@ class _MapboxSurfaceState extends State<_MapboxSurface> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _pulseTimer?.cancel();
     _syncGen++;
     super.dispose();
+  }
+
+  Future<void> _applyGlowPulse() async {
+    final circles = _circles;
+    if (circles == null || _glowRefs.isEmpty || _updatingGlow) return;
+    _updatingGlow = true;
+    final t = _pulseT;
+    try {
+      for (final ref in _glowRefs) {
+        final phase = (t + ref.ringIndex / 2.0) % 1.0;
+        final radius = ref.baseRadius + phase * (ref.selected ? 14.0 : 10.0);
+        final opacity =
+            (ref.baseOpacity * (1.0 - phase * 0.85)).clamp(0.04, 0.4);
+        ref.annotation.circleRadius = radius;
+        ref.annotation.circleOpacity = opacity;
+        await circles.update(ref.annotation);
+      }
+    } catch (_) {
+      // Style / manager may be mid-rebuild.
+    } finally {
+      _updatingGlow = false;
+    }
   }
 
   Future<void> _onCreated(mb.MapboxMap map) async {
@@ -223,29 +269,60 @@ class _MapboxSurfaceState extends State<_MapboxSurface> {
     await points.deleteAll();
     if (gen != _syncGen) return;
     _annotationPins.clear();
+    _glowRefs = const [];
 
     final circleOpts = <mb.CircleAnnotationOptions>[];
     final pointOpts = <mb.PointAnnotationOptions>[];
     final selectedId = widget.selected?.id;
+    // Track which circle options are pulse glow rings (pinId + ring index).
+    final glowMeta = <({String pinId, int ring, double base, double opacity, bool selected})>[];
 
     for (final pin in widget.pins) {
       final color = _colorInt(_colorFor(pin));
       final selected = pin.id == selectedId;
-      final glowRadius = selected ? 30.0 : (pin.isLive ? 22.0 : 14.0);
+      final pulse = pin.isLive || selected;
+      final glowRadius = selected ? 26.0 : (pin.isLive ? 18.0 : 14.0);
       final coreRadius = selected ? 11.0 : (pin.isLive ? 8.0 : 6.0);
+      final glowOpacity = selected ? 0.32 : (pin.isLive ? 0.22 : 0.12);
 
-      circleOpts.add(
-        mb.CircleAnnotationOptions(
-          geometry: mb.Point(
-            coordinates: mb.Position(pin.point.longitude, pin.point.latitude),
+      if (pulse) {
+        for (var ring = 0; ring < 2; ring++) {
+          circleOpts.add(
+            mb.CircleAnnotationOptions(
+              geometry: mb.Point(
+                coordinates:
+                    mb.Position(pin.point.longitude, pin.point.latitude),
+              ),
+              circleRadius: glowRadius + ring * 4,
+              circleColor: color,
+              circleOpacity: glowOpacity * (ring == 0 ? 1.0 : 0.65),
+              circleStrokeWidth: 0,
+              customData: {'pinId': pin.id, 'glow': true, 'ring': ring},
+            ),
+          );
+          glowMeta.add((
+            pinId: pin.id,
+            ring: ring,
+            base: glowRadius + ring * 2.0,
+            opacity: glowOpacity * (ring == 0 ? 1.0 : 0.65),
+            selected: selected,
+          ));
+        }
+      } else {
+        circleOpts.add(
+          mb.CircleAnnotationOptions(
+            geometry: mb.Point(
+              coordinates: mb.Position(pin.point.longitude, pin.point.latitude),
+            ),
+            circleRadius: glowRadius,
+            circleColor: color,
+            circleOpacity: glowOpacity,
+            circleStrokeWidth: 0,
+            customData: {'pinId': pin.id},
           ),
-          circleRadius: glowRadius,
-          circleColor: color,
-          circleOpacity: selected ? 0.35 : (pin.isLive ? 0.22 : 0.12),
-          circleStrokeWidth: 0,
-          customData: {'pinId': pin.id},
-        ),
-      );
+        );
+      }
+
       circleOpts.add(
         mb.CircleAnnotationOptions(
           geometry: mb.Point(
@@ -284,8 +361,27 @@ class _MapboxSurfaceState extends State<_MapboxSurface> {
     }
 
     if (circleOpts.isNotEmpty) {
-      await circles.createMulti(circleOpts);
+      final createdCircles = await circles.createMulti(circleOpts);
       if (gen != _syncGen) return;
+      final refs = <_GlowCircleRef>[];
+      var glowIdx = 0;
+      for (final annotation in createdCircles) {
+        if (annotation == null) continue;
+        final data = annotation.customData;
+        if (data == null || data['glow'] != true) continue;
+        if (glowIdx >= glowMeta.length) break;
+        final meta = glowMeta[glowIdx++];
+        refs.add(
+          _GlowCircleRef(
+            annotation: annotation,
+            ringIndex: meta.ring,
+            baseRadius: meta.base,
+            baseOpacity: meta.opacity,
+            selected: meta.selected,
+          ),
+        );
+      }
+      _glowRefs = refs;
     }
     if (pointOpts.isNotEmpty) {
       final created = await points.createMulti(pointOpts);
@@ -364,4 +460,20 @@ class _MapboxSurfaceState extends State<_MapboxSurface> {
       onCameraChangeListener: _onCameraChanged,
     );
   }
+}
+
+class _GlowCircleRef {
+  final mb.CircleAnnotation annotation;
+  final int ringIndex;
+  final double baseRadius;
+  final double baseOpacity;
+  final bool selected;
+
+  const _GlowCircleRef({
+    required this.annotation,
+    required this.ringIndex,
+    required this.baseRadius,
+    required this.baseOpacity,
+    required this.selected,
+  });
 }
