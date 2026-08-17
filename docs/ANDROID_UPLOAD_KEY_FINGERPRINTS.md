@@ -1,7 +1,7 @@
 # FirstVue Android upload key fingerprints
 
-Generated for the Play upload keystore used to sign `FirstVue-1.0.2+3-release.aab`
-(versionName `1.0.2`, versionCode `3`).
+Generated for the Play upload keystore used to sign Play releases
+(including `FirstVue-1.0.2+3-release.aab` and `FirstVue-1.0.3+4-release.aab`).
 
 | Field | Value |
 |-------|--------|

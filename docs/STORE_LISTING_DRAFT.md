@@ -13,15 +13,20 @@ FirstVue helps you discover trusted local businesses, professionals, communities
 
 SEE FIRST. BOOK FIRST.
 
-• Explore nearby businesses and professionals  
-• Watch VUE moments and community posts  
+• Explore nearby businesses and professionals with distance & travel time  
+• Watch VUE moments, Stories (photo / video / text), and community posts  
 • Follow creators and entities you care about  
 • Message securely inside FirstVue  
 • Join groups and communities  
-• Find and RSVP to local events  
+• Find and RSVP to local events with address search  
+• Discover content with trending hashtags  
 • Switch between personal and business identities  
 
 FirstVue is for users 13 and older. Payments are not enabled in this trial build.
+
+## Release notes — 1.0.3 (4)
+
+Smarter addresses, distance on profiles, richer Stories & posts, hashtag discovery, live map pulse, updated tutorial, demo auto-purge, Sounds & Haptics.
 
 Support: hkendale16@gmail.com  
 Privacy: https://firstvue.app/privacy.html  

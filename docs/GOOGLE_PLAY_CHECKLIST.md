@@ -7,8 +7,8 @@ Path for a **personal** Google Play developer account publishing `com.FirstVue`.
 | Milestone | Status |
 |-----------|--------|
 | Developer account approved | **Yes** (operator confirmed) |
-| App created in Play Console | Pending |
-| Signed AAB on Internal testing | Pending |
+| App created in Play Console | **Yes** |
+| Signed AAB on Internal testing | **Yes** (versionCode `3` live; next upload `4` / `1.0.3`) |
 
 ---
 

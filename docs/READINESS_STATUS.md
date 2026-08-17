@@ -62,7 +62,7 @@ Not **READY FOR PRODUCTION** until closed-test gate (12×14 days on personal acc
 | Android API 36 | **PASS** |
 | applicationId `com.FirstVue` | **PASS** |
 | Console setup guide | **PASS** (`docs/GOOGLE_CONSOLE_SETUP.md`) |
-| Release signing / signed AAB | **PASS** — `FirstVue-1.0.1+2-release.aab` built (agent artifacts) |
+| Release signing / signed AAB | **PASS** — `FirstVue-1.0.3+4-release.aab` (same upload key) |
 | Upload key fingerprints | **PASS** (`docs/ANDROID_UPLOAD_KEY_FINGERPRINTS.md`) |
 | Privacy policy page in repo | **PASS** (`web/privacy.html`) |
 | Privacy URL live on domain | **FAIL** until you deploy domain |
@@ -72,12 +72,12 @@ Not **READY FOR PRODUCTION** until closed-test gate (12×14 days on personal acc
 | Account deletion | **PASS** |
 | Payments disabled | **PASS** |
 | Google Client Secret in Supabase | **CHECK** (paste current secret from Cloud Console) |
-| Internal testing upload | **READY** — upload AAB in Play Console |
+| Internal testing upload | **PASS** for `3`; **upload `1.0.3+4`** next (`docs/PLAY_RELEASE_1.0.3.md`) |
 | Closed testing ready | **FAIL** until testers + listing assets |
 
 ### Exact next step
-1. Download agent artifacts `firstvue-play/` (AAB parts + keystore) and reassemble per `UPLOAD_TO_PLAY.md`.
-2. Create Play app → Internal testing → upload AAB.
-3. Add Android OAuth client with SHA-1 from `docs/ANDROID_UPLOAD_KEY_FINGERPRINTS.md`.
-4. Sync Google Client Secret → Supabase.
+1. Download `FirstVue-1.0.3+4-release.aab` from agent artifacts / download link.
+2. Play Console → Internal testing → create release → upload AAB → paste release notes from `docs/PLAY_RELEASE_1.0.3.md`.
+3. Add Android OAuth client with SHA-1 from `docs/ANDROID_UPLOAD_KEY_FINGERPRINTS.md` (if not done).
+4. Sync Google Client Secret → Supabase (if not done).
 5. Deploy `https://firstvue.app/.well-known/assetlinks.json` + privacy page.
