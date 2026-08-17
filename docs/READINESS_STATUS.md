@@ -30,7 +30,7 @@ Not **READY FOR PRODUCTION** until closed-test gate (12×14 days on personal acc
 |------|--------|
 | Release signing keystore | Create locally; never commit |
 | Signed `.aab` | `flutter build appbundle --release` on your machine |
-| Branded 512 icon + feature graphic + screenshots | Icon ready (`store-listing/play-icon-512.png`); graphic + screenshots still needed |
+| Branded 512 icon + feature graphic + screenshots | **PASS** — `store-listing/` (icon, feature graphic, 4 phone shots) |
 | Hosted privacy URL | Deploy web (`/privacy.html`) on `firstvue.app` |
 | Adaptive icon art | Replace Flutter default mipmaps with brand art |
 | Closed testing cohort | 12 opted-in testers × 14 days |

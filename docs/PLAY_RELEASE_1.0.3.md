@@ -46,7 +46,7 @@ Upload `store-listing/play-icon-512.png` (512×512 gold **V**). Use a computer b
 ## Still required before Production
 
 - Closed testing gate: **12 opted-in testers × 14 consecutive days** (personal account).
-- Branded store assets (icon / feature graphic / screenshots) if not done.
+- Branded store assets (icon / feature graphic / 4 phone screenshots) in `store-listing/`
 - Live privacy URL: `https://firstvue.app/privacy.html`
 - Android OAuth client with upload SHA-1 (if Google Sign-In on Android still pending).
 - Google Web client secret synced into Supabase (if not already).
