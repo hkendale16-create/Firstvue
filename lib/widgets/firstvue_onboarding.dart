@@ -8,6 +8,59 @@ const _kDialogBg = Color(0xFF10151B);
 const _kGold = Color(0xFFD8B56A);
 const _kTeal = Color(0xFF3DD9C9);
 
+/// Compact overview of what FirstVue covers, shown on the welcome dialog.
+/// Intentionally short chips, not a long slide deck — the real depth comes
+/// from contextual section tips as each area is opened.
+class _WelcomeHighlights extends StatelessWidget {
+  const _WelcomeHighlights();
+
+  static const _items = <(IconData, String)>[
+    (Icons.explore_outlined, 'VUE & Nearby'),
+    (Icons.home_outlined, 'Home'),
+    (Icons.travel_explore_outlined, 'Explore'),
+    (Icons.event_outlined, 'Events'),
+    (Icons.storefront_outlined, 'Businesses'),
+    (Icons.groups_2_outlined, 'Communities & Groups'),
+    (Icons.chat_bubble_outline, 'Messaging'),
+    (Icons.person_outline, 'Profiles & Following'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final (icon, label) in _items)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: _kTeal.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _kTeal.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 13, color: _kTeal),
+                const SizedBox(width: 5),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 /// First signed-in visit or post-update session: welcome / what's new, then tips.
 Future<void> showFirstLaunchExperience(
   BuildContext context, {
@@ -112,15 +165,18 @@ class FirstVueWelcomeDialog extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Discover events near you, meet people in your city, '
-                'follow communities, and celebrate local moments together.',
+                'FirstVue helps you discover what\'s nearby and stay connected '
+                'to the people, businesses, communities, and events around you.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white70, height: 1.45),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
+              const _WelcomeHighlights(),
+              const SizedBox(height: 14),
               const Text(
-                'We\'ll show short tips as you open each section — Home, VUE & '
-                'LIVE, Feeds, Explore, Messages, and Settings — not all at once.',
+                'We\'ll show short tips as you open each part of the app — '
+                'not all at once — including setting up your profile and '
+                'picking a theme.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: _kGold, height: 1.4, fontSize: 13.5),
               ),
@@ -205,8 +261,9 @@ class FirstVueWhatsNewDialog extends StatelessWidget {
               const SizedBox(height: 16),
               const Text(
                 'We added short tips that appear when you open each section — '
-                'Home, VUE & LIVE, Feeds, Explore, Messages, and Settings — '
-                'so new updates are easier to find.',
+                'Home, VUE & LIVE, Feeds, Explore, Messages, Settings, plus '
+                'setting up your profile and choosing a theme — so new '
+                'updates are easier to find.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white70, height: 1.45),
               ),
@@ -266,8 +323,9 @@ class _TutorialReplayDialog extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const Text(
-                'Open Home, VUE, Feeds, Explore, Messages, or Settings — '
-                'a short tip will point out that section when you get there.',
+                'Open Home, VUE, Feeds, Explore, Messages, Settings, your '
+                'profile, or Appearance — a short tip will point out that '
+                'section when you get there.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white70, height: 1.45),
               ),

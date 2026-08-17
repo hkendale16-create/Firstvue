@@ -7,6 +7,7 @@ import '../services/business_media_service.dart';
 import '../services/business_submission_service.dart';
 import '../services/entity_deletion_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../widgets/confirm_delete_entity_dialog.dart';
 import '../widgets/fv_ui.dart';
 import '../widgets/signed_media_viewer.dart';
 import 'admin_approvals_hub_screen.dart';
@@ -168,49 +169,15 @@ class _EntitySettingsScreenState extends State<EntitySettingsScreen> {
   Future<void> _confirmDelete() async {
     final business = _selected;
     if (business == null) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        final controller = TextEditingController();
-        return AlertDialog(
-          backgroundColor: ctx.fv.surface,
-          title: const Text('Delete entity?'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'This permanently deletes ${business.name}, its media, and catalogs. '
-                'Reviews and comments remain anonymized.',
-              ),
-              const SizedBox(height: 12),
-              const Text('Type DELETE to confirm.'),
-              const SizedBox(height: 8),
-              TextField(
-                controller: controller,
-                decoration: const InputDecoration(hintText: 'DELETE'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: context.fv.error),
-              onPressed: () {
-                if (controller.text.trim() == 'DELETE') {
-                  Navigator.pop(ctx, true);
-                }
-              },
-              child: const Text('Delete forever'),
-            ),
-          ],
-        );
-      },
+    final confirmed = await confirmDeleteEntity(
+      context,
+      entityLabel: business.name,
+      detail:
+          'This permanently deletes ${business.name}, its media, and '
+          'catalogs. Reviews and comments remain anonymized. '
+          'This cannot be undone.',
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
     try {
       await EntityDeletionService.deleteOwnedBusiness(business.id);
       if (!mounted) return;

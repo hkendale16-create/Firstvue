@@ -8,9 +8,11 @@ import '../services/location_service.dart';
 import '../services/things_to_do_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../theme/live_tokens.dart';
+import '../utils/entity_address_requirements.dart';
 import '../widgets/event_date_time_fields.dart';
 import '../widgets/media_picker_sheet.dart';
 import '../widgets/network_photo.dart';
+import '../widgets/smart_address_field.dart';
 
 enum EditEventMode { create, edit, duplicate }
 
@@ -48,6 +50,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
   DateTime? _endsAt;
   double? _latitude;
   double? _longitude;
+  AddressResult? _selectedAddress;
   bool _clearCoordinates = false;
   bool _pinningLocation = false;
   String? _businessId;
@@ -88,11 +91,48 @@ class _EditEventScreenState extends State<EditEventScreen> {
         EditEventMode.duplicate => 'DUPLICATE EVENT',
       };
 
+  void _onAddressSelected(AddressResult result) {
+    setState(() {
+      _selectedAddress = result;
+      _latitude = result.lat;
+      _longitude = result.lng;
+      _clearCoordinates = false;
+      final formatted = result.formatted?.trim();
+      if (formatted != null && formatted.isNotEmpty) {
+        _location.text = formatted;
+      }
+    });
+  }
+
+  String? _addressValidationError({required bool publish}) {
+    if (!publish) return null;
+    final label = _location.text.trim();
+    if (label.isEmpty) {
+      return 'Add a location for this event before publishing.';
+    }
+    final selected = _selectedAddress;
+    if (selected != null) {
+      return EntityAddressRequirements.validateCityState(
+        city: selected.city,
+        state: selected.state,
+        kind: EntityAddressKind.event,
+      );
+    }
+    return null;
+  }
+
   Future<void> _save({required bool publish}) async {
     if (_title.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter an event title.')),
       );
+      return;
+    }
+    final addressError = _addressValidationError(publish: publish);
+    if (addressError != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(addressError)));
       return;
     }
 
@@ -269,10 +309,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: _location,
-            style: TextStyle(color: fv.primaryText),
-            decoration: const InputDecoration(labelText: 'Location'),
+          SmartAddressField(
+            streetController: _location,
+            streetLabel: 'Location',
+            showUnitField: false,
+            showStructuredFields: false,
+            onSelected: _onAddressSelected,
           ),
           const SizedBox(height: 18),
           EventDateTimeFields(

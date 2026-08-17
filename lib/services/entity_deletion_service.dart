@@ -22,6 +22,25 @@ class EntityDeletionService {
     }
   }
 
+  /// Permanently deletes an individual professional profile
+  /// (`public.professional_profiles`). Owner only.
+  static Future<void> deleteOwnedProfessional(
+    String professionalProfileId,
+  ) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw const AuthException('Sign in to delete this profile.');
+    }
+    try {
+      await _client.rpc(
+        'delete_owned_professional',
+        params: {'p_professional_profile_id': professionalProfileId},
+      );
+    } on PostgrestException catch (error) {
+      throw AuthException(_friendlyProfessionalError(error));
+    }
+  }
+
   /// Permanently deletes a Group (`public.communities`). Owner/creator only.
   static Future<void> deleteOwnedGroup(String groupId) async {
     final user = _client.auth.currentUser;
@@ -67,6 +86,20 @@ class EntityDeletionService {
       return 'Please sign in again to confirm deletion.';
     }
     return 'Could not delete this business. ${error.message}';
+  }
+
+  static String _friendlyProfessionalError(PostgrestException error) {
+    final message = error.message.toLowerCase();
+    if (message.contains('only the owner')) {
+      return 'Only the owner can permanently delete this professional profile.';
+    }
+    if (message.contains('not found')) {
+      return 'This professional profile could not be found.';
+    }
+    if (message.contains('authentication')) {
+      return 'Please sign in again to confirm deletion.';
+    }
+    return 'Could not delete this professional profile. ${error.message}';
   }
 
   static String _friendlyGroupError(PostgrestException error) {

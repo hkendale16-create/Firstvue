@@ -35,6 +35,10 @@ class ProfessionalProfile {
   final String bookingUrl;
   final String status;
   final DateTime? createdAt;
+  final String? addressLine1;
+  final double? latitude;
+  final double? longitude;
+  final String? placeId;
 
   const ProfessionalProfile({
     required this.id,
@@ -51,6 +55,10 @@ class ProfessionalProfile {
     required this.bookingUrl,
     required this.status,
     this.createdAt,
+    this.addressLine1,
+    this.latitude,
+    this.longitude,
+    this.placeId,
   });
 
   factory ProfessionalProfile.fromMap(Map<String, dynamic> map) {
@@ -73,6 +81,10 @@ class ProfessionalProfile {
       bookingUrl: (map['booking_url'] as String?) ?? '',
       status: (map['status'] as String?) ?? 'pending',
       createdAt: DateTime.tryParse((map['created_at'] as String?) ?? ''),
+      addressLine1: map['address_line_1'] as String?,
+      latitude: (map['latitude'] as num?)?.toDouble(),
+      longitude: (map['longitude'] as num?)?.toDouble(),
+      placeId: map['place_id'] as String?,
     );
   }
 }
@@ -131,11 +143,18 @@ class ProfessionalProfilesService {
     required bool acceptsNewClients,
     required String availabilityNote,
     required String bookingUrl,
+    String? addressLine1,
+    double? latitude,
+    double? longitude,
+    String? placeId,
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) {
       throw StateError('Sign in to create a professional profile.');
     }
+
+    final trimmedAddress = addressLine1?.trim();
+    final trimmedPlaceId = placeId?.trim();
 
     await _client.from('profiles').upsert({
       'id': user.id,
@@ -157,6 +176,10 @@ class ProfessionalProfilesService {
       'availability_note': availabilityNote,
       'booking_url': bookingUrl,
       'status': 'pending',
+      'address_line_1': ?trimmedAddress,
+      'latitude': ?latitude,
+      'longitude': ?longitude,
+      'place_id': ?trimmedPlaceId,
       'updated_at': DateTime.now().toIso8601String(),
     }, onConflict: 'profile_id');
   }

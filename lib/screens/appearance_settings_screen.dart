@@ -3,16 +3,31 @@ import 'package:flutter/material.dart';
 import '../services/theme_preference_service.dart';
 import '../theme/app_theme_controller.dart';
 import '../theme/firstvue_theme.dart';
+import '../widgets/firstvue_section_tip.dart';
 
 /// Settings → Appearance → Theme
-class AppearanceSettingsScreen extends StatelessWidget {
+class AppearanceSettingsScreen extends StatefulWidget {
   const AppearanceSettingsScreen({super.key});
 
+  @override
+  State<AppearanceSettingsScreen> createState() =>
+      _AppearanceSettingsScreenState();
+}
+
+class _AppearanceSettingsScreenState extends State<AppearanceSettingsScreen> {
   static const _options = <ThemeMode>[
     ThemeMode.system,
     ThemeMode.light,
     ThemeMode.dark,
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybeShowThemeTip(context);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

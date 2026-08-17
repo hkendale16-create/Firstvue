@@ -7,12 +7,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../constants/business_types.dart';
-import '../data/us_locations.dart';
 import '../services/business_media_service.dart';
 import '../services/business_submission_service.dart';
+import '../utils/entity_address_requirements.dart';
 import '../utils/form_validators.dart';
 import '../widgets/fv_ui.dart';
 import '../widgets/media_picker_sheet.dart';
+import '../widgets/smart_address_field.dart';
 import '../auth/ensure_signed_in.dart';
 import 'rentals_screen.dart';
 
@@ -615,18 +616,22 @@ class _VerificationFormScreenState extends State<_VerificationFormScreen> {
   final _addressController = TextEditingController();
   final _address2Controller = TextEditingController();
   final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
   final _zipController = TextEditingController();
   final _instagramController = TextEditingController();
   final _facebookController = TextEditingController();
   final _tiktokController = TextEditingController();
   final _xController = TextEditingController();
   final _youtubeController = TextEditingController();
+  final _addressFieldKey = GlobalKey<SmartAddressFieldState>();
 
-  String? _state;
+  AddressResult? _selectedAddress;
+  double? _latitude;
+  double? _longitude;
+  String? _placeId;
+  String? _formattedAddress;
   String? _contactPreference;
   bool _isSubmitting = false;
-  bool _stateFocused = false;
-  bool _cityFocused = false;
   bool _preferenceFocused = false;
 
   static const _preferences = <String>[
@@ -646,6 +651,7 @@ class _VerificationFormScreenState extends State<_VerificationFormScreen> {
     _addressController.dispose();
     _address2Controller.dispose();
     _cityController.dispose();
+    _stateController.dispose();
     _zipController.dispose();
     _instagramController.dispose();
     _facebookController.dispose();
@@ -655,57 +661,13 @@ class _VerificationFormScreenState extends State<_VerificationFormScreen> {
     super.dispose();
   }
 
-  Future<void> _pickState() async {
-    setState(() => _stateFocused = true);
-    final selected = await showFvSearchablePicker(
-      context: context,
-      title: 'Select state',
-      searchHint: 'Search states',
-      selectedId: _state,
-      options: [
-        for (final state in UsLocations.states)
-          FvPickerOption(id: state, label: state, icon: Icons.map_outlined),
-      ],
-    );
-    if (!mounted) return;
+  void _onAddressSelected(AddressResult result) {
     setState(() {
-      _stateFocused = false;
-      if (selected != null) {
-        _state = selected.id;
-        _cityController.clear();
-      }
-    });
-  }
-
-  Future<void> _pickCity() async {
-    if (_state == null || _state!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select a state first.')),
-      );
-      return;
-    }
-    setState(() => _cityFocused = true);
-    final cities = UsLocations.citiesForState(_state);
-    final selected = await showFvSearchablePicker(
-      context: context,
-      title: 'Select city',
-      searchHint: 'Search cities in $_state',
-      selectedId: _cityController.text.trim().isEmpty
-          ? null
-          : _cityController.text.trim(),
-      options: [
-        for (final city in cities)
-          FvPickerOption(
-            id: city,
-            label: city,
-            icon: Icons.location_city_outlined,
-          ),
-      ],
-    );
-    if (!mounted) return;
-    setState(() {
-      _cityFocused = false;
-      if (selected != null) _cityController.text = selected.id;
+      _selectedAddress = result;
+      _latitude = result.lat;
+      _longitude = result.lng;
+      _placeId = result.placeId;
+      _formattedAddress = result.formatted;
     });
   }
 
@@ -746,7 +708,27 @@ class _VerificationFormScreenState extends State<_VerificationFormScreen> {
     if (webErr != null) return webErr;
     final zipErr = FormValidators.optionalUsZip(_zipController.text);
     if (zipErr != null) return zipErr;
-    return null;
+    if (widget.isClaim) return null;
+    return EntityAddressRequirements.validate(
+      _currentAddress(),
+      kind: EntityAddressKind.business,
+    );
+  }
+
+  AddressResult _currentAddress() {
+    return (_selectedAddress ?? const AddressResult()).copyWith(
+      street: _addressController.text.trim(),
+      unit: _address2Controller.text.trim().isEmpty
+          ? null
+          : _address2Controller.text.trim(),
+      city: _cityController.text.trim(),
+      state: _stateController.text.trim(),
+      zip: _zipController.text.trim(),
+      formatted: _formattedAddress,
+      lat: _latitude,
+      lng: _longitude,
+      placeId: _placeId,
+    );
   }
 
   Future<void> _submit() async {
@@ -807,10 +789,14 @@ class _VerificationFormScreenState extends State<_VerificationFormScreen> {
           addressLine1: _addressController.text.trim(),
           addressLine2: _address2Controller.text.trim(),
           city: _cityController.text.trim(),
-          state: _state,
+          state: _stateController.text.trim(),
           zip: _zipController.text.trim(),
           contactPreference: _contactPreference,
           socialLinks: socials,
+          latitude: _latitude,
+          longitude: _longitude,
+          placeId: _placeId,
+          formattedAddress: _formattedAddress,
         );
         if (widget.avatarFile != null) {
           try {
@@ -931,43 +917,15 @@ class _VerificationFormScreenState extends State<_VerificationFormScreen> {
                   keyboardType: TextInputType.url,
                 ),
                 const SizedBox(height: 14),
-                FvCompactField(
-                  label: 'Address',
-                  hint: 'Street address',
-                  controller: _addressController,
-                ),
-                const SizedBox(height: 14),
-                FvCompactField(
-                  label: 'Address line 2 (optional)',
-                  hint: 'Suite, unit, floor',
-                  controller: _address2Controller,
-                ),
-                const SizedBox(height: 14),
-                FvSelectorField(
-                  label: 'State',
-                  value: _state,
-                  hint: 'Select state',
-                  icon: Icons.map_outlined,
-                  focused: _stateFocused,
-                  onTap: _pickState,
-                ),
-                const SizedBox(height: 14),
-                FvSelectorField(
-                  label: 'City',
-                  value: _cityController.text.trim().isEmpty
-                      ? null
-                      : _cityController.text.trim(),
-                  hint: _state == null ? 'Select a state first' : 'Select city',
-                  icon: Icons.location_city_outlined,
-                  focused: _cityFocused,
-                  onTap: _pickCity,
-                ),
-                const SizedBox(height: 14),
-                FvCompactField(
-                  label: 'ZIP / postal code',
-                  hint: '30301',
-                  controller: _zipController,
-                  keyboardType: TextInputType.number,
+                SmartAddressField(
+                  key: _addressFieldKey,
+                  streetController: _addressController,
+                  unitController: _address2Controller,
+                  cityController: _cityController,
+                  stateController: _stateController,
+                  zipController: _zipController,
+                  streetLabel: 'Business address',
+                  onSelected: _onAddressSelected,
                 ),
                 const SizedBox(height: 14),
                 FvSelectorField(

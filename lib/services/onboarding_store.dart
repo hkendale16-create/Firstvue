@@ -8,6 +8,8 @@ enum TutorialSection {
   explore,
   messages,
   settings,
+  profile,
+  theme,
 }
 
 /// Why the first-launch / tips flow should run for this session.
@@ -26,15 +28,21 @@ class OnboardingStore {
   ///
   /// New users always get [TutorialPromptKind.welcome]. Existing users who
   /// already finished tips see [TutorialPromptKind.whatsNew] when this rises.
-  static const contentVersion = 3;
+  ///
+  /// This value must only change for meaningful tutorial content updates
+  /// (new sections, materially different copy) — not on every release —
+  /// so the tour does not resurface on every login.
+  static const contentVersion = 4;
 
-  /// Welcome dialog (v3 copy — contextual tips, no slide chooser).
-  static const _welcomeKey = 'firstvue_welcome_v3_seen';
+  /// Welcome dialog (v4 copy — expanded FirstVue overview + tip preview).
+  static const _welcomeKey = 'firstvue_welcome_v4_seen';
+  static const _legacyWelcomeV3Key = 'firstvue_welcome_v3_seen';
   static const _legacyWelcomeV2Key = 'firstvue_welcome_v2_seen';
   static const _legacyWelcomeV1Key = 'firstvue_welcome_v1_seen';
 
   /// When true, section tips are suppressed (user skipped or finished all).
-  static const _tipsOptOutKey = 'firstvue_tips_v3_opt_out';
+  static const _tipsOptOutKey = 'firstvue_tips_v4_opt_out';
+  static const _legacyTutorialV3Key = 'firstvue_tips_v3_opt_out';
   static const _legacyTutorialV2Key = 'firstvue_tutorial_v2_completed';
   static const _legacyTutorialV1Key = 'firstvue_tutorial_v1_completed';
 
@@ -42,7 +50,7 @@ class OnboardingStore {
   static const _pendingWhatsNewKey = 'firstvue_tutorial_whats_new_pending';
 
   static String _tipKey(TutorialSection section) =>
-      'firstvue_tip_v3_${section.name}_seen';
+      'firstvue_tip_v4_${section.name}_seen';
 
   /// Call once per signed-in home session before showing tips.
   ///
@@ -56,6 +64,16 @@ class OnboardingStore {
 
     if (seen != null && seen < contentVersion) {
       // Feature/tutorial update for someone already on the versioned system.
+      // Carry forward "already welcomed" state under the new key name so a
+      // storage-key rename never re-triggers the brand-new welcome dialog —
+      // returning users always get What's new, never Welcome, on a bump.
+      final alreadyWelcomed = (prefs.getBool(_welcomeKey) ?? false) ||
+          (prefs.getBool(_legacyWelcomeV3Key) ?? false) ||
+          (prefs.getBool(_legacyWelcomeV2Key) ?? false) ||
+          (prefs.getBool(_legacyWelcomeV1Key) ?? false);
+      if (alreadyWelcomed) {
+        await prefs.setBool(_welcomeKey, true);
+      }
       await _clearTipProgress(prefs);
       await prefs.setBool(_pendingWhatsNewKey, true);
       await prefs.setInt(_seenContentVersionKey, contentVersion);
@@ -63,9 +81,11 @@ class OnboardingStore {
     }
 
     // First time on the versioned tip system (seen == null).
-    final legacyWelcome = (prefs.getBool(_legacyWelcomeV2Key) ?? false) ||
+    final legacyWelcome = (prefs.getBool(_legacyWelcomeV3Key) ?? false) ||
+        (prefs.getBool(_legacyWelcomeV2Key) ?? false) ||
         (prefs.getBool(_legacyWelcomeV1Key) ?? false);
-    final legacyTutorial = (prefs.getBool(_legacyTutorialV2Key) ?? false) ||
+    final legacyTutorial = (prefs.getBool(_legacyTutorialV3Key) ?? false) ||
+        (prefs.getBool(_legacyTutorialV2Key) ?? false) ||
         (prefs.getBool(_legacyTutorialV1Key) ?? false);
 
     if (legacyWelcome && !(prefs.getBool(_welcomeKey) ?? false)) {
@@ -156,6 +176,7 @@ class OnboardingStore {
   static Future<void> resetTips() async {
     final prefs = await SharedPreferences.getInstance();
     await _clearTipProgress(prefs);
+    await prefs.remove(_legacyTutorialV3Key);
     await prefs.remove(_legacyTutorialV2Key);
     await prefs.remove(_legacyTutorialV1Key);
   }
@@ -164,6 +185,7 @@ class OnboardingStore {
   static Future<void> reset() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_welcomeKey);
+    await prefs.remove(_legacyWelcomeV3Key);
     await prefs.remove(_legacyWelcomeV2Key);
     await prefs.remove(_legacyWelcomeV1Key);
     await prefs.remove(_seenContentVersionKey);

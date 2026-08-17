@@ -292,11 +292,24 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                         ? _handleAccount
                         : () => _open(const SettingsPreferencesScreen()),
                   ),
+                ],
+              ),
+              _SettingsGroup(
+                title: 'Help / Tutorial',
+                children: [
                   _SettingsTile(
                     icon: Icons.menu_book_outlined,
-                    title: 'App tutorial',
-                    subtitle: 'Short tips as you open each section',
+                    title: 'View Tutorial Again',
+                    subtitle: 'Replay short tips for every section',
                     onTap: () => showOnboardingTourReplay(context),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.chat_bubble_outline,
+                    title: 'Send feedback',
+                    subtitle: 'Bugs, ideas & what\'s missing near you',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => _open(const HelpBuildFirstVueScreen()),
                   ),
                 ],
               ),

@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/community_creation_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../utils/entity_address_requirements.dart';
 import '../widgets/create_entity_form_chrome.dart';
 import '../widgets/location_autocomplete_field.dart';
 import '../auth/ensure_signed_in.dart';
@@ -105,6 +106,15 @@ class _CreateCommunityHubScreenState extends State<CreateCommunityHubScreen> {
       setState(
         () => _error = 'Please explain why this Community should exist.',
       );
+      return;
+    }
+    final locationError = EntityAddressRequirements.validateCityState(
+      city: _city.text,
+      state: _state.text,
+      kind: EntityAddressKind.community,
+    );
+    if (locationError != null) {
+      setState(() => _error = locationError);
       return;
     }
 

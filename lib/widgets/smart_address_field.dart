@@ -264,10 +264,11 @@ class SmartAddressField extends StatefulWidget {
   });
 
   @override
-  State<SmartAddressField> createState() => _SmartAddressFieldState();
+  State<SmartAddressField> createState() => SmartAddressFieldState();
 }
 
-class _SmartAddressFieldState extends State<SmartAddressField> {
+/// Public state so parents can read [currentResult] via a [GlobalKey].
+class SmartAddressFieldState extends State<SmartAddressField> {
   final _focusNode = FocusNode();
   final _layerLink = LayerLink();
   final _http = http.Client();

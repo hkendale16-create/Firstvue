@@ -14,6 +14,41 @@ enum ProfileActivityType {
   sparkReceived,
   reviewWritten,
   reviewReceived,
+  savedItem,
+  sharedPost,
+}
+
+/// Recent Activity filter shown as tabs/dropdown on a profile.
+///
+/// Saves and shares are always the *viewer's own* — [ProfileActivityService]
+/// never exposes another user's saved or shared items, even when a filter
+/// other than [all] is requested for an entity's public activity.
+enum ProfileActivityFilter {
+  all,
+  likes,
+  saves,
+  shares;
+
+  String get label => switch (this) {
+        ProfileActivityFilter.all => 'All',
+        ProfileActivityFilter.likes => 'Likes',
+        ProfileActivityFilter.saves => 'Saves',
+        ProfileActivityFilter.shares => 'Shares',
+      };
+
+  bool matches(ProfileActivityType type) {
+    switch (this) {
+      case ProfileActivityFilter.all:
+        return true;
+      case ProfileActivityFilter.likes:
+        return type == ProfileActivityType.sparkGiven ||
+            type == ProfileActivityType.sparkReceived;
+      case ProfileActivityFilter.saves:
+        return type == ProfileActivityType.savedItem;
+      case ProfileActivityFilter.shares:
+        return type == ProfileActivityType.sharedPost;
+    }
+  }
 }
 
 class ProfileActivityItem {
@@ -53,57 +88,100 @@ class ProfileActivityService {
     return _urlPattern.firstMatch(text.trim())?.group(0);
   }
 
+  /// Fetches the current user's own activity, one page at a time.
+  ///
+  /// [filter] narrows the feed to Likes (sparks given/received), Saves
+  /// (owner-only — from `user_saved_items`), or Shares (owner-only — from
+  /// `feed_interactions`). [offset] + [limit] give simple "load more"
+  /// pagination; callers should not request the entire history at once.
   static Future<List<ProfileActivityItem>> fetchUserActivity({
     int limit = 20,
+    int offset = 0,
+    ProfileActivityFilter filter = ProfileActivityFilter.all,
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) return const [];
 
-    final perSource = (limit / 2).ceil().clamp(4, limit);
-    final batches = await Future.wait([
-      _fetchNewsPostsByAuthor(user.id, perSource),
-      _fetchFeedCommentsByAuthor(user.id, perSource),
-      _fetchBusinessMediaForOwner(user.id, perSource),
-      _fetchSparksGiven(user.id, perSource),
-      _fetchSparksReceived(user.id, perSource),
-      _fetchReviewsWritten(user.id, perSource),
-    ]);
-
-    return _mergeAndLimit(batches.expand((items) => items), limit);
+    switch (filter) {
+      case ProfileActivityFilter.likes:
+        final perSource = (limit / 2).ceil().clamp(2, limit);
+        final batches = await Future.wait([
+          _fetchSparksGiven(user.id, perSource, offset: offset),
+          _fetchSparksReceived(user.id, perSource, offset: offset),
+        ]);
+        return _mergeAndLimit(batches.expand((items) => items), limit);
+      case ProfileActivityFilter.saves:
+        return _fetchSavedItems(user.id, limit, offset: offset);
+      case ProfileActivityFilter.shares:
+        return _fetchShares(user.id, limit, offset: offset);
+      case ProfileActivityFilter.all:
+        // A merged multi-source feed has no single cursor, so "load more"
+        // widens the fetch window per source rather than tracking N cursors.
+        final window = (limit + offset).clamp(limit, 200);
+        final batches = await Future.wait([
+          _fetchNewsPostsByAuthor(user.id, window),
+          _fetchFeedCommentsByAuthor(user.id, window),
+          _fetchBusinessMediaForOwner(user.id, window),
+          _fetchSparksGiven(user.id, window),
+          _fetchSparksReceived(user.id, window),
+          _fetchReviewsWritten(user.id, window),
+          _fetchSavedItems(user.id, window),
+          _fetchShares(user.id, window),
+        ]);
+        final merged = _mergeAndLimit(
+          batches.expand((items) => items),
+          window,
+        );
+        if (offset >= merged.length) return const [];
+        return merged.skip(offset).take(limit).toList();
+    }
   }
 
+  /// Public entity activity (business). Never includes saves/shares — those
+  /// stay owner-only and only appear via [fetchUserActivity].
   static Future<List<ProfileActivityItem>> fetchBusinessActivity(
     String businessId, {
     int limit = 15,
+    int offset = 0,
   }) async {
-    final perSource = (limit / 2).ceil().clamp(3, limit);
+    final window = (limit + offset).clamp(limit, 200);
+    final perSource = (window / 2).ceil().clamp(3, window);
     final batches = await Future.wait([
       _fetchNewsPostsForBusiness(businessId, perSource),
       _fetchBusinessMedia(businessId, perSource),
       _fetchReviewsForBusiness(businessId, perSource),
     ]);
 
-    return _mergeAndLimit(batches.expand((items) => items), limit);
+    final merged = _mergeAndLimit(batches.expand((items) => items), window);
+    if (offset >= merged.length) return const [];
+    return merged.skip(offset).take(limit).toList();
   }
 
+  /// Public entity activity (professional). Never includes saves/shares.
   static Future<List<ProfileActivityItem>> fetchProfessionalActivity(
     String professionalProfileId, {
     int limit = 15,
+    int offset = 0,
   }) async {
-    final perSource = (limit / 2).ceil().clamp(3, limit);
+    final window = (limit + offset).clamp(limit, 200);
+    final perSource = (window / 2).ceil().clamp(3, window);
     final batches = await Future.wait([
       _fetchNewsPostsForProfessional(professionalProfileId, perSource),
       _fetchProfessionalMedia(professionalProfileId, perSource),
     ]);
 
-    return _mergeAndLimit(batches.expand((items) => items), limit);
+    final merged = _mergeAndLimit(batches.expand((items) => items), window);
+    if (offset >= merged.length) return const [];
+    return merged.skip(offset).take(limit).toList();
   }
 
   static Future<List<ProfileActivityItem>> fetchEventActivity(
     String eventId, {
     int limit = 15,
+    int offset = 0,
   }) async {
-    return _fetchNewsPostsForEvent(eventId, limit);
+    return _fetchNewsPostsForEvent(eventId, limit + offset)
+        .then((items) => items.skip(offset).take(limit).toList());
   }
 
   static List<ProfileActivityItem> _mergeAndLimit(
@@ -462,15 +540,16 @@ class ProfileActivityService {
 
   static Future<List<ProfileActivityItem>> _fetchSparksGiven(
     String userId,
-    int limit,
-  ) async {
+    int limit, {
+    int offset = 0,
+  }) async {
     try {
       final rows = await _client
           .from('community_news_post_sparks')
           .select('created_at, post_id, community_news_posts(body)')
           .eq('user_id', userId)
           .order('created_at', ascending: false)
-          .limit(limit);
+          .range(offset, offset + limit - 1);
 
       final postIds = rows
           .map((row) => row['post_id'] as String?)
@@ -503,8 +582,9 @@ class ProfileActivityService {
 
   static Future<List<ProfileActivityItem>> _fetchSparksReceived(
     String userId,
-    int limit,
-  ) async {
+    int limit, {
+    int offset = 0,
+  }) async {
     try {
       final posts = await _client
           .from('community_news_posts')
@@ -522,7 +602,7 @@ class ProfileActivityService {
           .inFilter('post_id', postBodies.keys.toList())
           .neq('user_id', userId)
           .order('created_at', ascending: false)
-          .limit(limit);
+          .range(offset, offset + limit - 1);
 
       final list = List<Map<String, dynamic>>.from(
         (rows as List).map((row) => Map<String, dynamic>.from(row as Map)),
@@ -554,6 +634,135 @@ class ProfileActivityService {
       }).toList();
     } catch (_) {
       return const [];
+    }
+  }
+
+  /// Owner-only: the current user's saved news posts and businesses.
+  /// `user_saved_items` RLS already restricts reads to `user_id = auth.uid()`,
+  /// so this can never surface another user's saves.
+  static Future<List<ProfileActivityItem>> _fetchSavedItems(
+    String userId,
+    int limit, {
+    int offset = 0,
+  }) async {
+    try {
+      final rows = await _client
+          .from('user_saved_items')
+          .select('id, content_id, content_type, created_at')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+      if (rows.isEmpty) return const [];
+
+      final newsPostIds = rows
+          .where((row) => row['content_type'] == 'news_post')
+          .map((row) => row['content_id'] as String)
+          .toList();
+      final businessIds = rows
+          .where((row) => row['content_type'] == 'business')
+          .map((row) => row['content_id'] as String)
+          .toList();
+
+      final mediaByPost =
+          await CommunityNewsMediaService.fetchMediaByPostIds(newsPostIds);
+      final postBodies = await _fetchNewsPostBodies(newsPostIds);
+      final businessNames = await _fetchBusinessNames(businessIds);
+
+      return rows.map((row) {
+        final contentType = row['content_type'] as String;
+        final contentId = row['content_id'] as String;
+        final createdAt = DateTime.parse(row['created_at'] as String);
+
+        if (contentType == 'news_post') {
+          final post = postBodies[contentId];
+          final media = mediaByPost[contentId] ?? const [];
+          final firstMedia = media.isNotEmpty ? media.first : null;
+          return ProfileActivityItem(
+            type: ProfileActivityType.savedItem,
+            title: 'Saved a post',
+            subtitle: post == null ? 'This post is no longer available.' : post,
+            createdAt: createdAt,
+            referenceId: contentId,
+            thumbnailUrl: firstMedia?.signedUrl,
+            thumbnailIsVideo: firstMedia?.isVideo ?? false,
+            linkUrl: post == null ? null : extractLink(post),
+          );
+        }
+
+        return ProfileActivityItem(
+          type: ProfileActivityType.savedItem,
+          title: 'Saved ${businessNames[contentId] ?? 'a business'}',
+          subtitle: 'Business profile saved for later',
+          createdAt: createdAt,
+          referenceId: contentId,
+        );
+      }).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Owner-only: the current user's own shares/reposts of feed posts.
+  /// `feed_interactions` RLS already restricts reads to `user_id = auth.uid()`.
+  static Future<List<ProfileActivityItem>> _fetchShares(
+    String userId,
+    int limit, {
+    int offset = 0,
+  }) async {
+    try {
+      final rows = await _client
+          .from('feed_interactions')
+          .select('created_at, post_id, interaction_type')
+          .eq('user_id', userId)
+          .inFilter('interaction_type', ['share', 'repost'])
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+      if (rows.isEmpty) return const [];
+
+      final postIds = rows
+          .map((row) => row['post_id'] as String?)
+          .whereType<String>()
+          .toSet()
+          .toList();
+      final postBodies = await _fetchNewsPostBodies(postIds);
+      final mediaByPost =
+          await CommunityNewsMediaService.fetchMediaByPostIds(postIds);
+
+      return rows.map((row) {
+        final postId = row['post_id'] as String?;
+        final body = postId == null ? null : postBodies[postId];
+        final media = postId == null ? const [] : (mediaByPost[postId] ?? const []);
+        final firstMedia = media.isNotEmpty ? media.first : null;
+        return ProfileActivityItem(
+          type: ProfileActivityType.sharedPost,
+          title: 'Shared a post',
+          subtitle: body ?? 'This post is no longer available.',
+          createdAt: DateTime.parse(row['created_at'] as String),
+          referenceId: postId,
+          thumbnailUrl: firstMedia?.signedUrl,
+          thumbnailIsVideo: firstMedia?.isVideo ?? false,
+          linkUrl: body == null ? null : extractLink(body),
+        );
+      }).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<Map<String, String>> _fetchNewsPostBodies(
+    List<String> postIds,
+  ) async {
+    if (postIds.isEmpty) return {};
+    try {
+      final rows = await _client
+          .from('community_news_posts')
+          .select('id, body')
+          .inFilter('id', postIds);
+      return {
+        for (final row in rows) row['id'] as String: _truncate(row['body'] as String),
+      };
+    } catch (_) {
+      return {};
     }
   }
 

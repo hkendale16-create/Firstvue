@@ -11,6 +11,7 @@ import '../services/entity_deletion_service.dart';
 import '../services/entity_details_service.dart';
 import '../services/profile_completion_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../utils/entity_address_requirements.dart';
 import '../widgets/editable_media_grid.dart';
 import '../widgets/entity_details_form.dart';
 import '../widgets/entity_profile_media_editor.dart';
@@ -420,8 +421,33 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
     }
   }
 
+  AddressResult _currentAddress() {
+    return AddressResult(
+      street: _address.text.trim(),
+      unit: _unit.text.trim().isEmpty ? null : _unit.text.trim(),
+      city: _city.text.trim(),
+      state: _state.text.trim(),
+      zip: _zip.text.trim(),
+      country: _country.text.trim().isEmpty ? 'US' : _country.text.trim(),
+      formatted: _formattedAddress,
+      lat: _latitude,
+      lng: _longitude,
+      placeId: _placeId,
+    );
+  }
+
   Future<void> _save() async {
     if (_saving) return;
+    final addressError = EntityAddressRequirements.validate(
+      _currentAddress(),
+      kind: EntityAddressKind.business,
+    );
+    if (addressError != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(addressError)));
+      return;
+    }
     setState(() => _saving = true);
     try {
       await BusinessSubmissionService.saveBusinessProfile(

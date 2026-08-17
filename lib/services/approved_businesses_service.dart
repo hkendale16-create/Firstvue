@@ -29,6 +29,10 @@ class PublicBusinessDetails {
   final String businessType;
   final String? description;
   final String? address;
+  final String? city;
+  final String? state;
+  final double? latitude;
+  final double? longitude;
   final List<String> services;
 
   const PublicBusinessDetails({
@@ -38,7 +42,21 @@ class PublicBusinessDetails {
     required this.description,
     required this.address,
     required this.services,
+    this.city,
+    this.state,
+    this.latitude,
+    this.longitude,
   });
+
+  String? get cityStateLabel {
+    final parts = [
+      if ((city ?? '').trim().isNotEmpty) city!.trim(),
+      if ((state ?? '').trim().isNotEmpty) state!.trim(),
+    ];
+    return parts.isEmpty ? null : parts.join(', ');
+  }
+
+  bool get hasMapCoordinates => latitude != null && longitude != null;
 }
 
 class ApprovedBusinessesService {
@@ -87,7 +105,9 @@ class ApprovedBusinessesService {
         .single();
     final location = await client
         .from('business_locations')
-        .select('address_line_1, city, state, postal_code')
+        .select(
+          'address_line_1, city, state, postal_code, latitude, longitude',
+        )
         .eq('business_id', businessId)
         .maybeSingle();
 
@@ -105,6 +125,10 @@ class ApprovedBusinessesService {
           (business['business_type'] as String?) ?? 'Service business',
       description: business['description'] as String?,
       address: locationParts.isEmpty ? null : locationParts.join(', '),
+      city: location?['city'] as String?,
+      state: location?['state'] as String?,
+      latitude: (location?['latitude'] as num?)?.toDouble(),
+      longitude: (location?['longitude'] as num?)?.toDouble(),
       services: List<String>.from((business['services'] as List?) ?? const []),
     );
     _cache.put(businessId, details);
