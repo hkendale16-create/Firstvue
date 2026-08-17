@@ -62,7 +62,8 @@ Prepare in Play Console → Main store listing:
 | Short description | ≤ 80 chars |
 | Full description | Features, communities, businesses, messaging |
 | App icon | 512×512 PNG — `store-listing/play-icon-512.png` |
-| Feature graphic | 1024×500 |
+| Feature graphic | 1024×500 — `store-listing/feature-graphic-1024x500.png` |
+| Phone screenshots | `store-listing/phone-screenshots/` (4 × 1080×1920) |
 | Tablet screenshots | 7-inch + 10-inch in `store-listing/tablet-*` |
 | Category | Social or Lifestyle (pick best fit) |
 
