@@ -2,6 +2,14 @@
 
 Path for a **personal** Google Play developer account publishing `app.firstvue.mobile`.
 
+**Post-approval walkthrough:** `docs/GOOGLE_CONSOLE_SETUP.md` (Play app creation + Google Cloud OAuth + signing order).
+
+| Milestone | Status |
+|-----------|--------|
+| Developer account approved | **Yes** (operator confirmed) |
+| App created in Play Console | Pending |
+| Signed AAB on Internal testing | Pending |
+
 ---
 
 ## 1. Build and signing

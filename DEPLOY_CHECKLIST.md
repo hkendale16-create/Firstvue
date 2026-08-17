@@ -26,6 +26,8 @@ Dashboard → **Authentication → URL Configuration**
 
 **Google “Continue with Google”** (required for OAuth to finish):
 
+Full post-approval walkthrough: `docs/GOOGLE_CONSOLE_SETUP.md` (Play Console + Cloud OAuth + Android SHA-1).
+
 Dashboard → **Authentication → Providers → Google**
 
 | Field | Value |
