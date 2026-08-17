@@ -10,6 +10,7 @@ import '../auth/auth_link_handler.dart';
 import '../auth/auth_local_state.dart';
 import '../auth/auth_redirect.dart';
 import '../auth/google_id_token_sign_in.dart';
+import '../services/demo_accounts_service.dart';
 import '../services/username_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/firstvue_emblem.dart';
@@ -51,6 +52,7 @@ class _AuthScreenState extends State<AuthScreen> {
   String? _confirmError;
   String? _formError;
   String? _infoMessage;
+  DemoAccountsStatus _demoStatus = DemoAccountsStatus.unavailable;
 
   @override
   void initState() {
@@ -58,6 +60,28 @@ class _AuthScreenState extends State<AuthScreen> {
     _mode = widget.initialMode;
     // OAuth failures land on /auth/callback with ?error=…; show that once.
     _formError = widget.initialError ?? AuthLinkHandler.takePendingError();
+    unawaited(_loadDemoStatus());
+  }
+
+  Future<void> _loadDemoStatus() async {
+    final status = await DemoAccountsService.fetchStatus();
+    if (!mounted) return;
+    setState(() => _demoStatus = status);
+  }
+
+  void _fillDemoCredentials() {
+    final email = _demoStatus.email;
+    final password = _demoStatus.password;
+    if (email == null || password == null) return;
+    _emailController.text = email;
+    _passwordController.text = password;
+    _setMode(AuthSheetMode.signIn);
+    setState(() {
+      _emailError = null;
+      _passwordError = null;
+      _formError = null;
+      _infoMessage = 'Demo credentials filled — tap Sign in.';
+    });
   }
 
   @override
@@ -717,6 +741,14 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
             ),
           ),
+        if ((signIn || create) && _demoStatus.available) ...[
+          const SizedBox(height: 8),
+          _DemoAccountsBanner(
+            status: _demoStatus,
+            enabled: !_submitting,
+            onUseDemo: _fillDemoCredentials,
+          ),
+        ],
         if (create) ...[
           Text(
             'Password: 8+ characters, uppercase, lowercase, and a number.',
@@ -1204,3 +1236,89 @@ class _LegalLink extends StatelessWidget {
     );
   }
 }
+
+/// Shown only while seeded demo accounts still exist in Supabase.
+class _DemoAccountsBanner extends StatelessWidget {
+  final DemoAccountsStatus status;
+  final bool enabled;
+  final VoidCallback onUseDemo;
+
+  const _DemoAccountsBanner({
+    required this.status,
+    required this.enabled,
+    required this.onUseDemo,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final email = status.email ?? 'fvdemo01@firstvue.demo';
+    final password = status.password ?? 'FirstVueDemo!25';
+    return Semantics(
+      container: true,
+      label: 'Demo accounts available',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFF182033),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: FirstVueColors.gold.withValues(alpha: .35)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Demo accounts available',
+                style: TextStyle(
+                  color: FirstVueColors.gold.withValues(alpha: .95),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                status.message ??
+                    'Try the seeded demo pack while early access fills up. '
+                        'Demo logins are removed after ${status.threshold} real signups.',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: .68),
+                  fontSize: 12,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Email: $email\nPassword: $password',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: .88),
+                  fontSize: 12,
+                  height: 1.4,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  key: const ValueKey('auth-use-demo-button'),
+                  onPressed: enabled ? onUseDemo : null,
+                  style: TextButton.styleFrom(
+                    foregroundColor: FirstVueColors.gold,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    minimumSize: const Size(44, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'Use demo login',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+

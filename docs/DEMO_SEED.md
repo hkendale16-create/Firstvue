@@ -6,6 +6,17 @@ All rows are marked `is_demo = true` and usernames start with `fvdemo_`.
 > **Important:** Refreshing the app does **not** create demo people. You must
 > run the SQL seed in Supabase once (steps below). After that, hard-refresh.
 
+## Auto-purge after 10 real signups
+
+Once **10 real (non-demo) users** have signed up, Supabase automatically deletes
+the entire demo pack via `fv_maybe_purge_demo_pack()` (see migration
+`20261017_demo_auto_purge_after_ten_users.sql`).
+
+While demos still exist, the auth screen shows a **Demo accounts available**
+banner with login credentials. After purge, that banner disappears.
+
+Public status RPC (anon + authenticated): `fv_demo_accounts_status()`.
+
 ## What you get
 
 | Kind | Count | Notes |
@@ -31,8 +42,12 @@ Also ship the app build that includes **external media URL** support (`MediaStor
 
 ## Purge (delete when done reviewing)
 
+Automatic: happens when real user count reaches 10.
+
+Manual:
+
 1. Open the SQL Editor again
-2. Paste **entire** `supabase/APPLY_DEMO_PURGE.sql`
+2. Paste **entire** `supabase/APPLY_DEMO_PURGE.sql` (or `select public.fv_purge_demo_pack();`)
 3. Run
 4. Confirm remaining demo counts are `0`
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -134,27 +135,14 @@ class _LiveMapSurfaceOsmState extends State<LiveMapSurface> {
           keepBuffer: 2,
           panBuffer: 1,
         ),
-        CircleLayer(
-          circles: [
-            for (final pin in widget.pins.where((p) => p.isLive || p.id == selectedId))
-              CircleMarker(
-                point: pin.point,
-                radius: pin.id == selectedId ? 36 : 28,
-                useRadiusInMeter: false,
-                color: _colorFor(pin).withValues(
-                  alpha: pin.id == selectedId ? 0.28 : 0.18,
-                ),
-                borderStrokeWidth: 0,
-              ),
-          ],
-        ),
         MarkerLayer(
           markers: [
             for (final pin in widget.pins)
               Marker(
                 point: pin.point,
-                width: pin.id == selectedId ? 52 : 44,
-                height: pin.id == selectedId ? 62 : 54,
+                width: pin.id == selectedId ? 72 : 64,
+                height: pin.id == selectedId ? 78 : 70,
+                alignment: Alignment.bottomCenter,
                 child: GestureDetector(
                   onTap: () => widget.onSelect(pin),
                   child: _GlowPin(
@@ -172,7 +160,7 @@ class _LiveMapSurfaceOsmState extends State<LiveMapSurface> {
   }
 }
 
-class _GlowPin extends StatelessWidget {
+class _GlowPin extends StatefulWidget {
   final Color color;
   final bool live;
   final bool selected;
@@ -185,57 +173,170 @@ class _GlowPin extends StatelessWidget {
   });
 
   @override
+  State<_GlowPin> createState() => _GlowPinState();
+}
+
+class _GlowPinState extends State<_GlowPin>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    );
+    if (widget.live || widget.selected) {
+      _pulse.repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _GlowPin oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final shouldPulse = widget.live || widget.selected;
+    final wasPulsing = oldWidget.live || oldWidget.selected;
+    if (shouldPulse && !wasPulsing) {
+      _pulse.repeat();
+    } else if (!shouldPulse && wasPulsing) {
+      _pulse
+        ..stop()
+        ..value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final size = selected ? 40.0 : 34.0;
+    final size = widget.selected ? 40.0 : 34.0;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
     return AnimatedScale(
-      scale: selected ? 1.08 : 1.0,
+      scale: widget.selected ? 1.08 : 1.0,
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: size,
-            height: size,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: color.withValues(alpha: selected ? 0.85 : 0.65),
-                  blurRadius: selected ? 18 : (live ? 14 : 8),
-                  spreadRadius: selected ? 3 : (live ? 2 : 0),
+      child: SizedBox(
+        width: 72,
+        height: 78,
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          clipBehavior: Clip.none,
+          children: [
+            if ((widget.live || widget.selected) && !reduceMotion)
+              Positioned(
+                bottom: 2,
+                child: AnimatedBuilder(
+                  animation: _pulse,
+                  builder: (context, _) {
+                    return CustomPaint(
+                      size: const Size(64, 28),
+                      painter: _PinRipplePainter(
+                        color: widget.color,
+                        progress: _pulse.value,
+                        intense: widget.selected,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: size,
+                  height: size,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: widget.color,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: widget.color.withValues(
+                          alpha: widget.selected ? 0.85 : 0.65,
+                        ),
+                        blurRadius: widget.selected ? 18 : (widget.live ? 14 : 8),
+                        spreadRadius:
+                            widget.selected ? 3 : (widget.live ? 2 : 0),
+                      ),
+                    ],
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      width: widget.selected ? 2.2 : 1.5,
+                    ),
+                  ),
+                  child: widget.live
+                      ? Text(
+                          'LIVE',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: widget.selected ? 9 : 8,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        )
+                      : Icon(
+                          widget.icon,
+                          size: widget.selected ? 18 : 16,
+                          color: Colors.white,
+                        ),
+                ),
+                CustomPaint(
+                  size: const Size(10, 8),
+                  painter: _PinTailPainter(widget.color),
                 ),
               ],
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.9),
-                width: selected ? 2.2 : 1.5,
-              ),
             ),
-            child: live
-                ? Text(
-                    'LIVE',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: selected ? 9 : 8,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  )
-                : Icon(
-                    icon,
-                    size: selected ? 18 : 16,
-                    color: Colors.white,
-                  ),
-          ),
-          CustomPaint(
-            size: const Size(10, 8),
-            painter: _PinTailPainter(color),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+}
+
+/// Expanding elliptical ripples under the pin tip — reads as a live pulse.
+class _PinRipplePainter extends CustomPainter {
+  final Color color;
+  final double progress;
+  final bool intense;
+
+  _PinRipplePainter({
+    required this.color,
+    required this.progress,
+    this.intense = false,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height * 0.55);
+    for (var i = 0; i < 3; i++) {
+      final phase = (progress + i / 3.0) % 1.0;
+      final radiusX = (intense ? 10.0 : 8.0) + phase * (intense ? 22.0 : 18.0);
+      final radiusY = radiusX * 0.38;
+      final opacity = (1.0 - phase) * (intense ? 0.55 : 0.42);
+      final paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(1.2, 2.4 * (1.0 - phase))
+        ..color = color.withValues(alpha: opacity);
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: center,
+          width: radiusX * 2,
+          height: radiusY * 2,
+        ),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PinRipplePainter oldDelegate) =>
+      oldDelegate.color != color ||
+      oldDelegate.progress != progress ||
+      oldDelegate.intense != intense;
 }
 
 class _PinTailPainter extends CustomPainter {

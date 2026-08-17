@@ -74,7 +74,7 @@ Prepare in Play Console → Main store listing:
 - [ ] **Privacy policy URL** on your **custom domain** (e.g. `https://firstvue.app/privacy` or dedicated path). Play requires a publicly reachable HTTPS URL — not only in-app text.
 - [x] **Support email** for store listing / privacy: `hkendale16@gmail.com` (change here if you prefer a different address).
 - [ ] In-app legal copy: Profile → Legal (already linked in the Flutter app).
-- [ ] Demo seed accounts (`fvdemo_*`) are **kept** for testing; purge later with `APPLY_DEMO_PURGE.sql` before public production if desired.
+- [ ] Demo seed accounts (`fvdemo_*`) remain until **10 real users** sign up (auto-purge via `fv_maybe_purge_demo_pack`); auth UI hides demo credentials after purge. Manual purge: `APPLY_DEMO_PURGE.sql`.
 
 ---
 
