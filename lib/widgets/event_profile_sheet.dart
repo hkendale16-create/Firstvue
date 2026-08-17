@@ -5,6 +5,7 @@ import '../auth/ensure_signed_in.dart';
 import '../config/app_config.dart';
 import '../models/share_payload.dart';
 import '../services/event_social_service.dart';
+import '../services/product_analytics_service.dart';
 import '../services/things_to_do_service.dart';
 import '../services/user_profile_service.dart';
 import '../theme/firstvue_theme.dart';
@@ -28,6 +29,10 @@ class EventProfileSheet extends StatefulWidget {
     required CommunityEvent event,
     bool canPost = false,
   }) {
+    ProductAnalyticsService.recordEvent(
+      'event_viewed',
+      screen: 'event',
+    );
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -145,13 +150,14 @@ class _EventProfileSheetState extends State<EventProfileSheet> {
     final event = widget.event;
     FirstVueShareSheet.show(
       context,
-      payload: SharePayload(
+      payload: SharePayload.event(
         title: event.title,
         link: AppConfig.eventShareUrl(event.id),
         subtitle: event.locationLabel,
         detailLine: event.eventAt == null
             ? null
             : EventDateTimeFields.formatLabel(event.eventAt),
+        eventId: event.id,
       ),
     );
   }

@@ -12,7 +12,10 @@ import '../models/composer_overlay.dart';
 import '../models/post_identity.dart';
 import '../services/composer_draft_service.dart';
 import '../services/firstvue_feedback_sounds.dart';
+import '../services/growth_prompt_service.dart';
+import '../models/growth_prompt.dart';
 import '../services/post_identity_service.dart';
+import '../services/product_analytics_service.dart';
 import '../services/story_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../theme/social_text_field_style.dart';
@@ -25,7 +28,9 @@ import '../widgets/story_overlay_canvas.dart';
 
 /// Modern Story composer: photo/video/text, overlays, caption, link, preview.
 class StoryComposerScreen extends StatefulWidget {
-  const StoryComposerScreen({super.key});
+  final String? initialCaption;
+
+  const StoryComposerScreen({super.key, this.initialCaption});
 
   @override
   State<StoryComposerScreen> createState() => _StoryComposerScreenState();
@@ -55,6 +60,10 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
   void initState() {
     super.initState();
     _caption.addListener(_scheduleDraftSave);
+    if (widget.initialCaption != null &&
+        widget.initialCaption!.trim().isNotEmpty) {
+      _caption.text = widget.initialCaption!.trim();
+    }
     _loadIdentities();
     _restoreDraft();
   }
@@ -78,6 +87,10 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
   }
 
   Future<void> _restoreDraft() async {
+    if (widget.initialCaption != null &&
+        widget.initialCaption!.trim().isNotEmpty) {
+      return;
+    }
     final draft = await ComposerDraftService.loadStoryDraft();
     if (!mounted || draft == null) return;
     setState(() {
@@ -409,6 +422,16 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
       );
       await ComposerDraftService.clearStoryDraft();
       await FirstVueFeedbackSounds.playPublishSuccess();
+      await GrowthPromptService.markCompleted(GrowthCompletedAction.createStory);
+      if (!_textOnly && _file != null) {
+        await ProductAnalyticsService.recordEvent(
+          'media_uploaded',
+          screen: 'story_composer',
+        );
+        await GrowthPromptService.markCompleted(
+          GrowthCompletedAction.uploadMedia,
+        );
+      }
       if (!mounted) return;
       Navigator.pop(context, story);
     } catch (error) {

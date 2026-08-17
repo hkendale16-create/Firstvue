@@ -213,13 +213,14 @@ class _LiveEventDetailScreenState extends State<LiveEventDetailScreen> {
   void _share() {
     FirstVueShareSheet.show(
       context,
-      payload: SharePayload(
+      payload: SharePayload.event(
         title: event.title,
         link: AppConfig.eventShareUrl(event.id),
         subtitle: event.locationLabel,
         detailLine: event.eventAt == null
             ? null
             : EventDateTimeFields.formatLabel(event.eventAt),
+        eventId: event.id,
       ),
     );
   }

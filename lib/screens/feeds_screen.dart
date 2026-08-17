@@ -12,6 +12,7 @@ import '../screens/community_detail_screen.dart';
 import '../screens/community_hub_detail_screen.dart';
 import '../screens/create_post_screen.dart';
 import '../screens/member_public_profile_screen.dart';
+import '../screens/people_to_follow_screen.dart';
 import '../services/community_hub_service.dart';
 import '../services/community_news_service.dart';
 import '../services/community_service.dart';
@@ -282,6 +283,14 @@ class _FeedsTabBody extends StatelessWidget {
           emptyTitle: 'No recommendations yet',
           emptySubtitle:
               'Follow people, join groups, and interact to personalize this feed.',
+          emptyActionLabel: 'Find People',
+          onEmptyAction: () {
+            Navigator.of(context).push(
+              FirstVuePageRoute(
+                builder: (_) => const PeopleToFollowScreen(),
+              ),
+            );
+          },
           useCursor: true,
           loader: ({
             int limit = 20,
@@ -309,6 +318,8 @@ class FeedsPostsList extends StatefulWidget {
   final String source;
   final String emptyTitle;
   final String emptySubtitle;
+  final String? emptyActionLabel;
+  final VoidCallback? onEmptyAction;
   final FeedsLoader loader;
   final bool useCursor;
   final Widget? header;
@@ -320,6 +331,8 @@ class FeedsPostsList extends StatefulWidget {
     required this.emptyTitle,
     required this.emptySubtitle,
     required this.loader,
+    this.emptyActionLabel,
+    this.onEmptyAction,
     this.useCursor = false,
     this.header,
   });
@@ -606,6 +619,8 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
             _FeedStateMessage(
               title: widget.emptyTitle,
               subtitle: widget.emptySubtitle,
+              actionLabel: widget.emptyActionLabel,
+              onAction: widget.onEmptyAction,
             )
           else ...[
             for (var i = 0; i < _posts.length; i++) ...[

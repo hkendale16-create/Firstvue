@@ -15,6 +15,8 @@ class AuthLocalState {
     'firstvue_follow_suggest',
     'firstvue_interaction',
     'firstvue_feed_page_',
+    'firstvue_growth_',
+    'firstvue_invite_code_',
   ];
 
   static const _protectedKeys = {
@@ -23,6 +25,7 @@ class AuthLocalState {
     'firstvue_vue_feed_tab',
     'firstvue_feed_page_main_v1',
     pendingLegalAcceptanceKey,
+    'firstvue_invite_attributed',
   };
 
   static Future<void> markPendingLegalAcceptance() async {

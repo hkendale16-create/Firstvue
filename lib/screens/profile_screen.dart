@@ -36,6 +36,7 @@ import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/follow_requests_section.dart';
 import '../widgets/firstvue_settings_drawer.dart';
 import '../widgets/founding_member_badge.dart';
+import '../widgets/invite_friends_sheet.dart';
 import '../models/share_payload.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -735,6 +736,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         OutlinedButton(
                           onPressed: _shareProfile,
                           child: const Text('Share profile'),
+                        ),
+                        OutlinedButton(
+                          onPressed: () => InviteFriendsSheet.show(context),
+                          child: const Text('Invite friends'),
                         ),
                       ],
                 trailing: user == null

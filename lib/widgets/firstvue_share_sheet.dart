@@ -4,13 +4,28 @@ import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/publish_destination.dart';
 import '../models/share_payload.dart';
+import '../navigation/entity_navigation.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../auth/ensure_signed_in.dart';
+import '../screens/create_post_screen.dart';
 import '../screens/new_message_screen.dart';
+import '../screens/story_composer_screen.dart';
+import '../services/product_analytics_service.dart';
 import '../theme/firstvue_theme.dart';
 
-enum ShareAction { copyLink, copyMessage, inAppMessage, email, sms, systemShare }
+enum ShareAction {
+  copyLink,
+  copyMessage,
+  inAppMessage,
+  email,
+  sms,
+  systemShare,
+  story,
+  post,
+  group,
+}
 
 class FirstVueShareSheet extends StatelessWidget {
   final SharePayload payload;
@@ -40,7 +55,63 @@ class FirstVueShareSheet extends StatelessWidget {
     );
   }
 
-  void _notify(ShareAction action) => onAction?.call(action);
+  void _notify(ShareAction action) {
+    onAction?.call(action);
+    if (payload.kind == ShareContentKind.event) {
+      ProductAnalyticsService.recordEvent(
+        'event_shared',
+        screen: 'share_sheet',
+        metadata: {'action': action.name},
+      );
+    }
+  }
+
+  Future<void> _shareToStory(BuildContext context) async {
+    if (Supabase.instance.client.auth.currentUser == null) {
+      if (!context.mounted) return;
+      await ensureSignedIn(context);
+      return;
+    }
+    _notify(ShareAction.story);
+    if (!context.mounted) return;
+    Navigator.pop(context);
+    await Navigator.push(
+      context,
+      FirstVuePageRoute(
+        builder: (_) => StoryComposerScreen(
+          initialCaption: payload.title,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _shareToPost(BuildContext context) async {
+    if (Supabase.instance.client.auth.currentUser == null) {
+      if (!context.mounted) return;
+      await ensureSignedIn(context);
+      return;
+    }
+    _notify(ShareAction.post);
+    if (!context.mounted) return;
+    Navigator.pop(context);
+    await Navigator.push(
+      context,
+      FirstVuePageRoute(
+        builder: (_) => CreatePostScreen(
+          initialBody: payload.messageText,
+          eventId: payload.relatedEventId,
+          initialDestination: PublishDestination.feed,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _shareToGroup(BuildContext context) async {
+    _notify(ShareAction.group);
+    if (!context.mounted) return;
+    Navigator.pop(context);
+    await EntityNavigation.openCommunitiesBrowse(context, allowCreate: false);
+  }
 
   Future<void> _copyLink(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: payload.link));
@@ -160,6 +231,26 @@ class FirstVueShareSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
+            if (payload.kind == ShareContentKind.event) ...[
+              _ShareOption(
+                icon: Icons.auto_awesome_motion_outlined,
+                label: 'FirstVue Story',
+                subtitle: 'Share this event to your Story',
+                onTap: () => _shareToStory(context),
+              ),
+              _ShareOption(
+                icon: Icons.edit_outlined,
+                label: 'FirstVue post',
+                subtitle: 'Post this event to your feed',
+                onTap: () => _shareToPost(context),
+              ),
+              _ShareOption(
+                icon: Icons.groups_outlined,
+                label: 'Group or Community',
+                subtitle: 'Share where posting is permitted',
+                onTap: () => _shareToGroup(context),
+              ),
+            ],
             _ShareOption(
               icon: Icons.link_rounded,
               label: 'Copy link',

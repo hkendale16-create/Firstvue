@@ -24,7 +24,10 @@ import 'screens/member_public_profile_screen.dart';
 import 'screens/post_detail_screen.dart';
 import 'services/activity_notifications_service.dart';
 import 'services/deep_link_service.dart';
+import 'services/growth_prompt_service.dart';
+import 'services/invite_friends_service.dart';
 import 'services/notification_service.dart';
+import 'services/user_preferences_service.dart';
 import 'theme/app_theme_controller.dart';
 import 'theme/firstvue_theme.dart';
 import 'utils/web_safari_media.dart';
@@ -32,6 +35,7 @@ import 'widgets/firstvue_bottom_nav.dart';
 import 'widgets/firstvue_onboarding.dart';
 import 'widgets/firstvue_section_tip.dart';
 import 'widgets/early_access_feedback_prompt.dart';
+import 'widgets/invite_friends_sheet.dart';
 import 'widgets/firstvue_refresh_scaffold.dart';
 import 'widgets/firstvue_settings_drawer.dart';
 import 'widgets/floating_messages_bubble.dart';
@@ -179,6 +183,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
       // on Home/Feeds/VUE — repeated history writes + video decode OOM Safari.
       if (kIsWeb) clearMessagingUrl();
       unawaited(_maybeShowEarlyAccessPrompt());
+      unawaited(_rememberIncomingInvite());
     });
   }
 
@@ -201,11 +206,31 @@ class _FirstVueHomeState extends State<FirstVueHome> {
   /// Soft Early Access prompt after a few signed-in sessions — never on first launch.
   Future<void> _maybeShowEarlyAccessPrompt() async {
     if (Supabase.instance.client.auth.currentUser == null) return;
+    await GrowthPromptService.startSession();
+    unawaited(InviteFriendsService.consumePendingIfSignedIn());
     await EarlyAccessPromptService.recordMeaningfulSession();
     // Let onboarding finish before competing for attention.
     await Future<void>.delayed(const Duration(seconds: 4));
     if (!mounted) return;
     await EarlyAccessFeedbackPrompt.maybeShow(context);
+    if (!mounted) return;
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    final welcomePending = await OnboardingStore.pendingPrompt() != null;
+    final city = await UserPreferencesService.localCity();
+    if (!mounted) return;
+    await GrowthPromptSheet.maybeShow(
+      context,
+      city: city,
+      welcomePending: welcomePending,
+    );
+  }
+
+  Future<void> _rememberIncomingInvite() async {
+    final webCode = AppConfig.initialInviteCodeFromUri();
+    if (webCode != null) {
+      await InviteFriendsService.rememberIncomingCode(webCode);
+    }
   }
 
   /// Tab routes are consumed before the first frame so Home never flashes.
@@ -245,6 +270,8 @@ class _FirstVueHomeState extends State<FirstVueHome> {
         _openMemberProfile(target.id);
       case 'post':
         _openPostDetail(target.id);
+      case 'invite':
+        unawaited(InviteFriendsService.rememberIncomingCode(target.id));
     }
   }
 

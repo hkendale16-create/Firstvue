@@ -10,6 +10,9 @@ import 'community_news_post_card.dart';
 import 'community_news_post_detail_sheet.dart';
 import 'feed_comments_sheet.dart';
 import 'firstvue_share_sheet.dart';
+import 'growth_prompt.dart';
+import '../models/growth_prompt.dart';
+import '../services/growth_prompt_catalog.dart';
 import '../screens/boost_post_sheet.dart';
 import '../screens/edit_post_screen.dart';
 
@@ -351,15 +354,10 @@ class _ProfileMyPostsSectionState extends State<ProfileMyPostsSection> {
             )
           else if (_posts.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 8),
-              child: Text(
-                'No posts yet. Share updates from the home feed and they will show up here.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: fv.secondaryText,
-                  height: 1.45,
-                  fontSize: 13,
-                ),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+              child: GrowthPrompt(
+                spec: GrowthPromptCatalog.emptyProfilePosts(),
+                variant: GrowthPromptVariant.empty,
               ),
             )
           else

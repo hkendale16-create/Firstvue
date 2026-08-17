@@ -9,7 +9,10 @@ import '../models/publish_destination.dart';
 import '../services/community_news_service.dart';
 import '../services/composer_draft_service.dart';
 import '../services/firstvue_feedback_sounds.dart';
+import '../services/growth_prompt_service.dart';
+import '../models/growth_prompt.dart';
 import '../services/post_identity_service.dart';
+import '../services/product_analytics_service.dart';
 import '../services/post_identity_store.dart';
 import '../theme/firstvue_theme.dart';
 import '../utils/safe_url.dart';
@@ -104,6 +107,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             : PublishDestination.feed);
     _loadIdentities();
     _restoreDraft();
+    unawaited(
+      ProductAnalyticsService.recordEvent('post_started', screen: 'composer'),
+    );
   }
 
   void _onBodyFocusChanged() {
@@ -307,6 +313,21 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       }
       await ComposerDraftService.clearPostDraft(_draftScope);
       await FirstVueFeedbackSounds.playPublishSuccess();
+      await ProductAnalyticsService.recordEvent(
+        'post_completed',
+        screen: 'composer',
+        metadata: {'destination': _destination.value},
+      );
+      await GrowthPromptService.markCompleted(GrowthCompletedAction.createPost);
+      if (_attachedMedia.isNotEmpty) {
+        await ProductAnalyticsService.recordEvent(
+          'media_uploaded',
+          screen: 'composer',
+        );
+        await GrowthPromptService.markCompleted(
+          GrowthCompletedAction.uploadMedia,
+        );
+      }
       if (!mounted) return;
       Navigator.pop(context, post);
     } catch (error) {

@@ -16,7 +16,10 @@ import '../services/trending_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'firstvue_share_sheet.dart';
 import 'feed_comments_sheet.dart';
+import 'growth_prompt.dart';
 import 'home_communities_section.dart';
+import '../models/growth_prompt.dart';
+import '../services/growth_prompt_catalog.dart';
 import 'social_chrome.dart';
 
 class HomeDiscoverySection extends StatefulWidget {
@@ -473,9 +476,9 @@ class _EventsFeedList extends StatelessWidget {
             if (!recentIds.contains(event.id)) event,
         ];
         if (recent.isEmpty && upcoming.isEmpty) {
-          return Text(
-            'Local events will appear here.',
-            style: TextStyle(color: context.fv.secondaryText),
+          return GrowthPrompt(
+            spec: GrowthPromptCatalog.emptyEvents(),
+            variant: GrowthPromptVariant.empty,
           );
         }
         return Column(

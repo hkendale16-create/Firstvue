@@ -4,10 +4,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../auth/ensure_signed_in.dart';
 import '../config/app_config.dart';
 import '../config/feature_flags.dart';
+import '../models/growth_prompt.dart';
 import '../models/publish_destination.dart';
 import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../services/discovery_feed_service.dart';
+import '../services/growth_prompt_catalog.dart';
 import '../services/live_mode_preference.dart';
 import '../services/saved_items_service.dart';
 import '../services/vue_featured_rotation.dart';
@@ -17,6 +19,7 @@ import '../utils/scroll_load_more_gate.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/fv_ui.dart';
+import '../widgets/growth_prompt.dart';
 import '../widgets/social_rich_text.dart';
 import '../widgets/tutorial_targets.dart';
 import '../widgets/vue_live_mode_switch.dart';
@@ -456,9 +459,19 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                       }
                       if (_items.isEmpty) {
                         return Center(
-                          child: Text(
-                            'No photos or videos to show yet.',
-                            style: TextStyle(color: fv.secondaryText),
+                          child: GrowthPrompt(
+                            spec: GrowthPromptCatalog.emptyVue(),
+                            variant: GrowthPromptVariant.empty,
+                            onAction: () {
+                              Navigator.push(
+                                context,
+                                FirstVuePageRoute(
+                                  builder: (_) => const CreatePostScreen(
+                                    initialDestination: PublishDestination.vue,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         );
                       }
@@ -493,8 +506,10 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
               bottom: 16 + bottomInset,
               child: Semantics(
                 button: true,
-                label: 'Create a Vue',
-                child: FloatingActionButton(
+                label: 'Add to VUE',
+                child: Tooltip(
+                  message: 'Add to VUE',
+                  child: FloatingActionButton(
                   heroTag: 'vue-create-fab',
                   onPressed: () {
                     Navigator.push(
@@ -510,6 +525,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                   foregroundColor: Colors.white,
                   elevation: 2,
                   child: const Icon(Icons.add, size: 28),
+                ),
                 ),
               ),
             ),
