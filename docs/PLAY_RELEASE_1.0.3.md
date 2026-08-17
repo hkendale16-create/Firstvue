@@ -33,11 +33,15 @@ Upload this release to **Google Play Console → Testing → Internal testing** 
 5. **Review release → Start rollout to Internal testing**.
 6. Open the tester opt-in link on your Android device (same Google account as tester email `hkendale16@gmail.com`) and install/update.
 
-## App icon (Main store listing)
+## App icon (not on the testing page)
 
-Upload `store-listing/play-icon-512.png` (512×512, gold background + the VUE-tab **V**).
+The AAB upload screen has **no** “Store presence” item. Leave **Test and release / Internal testing** and open the listing page:
 
-Play Console → **Store presence → Main store listing → App icon**. This is separate from the AAB upload.
+**Easiest:** Dashboard → **Set up your app** → **Set up your store listing** (or **View tasks**). Scroll to **Graphics** → **App icon**.
+
+**From the left menu:** click **FirstVue**, then **Grow users**. Expand it and open **Store listings** (newer name) or **Store presence → Main store listing**. Scroll to **Graphics**.
+
+Upload `store-listing/play-icon-512.png` (512×512 gold **V**). Use a computer browser; the phone Play Console often hides that menu.
 
 ## Still required before Production
 

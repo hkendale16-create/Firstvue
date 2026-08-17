@@ -53,7 +53,11 @@ Play shows a left-nav / dashboard list. Fill these with FirstVue answers:
 
 ### A3. Store listing
 
-**Main store listing** — paste from `docs/STORE_LISTING_DRAFT.md`:
+Open **FirstVue** → **Dashboard** → **Set up your app** → **Set up your store listing**.
+
+Or left menu: **Grow users** → **Store listings** (may still say **Store presence → Main store listing**).
+
+Paste copy from `docs/STORE_LISTING_DRAFT.md`. Scroll to **Graphics** for the app icon — this is not on the Internal testing page.
 
 - Short description ≤ 80 chars  
 - Full description  
