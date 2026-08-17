@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.firstvue.mobile",
+      "sha256_cert_fingerprints": [
+        "B7:54:00:BA:93:67:4F:E9:F4:74:C6:CF:B3:DA:44:3B:DD:7B:B7:DE:F5:23:B4:7A:6F:D3:1D:26:92:1D:B6:79"
+      ]
+    }
+  }
+]

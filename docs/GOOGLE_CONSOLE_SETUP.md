@@ -206,11 +206,12 @@ After you have the upload SHA-256:
 | Milestone | Status |
 |-----------|--------|
 | Play / Cloud Console access | **Approved** (operator confirmed) |
+| Upload keystore + signed AAB | **Built** — `FirstVue-1.0.1+2-release.aab` (see agent artifacts `firstvue-play/`) |
+| Fingerprints documented | **Yes** — `docs/ANDROID_UPLOAD_KEY_FINGERPRINTS.md` |
 | Play app created | Pending operator |
 | Store listing + Data safety | Pending operator (worksheets ready in repo) |
-| Upload keystore + signed AAB | Pending local machine |
 | Google Client Secret synced to Supabase | Pending operator |
-| Android OAuth client (package + SHA-1) | Pending after keystore |
-| Internal testing release live | Pending AAB upload |
+| Android OAuth client (package + SHA-1) | Pending — use SHA-1 from fingerprints doc |
+| Internal testing release live | Pending AAB upload in Play Console |
 | Closed test gate (12 × 14) | Not started |
 | Production | Blocked on closed-test gate |
