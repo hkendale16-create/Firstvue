@@ -222,6 +222,11 @@ class StoryService {
       );
     }
 
+    final trimmedLinkLabel =
+        linkLabel != null && linkLabel.trim().isNotEmpty ? linkLabel.trim() : null;
+    final resolvedLinkKind = sanitizedLink == null
+        ? null
+        : (linkKind ?? SafeUrl.classifyKind(sanitizedLink));
     final payload = <String, dynamic>{
       'owner_id': user.id,
       'entity_type': entityType,
@@ -230,12 +235,10 @@ class StoryService {
       'media_kind': mediaKind,
       'caption': trimmedCaption,
       'overlays': ComposerTextOverlay.listToJson(overlays),
-      if (backgroundKey != null) 'background_key': backgroundKey,
-      if (sanitizedLink != null) 'link_url': sanitizedLink,
-      if (linkLabel != null && linkLabel.trim().isNotEmpty)
-        'link_label': linkLabel.trim(),
-      if (sanitizedLink != null)
-        'link_kind': linkKind ?? SafeUrl.classifyKind(sanitizedLink),
+      'background_key': ?backgroundKey,
+      'link_url': ?sanitizedLink,
+      'link_label': ?trimmedLinkLabel,
+      'link_kind': ?resolvedLinkKind,
     };
 
     Map<String, dynamic> row;

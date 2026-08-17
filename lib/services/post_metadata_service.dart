@@ -112,13 +112,13 @@ class PostMetadataService {
     final trimmed = body.trim();
     final payload = <String, dynamic>{
       'body': trimmed,
-      if (backgroundColor != null) 'background_color': backgroundColor,
-      if (visibility != null) 'visibility': visibility,
-      if (locationLabel != null) 'location_label': locationLabel,
-      if (locationCity != null) 'location_city': locationCity,
-      if (locationState != null) 'location_state': locationState,
-      if (linkUrl != null) 'link_url': linkUrl,
-      if (linkLabel != null) 'link_label': linkLabel,
+      'background_color': ?backgroundColor,
+      'visibility': ?visibility,
+      'location_label': ?locationLabel,
+      'location_city': ?locationCity,
+      'location_state': ?locationState,
+      'link_url': ?linkUrl,
+      'link_label': ?linkLabel,
     };
     await _client.from('community_news_posts').update(payload).eq('id', postId);
     await syncForPost(postId, trimmed);
