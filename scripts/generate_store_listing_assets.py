@@ -20,8 +20,6 @@ IVORY = (244, 239, 230, 255)
 DARK = (14, 11, 26, 255)
 
 PHONE_W, PHONE_H = 1080, 1920
-TABLET_7_W, TABLET_7_H = 1080, 1920  # 9:16, 320–3840
-TABLET_10_W, TABLET_10_H = 1440, 2560  # 9:16, both sides ≥ 1080
 FEATURE_W, FEATURE_H = 1024, 500
 
 
@@ -109,8 +107,6 @@ def main() -> None:
     ]
     outputs = [
         (LISTING / "phone-screenshots", PHONE_W, PHONE_H),
-        (LISTING / "tablet-7inch", TABLET_7_W, TABLET_7_H),
-        (LISTING / "tablet-10inch", TABLET_10_W, TABLET_10_H),
     ]
     for dest, w, h in outputs:
         dest.mkdir(exist_ok=True)
@@ -118,7 +114,7 @@ def main() -> None:
             framed_screenshot(src, w, h).save(dest / name, "PNG", optimize=True)
             print("wrote", dest.name, name)
 
-    print("Wrote feature graphic, phone, 7-inch, and 10-inch screenshots")
+    print("Wrote feature graphic and 4 phone screenshots")
 
 
 if __name__ == "__main__":
