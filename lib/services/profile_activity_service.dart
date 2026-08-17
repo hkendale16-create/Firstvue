@@ -680,7 +680,7 @@ class ProfileActivityService {
           return ProfileActivityItem(
             type: ProfileActivityType.savedItem,
             title: 'Saved a post',
-            subtitle: post == null ? 'This post is no longer available.' : post,
+            subtitle: post ?? 'This post is no longer available.',
             createdAt: createdAt,
             referenceId: contentId,
             thumbnailUrl: firstMedia?.signedUrl,
