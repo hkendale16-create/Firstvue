@@ -21,10 +21,15 @@ void main() {
     expect(parsed.hashtags.where((tag) => tag == 'atlanta').length, 1);
   });
 
-  test('syncForPost prefers sync_post_hashtags RPC', () {
+  test('syncForPost prefers global sync_content_hashtags RPC', () {
     final src =
         File('lib/services/post_metadata_service.dart').readAsStringSync();
+    expect(src, contains('sync_content_hashtags'));
+    expect(src, contains("'p_content_type': contentType"));
+    expect(src, contains("'p_content_id': contentId"));
+    // Legacy post hashtag RPC remains as a fallback for older backends.
     expect(src, contains('sync_post_hashtags'));
-    expect(src, contains("params: {'p_post_id': postId, 'p_body': body}"));
+    expect(src, contains("'p_post_id': contentId"));
+    expect(src, contains("'p_body': body"));
   });
 }
