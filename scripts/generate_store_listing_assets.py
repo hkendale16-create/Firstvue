@@ -20,6 +20,8 @@ IVORY = (244, 239, 230, 255)
 DARK = (14, 11, 26, 255)
 
 PHONE_W, PHONE_H = 1080, 1920
+TABLET_7_W, TABLET_7_H = 1080, 1920  # 9:16, 320–3840
+TABLET_10_W, TABLET_10_H = 1440, 2560  # 9:16, both sides ≥ 1080
 FEATURE_W, FEATURE_H = 1024, 500
 
 
@@ -78,26 +80,23 @@ def feature_graphic() -> Image.Image:
     return img.convert("RGB")
 
 
-def phone_screenshot(src: Path) -> Image.Image:
+def framed_screenshot(src: Path, canvas_w: int, canvas_h: int) -> Image.Image:
     shot = Image.open(src).convert("RGB")
-    canvas = Image.new("RGB", (PHONE_W, PHONE_H), IVORY[:3])
-    # Scale to full width, keep aspect, center vertically.
-    scale = PHONE_W / shot.width
-    nw, nh = PHONE_W, int(shot.height * scale)
-    if nh > PHONE_H:
-        scale = PHONE_H / shot.height
-        nw, nh = int(shot.width * scale), PHONE_H
+    canvas = Image.new("RGB", (canvas_w, canvas_h), IVORY[:3])
+    scale = canvas_w / shot.width
+    nw, nh = canvas_w, int(shot.height * scale)
+    if nh > canvas_h:
+        scale = canvas_h / shot.height
+        nw, nh = int(shot.width * scale), canvas_h
     shot = shot.resize((nw, nh), Image.Resampling.LANCZOS)
-    x = (PHONE_W - nw) // 2
-    y = (PHONE_H - nh) // 2
+    x = (canvas_w - nw) // 2
+    y = (canvas_h - nh) // 2
     canvas.paste(shot, (x, y))
     return canvas
 
 
 def main() -> None:
     LISTING.mkdir(exist_ok=True)
-    phones_dir = LISTING / "phone-screenshots"
-    phones_dir.mkdir(exist_ok=True)
 
     feature = feature_graphic()
     feature.save(LISTING / "feature-graphic-1024x500.png", "PNG", optimize=True)
@@ -108,11 +107,18 @@ def main() -> None:
         ("03-business.png", CHOSEN / "06-entity-business-profile.png"),
         ("04-profile.png", CHOSEN / "04-profile.png"),
     ]
-    for name, src in shots:
-        phone_screenshot(src).save(phones_dir / name, "PNG", optimize=True)
-        print("wrote", name)
+    outputs = [
+        (LISTING / "phone-screenshots", PHONE_W, PHONE_H),
+        (LISTING / "tablet-7inch", TABLET_7_W, TABLET_7_H),
+        (LISTING / "tablet-10inch", TABLET_10_W, TABLET_10_H),
+    ]
+    for dest, w, h in outputs:
+        dest.mkdir(exist_ok=True)
+        for name, src in shots:
+            framed_screenshot(src, w, h).save(dest / name, "PNG", optimize=True)
+            print("wrote", dest.name, name)
 
-    print("Wrote feature graphic and 4 phone screenshots")
+    print("Wrote feature graphic, phone, 7-inch, and 10-inch screenshots")
 
 
 if __name__ == "__main__":

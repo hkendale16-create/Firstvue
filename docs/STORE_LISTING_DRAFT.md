@@ -42,4 +42,5 @@ Lifestyle (or Social — choose one that best matches discovery + UGC)
 - [x] 512×512 app icon PNG — `store-listing/play-icon-512.png` (VUE-tab V on gold)  
 - [x] 1024×500 feature graphic — `store-listing/feature-graphic-1024x500.png`  
 - [x] Phone screenshots — `store-listing/phone-screenshots/` (4 × 1080×1920)  
-- [ ] Optional 7" / 10" tablet screenshots if you claim tablet support (skip; phone shots cover the minimum)  
+- [x] 7-inch tablet screenshots — `store-listing/tablet-7inch/` (1080×1920)  
+- [x] 10-inch tablet screenshots — `store-listing/tablet-10inch/` (1440×2560)  
