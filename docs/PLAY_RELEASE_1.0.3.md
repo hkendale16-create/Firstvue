@@ -33,6 +33,12 @@ Upload this release to **Google Play Console → Testing → Internal testing** 
 5. **Review release → Start rollout to Internal testing**.
 6. Open the tester opt-in link on your Android device (same Google account as tester email `hkendale16@gmail.com`) and install/update.
 
+## App icon (Main store listing)
+
+Upload `store-listing/play-icon-512.png` (512×512, gold background + the VUE-tab **V**).
+
+Play Console → **Store presence → Main store listing → App icon**. This is separate from the AAB upload.
+
 ## Still required before Production
 
 - Closed testing gate: **12 opted-in testers × 14 consecutive days** (personal account).

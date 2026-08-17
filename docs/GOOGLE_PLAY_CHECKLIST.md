@@ -61,7 +61,7 @@ Prepare in Play Console → Main store listing:
 | App name | **FirstVue** |
 | Short description | ≤ 80 chars |
 | Full description | Features, communities, businesses, messaging |
-| App icon | 512×512 PNG |
+| App icon | 512×512 PNG — `store-listing/play-icon-512.png` |
 | Feature graphic | 1024×500 |
 | Phone screenshots | At least 2 (recommend 6.7" and standard phone) |
 | Tablet screenshots | If tablet layout is supported |

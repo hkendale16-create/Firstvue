@@ -39,7 +39,7 @@ Lifestyle (or Social — choose one that best matches discovery + UGC)
 - Website: https://firstvue.app  
 
 ## Assets still needed (create locally)
-- [ ] 512×512 app icon PNG (branded)  
+- [x] 512×512 app icon PNG — `store-listing/play-icon-512.png` (VUE-tab V on gold)  
 - [ ] 1024×500 feature graphic  
 - [ ] Phone screenshots (min 2; recommend 4–8)  
 - [ ] Optional 7" / 10" tablet screenshots if you claim tablet support  

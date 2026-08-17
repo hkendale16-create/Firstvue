@@ -57,7 +57,7 @@ Play shows a left-nav / dashboard list. Fill these with FirstVue answers:
 
 - Short description ≤ 80 chars  
 - Full description  
-- App icon **512×512** PNG (branded — replace Flutter default before upload)  
+- App icon **512×512** PNG — use `store-listing/play-icon-512.png` (VUE-tab V)  
 - Feature graphic **1024×500**  
 - Phone screenshots (minimum 2)  
 - Category: **Lifestyle** or **Social**  
