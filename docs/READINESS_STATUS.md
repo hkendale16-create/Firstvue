@@ -1,8 +1,10 @@
-# FirstVue readiness snapshot — 2026-08-15
+# FirstVue readiness snapshot — 2026-08-17
 
 ## FIRSTVUE STATUS
 
 **READY FOR INTERNAL TEST** (code/backend Critical blockers for trial addressed)
+
+**Google Play / Cloud Console:** operator confirmed **approved**. Follow `docs/GOOGLE_CONSOLE_SETUP.md` to create the Play app, sync the Google Client Secret into Supabase, generate the upload keystore, and upload the first AAB.
 
 Not yet **READY FOR CLOSED TEST** until you: build a signed AAB, host privacy URL, add branded store assets, and recruit 12 testers.
 
@@ -56,21 +58,26 @@ Not **READY FOR PRODUCTION** until closed-test gate (12×14 days on personal acc
 
 | Check | Result |
 |-------|--------|
+| Developer account access | **PASS** (approved) |
 | Android API 36 | **PASS** |
-| applicationId `app.firstvue.mobile` | **PASS** |
-| Release signing | **FAIL** until keystore |
-| AAB generated | **FAIL** here (no Android SDK in cloud agent); build locally |
+| applicationId `com.FirstVue` | **PASS** |
+| Console setup guide | **PASS** (`docs/GOOGLE_CONSOLE_SETUP.md`) |
+| Release signing / signed AAB | **PASS** — `FirstVue-1.0.1+2-release.aab` built (agent artifacts) |
+| Upload key fingerprints | **PASS** (`docs/ANDROID_UPLOAD_KEY_FINGERPRINTS.md`) |
 | Privacy policy page in repo | **PASS** (`web/privacy.html`) |
 | Privacy URL live on domain | **FAIL** until you deploy domain |
 | Data Safety worksheet | **PASS** (`docs/DATA_SAFETY.md`) |
+| Store listing draft | **PASS** (`docs/STORE_LISTING_DRAFT.md`) |
 | Store assets | **MISSING** |
 | Account deletion | **PASS** |
 | Payments disabled | **PASS** |
-| Closed testing ready | **FAIL** until AAB + assets + testers |
+| Google Client Secret in Supabase | **CHECK** (paste current secret from Cloud Console) |
+| Internal testing upload | **READY** — upload AAB in Play Console |
+| Closed testing ready | **FAIL** until testers + listing assets |
 
 ### Exact next step
-1. Deploy/publish web so `https://firstvue.app/privacy.html` loads.  
-2. Create upload keystore + `android/key.properties`.  
-3. Replace launcher icon art.  
-4. `flutter build appbundle --release`  
-5. Upload to Play **Internal testing**, then promote to **Closed testing**.  
+1. Download agent artifacts `firstvue-play/` (AAB parts + keystore) and reassemble per `UPLOAD_TO_PLAY.md`.
+2. Create Play app → Internal testing → upload AAB.
+3. Add Android OAuth client with SHA-1 from `docs/ANDROID_UPLOAD_KEY_FINGERPRINTS.md`.
+4. Sync Google Client Secret → Supabase.
+5. Deploy `https://firstvue.app/.well-known/assetlinks.json` + privacy page.

@@ -1,1 +1,5 @@
-Rename assetlinks.json.example to assetlinks.json after inserting your upload keystore SHA-256.
+Rename is no longer required for the first upload key — `assetlinks.json` is filled
+with the SHA-256 from docs/ANDROID_UPLOAD_KEY_FINGERPRINTS.md.
+
+After deploy, verify:
+https://firstvue.app/.well-known/assetlinks.json

@@ -51,3 +51,5 @@ supabase/.temp/
 assets/images/firstvue_theme_*.png
 assets/images/firstvue_theme_option_*.png
 assets/images/explore_*.png
+/artifacts/
+android/build/

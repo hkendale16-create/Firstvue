@@ -1,13 +1,21 @@
 # Google Play — FirstVue personal developer account checklist
 
-Path for a **personal** Google Play developer account publishing `app.firstvue.mobile`.
+Path for a **personal** Google Play developer account publishing `com.FirstVue`.
+
+**Post-approval walkthrough:** `docs/GOOGLE_CONSOLE_SETUP.md` (Play app creation + Google Cloud OAuth + signing order).
+
+| Milestone | Status |
+|-----------|--------|
+| Developer account approved | **Yes** (operator confirmed) |
+| App created in Play Console | Pending |
+| Signed AAB on Internal testing | Pending |
 
 ---
 
 ## 1. Build and signing
 
 - [ ] Install Flutter SDK and run `flutter pub get` from the repo root.
-- [ ] Confirm `android/app/build.gradle.kts` uses `applicationId = "app.firstvue.mobile"` and namespace `app.firstvue.mobile`.
+- [ ] Confirm `android/app/build.gradle.kts` uses `applicationId = "com.FirstVue"` and namespace `com.FirstVue`.
 - [ ] Generate an **upload keystore locally** (never commit it):
 
   ```bash
@@ -123,7 +131,7 @@ Play requires an in-app path to request account deletion (or a documented web fl
   https://firstvue.app/.well-known/assetlinks.json
   ```
 
-  Include the release signing certificate SHA-256 fingerprint and package name `app.firstvue.mobile`.
+  Include the release signing certificate SHA-256 fingerprint and package name `com.FirstVue`.
 
   ```bash
   keytool -list -v -keystore ~/upload-keystore.jks -alias upload
@@ -159,7 +167,7 @@ Play requires an in-app path to request account deletion (or a documented web fl
 
 | Item | Value |
 |------|--------|
-| Package / application ID | `app.firstvue.mobile` |
+| Package / application ID | `com.FirstVue` |
 | Display name | FIRSTVUE |
 | Deep link host | `firstvue.app` |
 | Signing config | `android/key.properties` (from example template) |
