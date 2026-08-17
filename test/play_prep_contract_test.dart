@@ -22,7 +22,7 @@ void main() {
     expect(gradle, contains('namespace = "com.FirstVue"'));
     expect(gradle, contains('applicationId = "com.FirstVue"'));
     expect(
-      File('android/app/src/main/kotlin/app/firstvue/mobile/MainActivity.kt')
+      File('android/app/src/main/kotlin/com/FirstVue/MainActivity.kt')
           .existsSync(),
       isTrue,
     );
