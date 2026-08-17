@@ -62,7 +62,7 @@ class ComposerTextOverlay {
         'rotation': rotation,
         'align': align.name,
         'styleKey': styleKey,
-        if (fillKey != null) 'fillKey': fillKey,
+        'fillKey': ?fillKey,
       };
 
   static ComposerTextOverlay fromJson(Map<String, dynamic> json) {
