@@ -886,3 +886,545 @@ Verify:
 * Loading and error states support both themes.
 * Status bar/navigation-bar icon brightness changes correctly for Light and Dark Mode.
 
+45. User Growth & Engagement Prompt System
+
+Add a lightweight User Growth / Engagement Prompt System throughout FirstVue.
+
+The goal is to encourage users to:
+
+* Create posts
+* Upload photos
+* Upload videos
+* Post Stories
+* Explore events
+* Create or RSVP to events
+* Explore nearby activity
+* Participate in communities/groups
+* Follow people/businesses
+* Share FirstVue with other people
+
+These prompts should feel natural, social, and encouraging — not like advertisements constantly interrupting the user.
+
+46. Periodic Login / Session Prompts
+
+Periodically after login, FirstVue can show a small contextual suggestion encouraging the user to participate.
+
+Do not show the same prompt after every login.
+
+Use controlled frequency and rotation.
+
+Examples:
+
+What’s happening today?
+Share a photo, video, or update with FirstVue.
+
+Show everyone what’s going on 📸
+Upload a photo or video.
+
+What’s happening near you?
+Explore events and things happening around your area.
+
+Help FirstVue discover what’s happening
+Post something happening around you.
+
+Bring your friends
+Invite friends to FirstVue and discover what’s happening together.
+
+Going somewhere?
+Share it with your followers.
+
+Prompts can appear as:
+
+* Small cards
+* Banners
+* Empty-state suggestions
+* Occasional modal/sheet
+* Feed composer suggestions
+
+Avoid aggressive full-screen popups.
+
+47. Smart Prompt Rotation
+
+Do not show every growth prompt simultaneously.
+
+Create a small reusable prompt system that rotates between actions.
+
+Possible prompt types:
+
+CREATE_POST
+UPLOAD_PHOTO
+UPLOAD_VIDEO
+CREATE_STORY
+EXPLORE_EVENTS
+DISCOVER_NEARBY
+FOLLOW_PEOPLE
+JOIN_COMMUNITY
+INVITE_FRIENDS
+SHARE_APP
+
+These are logical examples only.
+
+Reuse the existing architecture where possible.
+
+48. Context-Aware Prompts
+
+Whenever possible, prompts should correspond to where the user currently is.
+
+Home
+
+Encourage:
+
+* Create a post
+* Share what’s happening
+
+VUE
+
+Encourage:
+
+* Upload a video
+* Share something worth discovering
+
+Explore
+
+Encourage:
+
+* Explore what’s happening
+* Find events nearby
+* Follow new people/businesses
+
+Events
+
+Encourage:
+
+* Find something happening tonight
+* Create an event
+* Share an event
+
+Profile
+
+If the user has little/no content:
+
+* Add your first photo
+* Introduce yourself with a post
+
+This should make FirstVue feel alive even during early growth.
+
+49. Empty-State Growth Prompts
+
+Empty screens should never just look broken or unfinished.
+
+If there is no relevant content, provide an action.
+
+Example:
+
+Nothing here yet.
+Be the first to share what's happening.
+[ Create Post ]
+
+Another example:
+
+No nearby events found.
+Explore another area or create an event.
+[ Explore ] [ Create Event ]
+
+Another:
+
+Your VUE is just getting started.
+Upload a photo or video and help people discover what's happening.
+[ Upload ]
+
+Do not create fake posts or fake users just to make an empty state appear populated.
+
+50. Encourage Media Uploads
+
+Make uploading media easy and visible throughout FirstVue.
+
+Where appropriate provide quick actions:
+
+* Photo
+* Video
+* Story
+* Post
+
+The Home composer could include a simple prompt such as:
+
+What’s happening?
+
+with quick media actions underneath.
+
+VUE can include:
+
++ Add to VUE
+
+or another FirstVue-appropriate equivalent.
+
+Use the existing post creation system.
+
+Do not create a separate VUE-upload database if normal posts already support media.
+
+51. Encourage Users to Explore Events
+
+FirstVue is heavily centered around discovery and things happening around users.
+
+Periodically surface contextual calls-to-action such as:
+
+* See what’s happening near you
+* Explore tonight’s events
+* Discover Atlanta
+* Find something to do
+* See what’s happening right now
+
+These should route into the existing Explore/Events/Live systems.
+
+If location is available and permission allows it, personalize the wording based on the user’s selected city/metro.
+
+Do not expose precise user location unnecessarily.
+
+52. Event Sharing
+
+Make event sharing easy.
+
+From an Event page provide:
+
+Share Event
+
+Possible destinations using the existing sharing system:
+
+* FirstVue Story
+* FirstVue Message
+* FirstVue post
+* Group/community where permitted
+* Copy link
+* External share
+
+Sharing an event should use the same global FirstVue sharing architecture rather than creating a new independent system.
+
+53. Share FirstVue / Invite Friends
+
+Add a simple Invite Friends / Share FirstVue feature.
+
+Possible locations:
+
+* Settings
+* Profile menu
+* Home engagement prompts
+* Empty states
+* Event sharing flows
+* Occasional growth prompt
+
+Example:
+
+Invite your friends
+FirstVue is better when the people you know are discovering what's happening too.
+[ Invite Friends ]
+
+Use the device’s native share sheet where supported.
+
+Allow a share message containing the FirstVue application/site link.
+
+Do not require FirstVue to upload the user’s entire address book.
+
+54. Referral-Ready Architecture
+
+Make the share system referral-ready, but do not create a complicated rewards program yet unless one already exists.
+
+Where practical, allow invitation links to contain a lightweight referral identifier.
+
+Example conceptual structure:
+
+firstvue.app/invite/USER_CODE
+
+Do not expose sensitive IDs.
+
+Use a public/random invitation code or secure equivalent if implemented.
+
+This gives FirstVue the ability to later measure:
+
+* Invitations sent
+* Invite links opened
+* New registrations from invitations
+
+without rebuilding the entire system.
+
+Do not build financial referral rewards at this stage.
+
+55. Do Not Spam Users
+
+This is extremely important.
+
+The growth system should include frequency control.
+
+Do not:
+
+* Show a popup every login.
+* Show a popup every page change.
+* Ask users to share the app constantly.
+* Repeat the same message continuously.
+
+Track simple local/session state such as:
+
+* last_prompt_type
+* last_prompt_time
+* dismissed_prompt
+* session_prompt_shown
+
+Where appropriate, store temporary frequency information locally rather than querying Supabase.
+
+Example behavior:
+
+A user might receive one lightweight engagement suggestion during a session, not one on every screen.
+
+56. Respect User Activity
+
+Do not prompt someone to perform an action they just completed.
+
+Examples:
+
+If the user just uploaded a video:
+
+Do not immediately say:
+
+Upload a video!
+
+If they just created an event:
+
+Do not immediately show:
+
+Create an event!
+
+Instead rotate to another relevant suggestion later.
+
+57. New User Onboarding
+
+For newer accounts, make the early experience guide them toward useful activity.
+
+Possible progression:
+
+Create profile
+      ↓
+Follow people/businesses
+      ↓
+Explore what's nearby
+      ↓
+Create first post
+      ↓
+Upload media
+      ↓
+Explore events
+      ↓
+Invite friends
+
+Do not force every step.
+
+These should be suggestions rather than blocking requirements unless the existing FirstVue onboarding requires a specific field.
+
+58. Returning User Experience
+
+Returning users should receive fewer onboarding-style prompts.
+
+Instead surface contextual prompts.
+
+Example:
+
+Welcome back.
+See what's happening today →
+
+or:
+
+Anything happening around you?
+Share it on FirstVue.
+
+Do not replay the entire tutorial every login.
+
+The complete tutorial should only appear for:
+
+* New users
+* Newly introduced major features where an explanation is necessary
+* Users who intentionally reopen Help/Tutorial
+
+59. Post Creation Prompts Within Feed
+
+Periodically integrate lightweight composer cards within Home where appropriate.
+
+Example:
+
+[ Avatar ]
+What's happening?
+[ Photo ] [ Video ] [ Event ]
+
+This should use the existing post composer.
+
+Do not duplicate the composer code.
+
+The card should blend naturally into the feed.
+
+60. VUE Creation Action
+
+Add an easy but unobtrusive way for users to contribute to VUE.
+
+Example:
+
++
+
+or:
+
+Add to VUE
+
+This should allow users to:
+
+* Select photo
+* Select video
+* Capture media where supported
+* Add caption
+* Add hashtags
+* Add mentions
+* Add link
+* Select appropriate visibility
+
+Media eligibility for VUE should continue to follow the existing FirstVue rules.
+
+61. Explore Contribution Prompts
+
+Explore should not only be a consumption page.
+
+Users should also be encouraged to contribute content that helps discovery.
+
+Possible subtle prompt:
+
+Know something happening around you?
+Share it with FirstVue.
+[ Create Post ]
+
+or:
+
+Hosting something?
+[ Create Event ]
+
+Do not show these excessively.
+
+62. Growth Analytics
+
+If FirstVue already has analytics/event logging, reuse it.
+
+Track lightweight events such as:
+
+* growth_prompt_seen
+* growth_prompt_clicked
+* post_started
+* post_completed
+* media_uploaded
+* event_explored
+* event_shared
+* invite_started
+* invite_shared
+
+Do not store unnecessary personal information.
+
+The purpose is to understand which prompts actually help users participate.
+
+63. Keep Analytics Data-Friendly
+
+Do not send an analytics database request for every animation, scroll movement, or minor UI event.
+
+Only track meaningful actions.
+
+Batch or use the existing event system where practical.
+
+Avoid generating large amounts of Supabase writes from simple browsing.
+
+64. Growth Prompt Component
+
+Prefer one reusable growth component/system rather than hardcoding dozens of banners throughout the app.
+
+Conceptually:
+
+GrowthPrompt
+    type
+    title
+    description
+    action
+    dismiss
+    context
+
+The exact component name can follow the current project architecture.
+
+Different screens can feed different prompt types into the same system.
+
+65. Global Goal
+
+As FirstVue grows, the app should naturally encourage a healthy loop:
+
+Discover
+   ↓
+Interact
+   ↓
+Post
+   ↓
+Upload Media
+   ↓
+Attend / Explore Events
+   ↓
+Share
+   ↓
+Invite Friends
+   ↓
+More Content
+   ↓
+More Discovery
+
+Build this into the user experience without turning the application into a collection of popups.
+
+The experience should communicate:
+
+“See what’s happening. Share what’s happening. Bring people with you.”
+
+This should feel like part of FirstVue’s identity.
+
+66. Test the Engagement System
+
+Test:
+
+* Brand-new account
+* Account with no posts
+* Account with existing posts
+* User who just uploaded media
+* User who just created an event
+* Returning user
+* Multiple logins
+* Multiple page transitions
+* Prompt dismissal
+* App restart
+* Home
+* VUE
+* Explore
+* Events
+* Profile
+
+Verify that users are not repeatedly shown the same prompt.
+
+Also verify that every CTA routes to the correct existing feature.
+
+67. Final Requirement
+
+When implementing this with the previous FirstVue update:
+
+Do not treat this as a separate app feature disconnected from the rest of FirstVue.
+
+Integrate it with the existing:
+
+* Post composer
+* VUE
+* Explore
+* Events
+* Stories
+* Messaging
+* Sharing
+* Profiles
+* Notifications
+* Analytics
+* Global theme
+
+Keep the system lightweight and reusable.
+
+The goal is to gradually turn users from viewers → participants → creators → people who invite other users, while still keeping the FirstVue experience clean and enjoyable.
+
