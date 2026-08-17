@@ -30,4 +30,4 @@ fi
 echo
 echo "Copy SHA1  → Google Cloud → Credentials → Android OAuth client"
 echo "Copy SHA256 → web/.well-known/assetlinks.json (Play App Links)"
-echo "Package name: app.firstvue.mobile"
+echo "Package name: com.FirstVue"

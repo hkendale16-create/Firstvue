@@ -60,7 +60,7 @@ Not **READY FOR PRODUCTION** until closed-test gate (12×14 days on personal acc
 |-------|--------|
 | Developer account access | **PASS** (approved) |
 | Android API 36 | **PASS** |
-| applicationId `app.firstvue.mobile` | **PASS** |
+| applicationId `com.FirstVue` | **PASS** |
 | Console setup guide | **PASS** (`docs/GOOGLE_CONSOLE_SETUP.md`) |
 | Release signing / signed AAB | **PASS** — `FirstVue-1.0.1+2-release.aab` built (agent artifacts) |
 | Upload key fingerprints | **PASS** (`docs/ANDROID_UPLOAD_KEY_FINGERPRINTS.md`) |

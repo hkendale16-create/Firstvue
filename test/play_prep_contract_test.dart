@@ -19,8 +19,8 @@ void main() {
 
   test('android namespace matches applicationId', () {
     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
-    expect(gradle, contains('namespace = "app.firstvue.mobile"'));
-    expect(gradle, contains('applicationId = "app.firstvue.mobile"'));
+    expect(gradle, contains('namespace = "com.FirstVue"'));
+    expect(gradle, contains('applicationId = "com.FirstVue"'));
     expect(
       File('android/app/src/main/kotlin/app/firstvue/mobile/MainActivity.kt')
           .existsSync(),

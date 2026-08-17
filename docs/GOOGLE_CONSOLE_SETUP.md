@@ -4,7 +4,7 @@ You are approved. Use this as the click-path for **Google Play Console** (publis
 
 | Item | Value |
 |------|--------|
-| Package / application ID | `app.firstvue.mobile` |
+| Package / application ID | `com.FirstVue` |
 | Display name | FIRSTVUE / FirstVue |
 | Support email | `hkendale16@gmail.com` |
 | Website | `https://firstvue.app` |
@@ -122,7 +122,7 @@ Create an **Android** OAuth client (same Google Cloud project):
 |-------|--------|
 | Application type | Android |
 | Name | FirstVue Android |
-| Package name | `app.firstvue.mobile` |
+| Package name | `com.FirstVue` |
 | SHA-1 | From your **upload** keystore (and debug keystore for local debug builds) |
 
 Print fingerprints after you create the keystore (Part C):
