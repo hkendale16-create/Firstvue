@@ -2,12 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../navigation/firstvue_page_route.dart';
 import '../messaging/services/fv_messaging_service.dart';
 import '../services/firstvue_feedback_sounds.dart';
 import '../services/story_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../utils/safe_url.dart';
+import '../widgets/social_rich_text.dart';
+import '../widgets/story_overlay_canvas.dart';
 import '../widgets/vue_video_player.dart';
 import '../widgets/network_photo.dart';
 import '../auth/ensure_signed_in.dart';
@@ -182,25 +186,13 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
       body: SafeArea(
         child: Stack(
           children: [
-            Positioned.fill(
-              child: story.isVideo
-                  ? VueVideoPlayer(
-                      url: story.mediaUrl,
-                      fit: BoxFit.contain,
-                      autoPlay: true,
-                      startMuted: false,
-                    )
-                  : NetworkPhoto(
-                      url: story.mediaUrl,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => const ColoredBox(
-                        color: Colors.black,
-                        child: Center(
-                          child: Icon(Icons.broken_image, color: Colors.white54),
-                        ),
-                      ),
-                    ),
-            ),
+            Positioned.fill(child: _storyBackdrop(story)),
+            if (story.overlays.isNotEmpty)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: StoryOverlayRenderer(overlays: story.overlays),
+                ),
+              ),
             Positioned.fill(
               child: Row(
                 children: [
@@ -297,13 +289,31 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
               Positioned(
                 left: 16,
                 right: 16,
-                bottom: 88,
-                child: Text(
-                  story.caption!,
+                bottom: story.linkUrl == null ? 88 : 132,
+                child: SocialRichText(
+                  text: story.caption!,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
+                    height: 1.35,
                     shadows: [Shadow(blurRadius: 8, color: Colors.black)],
+                  ),
+                ),
+              ),
+            if (story.linkUrl != null && story.linkUrl!.isNotEmpty)
+              Positioned(
+                left: 24,
+                right: 24,
+                bottom: 88,
+                child: FilledButton.tonalIcon(
+                  onPressed: () => _openStoryLink(story.linkUrl!),
+                  icon: const Icon(Icons.link_rounded, size: 18),
+                  label: Text(story.linkLabel?.trim().isNotEmpty == true
+                      ? story.linkLabel!.trim()
+                      : 'Open link'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: 0.18),
+                    foregroundColor: Colors.white,
                   ),
                 ),
               ),
@@ -352,5 +362,70 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
         ),
       ),
     );
+  }
+
+  Widget _storyBackdrop(StoryItem story) {
+    if (story.isTextOnly) {
+      final empty = story.overlays.isEmpty &&
+          (story.caption == null || story.caption!.isEmpty);
+      return ColoredBox(
+        color: _textStoryColor(story.backgroundKey),
+        child: empty
+            ? const Center(
+                child: Text(
+                  'Story',
+                  style: TextStyle(color: Colors.white70, fontSize: 22),
+                ),
+              )
+            : const SizedBox.expand(),
+      );
+    }
+    if (story.isVideo) {
+      return VueVideoPlayer(
+        url: story.mediaUrl,
+        fit: BoxFit.contain,
+        autoPlay: true,
+        startMuted: false,
+      );
+    }
+    return NetworkPhoto(
+      url: story.mediaUrl,
+      fit: BoxFit.contain,
+      errorBuilder: (_, _, _) => const ColoredBox(
+        color: Colors.black,
+        child: Center(
+          child: Icon(Icons.broken_image, color: Colors.white54),
+        ),
+      ),
+    );
+  }
+
+  Color _textStoryColor(String? key) {
+    return switch (key) {
+      'teal' => const Color(0xFF0E6B63),
+      'navy' => const Color(0xFF1A2744),
+      'forest' => const Color(0xFF1F4D38),
+      'sunset' => const Color(0xFFB65A2A),
+      'midnight' => const Color(0xFF10131F),
+      'bronze' => const Color(0xFF6B4E1F),
+      'gold' => const Color(0xFF8A6A1F),
+      _ => const Color(0xFFB8432F),
+    };
+  }
+
+  Future<void> _openStoryLink(String raw) async {
+    final sanitized = SafeUrl.sanitize(raw);
+    if (sanitized == null) return;
+    if (sanitized.startsWith('/')) {
+      // Internal routes are opened via the app navigator when possible.
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Open $sanitized from Search or profile.')),
+      );
+      return;
+    }
+    final uri = Uri.tryParse(sanitized);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }

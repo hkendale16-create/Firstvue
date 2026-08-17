@@ -19,6 +19,8 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
   bool _loading = true;
   bool _saving = false;
   bool _interactionSounds = true;
+  bool _messageSounds = true;
+  bool _hapticsEnabled = true;
   String? _state;
   String? _city;
   bool _stateFocused = false;
@@ -34,6 +36,9 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
     setState(() => _loading = true);
     final prefs = await UserPreferencesService.fetch();
     final sounds = await InteractionPreferencesService.interactionSoundsEnabled();
+    final messageSounds =
+        await InteractionPreferencesService.messageSoundsEnabled();
+    final haptics = await InteractionPreferencesService.hapticsEnabled();
     if (!mounted) return;
     setState(() {
       _prefs = prefs;
@@ -50,6 +55,8 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
         // Keep free-text legacy cities that aren't in the catalog.
       }
       _interactionSounds = sounds;
+      _messageSounds = messageSounds;
+      _hapticsEnabled = haptics;
       _loading = false;
     });
   }
@@ -149,6 +156,18 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
     await InteractionPreferencesService.setInteractionSoundsEnabled(value);
     if (!mounted) return;
     setState(() => _interactionSounds = value);
+  }
+
+  Future<void> _toggleMessageSounds(bool value) async {
+    await InteractionPreferencesService.setMessageSoundsEnabled(value);
+    if (!mounted) return;
+    setState(() => _messageSounds = value);
+  }
+
+  Future<void> _toggleHaptics(bool value) async {
+    await InteractionPreferencesService.setHapticsEnabled(value);
+    if (!mounted) return;
+    setState(() => _hapticsEnabled = value);
   }
 
   @override
@@ -262,7 +281,7 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                 ),
                 const SizedBox(height: 28),
                 Text(
-                  'INTERACTIONS',
+                  'SOUNDS & HAPTICS',
                   style: TextStyle(
                     color: FirstVueColors.gold,
                     fontWeight: FontWeight.bold,
@@ -278,16 +297,52 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                     color: FirstVueColors.gold,
                   ),
                   title: Text(
-                    'App Sounds',
+                    'Interaction sounds',
                     style: TextStyle(color: fv.primaryText),
                   ),
                   subtitle: Text(
-                    'Spark, refresh, and incoming message sounds',
+                    'Spark, refresh, publish, and save sounds',
                     style: TextStyle(color: fv.secondaryText, fontSize: 12),
                   ),
                   value: _interactionSounds,
                   activeThumbColor: FirstVueColors.teal,
                   onChanged: _toggleInteractionSounds,
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: Icon(
+                    Icons.chat_bubble_outline,
+                    color: FirstVueColors.gold,
+                  ),
+                  title: Text(
+                    'Message sounds',
+                    style: TextStyle(color: fv.primaryText),
+                  ),
+                  subtitle: Text(
+                    'Incoming message cues',
+                    style: TextStyle(color: fv.secondaryText, fontSize: 12),
+                  ),
+                  value: _messageSounds,
+                  activeThumbColor: FirstVueColors.teal,
+                  onChanged: _toggleMessageSounds,
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: Icon(
+                    Icons.vibration,
+                    color: FirstVueColors.gold,
+                  ),
+                  title: Text(
+                    'Haptic feedback',
+                    style: TextStyle(color: fv.primaryText),
+                  ),
+                  subtitle: Text(
+                    'Subtle vibration on spark, refresh, and publish',
+                    style: TextStyle(color: fv.secondaryText, fontSize: 12),
+                  ),
+                  value: _hapticsEnabled,
+                  activeThumbColor: FirstVueColors.teal,
+                  onChanged: _toggleHaptics,
                 ),
                 const SizedBox(height: 28),
                 Text(

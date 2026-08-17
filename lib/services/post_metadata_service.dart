@@ -39,21 +39,53 @@ class PostMetadataService {
   }
 
   static Future<void> syncForPost(String postId, String body) async {
+    await syncForContent(
+      contentType: 'post',
+      contentId: postId,
+      body: body,
+    );
+  }
+
+  /// Sync hashtags into the global discovery system for any content type.
+  static Future<void> syncForContent({
+    required String contentType,
+    required String contentId,
+    required String body,
+    String? city,
+    String? state,
+  }) async {
     try {
       await _client.rpc(
-        'sync_post_hashtags',
-        params: {'p_post_id': postId, 'p_body': body},
+        'sync_content_hashtags',
+        params: {
+          'p_content_type': contentType,
+          'p_content_id': contentId,
+          'p_body': body,
+          'p_city': city,
+          'p_state': state,
+        },
       );
     } catch (_) {
-      final parsed = parse(body);
-      for (final tag in parsed.hashtags) {
-        await _linkHashtag(postId, tag);
+      if (contentType == 'post') {
+        try {
+          await _client.rpc(
+            'sync_post_hashtags',
+            params: {'p_post_id': contentId, 'p_body': body},
+          );
+        } catch (_) {
+          final parsed = parse(body);
+          for (final tag in parsed.hashtags) {
+            await _linkHashtag(contentId, tag);
+          }
+        }
       }
     }
 
-    final parsed = parse(body);
-    for (final username in parsed.mentionUsernames) {
-      await _linkMention(postId, username);
+    if (contentType == 'post') {
+      final parsed = parse(body);
+      for (final username in parsed.mentionUsernames) {
+        await _linkMention(contentId, username);
+      }
     }
   }
 
@@ -63,6 +95,32 @@ class PostMetadataService {
         .from('community_news_posts')
         .update({'body': trimmed})
         .eq('id', postId);
+    await syncForPost(postId, trimmed);
+  }
+
+  static Future<void> updatePostMetadata({
+    required String postId,
+    required String body,
+    String? backgroundColor,
+    String? visibility,
+    String? locationLabel,
+    String? locationCity,
+    String? locationState,
+    String? linkUrl,
+    String? linkLabel,
+  }) async {
+    final trimmed = body.trim();
+    final payload = <String, dynamic>{
+      'body': trimmed,
+      'background_color': ?backgroundColor,
+      'visibility': ?visibility,
+      'location_label': ?locationLabel,
+      'location_city': ?locationCity,
+      'location_state': ?locationState,
+      'link_url': ?linkUrl,
+      'link_label': ?linkLabel,
+    };
+    await _client.from('community_news_posts').update(payload).eq('id', postId);
     await syncForPost(postId, trimmed);
   }
 

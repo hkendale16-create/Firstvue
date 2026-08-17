@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../services/media_type_helpers.dart';
 import '../theme/firstvue_theme.dart';
+import '../theme/social_text_field_style.dart';
 import 'network_photo.dart';
 import 'signed_media_viewer.dart';
 
@@ -257,29 +258,13 @@ class _MediaCaptionEditorScreenState extends State<MediaCaptionEditorScreen> {
                   maxLines: 3,
                   maxLength: 280,
                   autofocus: true,
-                  style: TextStyle(color: fv.primaryText, height: 1.35),
+                  style: SocialTextFieldStyle.bodyStyle(context),
                   onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
+                  decoration: SocialTextFieldStyle.borderless(
+                    context,
                     hintText: 'Say something about this photo…',
-                    hintStyle: TextStyle(color: fv.tertiaryText),
-                    filled: true,
-                    fillColor: fv.inputFill,
-                    counterStyle: TextStyle(color: fv.tertiaryText),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: fv.borderSubtle),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: fv.borderSubtle),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(
-                        color: FirstVueColors.teal,
-                        width: 1.4,
-                      ),
-                    ),
+                    showUnderline: true,
+                    maxLength: 280,
                   ),
                 ),
               ],
