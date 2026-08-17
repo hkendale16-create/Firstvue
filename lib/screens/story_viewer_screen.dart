@@ -366,17 +366,18 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
 
   Widget _storyBackdrop(StoryItem story) {
     if (story.isTextOnly) {
+      final empty = story.overlays.isEmpty &&
+          (story.caption == null || story.caption!.isEmpty);
       return ColoredBox(
         color: _textStoryColor(story.backgroundKey),
-        child: story.overlays.isEmpty &&
-                (story.caption == null || story.caption!.isEmpty)
+        child: empty
             ? const Center(
                 child: Text(
                   'Story',
                   style: TextStyle(color: Colors.white70, fontSize: 22),
                 ),
               )
-            : null,
+            : const SizedBox.expand(),
       );
     }
     if (story.isVideo) {
