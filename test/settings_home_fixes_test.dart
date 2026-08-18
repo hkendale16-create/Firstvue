@@ -42,7 +42,7 @@ void main() {
     final src = File(
       'lib/screens/business_owner_start_screen.dart',
     ).readAsStringSync();
-    expect(src, contains("tabLabels = ['CLAIM', 'ADD', 'RENTAL']"));
+    expect(src, contains("tabLabels = ['Claim', 'Add', 'Rental']"));
     expect(src, contains('_BusinessToolsTabBar'));
     expect(src, contains('Claim a listed business'));
     expect(src, contains('Add an unlisted business'));

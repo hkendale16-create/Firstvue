@@ -20,7 +20,7 @@ import 'rentals_screen.dart';
 class BusinessOwnerStartScreen extends StatefulWidget {
   const BusinessOwnerStartScreen({super.key});
 
-  static const tabLabels = ['CLAIM', 'ADD', 'RENTAL'];
+  static const tabLabels = ['Claim', 'Add', 'Rental'];
 
   @override
   State<BusinessOwnerStartScreen> createState() =>
@@ -121,53 +121,50 @@ class _BusinessToolsTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final fv = context.fv;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: fv.borderSubtle)),
-        ),
-        child: Row(
-          children: [
-            for (var i = 0; i < BusinessOwnerStartScreen.tabLabels.length; i++)
-              Expanded(
-                child: InkWell(
-                  onTap: () => onSelected(i),
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 10),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          BusinessOwnerStartScreen.tabLabels[i],
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: selectedIndex == i
-                                ? FirstVueColors.gold
-                                : fv.secondaryText,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                            letterSpacing: 1.1,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 160),
-                          height: 2,
-                          width: selectedIndex == i ? 36 : 0,
-                          decoration: BoxDecoration(
-                            color: FirstVueColors.gold,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ],
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: Row(
+        children: [
+          for (var i = 0; i < BusinessOwnerStartScreen.tabLabels.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => onSelected(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: i == selectedIndex
+                        ? FirstVueColors.gold
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: i == selectedIndex
+                          ? FirstVueColors.gold
+                          : fv.borderSubtle,
+                    ),
+                    boxShadow: i == selectedIndex
+                        ? FirstVueColors.goldGlow(intensity: 0.45)
+                        : const [],
+                  ),
+                  child: Text(
+                    BusinessOwnerStartScreen.tabLabels[i],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: i == selectedIndex
+                          ? FirstVueColors.onGold
+                          : fv.secondaryText,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
                     ),
                   ),
                 ),
               ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
