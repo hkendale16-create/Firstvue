@@ -38,15 +38,18 @@ void main() {
     expect(src, contains('_isUnknownColumn'));
   });
 
-  test('business owner start lists the three workflow options', () {
+  test('business owner start uses Claim / Add / Rental tabs', () {
     final src = File(
       'lib/screens/business_owner_start_screen.dart',
     ).readAsStringSync();
+    expect(src, contains("tabLabels = ['CLAIM', 'ADD', 'RENTAL']"));
+    expect(src, contains('_BusinessToolsTabBar'));
     expect(src, contains('Claim a listed business'));
     expect(src, contains('Add an unlisted business'));
     expect(src, contains('Post an available rental'));
-    expect(src, contains('ListView('));
+    expect(src, contains('_WorkflowTabPane'));
     expect(src, isNot(contains('const Spacer()')));
     expect(src, isNot(contains('local demonstration')));
+    expect(src, isNot(contains('class _WorkflowOption')));
   });
 }
