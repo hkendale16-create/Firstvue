@@ -96,12 +96,27 @@ void main() {
       expect(updated.sparkedByMe, isTrue);
       expect(updated.sparkCount, 2);
       expect(updated.body, 'Hello');
+      expect(updated.replyCount, 0);
+      expect(comment.copyWith(replyCount: 3).replyCount, 3);
     });
   });
 
+  test('comment pages are bounded instead of downloading every row', () {
+    final src = File(
+      'lib/services/feed_comments_service.dart',
+    ).readAsStringSync();
+    expect(src, contains('fetchCommentPage'));
+    expect(src, contains('limit = 20'));
+    expect(src, contains("isFilter('parent_id', null)"));
+    expect(src, contains('fetchReplies'));
+    expect(src, contains('deleteComment'));
+    expect(src, contains('isWidgetTestBinding'));
+  });
+
   test('postComment syncs hashtags into the global content system', () {
-    final src =
-        File('lib/services/feed_comments_service.dart').readAsStringSync();
+    final src = File(
+      'lib/services/feed_comments_service.dart',
+    ).readAsStringSync();
     expect(src, contains('PostMetadataService.syncForContent'));
     expect(src, contains("contentType: 'comment'"));
     expect(src, contains('contentId: inserted[\'id\'] as String'));

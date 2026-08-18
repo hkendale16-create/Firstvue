@@ -44,7 +44,88 @@ double scoreVueFeedItem(
     score -= FeedRankingConfig.vueSameCreatorPenalty;
   }
 
+  score += vueTrendingScore(item) * FeedRankingConfig.vueEngagementMix;
+
   return score;
+}
+
+/// Engagement + recency score used for the 🔥 trending rank badge.
+/// Recent (48h) activity outweighs lifetime totals; raw views alone cannot
+/// keep stale media at #1.
+double vueTrendingScore(DiscoveryFeedItem item, {DateTime? now}) {
+  double mix(int recent, int lifetime, double weight) {
+    return recent * weight * FeedRankingConfig.vueRecentWeight +
+        lifetime * weight * FeedRankingConfig.vueLifetimeWeight;
+  }
+
+  var score = 0.0;
+  score += mix(
+    item.recentViewsCount,
+    item.viewsCount,
+    FeedRankingConfig.weightViews,
+  );
+  score += mix(
+    item.recentLikesCount,
+    item.likesCount,
+    FeedRankingConfig.weightLikes,
+  );
+  score += mix(
+    item.recentCommentsCount,
+    item.commentsCount,
+    FeedRankingConfig.weightComments,
+  );
+  score += mix(
+    item.recentSavesCount,
+    item.savesCount,
+    FeedRankingConfig.weightSaves,
+  );
+  score += mix(
+    item.recentSharesCount,
+    item.sharesCount,
+    FeedRankingConfig.weightShares,
+  );
+  score += mix(
+    item.recentPlaysCount,
+    item.playsCount,
+    FeedRankingConfig.vuePlayWeight,
+  );
+
+  final createdAt = item.createdAt;
+  if (createdAt != null) {
+    final clock = now ?? DateTime.now();
+    final ageHours = clock.difference(createdAt).inSeconds / 3600.0;
+    if (ageHours > 0) {
+      score -= (ageHours / FeedRankingConfig.trendingAgeDecayHours) *
+          FeedRankingConfig.ageDecayFactor;
+    }
+  }
+  return score;
+}
+
+/// Assigns 1-based trending ranks from engagement velocity. Mosaic / For You
+/// order is left unchanged — only the badge number is rewritten.
+List<DiscoveryFeedItem> assignVueTrendingRanks(
+  List<DiscoveryFeedItem> items, {
+  DateTime? now,
+}) {
+  if (items.isEmpty) return items;
+  final ranked = List<DiscoveryFeedItem>.from(items);
+  ranked.sort((a, b) {
+    final cmp = vueTrendingScore(b, now: now)
+        .compareTo(vueTrendingScore(a, now: now));
+    if (cmp != 0) return cmp;
+    final created = (b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0))
+        .compareTo(a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0));
+    if (created != 0) return created;
+    return a.mediaId.compareTo(b.mediaId);
+  });
+  final ranks = <String, int>{
+    for (var i = 0; i < ranked.length; i++) ranked[i].mediaId: i + 1,
+  };
+  return [
+    for (final item in items)
+      item.copyWith(trendingRank: ranks[item.mediaId] ?? item.trendingRank),
+  ];
 }
 
 /// Rank + shuffle VUE tiles like Instagram Reels: quality signals plus a
@@ -77,12 +158,12 @@ List<DiscoveryFeedItem> rankVueFeedItems(
       );
       // Mode nudges: trending leans harder on rating; nearby keeps seed mix.
       final modeBiasA = switch (mode) {
-        VueFeedMode.trending => a.rating * 10.0,
+        VueFeedMode.trending => vueTrendingScore(a) + a.rating * 2.0,
         VueFeedMode.nearby => a.sponsored ? 4.0 : 0.0,
         VueFeedMode.forYou => 0.0,
       };
       final modeBiasB = switch (mode) {
-        VueFeedMode.trending => b.rating * 10.0,
+        VueFeedMode.trending => vueTrendingScore(b) + b.rating * 2.0,
         VueFeedMode.nearby => b.sponsored ? 4.0 : 0.0,
         VueFeedMode.forYou => 0.0,
       };

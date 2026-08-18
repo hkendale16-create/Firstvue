@@ -1,49 +1,66 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../utils/app_environment.dart';
 import 'activity_notifications_service.dart';
 import 'community_news_service.dart';
 import 'post_metadata_service.dart';
 import 'profile_cards.dart';
+import 'profile_media_service.dart';
 
 class FeedComment {
   final String id;
   final String body;
   final String authorName;
   final String? authorId;
+  final String? avatarUrl;
   final DateTime createdAt;
   final bool isMine;
   final String? parentId;
   final int sparkCount;
   final bool sparkedByMe;
+  final int replyCount;
 
   const FeedComment({
     required this.id,
     required this.body,
     required this.authorName,
     required this.authorId,
+    this.avatarUrl,
     required this.createdAt,
     required this.isMine,
     required this.parentId,
     required this.sparkCount,
     required this.sparkedByMe,
+    this.replyCount = 0,
   });
 
   FeedComment copyWith({
     int? sparkCount,
     bool? sparkedByMe,
+    int? replyCount,
+    String? avatarUrl,
   }) {
     return FeedComment(
       id: id,
       body: body,
       authorName: authorName,
       authorId: authorId,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       createdAt: createdAt,
       isMine: isMine,
       parentId: parentId,
       sparkCount: sparkCount ?? this.sparkCount,
       sparkedByMe: sparkedByMe ?? this.sparkedByMe,
+      replyCount: replyCount ?? this.replyCount,
     );
   }
+}
+
+class FeedCommentPage {
+  final List<FeedComment> comments;
+  final bool hasMore;
+
+  const FeedCommentPage({required this.comments, required this.hasMore});
 }
 
 class FeedCommentsService {
@@ -85,8 +102,7 @@ class FeedCommentsService {
     List<FeedComment> all,
     String rootId,
   ) {
-    final direct =
-        all.where((comment) => comment.parentId == rootId).toList();
+    final direct = all.where((comment) => comment.parentId == rootId).toList();
     final result = <FeedComment>[];
     for (final reply in direct) {
       result.add(reply);
@@ -96,17 +112,137 @@ class FeedCommentsService {
   }
 
   static Future<List<FeedComment>> fetchComments(String mediaId) async {
+    final page = await fetchCommentPage(mediaId, limit: 200);
+    return page.comments;
+  }
+
+  /// Newest top-level comments first. Reply bodies load on expand.
+  static Future<FeedCommentPage> fetchCommentPage(
+    String mediaId, {
+    int limit = 20,
+    DateTime? before,
+  }) async {
+    if (isWidgetTestBinding) {
+      return const FeedCommentPage(comments: [], hasMore: false);
+    }
     final me = _client.auth.currentUser?.id;
+    final pageSize = limit.clamp(1, 50);
     try {
-      final rows = await _client
+      var query = _client
           .from('feed_comments')
           .select('id, body, created_at, author_id, parent_id')
           .eq('media_id', mediaId)
-          .order('created_at', ascending: true);
+          .isFilter('parent_id', null);
+      if (before != null) {
+        query = query.lt('created_at', before.toUtc().toIso8601String());
+      }
+      final topRows = await query
+          .order('created_at', ascending: false)
+          .limit(pageSize + 1);
 
-      return await _mapCommentRows(rows, me: me);
+      final hasMore = topRows.length > pageSize;
+      final pageRows = hasMore
+          ? topRows.take(pageSize).toList()
+          : List<dynamic>.from(topRows);
+      if (pageRows.isEmpty) {
+        return const FeedCommentPage(comments: [], hasMore: false);
+      }
+
+      final topIds = pageRows.map((row) => row['id'] as String).toList();
+      final replyCounts = await _countReplies(mediaId, topIds);
+      final mapped = await _mapCommentRows(
+        pageRows,
+        me: me,
+        replyCounts: replyCounts,
+      );
+      return FeedCommentPage(comments: mapped, hasMore: hasMore);
     } on PostgrestException catch (error) {
       throw FeedCommentsException(userMessageForError(error), cause: error);
+    }
+  }
+
+  /// Direct replies for [parentId], plus one nested level.
+  static Future<List<FeedComment>> fetchReplies({
+    required String mediaId,
+    required String parentId,
+  }) async {
+    if (isWidgetTestBinding) return const [];
+    final me = _client.auth.currentUser?.id;
+    try {
+      List<dynamic> replyRows = await _client
+          .from('feed_comments')
+          .select('id, body, created_at, author_id, parent_id')
+          .eq('media_id', mediaId)
+          .eq('parent_id', parentId)
+          .order('created_at', ascending: true);
+      final nestedIds = replyRows.map((row) => row['id'] as String).toList();
+      if (nestedIds.isNotEmpty) {
+        try {
+          final nested = await _client
+              .from('feed_comments')
+              .select('id, body, created_at, author_id, parent_id')
+              .eq('media_id', mediaId)
+              .inFilter('parent_id', nestedIds)
+              .order('created_at', ascending: true);
+          replyRows = [...replyRows, ...nested];
+        } catch (_) {}
+      }
+      return await _mapCommentRows(replyRows, me: me);
+    } on PostgrestException catch (error) {
+      throw FeedCommentsException(userMessageForError(error), cause: error);
+    }
+  }
+
+  static Future<void> deleteComment(String commentId) async {
+    if (isWidgetTestBinding) return;
+    final me = _client.auth.currentUser?.id;
+    if (me == null) throw const FeedCommentsAuthException();
+    try {
+      await _client.from('feed_comments').delete().eq('id', commentId);
+    } on PostgrestException catch (error) {
+      throw FeedCommentsException(userMessageForError(error), cause: error);
+    }
+  }
+
+  static Future<Map<String, int>> _countReplies(
+    String mediaId,
+    List<String> parentIds,
+  ) async {
+    if (parentIds.isEmpty) return const {};
+    try {
+      final direct = await _client
+          .from('feed_comments')
+          .select('id, parent_id')
+          .eq('media_id', mediaId)
+          .inFilter('parent_id', parentIds);
+      final counts = <String, int>{};
+      final childIds = <String>[];
+      final childToTop = <String, String>{};
+      for (final row in direct) {
+        final parentId = row['parent_id'] as String?;
+        final id = row['id'] as String?;
+        if (parentId == null || id == null) continue;
+        counts[parentId] = (counts[parentId] ?? 0) + 1;
+        childIds.add(id);
+        childToTop[id] = parentId;
+      }
+      if (childIds.isEmpty) return counts;
+      try {
+        final nested = await _client
+            .from('feed_comments')
+            .select('parent_id')
+            .eq('media_id', mediaId)
+            .inFilter('parent_id', childIds);
+        for (final row in nested) {
+          final nestedParent = row['parent_id'] as String?;
+          final topId = childToTop[nestedParent];
+          if (topId == null) continue;
+          counts[topId] = (counts[topId] ?? 0) + 1;
+        }
+      } catch (_) {}
+      return counts;
+    } catch (_) {
+      return const {};
     }
   }
 
@@ -121,6 +257,7 @@ class FeedCommentsService {
   static Future<List<FeedComment>> _mapCommentRows(
     List<dynamic> rows, {
     required String? me,
+    Map<String, int> replyCounts = const {},
   }) async {
     if (rows.isEmpty) return const [];
 
@@ -132,6 +269,10 @@ class FeedCommentsService {
         .toList();
 
     final authorNames = await _fetchProfileNames(authorIds);
+    Map<String, String> avatars = const {};
+    try {
+      avatars = await ProfileMediaService.fetchAvatarUrlsForProfiles(authorIds);
+    } catch (_) {}
     final sparkCounts = await _fetchSparkCounts(commentIds);
     final mySparks = me == null
         ? const <String>{}
@@ -143,14 +284,18 @@ class FeedCommentsService {
             row as Map<String, dynamic>,
             me: me,
             authorNames: authorNames,
+            avatars: avatars,
             sparkCounts: sparkCounts,
             mySparks: mySparks,
+            replyCounts: replyCounts,
           ),
         )
         .toList();
   }
 
-  static Future<Map<String, int>> _fetchSparkCounts(List<String> commentIds) async {
+  static Future<Map<String, int>> _fetchSparkCounts(
+    List<String> commentIds,
+  ) async {
     if (commentIds.isEmpty) return {};
     try {
       final rows = await _client
@@ -222,11 +367,14 @@ class FeedCommentsService {
     Map<String, dynamic> row, {
     required String? me,
     Map<String, String> authorNames = const {},
+    Map<String, String> avatars = const {},
     Map<String, int> sparkCounts = const {},
     Set<String> mySparks = const {},
+    Map<String, int> replyCounts = const {},
   }) {
     final authorId = row['author_id'] as String?;
     final id = row['id'] as String;
+    final avatar = authorId == null ? null : avatars[authorId];
     return FeedComment(
       id: id,
       body: row['body'] as String,
@@ -234,11 +382,13 @@ class FeedCommentsService {
           ? 'FirstVue member'
           : (authorNames[authorId] ?? 'FirstVue member'),
       authorId: authorId,
+      avatarUrl: (avatar != null && avatar.startsWith('http')) ? avatar : null,
       createdAt: DateTime.parse(row['created_at'] as String),
       isMine: authorId == me,
       parentId: row['parent_id'] as String?,
       sparkCount: sparkCounts[id] ?? 0,
       sparkedByMe: mySparks.contains(id),
+      replyCount: replyCounts[id] ?? 0,
     );
   }
 
@@ -322,12 +472,8 @@ class FeedCommentsService {
         );
       } catch (_) {}
 
-      final authorNames = await _fetchProfileNames([user.id]);
-      return _commentFromRow(
-        inserted,
-        me: user.id,
-        authorNames: authorNames,
-      );
+      final mapped = await _mapCommentRows([inserted], me: user.id);
+      return mapped.first;
     } on PostgrestException catch (error) {
       throw FeedCommentsException(userMessageForError(error), cause: error);
     }
@@ -375,10 +521,7 @@ class FeedCommentsService {
             type: 'comment_spark',
             title: 'Someone sparked your comment',
             body: comment.body,
-            payload: {
-              'comment_id': comment.id,
-              'post_id': ?postId,
-            },
+            payload: {'comment_id': comment.id, 'post_id': ?postId},
           );
         }
       }

@@ -72,4 +72,15 @@ class FeedRankingConfig {
 
   /// Soft penalty for stacking the same creator back-to-back in ranked order.
   static const double vueSameCreatorPenalty = 12.0;
+
+  /// Blend of recent (48h) vs lifetime engagement for VUE trending ranks.
+  /// Recent velocity is the primary signal; lifetime is a light tie-break.
+  static const double vueRecentWeight = 1.0;
+  static const double vueLifetimeWeight = 0.18;
+
+  /// Per valid video play session (not unique viewers, not autoplay restarts).
+  static const double vuePlayWeight = 0.8;
+
+  /// How much engagement may nudge the For You mosaic shuffle.
+  static const double vueEngagementMix = 0.25;
 }

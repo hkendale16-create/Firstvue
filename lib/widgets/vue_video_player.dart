@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../theme/firstvue_theme.dart';
+import 'network_photo.dart';
 
 /// Full video player with mute toggle and progress bar for videos longer than 10s.
 class VueVideoPlayer extends StatefulWidget {
   final String url;
+  final String? thumbnailUrl;
   final double? aspectRatio;
   final BoxFit fit;
   final BorderRadius? borderRadius;
@@ -13,15 +15,21 @@ class VueVideoPlayer extends StatefulWidget {
   final bool startMuted;
   final bool active;
 
+  final bool showChrome;
+  final VoidCallback? onPlaybackStarted;
+
   const VueVideoPlayer({
     super.key,
     required this.url,
+    this.thumbnailUrl,
     this.aspectRatio,
     this.fit = BoxFit.contain,
     this.borderRadius,
     this.autoPlay = true,
     this.startMuted = true,
     this.active = true,
+    this.showChrome = true,
+    this.onPlaybackStarted,
   });
 
   @override
@@ -34,6 +42,7 @@ class _VueVideoPlayerState extends State<VueVideoPlayer> {
   bool _failed = false;
   bool _muted = true;
   bool _showLongProgress = false;
+  bool _notifiedPlay = false;
 
   @override
   void initState() {
@@ -60,6 +69,7 @@ class _VueVideoPlayerState extends State<VueVideoPlayer> {
     if (controller == null || !_ready) return;
     if (widget.active && widget.autoPlay) {
       await controller.play();
+      _notifyPlay();
     } else {
       await controller.pause();
     }
@@ -81,6 +91,7 @@ class _VueVideoPlayerState extends State<VueVideoPlayer> {
       final duration = controller.value.duration;
       if (widget.autoPlay && widget.active) {
         await controller.play();
+        _notifyPlay();
       }
 
       setState(() {
@@ -93,11 +104,18 @@ class _VueVideoPlayerState extends State<VueVideoPlayer> {
     }
   }
 
+  void _notifyPlay() {
+    if (_notifiedPlay) return;
+    _notifiedPlay = true;
+    widget.onPlaybackStarted?.call();
+  }
+
   void _disposeController() {
     _controller?.dispose();
     _controller = null;
     _ready = false;
     _failed = false;
+    _notifiedPlay = false;
   }
 
   @override
@@ -122,6 +140,7 @@ class _VueVideoPlayerState extends State<VueVideoPlayer> {
       await controller.pause();
     } else {
       await controller.play();
+      _notifyPlay();
     }
     if (mounted) setState(() {});
   }
@@ -146,10 +165,20 @@ class _VueVideoPlayerState extends State<VueVideoPlayer> {
     }
 
     if (!_ready || _controller == null) {
+      final poster = (widget.thumbnailUrl ?? '').trim();
       return Container(
         alignment: Alignment.center,
-        color: FirstVueColors.elevatedSurface,
-        child: const CircularProgressIndicator(color: FirstVueColors.teal),
+        color: Colors.black,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (poster.startsWith('http'))
+              NetworkPhoto(url: poster, fit: widget.fit),
+            const Center(
+              child: CircularProgressIndicator(color: FirstVueColors.teal),
+            ),
+          ],
+        ),
       );
     }
 
@@ -178,21 +207,28 @@ class _VueVideoPlayerState extends State<VueVideoPlayer> {
                 shape: BoxShape.circle,
               ),
               padding: const EdgeInsets.all(12),
-              child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 36),
-            ),
-          Positioned(
-            right: 8,
-            bottom: _showLongProgress ? 36 : 8,
-            child: IconButton.filled(
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.black.withValues(alpha: .55),
-                foregroundColor: Colors.white,
+              child: const Icon(
+                Icons.play_arrow_rounded,
+                color: Colors.white,
+                size: 36,
               ),
-              onPressed: _toggleMute,
-              icon: Icon(_muted ? Icons.volume_off_rounded : Icons.volume_up_rounded),
             ),
-          ),
-          if (_showLongProgress)
+          if (widget.showChrome)
+            Positioned(
+              right: 8,
+              bottom: _showLongProgress ? 36 : 8,
+              child: IconButton.filled(
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black.withValues(alpha: .55),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: _toggleMute,
+                icon: Icon(
+                  _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                ),
+              ),
+            ),
+          if (widget.showChrome && _showLongProgress)
             Positioned(
               left: 0,
               right: 0,
@@ -227,11 +263,17 @@ class _VueVideoPlayerState extends State<VueVideoPlayer> {
                           children: [
                             Text(
                               _formatDuration(position),
-                              style: const TextStyle(color: Colors.white70, fontSize: 11),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                              ),
                             ),
                             Text(
                               _formatDuration(duration),
-                              style: const TextStyle(color: Colors.white70, fontSize: 11),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                              ),
                             ),
                           ],
                         ),
