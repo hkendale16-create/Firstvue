@@ -1,0 +1,53 @@
+# FirstVue — iOS App Store / TestFlight from Windows (no Mac required).
+# Codemagic rents a Mac, signs the IPA, and uploads it to App Store Connect.
+#
+# Setup (once) is in docs/APP_STORE_UPLOAD.md → “Windows (no Mac)”.
+# Name the App Store Connect integration **FirstVue** so it matches below.
+
+workflows:
+  ios-app-store:
+    name: iOS App Store 1.0.7
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: FirstVue
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.FirstVue
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Set up code signing
+        script: |
+          xcode-project use-profiles \
+            --custom-export-options='{"testFlightInternalTestingOnly": true}'
+      - name: Flutter packages
+        script: |
+          flutter pub get
+      - name: CocoaPods
+        script: |
+          find . -name Podfile -execdir pod install \;
+      - name: Build App Store IPA
+        script: |
+          flutter build ipa --release \
+            --build-name=1.0.7 \
+            --build-number=8 \
+            --export-options-plist=/Users/builder/export_options.plist \
+            --dart-define=FIRSTVUE_OAUTH_GOOGLE=true \
+            --dart-define=FIRSTVUE_GOOGLE_WEB_CLIENT_ID=232279155211-ilegqngbve9fr34o5ajjq7396c48n877.apps.googleusercontent.com
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      email:
+        recipients:
+          - hkendale16@gmail.com
+        notify:
+          success: true
+          failure: true
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false

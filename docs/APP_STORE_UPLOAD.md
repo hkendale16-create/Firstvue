@@ -1,79 +1,71 @@
-# App Store / TestFlight — FirstVue upload guide
+# App Store / TestFlight — FirstVue (Windows)
 
-This Linux cloud agent **cannot** produce an `.ipa` (Apple requires macOS + Xcode).
-Use this checklist on a Mac, then upload with Transporter or Xcode.
+You **cannot** build an App Store `.ipa` on Windows (or Linux). Apple only lets **macOS + Xcode** compile iOS. From Windows, a cloud Mac does that for you.
 
-## Identifiers (match Android / Play)
+Use **Codemagic** in the browser. This repo already has `codemagic.yaml`.
 
 | Field | Value |
 |-------|--------|
 | Bundle ID | `com.FirstVue` |
 | Display name | FIRSTVUE |
-| Version | `1.0.2` (from `pubspec.yaml`) |
-| Build | `3` |
+| Version | `1.0.7` |
+| Build | `8` |
 | Support email | `hkendale16@gmail.com` |
 | Privacy | `https://firstvue.app/privacy.html` |
 | Marketing URL | `https://firstvue.app` |
 
-Replace `TEAMID` in `web/.well-known/apple-app-site-association` with your Apple Team ID after you create the App ID.
-
 ---
 
-## 1. App Store Connect (browser)
+## Windows path (no Mac)
 
-1. Open [App Store Connect](https://appstoreconnect.apple.com) → **My Apps** → **+** → **New App**
-2. Platforms: **iOS**
-3. Name: **FirstVue**
-4. Primary language: English (U.S.)
-5. Bundle ID: select **com.FirstVue** (create it first in [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/identifiers/list) if missing)
-6. SKU: `firstvue001`
-7. User Access: Full Access
+### A. Apple Developer (browser)
 
-### Create Bundle ID (if needed)
+1. Enroll at [developer.apple.com](https://developer.apple.com) with `hkendale16@gmail.com` (paid Apple Developer Program).
+2. [Identifiers](https://developer.apple.com/account/resources/identifiers/list) → **+** → App IDs → App  
+   - Description: FirstVue  
+   - Bundle ID: **Explicit** → `com.FirstVue`
+3. [App Store Connect](https://appstoreconnect.apple.com) → **My Apps** → **+** → New App  
+   - Platform: iOS  
+   - Name: **FirstVue**  
+   - Language: English (U.S.)  
+   - Bundle ID: `com.FirstVue`  
+   - SKU: `firstvue001`
 
-Developer portal → Identifiers → **+** → App IDs → App  
-- Description: FirstVue  
-- Bundle ID: **Explicit** → `com.FirstVue`  
-- Capabilities: Associated Domains (if using Universal Links), Push later if needed  
+### B. App Store Connect API key (lets Codemagic upload)
 
----
+1. App Store Connect → **Users and Access** → **Integrations** → **App Store Connect API**
+2. **Generate API Key**
+   - Name: `FirstVue`
+   - Access: **App Manager**
+3. Download the `.p8` file (Apple shows it **once**). Copy **Issuer ID** and **Key ID**.
 
-## 2. Build on a Mac (produces the upload file)
+### C. Codemagic (this is the Mac that builds the IPA)
 
-```bash
-git clone https://github.com/hkendale16-create/Firstvue.git
-cd Firstvue
-git checkout cursor/google-console-setup-2f4a   # or main after merge
-flutter pub get
-cd ios && pod install && cd ..
-flutter build ipa --release \
-  --dart-define=FIRSTVUE_OAUTH_GOOGLE=true \
-  --dart-define=FIRSTVUE_GOOGLE_WEB_CLIENT_ID=232279155211-ilegqngbve9fr34o5ajjq7396c48n877.apps.googleusercontent.com
+1. Open [codemagic.io](https://codemagic.io) → sign in with **GitHub** → add `hkendale16-create/Firstvue`.
+2. Teams → **Integrations** → **App Store Connect** → add the API key.  
+   Name the integration **FirstVue** (must match `codemagic.yaml`).
+3. Teams → **Code signing identities** → iOS → fetch/create certificates for `com.FirstVue` (App Store distribution). Codemagic can create the certs so you never need Keychain on a Mac.
+4. Start build → workflow **iOS App Store 1.0.7**.
+5. When it finishes, the `.ipa` is already uploaded to **TestFlight**.
+
+### D. Install on iPhone
+
+1. App Store Connect → **TestFlight** → add `hkendale16@gmail.com` as an internal tester.
+2. On iPhone, install **TestFlight**, accept the invite, install FirstVue.
+
+### E. Store listing (still in the browser)
+
+Fill name, screenshots, privacy, then **Submit for Review** when you are ready. Do **not** set Codemagic to submit to the App Store until the listing is complete.
+
+**What’s New (paste):**
+```
+Business Tools now uses Claim, Add, and Rental tabs.
+Settings search, Home post photos, and city / profile save fixes.
 ```
 
-Output (typical):
-
-`build/ios/ipa/*.ipa`
-
-Or in Xcode:
-
-1. Open `ios/Runner.xcworkspace`
-2. Select **Any iOS Device (arm64)**
-3. Signing & Capabilities → Team = your Apple Developer team (auto-manage signing)
-4. **Product → Archive** → **Distribute App** → **App Store Connect** → Upload
-
 ---
 
-## 3. TestFlight
-
-After processing finishes in App Store Connect → **TestFlight**:
-1. Add yourself (`hkendale16@gmail.com`) as internal tester
-2. Install **TestFlight** on iPhone
-3. Accept invite → install FirstVue
-
----
-
-## 4. App Store listing (paste-ready)
+## Listing (paste-ready)
 
 **Name:** FirstVue  
 
@@ -107,17 +99,22 @@ FirstVue is for users 13 and older. Payments are not enabled in this trial build
 
 ---
 
-## 5. Assets you still need locally
+## Assets you still need
 
 - 1024×1024 App Store icon (no alpha)
 - iPhone screenshots (6.7" and/or 6.5") — at least 1 set
-- Optional iPad screenshots if you check iPad support
 
 ---
 
-## Cannot do from this agent
+## If you later have a Mac
 
-- Build/sign `.ipa`
-- Upload to App Store Connect without Apple credentials + Mac CI
+```bash
+git clone https://github.com/hkendale16-create/Firstvue.git
+cd Firstvue
+git checkout cursor/store-release-1-0-7-4635
+./scripts/build-ios-ipa.sh
+```
 
-If you have a Mac, run section 2 and upload. If you want CI builds later, provide Team ID + distribution cert + provisioning profile as secrets.
+Then upload `build/ios/ipa/FirstVue-1.0.7+8.ipa` with **Transporter**.
+
+Replace `TEAMID` in `web/.well-known/apple-app-site-association` with your Apple Team ID after you create the App ID.
