@@ -6,6 +6,7 @@ import 'media_type_helpers.dart';
 import 'media_variant_uploader.dart';
 import 'media_variants.dart';
 import 'profile_cards.dart';
+import 'profile_media_service.dart';
 import 'vue_engagement_service.dart';
 import 'vue_feed_ranking.dart';
 
@@ -121,6 +122,7 @@ class DiscoveryFeedItem {
 
   DiscoveryFeedItem copyWith({
     String? caption,
+    String? avatarUrl,
     int? likesCount,
     int? commentsCount,
     int? sharesCount,
@@ -150,7 +152,7 @@ class DiscoveryFeedItem {
       mediaType: mediaType,
       mediaUrl: mediaUrl,
       thumbnailUrl: thumbnailUrl,
-      avatarUrl: avatarUrl,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       durationLabel: durationLabel,
       locationLabel: locationLabel,
       handle: handle,
@@ -177,8 +179,9 @@ class DiscoveryFeedItem {
       trendingRank: trendingRank ?? this.trendingRank,
       userHasLiked: userHasLiked ?? this.userHasLiked,
       userHasSaved: userHasSaved ?? this.userHasSaved,
-      myReactionType:
-          clearReaction ? null : (myReactionType ?? this.myReactionType),
+      myReactionType: clearReaction
+          ? null
+          : (myReactionType ?? this.myReactionType),
     );
   }
 }
@@ -224,19 +227,20 @@ class DiscoveryFeedService {
     final memberItems = sourced[1];
     final vueNews = sourced[2];
 
-    final combined = _dedupeByMediaId([
-      ...vueNews,
-      ...memberItems,
-      // Prefer rows that already have a usable URL (external/demo first).
-      ...businessItems.where((item) => item.mediaUrl.startsWith('http')),
-      ...businessItems.where((item) => !item.mediaUrl.startsWith('http')),
-    ]).where((item) {
-      final hasMedia = item.mediaUrl.trim().isNotEmpty;
-      final hasPoster = (item.thumbnailUrl ?? '').trim().isNotEmpty;
-      if (!hasMedia && !hasPoster) return false;
-      if (excludeMediaIds.contains(item.mediaId)) return false;
-      return true;
-    }).toList();
+    final combined =
+        _dedupeByMediaId([
+          ...vueNews,
+          ...memberItems,
+          // Prefer rows that already have a usable URL (external/demo first).
+          ...businessItems.where((item) => item.mediaUrl.startsWith('http')),
+          ...businessItems.where((item) => !item.mediaUrl.startsWith('http')),
+        ]).where((item) {
+          final hasMedia = item.mediaUrl.trim().isNotEmpty;
+          final hasPoster = (item.thumbnailUrl ?? '').trim().isNotEmpty;
+          if (!hasMedia && !hasPoster) return false;
+          if (excludeMediaIds.contains(item.mediaId)) return false;
+          return true;
+        }).toList();
 
     // Ranked + seeded shuffle (Instagram Reels-style): different order each
     // access / refresh while still boosting stronger tiles.
@@ -256,11 +260,40 @@ class DiscoveryFeedService {
       page = ranked.take(limit).toList();
     }
     if (page.isEmpty) return page;
-    return VueEngagementService.hydrate(page);
+    final hydrated = await VueEngagementService.hydrate(page);
+    return _attachCreatorAvatars(hydrated);
+  }
+
+  /// One batched avatar lookup per page — mosaic + reel overlay share the URL.
+  static Future<List<DiscoveryFeedItem>> _attachCreatorAvatars(
+    List<DiscoveryFeedItem> items,
+  ) async {
+    final ids = items
+        .map((item) => item.ownerId.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    if (ids.isEmpty) return items;
+    try {
+      final avatars = await ProfileMediaService.fetchAvatarUrlsForProfiles(
+        ids,
+      ).timeout(const Duration(seconds: 4), onTimeout: () => const {});
+      if (avatars.isEmpty) return items;
+      return [
+        for (final item in items)
+          if ((avatars[item.ownerId] ?? '').startsWith('http'))
+            item.copyWith(avatarUrl: avatars[item.ownerId])
+          else
+            item,
+      ];
+    } catch (_) {
+      return items;
+    }
   }
 
   /// Prefer first occurrence of each media id (stable across pages).
-  static List<DiscoveryFeedItem> _dedupeByMediaId(List<DiscoveryFeedItem> items) {
+  static List<DiscoveryFeedItem> _dedupeByMediaId(
+    List<DiscoveryFeedItem> items,
+  ) {
     final seen = <String>{};
     final out = <DiscoveryFeedItem>[];
     for (final item in items) {

@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../theme/firstvue_theme.dart';
+import 'network_photo.dart';
 
 /// Full video player with mute toggle and progress bar for videos longer than 10s.
 class VueVideoPlayer extends StatefulWidget {
   final String url;
+  final String? thumbnailUrl;
   final double? aspectRatio;
   final BoxFit fit;
   final BorderRadius? borderRadius;
@@ -19,6 +21,7 @@ class VueVideoPlayer extends StatefulWidget {
   const VueVideoPlayer({
     super.key,
     required this.url,
+    this.thumbnailUrl,
     this.aspectRatio,
     this.fit = BoxFit.contain,
     this.borderRadius,
@@ -162,10 +165,20 @@ class _VueVideoPlayerState extends State<VueVideoPlayer> {
     }
 
     if (!_ready || _controller == null) {
+      final poster = (widget.thumbnailUrl ?? '').trim();
       return Container(
         alignment: Alignment.center,
-        color: FirstVueColors.elevatedSurface,
-        child: const CircularProgressIndicator(color: FirstVueColors.teal),
+        color: Colors.black,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (poster.startsWith('http'))
+              NetworkPhoto(url: poster, fit: widget.fit),
+            const Center(
+              child: CircularProgressIndicator(color: FirstVueColors.teal),
+            ),
+          ],
+        ),
       );
     }
 
@@ -194,21 +207,27 @@ class _VueVideoPlayerState extends State<VueVideoPlayer> {
                 shape: BoxShape.circle,
               ),
               padding: const EdgeInsets.all(12),
-              child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 36),
+              child: const Icon(
+                Icons.play_arrow_rounded,
+                color: Colors.white,
+                size: 36,
+              ),
             ),
           if (widget.showChrome)
             Positioned(
-            right: 8,
-            bottom: _showLongProgress ? 36 : 8,
-            child: IconButton.filled(
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.black.withValues(alpha: .55),
-                foregroundColor: Colors.white,
+              right: 8,
+              bottom: _showLongProgress ? 36 : 8,
+              child: IconButton.filled(
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black.withValues(alpha: .55),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: _toggleMute,
+                icon: Icon(
+                  _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                ),
               ),
-              onPressed: _toggleMute,
-              icon: Icon(_muted ? Icons.volume_off_rounded : Icons.volume_up_rounded),
             ),
-          ),
           if (widget.showChrome && _showLongProgress)
             Positioned(
               left: 0,
@@ -244,11 +263,17 @@ class _VueVideoPlayerState extends State<VueVideoPlayer> {
                           children: [
                             Text(
                               _formatDuration(position),
-                              style: const TextStyle(color: Colors.white70, fontSize: 11),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                              ),
                             ),
                             Text(
                               _formatDuration(duration),
-                              style: const TextStyle(color: Colors.white70, fontSize: 11),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                              ),
                             ),
                           ],
                         ),

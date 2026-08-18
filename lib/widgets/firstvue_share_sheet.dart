@@ -31,11 +31,7 @@ class FirstVueShareSheet extends StatelessWidget {
   final SharePayload payload;
   final ValueChanged<ShareAction>? onAction;
 
-  const FirstVueShareSheet({
-    super.key,
-    required this.payload,
-    this.onAction,
-  });
+  const FirstVueShareSheet({super.key, required this.payload, this.onAction});
 
   static Future<void> show(
     BuildContext context, {
@@ -48,10 +44,7 @@ class FirstVueShareSheet extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => FirstVueShareSheet(
-        payload: payload,
-        onAction: onAction,
-      ),
+      builder: (_) => FirstVueShareSheet(payload: payload, onAction: onAction),
     );
   }
 
@@ -78,9 +71,7 @@ class FirstVueShareSheet extends StatelessWidget {
     await Navigator.push(
       context,
       FirstVuePageRoute(
-        builder: (_) => StoryComposerScreen(
-          initialCaption: payload.title,
-        ),
+        builder: (_) => StoryComposerScreen(initialCaption: payload.title),
       ),
     );
   }
@@ -117,18 +108,18 @@ class FirstVueShareSheet extends StatelessWidget {
     await Clipboard.setData(ClipboardData(text: payload.link));
     _notify(ShareAction.copyLink);
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Link copied')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Link copied')));
   }
 
   Future<void> _copyMessage(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: payload.messageText));
     _notify(ShareAction.copyMessage);
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Message copied')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Message copied')));
   }
 
   Future<void> _messageInApp(BuildContext context) async {
@@ -143,9 +134,7 @@ class FirstVueShareSheet extends StatelessWidget {
     await Navigator.push(
       context,
       FirstVuePageRoute(
-        builder: (_) => NewMessageScreen(
-          initialMessage: payload.messageText,
-        ),
+        builder: (_) => NewMessageScreen(initialMessage: payload.messageText),
       ),
     );
   }
@@ -176,7 +165,9 @@ class FirstVueShareSheet extends StatelessWidget {
     if (!await launchUrl(uri)) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to open messages on this device.')),
+        const SnackBar(
+          content: Text('Unable to open messages on this device.'),
+        ),
       );
     }
   }
@@ -184,10 +175,7 @@ class FirstVueShareSheet extends StatelessWidget {
   Future<void> _systemShare(BuildContext context) async {
     _notify(ShareAction.systemShare);
     await SharePlus.instance.share(
-      ShareParams(
-        text: payload.messageText,
-        subject: payload.emailSubject,
-      ),
+      ShareParams(text: payload.messageText, subject: payload.emailSubject),
     );
   }
 
@@ -195,99 +183,98 @@ class FirstVueShareSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final fv = context.fv;
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 42,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: fv.divider,
-                  borderRadius: BorderRadius.circular(4),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: fv.divider,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'ROUTE & SHARE',
-              style: TextStyle(
-                color: FirstVueColors.gold,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
+              const SizedBox(height: 16),
+              const Text(
+                'ROUTE & SHARE',
+                style: TextStyle(
+                  color: FirstVueColors.gold,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              payload.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: fv.secondaryText,
-                fontSize: 13,
+              const SizedBox(height: 4),
+              Text(
+                payload.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: fv.secondaryText, fontSize: 13),
               ),
-            ),
-            const SizedBox(height: 16),
-            if (payload.kind == ShareContentKind.event) ...[
+              const SizedBox(height: 16),
+              if (payload.kind == ShareContentKind.event) ...[
+                _ShareOption(
+                  icon: Icons.auto_awesome_motion_outlined,
+                  label: 'FirstVue Story',
+                  subtitle: 'Share this event to your Story',
+                  onTap: () => _shareToStory(context),
+                ),
+                _ShareOption(
+                  icon: Icons.edit_outlined,
+                  label: 'FirstVue post',
+                  subtitle: 'Post this event to your feed',
+                  onTap: () => _shareToPost(context),
+                ),
+                _ShareOption(
+                  icon: Icons.groups_outlined,
+                  label: 'Group or Community',
+                  subtitle: 'Share where posting is permitted',
+                  onTap: () => _shareToGroup(context),
+                ),
+              ],
               _ShareOption(
-                icon: Icons.auto_awesome_motion_outlined,
-                label: 'FirstVue Story',
-                subtitle: 'Share this event to your Story',
-                onTap: () => _shareToStory(context),
+                icon: Icons.link_rounded,
+                label: 'Copy link',
+                subtitle: 'Paste anywhere',
+                onTap: () => _copyLink(context),
               ),
               _ShareOption(
-                icon: Icons.edit_outlined,
-                label: 'FirstVue post',
-                subtitle: 'Post this event to your feed',
-                onTap: () => _shareToPost(context),
+                icon: Icons.content_copy_rounded,
+                label: 'Copy message',
+                subtitle: 'Rating, details & link',
+                onTap: () => _copyMessage(context),
               ),
               _ShareOption(
-                icon: Icons.groups_outlined,
-                label: 'Group or Community',
-                subtitle: 'Share where posting is permitted',
-                onTap: () => _shareToGroup(context),
+                icon: Icons.chat_bubble_outline_rounded,
+                label: 'Message on FirstVue',
+                subtitle: 'Send to another member',
+                onTap: () => _messageInApp(context),
+              ),
+              _ShareOption(
+                icon: Icons.email_outlined,
+                label: 'Email',
+                subtitle: 'Share via mail app',
+                onTap: () => _email(context),
+              ),
+              _ShareOption(
+                icon: Icons.sms_outlined,
+                label: 'Text message',
+                subtitle: 'Share via SMS',
+                onTap: () => _sms(context),
+              ),
+              _ShareOption(
+                icon: Icons.ios_share_rounded,
+                label: 'More apps',
+                subtitle: 'Instagram, WhatsApp & more',
+                onTap: () => _systemShare(context),
               ),
             ],
-            _ShareOption(
-              icon: Icons.link_rounded,
-              label: 'Copy link',
-              subtitle: 'Paste anywhere',
-              onTap: () => _copyLink(context),
-            ),
-            _ShareOption(
-              icon: Icons.content_copy_rounded,
-              label: 'Copy message',
-              subtitle: 'Rating, details & link',
-              onTap: () => _copyMessage(context),
-            ),
-            _ShareOption(
-              icon: Icons.chat_bubble_outline_rounded,
-              label: 'Message on FirstVue',
-              subtitle: 'Send to another member',
-              onTap: () => _messageInApp(context),
-            ),
-            _ShareOption(
-              icon: Icons.email_outlined,
-              label: 'Email',
-              subtitle: 'Share via mail app',
-              onTap: () => _email(context),
-            ),
-            _ShareOption(
-              icon: Icons.sms_outlined,
-              label: 'Text message',
-              subtitle: 'Share via SMS',
-              onTap: () => _sms(context),
-            ),
-            _ShareOption(
-              icon: Icons.ios_share_rounded,
-              label: 'More apps',
-              subtitle: 'Instagram, WhatsApp & more',
-              onTap: () => _systemShare(context),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -343,18 +330,12 @@ class _ShareOption extends StatelessWidget {
                     ),
                     Text(
                       subtitle,
-                      style: TextStyle(
-                        color: fv.tertiaryText,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: fv.tertiaryText, fontSize: 12),
                     ),
                   ],
                 ),
               ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: fv.tertiaryText,
-              ),
+              Icon(Icons.chevron_right_rounded, color: fv.tertiaryText),
             ],
           ),
         ),

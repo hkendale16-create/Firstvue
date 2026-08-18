@@ -51,8 +51,10 @@ void main() {
     ];
     final first = rankVueFeedItems(items, seed: 42.5);
     final second = rankVueFeedItems(items, seed: 42.5);
-    expect(first.map((e) => e.mediaId).toList(),
-        second.map((e) => e.mediaId).toList());
+    expect(
+      first.map((e) => e.mediaId).toList(),
+      second.map((e) => e.mediaId).toList(),
+    );
   });
 
   test('different seeds usually change order', () {
@@ -67,7 +69,12 @@ void main() {
 
   test('sponsored and high rating tend to rank above plain tiles', () {
     final plain = _item(id: 'plain', rating: 0);
-    final strong = _item(id: 'strong', rating: 5, sponsored: true, verified: true);
+    final strong = _item(
+      id: 'strong',
+      rating: 5,
+      sponsored: true,
+      verified: true,
+    );
     final ranked = rankVueFeedItems([plain, strong], seed: 7.0);
     expect(ranked.first.mediaId, 'strong');
   });
@@ -75,11 +82,7 @@ void main() {
   test('viewer own content receives a boost', () {
     final mine = _item(id: 'mine', owner: 'me', rating: 0);
     final other = _item(id: 'other', owner: 'them', rating: 1);
-    final ranked = rankVueFeedItems(
-      [other, mine],
-      seed: 3.0,
-      viewerId: 'me',
-    );
+    final ranked = rankVueFeedItems([other, mine], seed: 3.0, viewerId: 'me');
     expect(ranked.first.mediaId, 'mine');
   });
 
@@ -105,10 +108,7 @@ void main() {
       likes: 5,
       createdAt: now.subtract(const Duration(days: 20)),
     );
-    final ranked = assignVueTrendingRanks(
-      [oldViews, viralNew],
-      now: now,
-    );
+    final ranked = assignVueTrendingRanks([oldViews, viralNew], now: now);
     expect(ranked.firstWhere((e) => e.mediaId == 'new').trendingRank, 1);
     expect(ranked.firstWhere((e) => e.mediaId == 'old').trendingRank, 2);
   });
@@ -122,5 +122,14 @@ void main() {
     final ranked = assignVueTrendingRanks(items);
     expect(ranked.map((e) => e.mediaId).toList(), ['a', 'b', 'c']);
     expect(ranked[1].trendingRank, 1);
+  });
+
+  test('trending ranks are unique 1..n', () {
+    final items = [
+      for (var i = 0; i < 8; i++) _item(id: 'm$i', likes: i, recentLikes: i),
+    ];
+    final ranked = assignVueTrendingRanks(items);
+    final ranks = ranked.map((e) => e.trendingRank).toSet();
+    expect(ranks, {1, 2, 3, 4, 5, 6, 7, 8});
   });
 }

@@ -230,9 +230,12 @@ class _RailButton extends StatelessWidget {
           width: 56,
           child: Column(
             children: [
-              Icon(icon, color: color, size: 30, shadows: const [
-                Shadow(color: Colors.black87, blurRadius: 8),
-              ]),
+              Icon(
+                icon,
+                color: color,
+                size: 30,
+                shadows: const [Shadow(color: Colors.black87, blurRadius: 8)],
+              ),
               if (label != null) ...[
                 const SizedBox(height: 2),
                 Text(
@@ -288,11 +291,13 @@ class _VueReelCaption extends StatelessWidget {
               child: VueTrendingBadge(rank: item.trendingRank!),
             ),
           GestureDetector(
+            key: const Key('vue-reel-creator'),
             onTap: onOpenProfile,
             child: Row(
               children: [
                 NetworkCircleAvatar(
-                  imageUrl: item.avatarUrl != null &&
+                  imageUrl:
+                      item.avatarUrl != null &&
                           item.avatarUrl!.startsWith('http')
                       ? item.avatarUrl
                       : null,
@@ -344,6 +349,7 @@ class _VueReelCaption extends StatelessWidget {
             ),
             if (long)
               GestureDetector(
+                key: const Key('vue-reel-caption-toggle'),
                 onTap: onToggleCaption,
                 child: Padding(
                   padding: const EdgeInsets.only(top: 2),

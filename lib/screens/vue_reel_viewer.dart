@@ -9,8 +9,10 @@ import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../services/community_news_service.dart';
 import '../services/discovery_feed_service.dart';
+import '../services/feed_interaction_service.dart';
 import '../services/vue_engagement_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../utils/app_environment.dart';
 import '../widgets/feed_comments_sheet.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/html_video_view.dart';
@@ -118,8 +120,10 @@ class _VueReelViewerState extends State<VueReelViewer> {
               _maybeLoadMore(index);
             },
             itemBuilder: (context, index) {
+              final pageItem = _items[index];
               return _VueReelPage(
-                item: _items[index],
+                key: ValueKey(pageItem.mediaId),
+                item: pageItem,
                 active: index == _index,
                 prepare: (index - _index).abs() == 1,
                 onChanged: (updated) => _replace(index, updated),
@@ -134,7 +138,11 @@ class _VueReelViewerState extends State<VueReelViewer> {
                 children: [
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.expand_more_rounded, color: Colors.white, size: 30),
+                    icon: const Icon(
+                      Icons.expand_more_rounded,
+                      color: Colors.white,
+                      size: 30,
+                    ),
                     tooltip: 'Close',
                   ),
                   const Text(
@@ -174,6 +182,7 @@ class _VueReelPage extends StatefulWidget {
   final VoidCallback onOpenProfile;
 
   const _VueReelPage({
+    super.key,
     required this.item,
     required this.active,
     required this.prepare,
@@ -225,19 +234,23 @@ class _VueReelPageState extends State<_VueReelPage> {
   }
 
   Future<void> _ensureAuth() async {
+    if (isWidgetTestBinding) return;
     if (Supabase.instance.client.auth.currentUser != null) return;
     await ensureSignedIn(context);
   }
 
   Future<void> _like() async {
-    if (_busy) return;
+    if (isWidgetTestBinding || _busy) return;
     await _ensureAuth();
     if (!mounted || Supabase.instance.client.auth.currentUser == null) return;
     setState(() => _busy = true);
     final previous = _item;
     final optimistic = _item.copyWith(
       userHasLiked: !_item.userHasLiked,
-      likesCount: (_item.likesCount + (_item.userHasLiked ? -1 : 1)).clamp(0, 1 << 30),
+      likesCount: (_item.likesCount + (_item.userHasLiked ? -1 : 1)).clamp(
+        0,
+        1 << 30,
+      ),
       myReactionType: _item.userHasLiked ? null : PostReactionType.spark.value,
       clearReaction: _item.userHasLiked,
     );
@@ -256,6 +269,7 @@ class _VueReelPageState extends State<_VueReelPage> {
   }
 
   Future<void> _react(PostReactionType type) async {
+    if (isWidgetTestBinding) return;
     await _ensureAuth();
     if (!mounted || Supabase.instance.client.auth.currentUser == null) return;
     final previous = _item;
@@ -270,13 +284,19 @@ class _VueReelPageState extends State<_VueReelPage> {
   }
 
   Future<void> _save() async {
+    if (isWidgetTestBinding) return;
     await _ensureAuth();
     if (!mounted || Supabase.instance.client.auth.currentUser == null) return;
     final previous = _item;
-    widget.onChanged(_item.copyWith(
-      userHasSaved: !_item.userHasSaved,
-      savesCount: (_item.savesCount + (_item.userHasSaved ? -1 : 1)).clamp(0, 1 << 30),
-    ));
+    widget.onChanged(
+      _item.copyWith(
+        userHasSaved: !_item.userHasSaved,
+        savesCount: (_item.savesCount + (_item.userHasSaved ? -1 : 1)).clamp(
+          0,
+          1 << 30,
+        ),
+      ),
+    );
     try {
       final updated = await VueEngagementService.toggleSave(previous);
       if (mounted) widget.onChanged(updated);
@@ -304,7 +324,8 @@ class _VueReelPageState extends State<_VueReelPage> {
         subtitle: _item.caption,
         link: '${AppConfig.webBaseUrl}/?vue=${_item.mediaId}',
       ),
-      onAction: (_) async {
+      onAction: (action) async {
+        if (!vueShareActionCounts(action)) return;
         await VueEngagementService.recordShare(_item);
         if (mounted) {
           widget.onChanged(_item.copyWith(sharesCount: _item.sharesCount + 1));
@@ -372,6 +393,26 @@ class _VueReelPageState extends State<_VueReelPage> {
                       FirstVuePageRoute(
                         builder: (_) =>
                             PostDetailScreen(postId: _item.newsPostId!),
+                      ),
+                    );
+                  },
+                ),
+              if (_item.newsPostId != null)
+                ListTile(
+                  leading: const Icon(Icons.flag_outlined),
+                  title: const Text('Report'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    if (isWidgetTestBinding) return;
+                    await FeedInteractionService.record(
+                      postId: _item.newsPostId!,
+                      interactionType: 'report',
+                      sourceTab: 'vue',
+                    );
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(this.context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Thanks — we received your report.'),
                       ),
                     );
                   },
@@ -471,7 +512,9 @@ class _VueReelPageState extends State<_VueReelPage> {
           onPlayStarted: () async {
             final recorded = await VueEngagementService.recordPlay(_item);
             if (recorded && mounted) {
-              widget.onChanged(_item.copyWith(playsCount: _item.playsCount + 1));
+              widget.onChanged(
+                _item.copyWith(playsCount: _item.playsCount + 1),
+              );
             }
           },
         ),
@@ -566,6 +609,7 @@ class _VueReelMedia extends StatelessWidget {
 
     return VueVideoPlayer(
       url: playUrl,
+      thumbnailUrl: imageUrl.startsWith('http') ? imageUrl : null,
       fit: BoxFit.contain,
       autoPlay: true,
       startMuted: false,
@@ -574,4 +618,10 @@ class _VueReelMedia extends StatelessWidget {
       onPlaybackStarted: onPlayStarted,
     );
   }
+}
+
+/// Completed outbound shares increment the count; drafting/copying a message
+/// does not.
+bool vueShareActionCounts(ShareAction action) {
+  return action != ShareAction.copyMessage;
 }
