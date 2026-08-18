@@ -128,7 +128,7 @@ class _EarnOnFirstVueScreenState extends State<EarnOnFirstVueScreen> {
             primaryLabel: 'Draft a bounty',
             onPrimary: () async {
               if (!await _ensureAuth()) return;
-              if (!mounted) return;
+              if (!context.mounted) return;
               await CreateBountyDraftSheet.show(context);
             },
             secondaryLabel: 'Campaigns',
@@ -163,8 +163,8 @@ class _EarnOnFirstVueScreenState extends State<EarnOnFirstVueScreen> {
           ),
           _HowRow(
             title: 'Bounty marketplace',
-            body: EarnMarketplace.splitLabel() +
-                ' on creator campaigns. No wallet on the phone.',
+            body:
+                '${EarnMarketplace.splitLabel()} on creator campaigns. No wallet on the phone.',
           ),
           _HowRow(
             title: 'Boosts & tickets later',
