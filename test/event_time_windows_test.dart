@@ -50,12 +50,13 @@ void main() {
   });
 
   test('this weekend includes Friday through Sunday', () {
+    final midweek = DateTime(2025, 12, 31, 10); // Wednesday
     final friday = _event(id: 'fri', eventAt: DateTime(2026, 1, 2, 19));
     final sunday = _event(id: 'sun', eventAt: DateTime(2026, 1, 4, 14));
     final monday = _event(id: 'mon', eventAt: DateTime(2026, 1, 5, 19));
-    expect(EventTimeWindows.isThisWeekend(friday, now: now), isTrue);
-    expect(EventTimeWindows.isThisWeekend(sunday, now: now), isTrue);
-    expect(EventTimeWindows.isThisWeekend(monday, now: now), isFalse);
+    expect(EventTimeWindows.isThisWeekend(friday, now: midweek), isTrue);
+    expect(EventTimeWindows.isThisWeekend(sunday, now: midweek), isTrue);
+    expect(EventTimeWindows.isThisWeekend(monday, now: midweek), isFalse);
   });
 
   test('happening now uses LIVE lifecycle including starting soon', () {

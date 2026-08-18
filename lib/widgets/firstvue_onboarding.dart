@@ -136,71 +136,73 @@ class FirstVueWelcomeDialog extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 420),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const FirstVueEmblem(size: 56),
-              const SizedBox(height: 18),
-              const Text(
-                'Welcome to FirstVue',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'CormorantGaramond',
-                  color: _kGold,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'where we stay connected',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'CormorantGaramond',
-                  color: _kTeal,
-                  fontSize: 18,
-                  fontStyle: FontStyle.italic,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'See what\'s going on near you — happening now, tonight, '
-                'and people worth following.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70, height: 1.45),
-              ),
-              const SizedBox(height: 10),
-              const _WelcomeHighlights(),
-              const SizedBox(height: 14),
-              const Text(
-                'Set your city to fill Home with nearby events and follows. '
-                'Short tips can wait until you\'ve looked around.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: _kGold, height: 1.4, fontSize: 13.5),
-              ),
-              const SizedBox(height: 22),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => _finish(context, takeTour: true),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _kGold,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const FirstVueEmblem(size: 56),
+                const SizedBox(height: 18),
+                const Text(
+                  'Welcome to FirstVue',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'CormorantGaramond',
+                    color: _kGold,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w600,
                   ),
-                  child: const Text('See what\'s nearby'),
                 ),
-              ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () => _finish(context, takeTour: false),
-                child: const Text(
-                  'I\'ll explore on my own',
-                  style: TextStyle(color: Colors.white60),
+                const SizedBox(height: 8),
+                const Text(
+                  'where we stay connected',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'CormorantGaramond',
+                    color: _kTeal,
+                    fontSize: 18,
+                    fontStyle: FontStyle.italic,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                const Text(
+                  'See what\'s going on near you — happening now, tonight, '
+                  'and people worth following.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white70, height: 1.45),
+                ),
+                const SizedBox(height: 10),
+                const _WelcomeHighlights(),
+                const SizedBox(height: 14),
+                const Text(
+                  'Set your city to fill Home with nearby events and follows. '
+                  'Short tips can wait until you\'ve looked around.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: _kGold, height: 1.4, fontSize: 13.5),
+                ),
+                const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => _finish(context, takeTour: true),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _kGold,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('See what\'s nearby'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => _finish(context, takeTour: false),
+                  child: const Text(
+                    'I\'ll explore on my own',
+                    style: TextStyle(color: Colors.white60),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
