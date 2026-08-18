@@ -594,6 +594,7 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
                             selectedId:
                                 _previewMode ? null : _selectedOverlayId,
                             interactive: !_previewMode && !_publishing,
+                            showSafeAreaGuide: !_previewMode,
                             onSelect: (id) =>
                                 setState(() => _selectedOverlayId = id),
                             onChanged: (updated) {

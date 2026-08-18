@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -20,6 +22,7 @@ import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/fv_ui.dart';
 import '../widgets/growth_prompt.dart';
+import '../widgets/messages_header_button.dart';
 import '../widgets/social_rich_text.dart';
 import '../widgets/tutorial_targets.dart';
 import '../widgets/vue_live_mode_switch.dart';
@@ -62,6 +65,7 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
   int _loadMoreFailures = 0;
   double _sessionSeed = 0;
   final _loadMoreGate = ScrollLoadMoreGate(thresholdPx: 480);
+  final _messagesHeaderKey = GlobalKey<MessagesHeaderButtonState>();
   static const _maxLoadMoreFailures = 3;
 
   bool get _liveModeActive =>
@@ -210,7 +214,11 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
       await _feedFuture;
     } catch (_) {
     } finally {
-      if (mounted) setState(() => _refreshing = false);
+      if (mounted) {
+        setState(() => _refreshing = false);
+        final headerRefresh = _messagesHeaderKey.currentState?.refresh();
+        if (headerRefresh != null) unawaited(headerRefresh);
+      }
     }
   }
 
@@ -372,21 +380,12 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                               letterSpacing: 2,
                             ),
                           ),
-                        if (!_liveModeActive)
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: IconButton(
-                              tooltip: 'Search',
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Search coming soon.'),
-                                  ),
-                                );
-                              },
-                              icon: Icon(Icons.search, color: fv.primaryText),
-                            ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: MessagesHeaderButton(
+                            key: _messagesHeaderKey,
                           ),
+                        ),
                       ],
                     ),
                   ),

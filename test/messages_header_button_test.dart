@@ -80,4 +80,10 @@ void main() {
     expect(messagesAt, greaterThan(0));
     expect(notificationsAt, greaterThan(messagesAt));
   });
+
+  test('VUE landing chrome hosts the same Messages control', () {
+    final src = File('lib/screens/discovery_feed_screen.dart').readAsStringSync();
+    expect(src, contains('MessagesHeaderButton'));
+    expect(src, isNot(contains('Search coming soon.')));
+  });
 }

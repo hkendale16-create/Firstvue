@@ -3,6 +3,42 @@ import 'package:flutter/material.dart';
 import '../models/composer_overlay.dart';
 import '../theme/firstvue_theme.dart';
 
+/// Shared Story overlay inset matching viewer chrome (progress, owner, reply).
+class StoryOverlaySafeArea {
+  StoryOverlaySafeArea._();
+
+  static const inset = EdgeInsets.fromLTRB(16, 72, 16, 120);
+
+  static Widget guide({required bool visible}) {
+    if (!visible) return const SizedBox.shrink();
+    return const Positioned.fill(
+      child: IgnorePointer(
+        child: Padding(
+          padding: inset,
+          child: _StoryOverlaySafeAreaFrame(),
+        ),
+      ),
+    );
+  }
+}
+
+class _StoryOverlaySafeAreaFrame extends StatelessWidget {
+  const _StoryOverlaySafeAreaFrame();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.32),
+          width: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
 /// Interactive canvas for Story text overlays (drag / pinch-scale / rotate).
 class StoryOverlayCanvas extends StatefulWidget {
   final List<ComposerTextOverlay> overlays;
@@ -12,6 +48,7 @@ class StoryOverlayCanvas extends StatefulWidget {
   final ValueChanged<String>? onDelete;
   final ValueChanged<ComposerTextOverlay>? onEdit;
   final bool interactive;
+  final bool showSafeAreaGuide;
   final EdgeInsets safeInset;
 
   const StoryOverlayCanvas({
@@ -23,7 +60,8 @@ class StoryOverlayCanvas extends StatefulWidget {
     this.onDelete,
     this.onEdit,
     this.interactive = true,
-    this.safeInset = const EdgeInsets.fromLTRB(16, 72, 16, 120),
+    this.showSafeAreaGuide = false,
+    this.safeInset = StoryOverlaySafeArea.inset,
   });
 
   @override
@@ -42,6 +80,7 @@ class _StoryOverlayCanvasState extends State<StoryOverlayCanvas> {
         return Stack(
           clipBehavior: Clip.none,
           children: [
+            StoryOverlaySafeArea.guide(visible: widget.showSafeAreaGuide),
             for (final overlay in widget.overlays)
               _OverlayBubble(
                 overlay: overlay,
@@ -218,7 +257,7 @@ class StoryOverlayRenderer extends StatelessWidget {
   const StoryOverlayRenderer({
     super.key,
     required this.overlays,
-    this.safeInset = const EdgeInsets.fromLTRB(16, 72, 16, 120),
+    this.safeInset = StoryOverlaySafeArea.inset,
   });
 
   @override
