@@ -25,10 +25,18 @@ void main() {
   });
 
   group('GrowthPromptService frequency', () {
-    test('new users do not get a session sheet', () async {
+    test('new users get a discovery session prompt, not a posting sheet', () async {
       await GrowthPromptService.startSession();
       final spec = await GrowthPromptService.nextSessionPrompt();
-      expect(spec, isNull);
+      expect(spec, isNotNull);
+      expect(
+        spec!.type,
+        isIn({
+          GrowthPromptType.followPeople,
+          GrowthPromptType.discoverNearby,
+        }),
+      );
+      expect(spec.type, isNot(GrowthPromptType.createPost));
     });
 
     test('returning users get one session prompt, then none', () async {
@@ -134,22 +142,20 @@ void main() {
   });
 
   group('GrowthPromptCatalog context', () {
-    test('home encourages posting, not every type at once', () {
-      expect(
-        GrowthPromptCatalog.typesFor(GrowthPromptContext.home),
-        contains(GrowthPromptType.createPost),
-      );
-      expect(
-        GrowthPromptCatalog.typesFor(GrowthPromptContext.home).length,
-        lessThan(GrowthPromptType.values.length),
-      );
+    test('home leads with discovery, not posting', () {
+      final types = GrowthPromptCatalog.typesFor(GrowthPromptContext.home);
+      expect(types.first, GrowthPromptType.followPeople);
+      expect(types, contains(GrowthPromptType.exploreEvents));
+      expect(types, contains(GrowthPromptType.createPost));
+      expect(types.indexOf(GrowthPromptType.createPost), greaterThan(2));
+      expect(types.length, lessThan(GrowthPromptType.values.length));
     });
 
-    test('VUE encourages upload', () {
-      expect(
-        GrowthPromptCatalog.typesFor(GrowthPromptContext.vue),
-        contains(GrowthPromptType.uploadVideo),
-      );
+    test('VUE leads with follow and nearby before upload', () {
+      final types = GrowthPromptCatalog.typesFor(GrowthPromptContext.vue);
+      expect(types.first, GrowthPromptType.followPeople);
+      expect(types, contains(GrowthPromptType.discoverNearby));
+      expect(types, contains(GrowthPromptType.uploadVideo));
     });
 
     test('personalizes event copy with city without exposing GPS', () {
@@ -164,7 +170,9 @@ void main() {
 
     test('empty states always include an action', () {
       expect(GrowthPromptCatalog.emptyHome().actionLabel, isNotEmpty);
+      expect(GrowthPromptCatalog.emptyHome().type, GrowthPromptType.followPeople);
       expect(GrowthPromptCatalog.emptyVue().actionLabel, isNotEmpty);
+      expect(GrowthPromptCatalog.emptyVue().type, GrowthPromptType.discoverNearby);
       expect(GrowthPromptCatalog.emptyEvents().secondaryActionLabel, 'Create Event');
       expect(GrowthPromptCatalog.emptyProfilePosts().actionLabel, isNotEmpty);
     });
@@ -263,7 +271,7 @@ void main() {
         ),
       );
       expect(find.text('Nothing here yet.'), findsOneWidget);
-      expect(find.text('Create Post'), findsOneWidget);
+      expect(find.text('Find People'), findsOneWidget);
     });
   });
 

@@ -66,10 +66,10 @@ CommunityNewsPost _post({
 
 void main() {
   group('authenticated landing', () {
-    test('root and vue routes select VUE', () {
-      expect(FirstVueBottomNav.indexForRoute('/'), FirstVueBottomNav.vueIndex);
+    test('root selects Home; /vue still selects VUE', () {
+      expect(FirstVueBottomNav.indexForRoute('/'), FirstVueBottomNav.homeIndex);
       expect(FirstVueBottomNav.indexForRoute('/vue'), FirstVueBottomNav.vueIndex);
-      expect(FirstVueBottomNav.indexForRoute(''), FirstVueBottomNav.vueIndex);
+      expect(FirstVueBottomNav.indexForRoute(''), FirstVueBottomNav.homeIndex);
     });
 
     test('signed-in tab routes map without discarding deep-link stacks', () {
@@ -89,7 +89,8 @@ void main() {
       expect(FirstVueBottomNav.indexForRoute('/messages'), isNull);
     });
 
-    test('VUE is the default bottom-nav destination', () {
+    test('Home is the default bottom-nav destination', () {
+      expect(FirstVueBottomNav.homeIndex, 0);
       expect(FirstVueBottomNav.vueIndex, 2);
     });
   });

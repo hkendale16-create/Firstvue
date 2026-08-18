@@ -24,7 +24,8 @@ class FirstVueBottomNav extends StatelessWidget {
   static int? indexForRoute(String? routeName) {
     final path = Uri.tryParse(routeName ?? '')?.path ?? routeName ?? '';
     return switch (path) {
-      '/' || '' || '/vue' => vueIndex,
+      '/' || '' => homeIndex,
+      '/vue' => vueIndex,
       '/feeds' => feedsIndex,
       '/explore' => exploreIndex,
       '/profile' => profileIndex,

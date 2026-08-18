@@ -15,11 +15,12 @@ import 'auth_link_handler.dart';
 import 'auth_redirect.dart';
 import 'auth_session_controller.dart';
 
-/// Waits for the first Supabase session event, then shows Sign in or VUE.
+/// Waits for the first Supabase session event, then shows Sign in or Home.
 ///
 /// Signed-out users only ever see [AuthScreen] (plus Terms/Privacy). They
 /// never reach [FirstVueHome], bottom nav, Settings, feeds, or Explore.
-/// Signed-in users land on VUE unless a protected deep link is pending.
+/// Signed-in users land on Home (discovery) unless a protected deep link
+/// is pending.
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key, this.controller, this.signedInHome});
 

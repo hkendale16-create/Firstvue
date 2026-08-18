@@ -1,31 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../auth/ensure_signed_in.dart';
 import '../config/app_config.dart';
+import '../models/growth_prompt.dart';
 import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
-import '../auth/ensure_signed_in.dart';
 import '../screens/firstvue_business_profile_screen.dart';
 import '../screens/people_to_follow_screen.dart';
 import '../screens/rentals_screen.dart';
+import '../services/event_time_windows.dart';
+import '../services/growth_prompt_catalog.dart';
 import '../services/recommendations_service.dart';
 import '../services/rentals_store.dart';
 import '../services/saved_items_service.dart';
 import '../services/things_to_do_service.dart';
 import '../services/trending_businesses_service.dart';
 import '../theme/firstvue_theme.dart';
-import 'firstvue_share_sheet.dart';
 import 'feed_comments_sheet.dart';
+import 'firstvue_share_sheet.dart';
 import 'growth_prompt.dart';
 import 'home_communities_section.dart';
-import '../models/growth_prompt.dart';
-import '../services/growth_prompt_catalog.dart';
 import 'social_chrome.dart';
+import 'whats_on_near_you.dart';
 
 class HomeDiscoverySection extends StatefulWidget {
   final int refreshToken;
+  final VoidCallback? onSetCity;
 
-  const HomeDiscoverySection({super.key, this.refreshToken = 0});
+  const HomeDiscoverySection({
+    super.key,
+    this.refreshToken = 0,
+    this.onSetCity,
+  });
 
   @override
   State<HomeDiscoverySection> createState() => _HomeDiscoverySectionState();
@@ -120,6 +127,10 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        WhatsOnNearYou(
+          refreshToken: widget.refreshToken,
+          onSetCity: widget.onSetCity,
+        ),
         SocialPillTabs(
           labels: _labels,
           selectedIndex: _tabController.index,
@@ -142,7 +153,7 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
             refreshToken: widget.refreshToken,
             loadBusinesses: () => _loadBusinessesForLabel(label),
             onSeeAllPeople: _openPeopleToFollow,
-            showPeopleToFollow: label == 'Recommended',
+            showPeopleToFollow: label == 'Recommended' || label == 'Trending',
           ),
       ],
     );
@@ -219,12 +230,21 @@ class _MixedSocialFeedState extends State<_MixedSocialFeed> {
               )
             else if (businesses.isEmpty)
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Text(
-                  widget.label == 'Coming Soon'
-                      ? 'No coming-soon listings near you yet.'
-                      : 'Nothing here yet. Pull to refresh.',
-                  style: TextStyle(color: context.fv.secondaryText),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.label == 'Coming Soon'
+                          ? 'No coming-soon listings near you yet.'
+                          : 'Nothing nearby in this list yet. Follow people or try another city.',
+                      style: TextStyle(color: context.fv.secondaryText),
+                    ),
+                    if (!widget.showPeopleToFollow) ...[
+                      const SizedBox(height: 16),
+                      PeopleToFollowRow(onSeeAll: widget.onSeeAllPeople),
+                    ],
+                  ],
                 ),
               )
             else if (businesses.isNotEmpty)
@@ -470,12 +490,24 @@ class _EventsFeedList extends StatelessWidget {
         }
         final recent = snapshot.data![0];
         final upcomingAll = snapshot.data![1];
+        final now = DateTime.now();
+        final tonight = EventTimeWindows.tonight(upcomingAll, now: now);
+        final tonightIds = {for (final event in tonight) event.id};
+        final weekend = [
+          for (final event in EventTimeWindows.thisWeekend(upcomingAll, now: now))
+            if (!tonightIds.contains(event.id)) event,
+        ];
+        final timedIds = {...tonightIds, for (final event in weekend) event.id};
         final recentIds = {for (final e in recent) e.id};
         final upcoming = [
           for (final event in upcomingAll)
-            if (!recentIds.contains(event.id)) event,
+            if (!recentIds.contains(event.id) && !timedIds.contains(event.id))
+              event,
         ];
-        if (recent.isEmpty && upcoming.isEmpty) {
+        if (recent.isEmpty &&
+            upcoming.isEmpty &&
+            tonight.isEmpty &&
+            weekend.isEmpty) {
           return GrowthPrompt(
             spec: GrowthPromptCatalog.emptyEvents(),
             variant: GrowthPromptVariant.empty,
@@ -484,6 +516,40 @@ class _EventsFeedList extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (tonight.isNotEmpty) ...[
+              Text(
+                'Tonight',
+                style: TextStyle(
+                  color: context.fv.primaryText,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 10),
+              for (final event in tonight) ...[
+                SocialEventCard(event: event),
+                const SizedBox(height: 12),
+              ],
+              const SizedBox(height: 8),
+            ],
+            if (weekend.isNotEmpty) ...[
+              Text(
+                'This weekend',
+                style: TextStyle(
+                  color: context.fv.primaryText,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 10),
+              for (final event in weekend) ...[
+                SocialEventCard(event: event),
+                const SizedBox(height: 12),
+              ],
+              const SizedBox(height: 8),
+            ],
             if (recent.isNotEmpty) ...[
               Text(
                 'Recently Posted',

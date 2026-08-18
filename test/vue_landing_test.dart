@@ -47,7 +47,9 @@ void main() {
     expect(find.text('VUE'), findsNothing);
   });
 
-  testWidgets('signed-in users normally land on VUE', (tester) async {
+  testWidgets('signed-in users see the Home shell with VUE in the nav', (
+    tester,
+  ) async {
     final auth = AuthSessionController.test(session: _fakeSession());
     await tester.pumpWidget(
       MaterialApp(
@@ -71,9 +73,12 @@ void main() {
     expect(find.text('HOME'), findsOneWidget);
   });
 
-  test('FirstVueHome defaults to the VUE tab index', () {
+  test('FirstVueHome defaults to the Home tab index', () {
     expect(const FirstVueHome().initialTab, isNull);
-    expect(FirstVueBottomNav.vueIndex, 2);
+    expect(FirstVueBottomNav.homeIndex, 0);
+    expect(FirstVueBottomNav.indexForRoute('/'), FirstVueBottomNav.homeIndex);
+    expect(FirstVueBottomNav.indexForRoute(''), FirstVueBottomNav.homeIndex);
+    expect(FirstVueBottomNav.indexForRoute('/vue'), FirstVueBottomNav.vueIndex);
   });
 
   test('protected deep links are remembered for post-auth return', () {
