@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/ensure_signed_in.dart';
 import '../config/app_config.dart';
+import '../models/growth_prompt.dart';
 import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../screens/firstvue_business_profile_screen.dart';
