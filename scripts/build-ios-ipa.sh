@@ -17,6 +17,8 @@ if ! command -v flutter >/dev/null 2>&1; then
   exit 1
 fi
 
+flutter config --no-enable-swift-package-manager
+bash "$ROOT_DIR/scripts/fix-xcode-filenames.sh"
 flutter pub get
 (cd ios && pod install)
 

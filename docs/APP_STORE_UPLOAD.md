@@ -73,6 +73,13 @@ If Codemagic says **No matching profiles found for bundle identifier "com.FirstV
 5. Confirm the profile row shows bundle `com.FirstVue`, type App Store, and a green check on the certificate.
 6. Re-run workflow **iOS App Store 1.0.8**.
 
+If **Build App Store IPA** fails with **Unable to get scheme file for Runner** (and logs show Mapbox Swift packages fetching from GitHub), that was a repo bug: Xcode files were stored as `*.xml` (`Runner.xcscheme.xml`, `contents.xcworkspacedata.xml`, `Main.storyboard.xml`). Flutter only looks for `Runner.xcscheme`. Do **not** retry the failed build.
+
+1. Wait until GitHub branch `cursor/store-release-1-0-8-4635` shows a commit that mentions repairing Xcode filenames / Runner scheme.
+2. In Codemagic, pick that branch again → **Check for configuration file** → **codemagic.yaml**.
+3. **Start new build** → **iOS App Store 1.0.8**.
+4. The IPA step must **not** fetch `mapbox-maps-ios.git`. If it still does, the build is not on the new commit.
+
 ### D. Install on iPhone
 
 1. App Store Connect → **TestFlight** → add `hkendale16@gmail.com` as an internal tester.

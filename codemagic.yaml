@@ -28,6 +28,9 @@ workflows:
         script: |
           xcode-project use-profiles \
             --custom-export-options='{"testFlightInternalTestingOnly": true}'
+      - name: Repair Xcode filenames
+        script: |
+          bash scripts/fix-xcode-filenames.sh
       - name: Flutter packages
         script: |
           flutter config --no-enable-swift-package-manager
@@ -37,6 +40,11 @@ workflows:
           find . -name Podfile -execdir pod install \;
       - name: Build App Store IPA
         script: |
+          # Disable SPM in this same step. Mapbox's iOS SDK is pulled via
+          # CocoaPods; Flutter's experimental SPM migrator needs Runner.xcscheme
+          # and fails CI if that file is missing or misnamed.
+          flutter config --no-enable-swift-package-manager
+          bash scripts/fix-xcode-filenames.sh
           flutter build ipa --release \
             --build-name=1.0.8 \
             --build-number=9 \

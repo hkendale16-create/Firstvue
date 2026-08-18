@@ -73,7 +73,8 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 flutter:
   config:
-    # CocoaPods until the shared Runner.xcscheme is in place on all CI images.
+    # Use CocoaPods on Codemagic. Flutter SPM needs a shared Runner.xcscheme
+    # and still fails this project's archive with "Unable to get scheme file".
     enable-swift-package-manager: false
 
   # The following line ensures that the Material Icons font is
