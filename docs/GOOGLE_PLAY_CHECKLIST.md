@@ -7,8 +7,8 @@ Path for a **personal** Google Play developer account publishing `com.FirstVue`.
 | Milestone | Status |
 |-----------|--------|
 | Developer account approved | **Yes** (operator confirmed) |
-| App created in Play Console | Pending |
-| Signed AAB on Internal testing | Pending |
+| App created in Play Console | **Yes** |
+| Signed AAB on Internal testing | **Yes** (versionCode `3` live; next upload `4` / `1.0.3`) |
 
 ---
 
@@ -61,10 +61,10 @@ Prepare in Play Console → Main store listing:
 | App name | **FirstVue** |
 | Short description | ≤ 80 chars |
 | Full description | Features, communities, businesses, messaging |
-| App icon | 512×512 PNG |
-| Feature graphic | 1024×500 |
-| Phone screenshots | At least 2 (recommend 6.7" and standard phone) |
-| Tablet screenshots | If tablet layout is supported |
+| App icon | 512×512 PNG — `store-listing/play-icon-512.png` |
+| Feature graphic | 1024×500 — `store-listing/feature-graphic-1024x500.png` |
+| Phone screenshots | `store-listing/phone-screenshots/` (4 × 1080×1920) |
+| Tablet screenshots | 7-inch + 10-inch in `store-listing/tablet-*` |
 | Category | Social or Lifestyle (pick best fit) |
 
 ---

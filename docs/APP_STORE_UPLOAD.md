@@ -9,7 +9,7 @@ Use this checklist on a Mac, then upload with Transporter or Xcode.
 |-------|--------|
 | Bundle ID | `com.FirstVue` |
 | Display name | FIRSTVUE |
-| Version | `1.0.2` (from `pubspec.yaml`) |
+| Version | `1.0.3` (from `pubspec.yaml`) |
 | Build | `3` |
 | Support email | `hkendale16@gmail.com` |
 | Privacy | `https://firstvue.app/privacy.html` |

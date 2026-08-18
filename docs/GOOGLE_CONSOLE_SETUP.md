@@ -53,11 +53,15 @@ Play shows a left-nav / dashboard list. Fill these with FirstVue answers:
 
 ### A3. Store listing
 
-**Main store listing** — paste from `docs/STORE_LISTING_DRAFT.md`:
+Open **FirstVue** → **Dashboard** → **Set up your app** → **Set up your store listing**.
+
+Or left menu: **Grow users** → **Store listings** (may still say **Store presence → Main store listing**).
+
+Paste copy from `docs/STORE_LISTING_DRAFT.md`. Scroll to **Graphics** for the app icon — this is not on the Internal testing page.
 
 - Short description ≤ 80 chars  
 - Full description  
-- App icon **512×512** PNG (branded — replace Flutter default before upload)  
+- App icon **512×512** PNG — use `store-listing/play-icon-512.png` (VUE-tab V)  
 - Feature graphic **1024×500**  
 - Phone screenshots (minimum 2)  
 - Category: **Lifestyle** or **Social**  
@@ -206,12 +210,12 @@ After you have the upload SHA-256:
 | Milestone | Status |
 |-----------|--------|
 | Play / Cloud Console access | **Approved** (operator confirmed) |
-| Upload keystore + signed AAB | **Built** — `FirstVue-1.0.1+2-release.aab` (see agent artifacts `firstvue-play/`) |
+| Upload keystore + signed AAB | **Built** — latest `FirstVue-1.0.3+4-release.aab` (same upload key as `1.0.2+3`) |
 | Fingerprints documented | **Yes** — `docs/ANDROID_UPLOAD_KEY_FINGERPRINTS.md` |
-| Play app created | Pending operator |
+| Play app created | **Yes** (operator) |
 | Store listing + Data safety | Pending operator (worksheets ready in repo) |
 | Google Client Secret synced to Supabase | Pending operator |
 | Android OAuth client (package + SHA-1) | Pending — use SHA-1 from fingerprints doc |
-| Internal testing release live | Pending AAB upload in Play Console |
+| Internal testing release live | **Yes** — was versionCode `3`; upload **`4`** next (`docs/PLAY_RELEASE_1.0.3.md`) |
 | Closed test gate (12 × 14) | Not started |
 | Production | Blocked on closed-test gate |
