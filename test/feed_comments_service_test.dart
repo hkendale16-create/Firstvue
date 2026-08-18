@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:firstvue/services/feed_comments_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -95,5 +97,13 @@ void main() {
       expect(updated.sparkCount, 2);
       expect(updated.body, 'Hello');
     });
+  });
+
+  test('postComment syncs hashtags into the global content system', () {
+    final src =
+        File('lib/services/feed_comments_service.dart').readAsStringSync();
+    expect(src, contains('PostMetadataService.syncForContent'));
+    expect(src, contains("contentType: 'comment'"));
+    expect(src, contains('contentId: inserted[\'id\'] as String'));
   });
 }

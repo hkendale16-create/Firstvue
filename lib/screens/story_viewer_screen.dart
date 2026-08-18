@@ -10,7 +10,9 @@ import '../services/firstvue_feedback_sounds.dart';
 import '../services/story_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../utils/safe_url.dart';
+import '../widgets/composer_link_dialog.dart';
 import '../widgets/social_rich_text.dart';
+import '../widgets/social_text_field.dart';
 import '../widgets/story_overlay_canvas.dart';
 import '../widgets/vue_video_player.dart';
 import '../widgets/network_photo.dart';
@@ -54,6 +56,9 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
   Timer? _timer;
   double _progress = 0;
   final _reply = TextEditingController();
+  String? _captionOverride;
+  String? _linkUrlOverride;
+  String? _linkLabelOverride;
 
   StoryRing get _ring => widget.rings[_ringIndex];
   StoryItem get _story => _ring.stories[_storyIndex];
@@ -178,6 +183,123 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
     } catch (_) {}
   }
 
+  Future<void> _editMetadata() async {
+    final story = _story;
+    final caption = TextEditingController(text: story.caption ?? '');
+    var linkUrl = story.linkUrl;
+    var linkLabel = story.linkLabel;
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.fv.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final fv = sheetContext.fv;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            12,
+            16,
+            16 + MediaQuery.viewInsetsOf(sheetContext).bottom,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setModal) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Edit Story',
+                    style: TextStyle(
+                      color: fv.primaryText,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Caption and link only. Replace the Story to change photos, video, or overlays.',
+                    style: TextStyle(color: fv.secondaryText, fontSize: 12),
+                  ),
+                  const SizedBox(height: 10),
+                  SocialTextField(
+                    controller: caption,
+                    hintText: 'Caption… #hashtags @mentions',
+                    minLines: 2,
+                    maxLines: 4,
+                    maxLength: 200,
+                    showUnderline: true,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      ComposerToolChip(
+                        icon: Icons.link_rounded,
+                        label: linkUrl == null ? 'Link' : 'Edit link',
+                        selected: linkUrl != null,
+                        onTap: () async {
+                          final result = await showComposerLinkDialog(
+                            context,
+                            initialUrl: linkUrl,
+                            initialLabel: linkLabel,
+                          );
+                          if (result == null) return;
+                          setModal(() {
+                            linkUrl = result.url;
+                            linkLabel = result.label;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: FirstVueColors.coral,
+                    ),
+                    child: const Text('Save'),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+    if (saved != true) {
+      caption.dispose();
+      return;
+    }
+    try {
+      await StoryService.updateStoryMetadata(
+        storyId: story.id,
+        caption: caption.text,
+        linkUrl: linkUrl,
+        linkLabel: linkLabel,
+      );
+      await FirstVueFeedbackSounds.playSaveSuccess();
+      if (!mounted) {
+        caption.dispose();
+        return;
+      }
+      setState(() {
+        _captionOverride = caption.text.trim();
+        _linkUrlOverride = linkUrl;
+        _linkLabelOverride = linkLabel;
+      });
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to update this Story.')),
+        );
+      }
+    }
+    caption.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final story = _story;
@@ -271,11 +393,16 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
                         ),
                       ),
                       const Spacer(),
-                      if (story.isMine)
+                      if (story.isMine) ...[
+                        IconButton(
+                          onPressed: _editMetadata,
+                          icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                        ),
                         IconButton(
                           onPressed: _delete,
                           icon: const Icon(Icons.delete_outline, color: Colors.white),
                         ),
+                      ],
                       IconButton(
                         onPressed: () => Navigator.pop(context),
                         icon: const Icon(Icons.close, color: Colors.white),
@@ -285,13 +412,14 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
                 ],
               ),
             ),
-            if (story.caption != null && story.caption!.isNotEmpty)
+            if ((_captionOverride ?? story.caption) != null &&
+                (_captionOverride ?? story.caption)!.isNotEmpty)
               Positioned(
                 left: 16,
                 right: 16,
-                bottom: story.linkUrl == null ? 88 : 132,
+                bottom: (_linkUrlOverride ?? story.linkUrl) == null ? 88 : 132,
                 child: SocialRichText(
-                  text: story.caption!,
+                  text: _captionOverride ?? story.caption!,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -300,17 +428,24 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
                   ),
                 ),
               ),
-            if (story.linkUrl != null && story.linkUrl!.isNotEmpty)
+            if ((_linkUrlOverride ?? story.linkUrl) != null &&
+                (_linkUrlOverride ?? story.linkUrl)!.isNotEmpty)
               Positioned(
                 left: 24,
                 right: 24,
                 bottom: 88,
                 child: FilledButton.tonalIcon(
-                  onPressed: () => _openStoryLink(story.linkUrl!),
+                  onPressed: () =>
+                      _openStoryLink(_linkUrlOverride ?? story.linkUrl!),
                   icon: const Icon(Icons.link_rounded, size: 18),
-                  label: Text(story.linkLabel?.trim().isNotEmpty == true
-                      ? story.linkLabel!.trim()
-                      : 'Open link'),
+                  label: Text(
+                    (_linkLabelOverride ?? story.linkLabel)
+                                ?.trim()
+                                .isNotEmpty ==
+                            true
+                        ? (_linkLabelOverride ?? story.linkLabel)!.trim()
+                        : 'Open link',
+                  ),
                   style: FilledButton.styleFrom(
                     backgroundColor: Colors.white.withValues(alpha: 0.18),
                     foregroundColor: Colors.white,

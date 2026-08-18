@@ -329,7 +329,7 @@ class CommunityNewsService {
   static final _client = Supabase.instance.client;
 
   static const _postColumnsWithBackground =
-      'id, body, created_at, author_id, business_id, community_id, visibility, professional_profile_id, event_id, author_profile_type, author_profile_id, background_color, publish_destination';
+      'id, body, created_at, author_id, business_id, community_id, visibility, professional_profile_id, event_id, author_profile_type, author_profile_id, background_color, publish_destination, location_label, location_city, location_state, link_url, link_label';
 
   static const _postColumns =
       'id, body, created_at, author_id, business_id, community_id, visibility, professional_profile_id, event_id, author_profile_type, author_profile_id';
@@ -1181,6 +1181,11 @@ class CommunityNewsService {
             backgroundColor: backgroundColor,
             publishDestination: publishDestination,
             media: media,
+            locationLabel: row['location_label'] as String?,
+            locationCity: row['location_city'] as String?,
+            locationState: row['location_state'] as String?,
+            linkUrl: row['link_url'] as String?,
+            linkLabel: row['link_label'] as String?,
           ),
         );
       } catch (error) {

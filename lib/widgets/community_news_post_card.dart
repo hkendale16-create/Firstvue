@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../navigation/firstvue_page_route.dart';
 import '../screens/community_detail_screen.dart';
@@ -8,6 +9,7 @@ import '../services/community_news_service.dart';
 import '../services/firstvue_feedback_sounds.dart';
 import '../services/profile_activity_service.dart';
 import '../theme/firstvue_theme.dart';
+import '../utils/safe_url.dart';
 import 'group_circle_avatar.dart';
 import 'spark_users_sheet.dart';
 import 'profile_avatar_thumbnail.dart';
@@ -375,6 +377,43 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
           else
             bodyText,
         ],
+        if (post.locationLabel != null && post.locationLabel!.trim().isNotEmpty)
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              _isTimeline ? 0 : 14,
+              8,
+              _isTimeline ? 0 : 14,
+              0,
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.place_outlined, size: 14, color: context.fv.tertiaryText),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    post.locationLabel!,
+                    style: TextStyle(
+                      color: context.fv.secondaryText,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (post.linkUrl != null && post.linkUrl!.trim().isNotEmpty)
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              _isTimeline ? 0 : 14,
+              8,
+              _isTimeline ? 0 : 14,
+              0,
+            ),
+            child: _PostLinkChip(
+              url: post.linkUrl!,
+              label: post.linkLabel,
+            ),
+          ),
         if (post.media.isNotEmpty) ...[
           SizedBox(height: _isTimeline ? 12 : 10),
           _NewsPostMediaBlock(
@@ -483,7 +522,10 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
                 child: _ActionButton(
                   icon: Icons.ios_share_outlined,
                   label: 'Share',
-                  onTap: widget.onShare!,
+                  onTap: () {
+                    FirstVueFeedbackSounds.playShareConfirmation();
+                    widget.onShare!();
+                  },
                 ),
               ),
             ),
@@ -497,7 +539,12 @@ class _CommunityNewsPostCardState extends State<CommunityNewsPostCard>
                   label: post.savedByMe ? 'Saved' : 'Save',
                   active: post.savedByMe,
                   activeColor: FirstVueColors.gold,
-                  onTap: widget.onSave!,
+                  onTap: () {
+                    if (!post.savedByMe) {
+                      FirstVueFeedbackSounds.playSaveSuccess();
+                    }
+                    widget.onSave!();
+                  },
                 ),
               ),
             ),
@@ -843,6 +890,58 @@ class _MediaTile extends StatelessWidget {
                 height: height,
                 borderRadius: BorderRadius.circular(fullWidth ? 0 : 12),
               ),
+      ),
+    );
+  }
+}
+
+class _PostLinkChip extends StatelessWidget {
+  final String url;
+  final String? label;
+
+  const _PostLinkChip({required this.url, this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final sanitized = SafeUrl.sanitize(url);
+    if (sanitized == null) return const SizedBox.shrink();
+    final host = Uri.tryParse(sanitized)?.host;
+    final text = (label != null && label!.trim().isNotEmpty)
+        ? label!.trim()
+        : (host == null || host.isEmpty ? sanitized : host);
+    return Material(
+      color: context.fv.elevatedSurface,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () async {
+          if (sanitized.startsWith('/')) return;
+          final uri = Uri.tryParse(sanitized);
+          if (uri == null) return;
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.link_rounded, size: 16, color: context.fv.secondaryText),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: FirstVueColors.teal,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

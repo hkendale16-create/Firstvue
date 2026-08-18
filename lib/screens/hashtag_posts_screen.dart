@@ -23,16 +23,18 @@ class _HashtagPostsScreenState extends State<HashtagPostsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabs;
   late Future<List<CommunityNewsPost>> _postsFuture;
+  late Future<List<CommunityNewsPost>> _vueFuture;
   late Future<List<StoryItem>> _storiesFuture;
-  late Future<List<TrendingHashtag>> _trendingFuture;
+  late Future<List<TrendingHashtag>> _localFuture;
 
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
+    _tabs = TabController(length: 5, vsync: this);
     _postsFuture = HashtagService.fetchPostsByTag(widget.tag);
+    _vueFuture = HashtagService.fetchPostsByTag(widget.tag, vueOnly: true);
     _storiesFuture = HashtagService.fetchStoriesByTag(widget.tag);
-    _trendingFuture = HashtagService.fetchTrending(limit: 12);
+    _localFuture = HashtagService.fetchTrending(limit: 12, nearYou: true);
     WebSeoService.update(
       title: '#${widget.tag} · FirstVue',
       description: 'Public FirstVue content tagged #${widget.tag}.',
@@ -48,10 +50,16 @@ class _HashtagPostsScreenState extends State<HashtagPostsScreen>
   Future<void> _refresh() async {
     setState(() {
       _postsFuture = HashtagService.fetchPostsByTag(widget.tag);
+      _vueFuture = HashtagService.fetchPostsByTag(widget.tag, vueOnly: true);
       _storiesFuture = HashtagService.fetchStoriesByTag(widget.tag);
-      _trendingFuture = HashtagService.fetchTrending(limit: 12);
+      _localFuture = HashtagService.fetchTrending(limit: 12, nearYou: true);
     });
-    await Future.wait([_postsFuture, _storiesFuture, _trendingFuture]);
+    await Future.wait([
+      _postsFuture,
+      _vueFuture,
+      _storiesFuture,
+      _localFuture,
+    ]);
   }
 
   @override
@@ -64,13 +72,16 @@ class _HashtagPostsScreenState extends State<HashtagPostsScreen>
         title: Text('#${widget.tag}'),
         bottom: TabBar(
           controller: _tabs,
+          isScrollable: true,
           labelColor: FirstVueColors.teal,
           unselectedLabelColor: fv.secondaryText,
           indicatorColor: FirstVueColors.teal,
           tabs: const [
+            Tab(text: 'Top'),
             Tab(text: 'Recent'),
+            Tab(text: 'VUE'),
             Tab(text: 'Stories'),
-            Tab(text: 'Related'),
+            Tab(text: 'Near you'),
           ],
         ),
       ),
@@ -79,9 +90,24 @@ class _HashtagPostsScreenState extends State<HashtagPostsScreen>
         child: TabBarView(
           controller: _tabs,
           children: [
-            _PostsTab(future: _postsFuture, tag: widget.tag),
+            _PostsTab(
+              future: _postsFuture.then(HashtagQuery.sortTop),
+              emptyLabel: 'No public posts with #${widget.tag} yet.',
+            ),
+            _PostsTab(
+              future: _postsFuture,
+              emptyLabel: 'No recent posts with #${widget.tag} yet.',
+            ),
+            _PostsTab(
+              future: _vueFuture,
+              emptyLabel: 'No VUE posts with #${widget.tag} yet.',
+            ),
             _StoriesTab(future: _storiesFuture, tag: widget.tag),
-            _RelatedTab(future: _trendingFuture, currentTag: widget.tag),
+            _RelatedTab(
+              future: _localFuture,
+              currentTag: widget.tag,
+              emptyLabel: 'No local hashtag trends yet.',
+            ),
           ],
         ),
       ),
@@ -91,9 +117,12 @@ class _HashtagPostsScreenState extends State<HashtagPostsScreen>
 
 class _PostsTab extends StatelessWidget {
   final Future<List<CommunityNewsPost>> future;
-  final String tag;
+  final String emptyLabel;
 
-  const _PostsTab({required this.future, required this.tag});
+  const _PostsTab({
+    required this.future,
+    required this.emptyLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -111,7 +140,7 @@ class _PostsTab extends StatelessWidget {
             children: [
               const SizedBox(height: 80),
               Text(
-                'No public posts with #$tag yet.',
+                emptyLabel,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: context.fv.secondaryText),
               ),
@@ -218,8 +247,13 @@ class _StoriesTab extends StatelessWidget {
 class _RelatedTab extends StatelessWidget {
   final Future<List<TrendingHashtag>> future;
   final String currentTag;
+  final String emptyLabel;
 
-  const _RelatedTab({required this.future, required this.currentTag});
+  const _RelatedTab({
+    required this.future,
+    required this.currentTag,
+    this.emptyLabel = 'Trending hashtags will appear here.',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -239,7 +273,7 @@ class _RelatedTab extends StatelessWidget {
             children: [
               const SizedBox(height: 80),
               Text(
-                'Trending hashtags will appear here.',
+                emptyLabel,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: context.fv.secondaryText),
               ),

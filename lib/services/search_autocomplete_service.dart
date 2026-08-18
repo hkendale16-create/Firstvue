@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'hashtag_service.dart';
 import 'profile_cards.dart';
 import 'username_service.dart';
 
@@ -60,6 +61,7 @@ class SearchAutocompleteService {
     }
 
     final lower = trimmed.toLowerCase();
+    final hashtagTokens = HashtagQuery.tokens(trimmed);
 
     // Fan-out in parallel so one keystroke is one round-trip wave, not six
     // sequential PostgREST calls.
@@ -68,7 +70,7 @@ class SearchAutocompleteService {
       _searchBusinesses(lower),
       _searchCommunities(lower),
       _searchCommunityHubs(lower),
-      _searchHashtags(lower),
+      _searchHashtagTokens(hashtagTokens),
       _searchEntityHandles(lower),
     ]);
 
@@ -378,6 +380,25 @@ class SearchAutocompleteService {
         return const [];
       }
     }
+  }
+
+  static Future<List<SearchAutocompleteResult>> _searchHashtagTokens(
+    List<String> tokens,
+  ) async {
+    if (tokens.isEmpty) return const [];
+    final seen = <String>{};
+    final results = <SearchAutocompleteResult>[];
+    // Prefix lookups on the unique `hashtags.tag` index — not body wildcards.
+    for (final token in tokens.take(3)) {
+      final batch = await _searchHashtags(token);
+      for (final item in batch) {
+        if (seen.add(item.label.toLowerCase())) {
+          results.add(item);
+        }
+        if (results.length >= 8) return results;
+      }
+    }
+    return results;
   }
 
   static Future<List<SearchAutocompleteResult>> _searchHashtags(

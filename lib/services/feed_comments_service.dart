@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'activity_notifications_service.dart';
 import 'community_news_service.dart';
+import 'post_metadata_service.dart';
 import 'profile_cards.dart';
 
 class FeedComment {
@@ -312,6 +313,14 @@ class FeedCommentsService {
           }
         } catch (_) {}
       }
+
+      try {
+        await PostMetadataService.syncForContent(
+          contentType: 'comment',
+          contentId: inserted['id'] as String,
+          body: trimmed,
+        );
+      } catch (_) {}
 
       final authorNames = await _fetchProfileNames([user.id]);
       return _commentFromRow(

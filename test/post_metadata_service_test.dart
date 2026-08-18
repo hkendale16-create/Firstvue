@@ -32,4 +32,17 @@ void main() {
     expect(src, contains("'p_post_id': contentId"));
     expect(src, contains("'p_body': body"));
   });
+
+  test('mentions resolve through EntityHandleService and skip null profile ids', () {
+    final src =
+        File('lib/services/post_metadata_service.dart').readAsStringSync();
+    expect(src, contains('EntityHandleService.lookup'));
+    expect(src, contains("payload['mentioned_profile_id'] = lookup.entityId"));
+    expect(src, contains("payload['mentioned_business_id'] = lookup.entityId"));
+    expect(src, isNot(contains('mentioned_profile_id: null')));
+    expect(
+      src,
+      isNot(contains("lookup.entityType == EntityHandleType.user ? lookup.entityId : null")),
+    );
+  });
 }

@@ -2,11 +2,14 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../navigation/entity_navigation.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../screens/hashtag_posts_screen.dart';
 import '../screens/member_public_profile_screen.dart';
+import '../services/entity_handle_service.dart';
 import '../services/post_metadata_service.dart';
 import '../services/profile_activity_service.dart';
+import '../services/shoutout_service.dart';
 import '../services/username_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../utils/safe_url.dart';
@@ -32,9 +35,46 @@ class SocialRichText extends StatelessWidget {
     if (normalized == null) return;
 
     try {
-      final row = await UsernameService.lookupProfileId(normalized);
-      if (!context.mounted || row == null) return;
-      openMemberProfile(context, profileId: row, displayName: '@$normalized');
+      final lookup = await EntityHandleService.lookup(normalized);
+      if (!context.mounted || lookup == null) return;
+      switch (lookup.entityType) {
+        case EntityHandleType.user:
+          openMemberProfile(
+            context,
+            profileId: lookup.entityId,
+            displayName: '@${lookup.handle}',
+          );
+        case EntityHandleType.business:
+          await EntityNavigation.openShoutoutTarget(
+            context,
+            type: ShoutoutTargetType.business,
+            id: lookup.entityId,
+          );
+        case EntityHandleType.professional:
+          await EntityNavigation.openShoutoutTarget(
+            context,
+            type: ShoutoutTargetType.professional,
+            id: lookup.entityId,
+          );
+        case EntityHandleType.community:
+          await EntityNavigation.openShoutoutTarget(
+            context,
+            type: ShoutoutTargetType.community,
+            id: lookup.entityId,
+          );
+        case EntityHandleType.group:
+          await EntityNavigation.openShoutoutTarget(
+            context,
+            type: ShoutoutTargetType.group,
+            id: lookup.entityId,
+          );
+        case EntityHandleType.rental:
+          openMemberProfile(
+            context,
+            profileId: lookup.entityId,
+            displayName: '@${lookup.handle}',
+          );
+      }
     } catch (_) {}
   }
 
