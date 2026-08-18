@@ -41,6 +41,7 @@ import 'widgets/firstvue_settings_drawer.dart';
 import 'widgets/floating_messages_bubble.dart';
 import 'widgets/firstvue_animated_header_title.dart';
 import 'widgets/home_city_chip.dart';
+import 'widgets/messages_header_button.dart';
 import 'widgets/home_discovery_section.dart';
 import 'widgets/network_photo.dart';
 import 'widgets/social_chrome.dart';
@@ -136,6 +137,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
   int _notificationBadge = 0;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _messagesBubbleKey = GlobalKey<FloatingMessagesBubbleState>();
+  final _messagesHeaderKey = GlobalKey<MessagesHeaderButtonState>();
   final _cityChipKey = GlobalKey<HomeCityChipState>();
   final _homeAvatarKey = GlobalKey<_HomeProfileAvatarState>();
   Widget? _vueTab;
@@ -394,6 +396,8 @@ class _FirstVueHomeState extends State<FirstVueHome> {
   Future<void> _refreshHomeTab() async {
     await _cityChipKey.currentState?.reload();
     await _homeAvatarKey.currentState?.reload();
+    await _messagesHeaderKey.currentState?.refresh();
+    await _messagesBubbleKey.currentState?.refresh();
     if (mounted) setState(() => _homeRefreshToken++);
   }
 
@@ -428,6 +432,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
                   pinOnly: true,
                   onLocationChanged: _refreshHomeTab,
                 ),
+                MessagesHeaderButton(key: _messagesHeaderKey),
                 IconButton(
                   onPressed: () async {
                     await Navigator.push(
@@ -563,6 +568,10 @@ class _FirstVueHomeState extends State<FirstVueHome> {
             if (index == FirstVueBottomNav.homeIndex) {
               _homeMounted = true;
               _homeAvatarKey.currentState?.reload();
+              final headerRefresh = _messagesHeaderKey.currentState?.refresh();
+              if (headerRefresh != null) unawaited(headerRefresh);
+              final bubbleRefresh = _messagesBubbleKey.currentState?.refresh();
+              if (bubbleRefresh != null) unawaited(bubbleRefresh);
             }
             if (index == FirstVueBottomNav.profileIndex) {
               final firstOpen = !_profileMounted;

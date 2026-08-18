@@ -7,6 +7,44 @@ import '../messaging/services/fv_messaging_service.dart';
 import '../services/user_preferences_service.dart';
 import '../theme/firstvue_theme.dart';
 
+/// Positions the optional Home chat bubble inside the *body* stack, not the
+/// full screen. Using [MediaQuery] height placed it over / under the bottom nav.
+class FloatingMessagesLayout {
+  FloatingMessagesLayout._();
+
+  static const bubbleSize = 56.0;
+  static const padding = 16.0;
+  static const minTop = 72.0;
+
+  static Offset clampToBody({
+    required Offset proposed,
+    required Size bodySize,
+  }) {
+    final maxX = (bodySize.width - bubbleSize - padding).clamp(
+      padding,
+      bodySize.width,
+    );
+    final maxY = (bodySize.height - bubbleSize - padding).clamp(
+      minTop,
+      bodySize.height,
+    );
+    return Offset(
+      proposed.dx.clamp(padding, maxX),
+      proposed.dy.clamp(minTop, maxY),
+    );
+  }
+
+  static Offset defaultBottomRight(Size bodySize) {
+    return clampToBody(
+      proposed: Offset(
+        bodySize.width - bubbleSize - padding,
+        bodySize.height - bubbleSize - padding,
+      ),
+      bodySize: bodySize,
+    );
+  }
+}
+
 class FloatingMessagesBubble extends StatefulWidget {
   const FloatingMessagesBubble({super.key});
 
@@ -15,7 +53,7 @@ class FloatingMessagesBubble extends StatefulWidget {
 }
 
 class FloatingMessagesBubbleState extends State<FloatingMessagesBubble> {
-  Offset _position = const Offset(20, 0);
+  Offset? _position;
   bool _visible = true;
   int _unreadCount = 0;
   bool _initialized = false;
@@ -59,14 +97,18 @@ class FloatingMessagesBubbleState extends State<FloatingMessagesBubble> {
   }
 
   Future<void> _confirmDismiss() async {
+    final fv = context.fv;
     final dismiss = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF10151B),
-        title: const Text('Hide messages bubble?', style: TextStyle(color: Colors.white)),
-        content: const Text(
-          'You can restore it anytime from Settings → Location & notifications.',
-          style: TextStyle(color: Colors.white70),
+        backgroundColor: fv.elevatedSurface,
+        title: Text(
+          'Hide messages bubble?',
+          style: TextStyle(color: fv.primaryText),
+        ),
+        content: Text(
+          'Messages stays in the Home header. You can restore this bubble from Settings → Location & notifications.',
+          style: TextStyle(color: fv.secondaryText),
         ),
         actions: [
           TextButton(
@@ -102,76 +144,90 @@ class FloatingMessagesBubbleState extends State<FloatingMessagesBubble> {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return const SizedBox.shrink();
 
-    final size = MediaQuery.sizeOf(context);
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final defaultY = size.height - bottomInset - 140;
-    final pos = _position.dy == 0
-        ? Offset(size.width - 76, defaultY)
-        : _position;
-
-    return Positioned(
-      left: pos.dx.clamp(8.0, size.width - 64),
-      top: pos.dy.clamp(80.0, size.height - bottomInset - 80),
-      child: GestureDetector(
-        onPanUpdate: (details) {
-          setState(() {
-            _position = Offset(
-              pos.dx + details.delta.dx,
-              pos.dy + details.delta.dy,
-            );
-          });
-        },
-        onLongPress: _confirmDismiss,
-        child: Material(
-          elevation: 8,
-          color: FirstVueColors.surface,
-          shape: const CircleBorder(
-            side: BorderSide(color: FirstVueColors.teal, width: 1.5),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: _openInbox,
-            customBorder: const CircleBorder(),
-            child: SizedBox(
-              width: 56,
-              height: 56,
-              child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.center,
-                children: [
-                  const Icon(
-                    Icons.chat_bubble_rounded,
-                    color: FirstVueColors.teal,
-                    size: 26,
-                  ),
-                  if (_unreadCount > 0)
-                    Positioned(
-                      right: 6,
-                      top: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 2,
+    return Positioned.fill(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final bodySize = Size(constraints.maxWidth, constraints.maxHeight);
+          if (bodySize.width <= 0 || bodySize.height <= 0) {
+            return const SizedBox.shrink();
+          }
+          final pos = FloatingMessagesLayout.clampToBody(
+            proposed: _position ?? FloatingMessagesLayout.defaultBottomRight(bodySize),
+            bodySize: bodySize,
+          );
+          return Stack(
+            children: [
+              Positioned(
+                left: pos.dx,
+                top: pos.dy,
+                child: GestureDetector(
+                  onPanUpdate: (details) {
+                    setState(() {
+                      _position = FloatingMessagesLayout.clampToBody(
+                        proposed: Offset(
+                          pos.dx + details.delta.dx,
+                          pos.dy + details.delta.dy,
                         ),
-                        decoration: BoxDecoration(
-                          color: FirstVueColors.coral,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          _unreadCount > 9 ? '9+' : '$_unreadCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        bodySize: bodySize,
+                      );
+                    });
+                  },
+                  onLongPress: _confirmDismiss,
+                  child: Material(
+                    elevation: 8,
+                    color: context.fv.elevatedSurface,
+                    shape: const CircleBorder(
+                      side: BorderSide(color: FirstVueColors.teal, width: 1.5),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: _openInbox,
+                      customBorder: const CircleBorder(),
+                      child: SizedBox(
+                        width: FloatingMessagesLayout.bubbleSize,
+                        height: FloatingMessagesLayout.bubbleSize,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          alignment: Alignment.center,
+                          children: [
+                            const Icon(
+                              Icons.chat_bubble_rounded,
+                              color: FirstVueColors.teal,
+                              size: 26,
+                            ),
+                            if (_unreadCount > 0)
+                              Positioned(
+                                right: 6,
+                                top: 6,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 5,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: FirstVueColors.coral,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    _unreadCount > 9 ? '9+' : '$_unreadCount',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ),
-                ],
+                  ),
+                ),
               ),
-            ),
-          ),
-        ),
+            ],
+          );
+        },
       ),
     );
   }
