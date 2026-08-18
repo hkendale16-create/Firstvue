@@ -30,6 +30,7 @@ workflows:
             --custom-export-options='{"testFlightInternalTestingOnly": true}'
       - name: Flutter packages
         script: |
+          flutter config --no-enable-swift-package-manager
           flutter pub get
       - name: CocoaPods
         script: |
