@@ -1,6 +1,11 @@
 # FirstVue — iOS App Store / TestFlight from Windows (no Mac required).
 # Codemagic rents a Mac, signs the IPA, and uploads it to App Store Connect.
 #
+# In Codemagic: pick branch cursor/store-release-1-0-8-4635 →
+# “Check for configuration file” → start workflow “iOS App Store 1.0.8”.
+# Do NOT use the Flutter Workflow Editor. It asks for a Shorebird token;
+# this app does not use Shorebird.
+#
 # Setup (once) is in docs/APP_STORE_UPLOAD.md → “Windows (no Mac)”.
 # Name the App Store Connect integration **FirstVue** so it matches below.
 

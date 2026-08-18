@@ -45,17 +45,24 @@ Use **Codemagic** in the browser. This repo already has `codemagic.yaml`.
 2. Teams → **Integrations** → **App Store Connect** → add the API key.  
    Name the integration **FirstVue** (must match `codemagic.yaml`).
 3. Teams → **Code signing identities** → iOS → fetch/create certificates for `com.FirstVue` (App Store distribution). Codemagic can create the certs so you never need Keychain on a Mac.
-4. At the top of the app, switch from **Workflow Editor** to **codemagic.yaml**.
-5. Start build → workflow **iOS App Store 1.0.8**.
-6. When it finishes, the `.ipa` is already uploaded to **TestFlight**.
+4. Open the app, pick branch **`cursor/store-release-1-0-8-4635`**, click **Check for configuration file**.
+5. Switch the page from **Workflow Editor** to **codemagic.yaml**.
+6. **Start new build** → workflow **iOS App Store 1.0.8** (this screen has no Shorebird field).
+7. When it finishes, the `.ipa` is already uploaded to **TestFlight**.
 
-If Codemagic says **Shorebird token is required**, you are in the visual Workflow Editor with Shorebird turned on. FirstVue does **not** use Shorebird. Do not create a Shorebird account for this upload.
+If Codemagic says **Shorebird token is required**, cancel that Start dialog. You are on the Flutter **Workflow Editor**, not the yaml workflow. FirstVue does **not** use Shorebird. A Shorebird token will not help — that mode runs `shorebird release` and this repo has no `shorebird.yaml`.
 
-1. Open the app at [codemagic.io/apps](https://codemagic.io/apps).
-2. Switch configuration to **codemagic.yaml** (not Workflow Editor).
-3. Or in Workflow Editor: **Publish updates to user devices using Shorebird** → **Disabled** / leave it off, then save.
+**Fix (do this instead of pasting a token):**
 
-Shorebird is optional code-push. This TestFlight IPA is a normal `flutter build ipa`.
+1. [codemagic.io/apps](https://codemagic.io/apps) → **Firstvue**
+2. Branch dropdown → `cursor/store-release-1-0-8-4635`
+3. **Check for configuration file** (docs: [scan for yaml](https://docs.codemagic.io/yaml-quick-start/building-a-flutter-app/))
+4. Top of the page: **codemagic.yaml** (leave Workflow Editor)
+5. Start **iOS App Store 1.0.8**
+
+If you are stuck in Workflow Editor: scroll to **Publish updates to user devices using Shorebird** and set it to **disabled** (not Release, not Patch). Save. Then the token field goes away.
+
+Do not create a Shorebird account for this TestFlight upload.
 
 ### D. Install on iPhone
 
