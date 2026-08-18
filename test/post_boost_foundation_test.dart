@@ -36,7 +36,7 @@ void main() {
   test('settings exposes Monetization section', () {
     final drawer =
         File('lib/widgets/firstvue_settings_drawer.dart').readAsStringSync();
-    expect(drawer, contains("title: 'Monetization'"));
+    expect(drawer, contains("monetizationGroup = 'Monetization'"));
     expect(drawer, contains('Monetization & Plans'));
   });
 

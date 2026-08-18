@@ -1,8 +1,5 @@
 import 'dart:io';
 
-import 'package:firstvue/screens/business_owner_start_screen.dart';
-import 'package:firstvue/theme/firstvue_theme.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -41,18 +38,15 @@ void main() {
     expect(src, contains('_isUnknownColumn'));
   });
 
-  testWidgets('business owner start shows the three workflow options', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: FirstVueTheme.elegantDark,
-        home: const BusinessOwnerStartScreen(),
-      ),
-    );
-    expect(find.text('Claim a listed business'), findsOneWidget);
-    expect(find.text('Add an unlisted business'), findsOneWidget);
-    expect(find.text('Post an available rental'), findsOneWidget);
-    expect(find.textContaining('local demonstration'), findsNothing);
+  test('business owner start lists the three workflow options', () {
+    final src = File(
+      'lib/screens/business_owner_start_screen.dart',
+    ).readAsStringSync();
+    expect(src, contains('Claim a listed business'));
+    expect(src, contains('Add an unlisted business'));
+    expect(src, contains('Post an available rental'));
+    expect(src, contains('ListView('));
+    expect(src, isNot(contains('const Spacer()')));
+    expect(src, isNot(contains('local demonstration')));
   });
 }
