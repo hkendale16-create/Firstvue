@@ -47,6 +47,8 @@ class MemberPublicProfileScreen extends StatefulWidget {
   final String profileId;
   final String? displayNameHint;
 
+  static const tabLabels = ['Posts', 'Photos', 'More'];
+
   const MemberPublicProfileScreen({
     super.key,
     required this.profileId,
@@ -59,8 +61,6 @@ class MemberPublicProfileScreen extends StatefulWidget {
 }
 
 class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
-  static const _tabLabels = ['POSTS', 'PHOTOS', 'GROUPS', 'COMMUNITIES'];
-
   ProfileImageSet _profileImages = const ProfileImageSet();
   ProfileEngagementStats _stats = const ProfileEngagementStats(
     postCount: 0,
@@ -71,6 +71,7 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
 
   String? _displayName;
   String? _username;
+  String? _bio;
   bool _loading = true;
   int _selectedTab = 0;
   FollowStatus _followStatus = FollowStatus.notFollowing;
@@ -104,6 +105,7 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
     setState(() {
       _displayName = profile?.displayName;
       _username = profile?.username;
+      _bio = profile?.bio;
       _profileImages = results[1] as ProfileImageSet;
       _stats = results[2] as ProfileEngagementStats;
       _posts = results[3] as List<CommunityNewsPost>;
@@ -513,6 +515,7 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
             SocialProfileHeader(
               name: _title,
               handle: _subtitle,
+              bio: _bio,
               coverImageUrl: _profileImages.cover?.signedUrl,
               avatarImageUrl: _profileImages.avatar?.signedUrl,
               coverIsVideo: _profileImages.cover?.isVideo ?? false,
@@ -563,15 +566,23 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
                   : [
                       SocialFollowButton(
                         label: _followLabel(),
+                        compact: true,
                         filled: _followStatus != FollowStatus.following,
                         onPressed: _loading || _followBusy
                             ? null
                             : _toggleFollow,
                       ),
-                      SocialFollowButton(
-                        label: 'Message',
-                        filled: false,
+                    ],
+              iconActions: _isSelf
+                  ? const []
+                  : [
+                      IconButton(
                         onPressed: _openMessage,
+                        tooltip: 'Message',
+                        icon: const Icon(
+                          Icons.chat_bubble_outline,
+                          color: FirstVueColors.gold,
+                        ),
                       ),
                     ],
             ),
@@ -581,7 +592,7 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
             ),
             const SizedBox(height: 8),
             SocialGoldUnderlineTabs(
-              labels: _tabLabels,
+              labels: MemberPublicProfileScreen.tabLabels,
               selectedIndex: _selectedTab,
               onSelected: (index) => setState(() => _selectedTab = index),
             ),
@@ -601,14 +612,9 @@ class _MemberPublicProfileScreenState extends State<MemberPublicProfileScreen> {
                   child: switch (_selectedTab) {
                     0 => _buildPostsTab(),
                     1 => _buildPhotosTab(),
-                    2 => ProfileAffiliationsSection(
-                      profileId: widget.profileId,
-                      showGroups: true,
-                      showCommunities: false,
-                    ),
                     _ => ProfileAffiliationsSection(
                       profileId: widget.profileId,
-                      showGroups: false,
+                      showGroups: true,
                       showCommunities: true,
                     ),
                   },

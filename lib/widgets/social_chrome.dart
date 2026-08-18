@@ -1432,6 +1432,7 @@ class SocialProfileHeader extends StatelessWidget {
   final IconData avatarIcon;
   final List<ProfileStatItem> stats;
   final List<Widget> actions;
+  final List<Widget> iconActions;
   final VoidCallback? onCoverTap;
   final VoidCallback? onAvatarTap;
   final Widget? trailing;
@@ -1450,6 +1451,7 @@ class SocialProfileHeader extends StatelessWidget {
     this.avatarIcon = Icons.person_outline,
     this.stats = const [],
     this.actions = const [],
+    this.iconActions = const [],
     this.onCoverTap,
     this.onAvatarTap,
     this.trailing,
@@ -1556,6 +1558,25 @@ class SocialProfileHeader extends StatelessWidget {
                   handle!.startsWith('@') ? handle! : '@$handle',
                   style: TextStyle(color: fv.tertiaryText, fontSize: 14),
                 ),
+              if (bio != null && bio!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: centerAvatar
+                      ? Alignment.center
+                      : Alignment.centerLeft,
+                  child: Text(
+                    bio!,
+                    textAlign: centerAvatar
+                        ? TextAlign.center
+                        : TextAlign.start,
+                    style: TextStyle(
+                      color: fv.secondaryText,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
               if (stats.isNotEmpty) ...[
                 const SizedBox(height: 14),
                 Row(
@@ -1587,29 +1608,62 @@ class SocialProfileHeader extends StatelessWidget {
                   ],
                 ),
               ],
-              if (actions.isNotEmpty) ...[
+              if (actions.isNotEmpty || iconActions.isNotEmpty) ...[
                 const SizedBox(height: 14),
-                Row(
-                  children: [
-                    for (var i = 0; i < actions.length; i++) ...[
-                      if (i > 0) const SizedBox(width: 10),
-                      Expanded(child: actions[i]),
+                Theme(
+                  data: Theme.of(context).copyWith(
+                    filledButtonTheme: FilledButtonThemeData(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: FirstVueColors.gold,
+                        foregroundColor: FirstVueColors.onGold,
+                        elevation: 0,
+                        minimumSize: const Size(0, 40),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                    ),
+                    outlinedButtonTheme: OutlinedButtonThemeData(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: FirstVueColors.gold,
+                        minimumSize: const Size(0, 40),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                        side: BorderSide(
+                          width: 1.4,
+                          color: FirstVueColors.gold.withValues(alpha: 0.85),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < actions.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 8),
+                        Expanded(child: actions[i]),
+                      ],
+                      for (final icon in iconActions) ...[
+                        const SizedBox(width: 4),
+                        icon,
+                      ],
                     ],
-                  ],
-                ),
-              ],
-              if (bio != null && bio!.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Align(
-                  alignment: centerAvatar
-                      ? Alignment.center
-                      : Alignment.centerLeft,
-                  child: Text(
-                    bio!,
-                    textAlign: centerAvatar
-                        ? TextAlign.center
-                        : TextAlign.start,
-                    style: TextStyle(color: fv.secondaryText, fontSize: 13),
                   ),
                 ),
               ],

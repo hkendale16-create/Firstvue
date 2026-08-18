@@ -42,6 +42,12 @@ import '../models/share_payload.dart';
 class ProfileScreen extends StatefulWidget {
   final int refreshToken;
 
+  static const tabLabels = [
+    'Posts',
+    'Photos',
+    'More',
+  ];
+
   const ProfileScreen({super.key, this.refreshToken = 0});
 
   @override
@@ -68,15 +74,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _pullRefreshToken = 0;
   List<OwnedBusiness> _approvedBusinesses = const [];
   bool _hasApprovedProfessional = false;
-
-  static const _tabLabels = [
-    'Posts',
-    'Photos',
-    'Portfolio',
-    'Groups',
-    'Communities',
-    'About',
-  ];
 
   @override
   void initState() {
@@ -558,65 +555,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
         refreshToken: _effectiveRefreshToken,
         embedded: true,
       ),
-      2 => PortfolioAlbumsSection(
-        ownerType: PortfolioOwnerType.user,
-        ownerId: userId,
-        canManage: true,
-      ),
-      3 => ProfileAffiliationsSection(
-        profileId: userId,
-        showGroups: true,
-        showCommunities: false,
-        refreshToken: _effectiveRefreshToken,
-      ),
-      4 => ProfileAffiliationsSection(
-        profileId: userId,
-        showGroups: false,
-        showCommunities: true,
-        refreshToken: _effectiveRefreshToken,
-      ),
-      _ => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (_approvedBusinesses.isNotEmpty)
-            ListTile(
-              leading: const Icon(
-                Icons.storefront_outlined,
-                color: FirstVueColors.gold,
-              ),
-              title: Text(
-                _approvedBusinesses.length == 1
-                    ? 'My Business'
-                    : 'My Businesses',
-              ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: _openMyBusiness,
+      _ => _buildMoreTab(userId),
+    };
+  }
+
+  Widget _buildMoreTab(String userId) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PortfolioAlbumsSection(
+          ownerType: PortfolioOwnerType.user,
+          ownerId: userId,
+          canManage: true,
+        ),
+        ProfileAffiliationsSection(
+          profileId: userId,
+          showGroups: true,
+          showCommunities: true,
+          refreshToken: _effectiveRefreshToken,
+        ),
+        if (_approvedBusinesses.isNotEmpty)
+          ListTile(
+            leading: const Icon(
+              Icons.storefront_outlined,
+              color: FirstVueColors.gold,
             ),
-          if (_hasApprovedProfessional)
-            ListTile(
-              leading: const Icon(
-                Icons.work_outline,
-                color: FirstVueColors.gold,
-              ),
-              title: const Text('My Professional'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: _openMyProfessional,
+            title: Text(
+              _approvedBusinesses.length == 1
+                  ? 'My Business'
+                  : 'My Businesses',
             ),
-          ProfileSavedSection(refreshToken: widget.refreshToken),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Text(
-              'Your about & saved items stay private to you unless you choose to share them.',
-              style: TextStyle(
-                color: context.fv.secondaryText,
-                fontSize: 13,
-                height: 1.4,
-              ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _openMyBusiness,
+          ),
+        if (_hasApprovedProfessional)
+          ListTile(
+            leading: const Icon(
+              Icons.work_outline,
+              color: FirstVueColors.gold,
+            ),
+            title: const Text('My Professional'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _openMyProfessional,
+          ),
+        ProfileSavedSection(refreshToken: widget.refreshToken),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Text(
+            'Saved items stay private unless you choose to share them.',
+            style: TextStyle(
+              color: context.fv.secondaryText,
+              fontSize: 13,
+              height: 1.4,
             ),
           ),
-        ],
-      ),
-    };
+        ),
+      ],
+    );
   }
 
   @override
@@ -698,7 +693,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 avatarImageUrl: _profileImages.avatar?.signedUrl,
                 coverIsVideo: _profileImages.cover?.isVideo ?? false,
                 avatarIsVideo: _profileImages.avatar?.isVideo ?? false,
-                verified: user != null,
                 centerAvatar: true,
                 onCoverTap: _imageUpdating ? null : _showCoverOptions,
                 onAvatarTap: _imageUpdating ? null : _showAvatarOptions,
@@ -733,13 +727,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           onPressed: _openEditProfile,
                           child: const Text('Edit profile'),
                         ),
-                        OutlinedButton(
+                      ],
+                iconActions: user == null
+                    ? const []
+                    : [
+                        IconButton(
                           onPressed: _shareProfile,
-                          child: const Text('Share profile'),
+                          tooltip: 'Share profile',
+                          icon: const Icon(
+                            Icons.ios_share_outlined,
+                            color: FirstVueColors.gold,
+                          ),
                         ),
-                        OutlinedButton(
-                          onPressed: () => InviteFriendsSheet.show(context),
-                          child: const Text('Invite friends'),
+                        PopupMenuButton<String>(
+                          tooltip: 'More',
+                          icon: const Icon(
+                            Icons.more_horiz,
+                            color: FirstVueColors.gold,
+                          ),
+                          onSelected: (value) {
+                            if (value == 'invite') {
+                              InviteFriendsSheet.show(context);
+                            }
+                          },
+                          itemBuilder: (context) => const [
+                            PopupMenuItem(
+                              value: 'invite',
+                              child: Text('Invite friends'),
+                            ),
+                          ],
                         ),
                       ],
                 trailing: user == null
@@ -778,7 +794,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               if (user != null) ...[
                 const SizedBox(height: 16),
                 SocialGoldUnderlineTabs(
-                  labels: _tabLabels,
+                  labels: ProfileScreen.tabLabels,
                   selectedIndex: _selectedTab,
                   onSelected: (index) => setState(() => _selectedTab = index),
                 ),
