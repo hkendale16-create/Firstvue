@@ -35,6 +35,18 @@ void main() {
       MoneyCents.creatorAllocationCents(spendCents: 50000, feeBps: 2000),
       40000,
     );
+    expect(
+      EarnMarketplace.poolCents(perCreatorCents: 5000, creatorsWanted: 2),
+      10000,
+    );
+    expect(
+      MoneyCents.creatorAllocationCents(
+        spendCents: 10000,
+        feeBps: EarnMarketplace.platformFeeBps,
+      ),
+      8500,
+    );
+    expect(EarnMarketplace.splitLabel(), contains('85%'));
   });
 
   test('product catalog keeps Pro price configurable centrally', () {
@@ -72,6 +84,8 @@ void main() {
     );
     expect(File('lib/screens/bounty_discovery_screen.dart').existsSync(), isTrue);
     expect(File('lib/screens/creator_earnings_screen.dart').existsSync(), isTrue);
+    expect(File('lib/screens/earn_on_firstvue_screen.dart').existsSync(), isTrue);
+    expect(File('lib/screens/create_bounty_draft_sheet.dart').existsSync(), isTrue);
     expect(
       File('lib/screens/business_campaign_dashboard_screen.dart').existsSync(),
       isTrue,

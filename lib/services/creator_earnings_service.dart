@@ -158,6 +158,24 @@ class CreatorEarningsService {
     return CreatorProfile.fromMap(Map<String, dynamic>.from(row as Map));
   }
 
+  /// Opt in as a creator and stamp city from local prefs (no GPS).
+  static Future<CreatorProfile> optInAsCreator({
+    String? homeCity,
+    String? homeState,
+  }) async {
+    final profile = await ensureCreatorProfile();
+    try {
+      await _client.from('creator_profiles').update({
+        if (homeCity != null && homeCity.trim().isNotEmpty)
+          'home_city': homeCity.trim(),
+        if (homeState != null && homeState.trim().isNotEmpty)
+          'home_state': homeState.trim(),
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('profile_id', profile.profileId);
+    } catch (_) {}
+    return profile;
+  }
+
   static Future<CreatorReputation?> fetchReputation(String profileId) async {
     try {
       final row = await _client

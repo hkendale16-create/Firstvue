@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../navigation/firstvue_page_route.dart';
 import '../services/bounty_service.dart';
+import '../services/creator_earnings_service.dart';
 import '../services/location_service.dart';
 import '../services/monetization_flags_service.dart';
+import '../services/user_preferences_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../widgets/bounty_nearby_teaser.dart';
+import 'create_bounty_draft_sheet.dart';
 import 'creator_earnings_screen.dart';
 
 class BountyDiscoveryScreen extends StatefulWidget {
@@ -103,8 +106,40 @@ class _BountyDiscoveryScreenState extends State<BountyDiscoveryScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'When businesses and organizers publish creator campaigns, eligible opportunities will show here — without cluttering your main feed.',
+                    'When venues hire coverage, those campaigns show here. Join as a creator now so you can apply the moment one is nearby.',
                     style: TextStyle(color: palette.secondaryText, height: 1.45),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () async {
+                      try {
+                        final prefs = await UserPreferencesService.fetch();
+                        await CreatorEarningsService.optInAsCreator(
+                          homeCity: prefs.locationCity,
+                          homeState: prefs.locationState,
+                        );
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('You’re a creator. We’ll show nearby bounties here.'),
+                          ),
+                        );
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(e.toString())),
+                        );
+                      }
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: FirstVueColors.gold,
+                      foregroundColor: Colors.black,
+                    ),
+                    child: const Text('Become a creator'),
+                  ),
+                  TextButton(
+                    onPressed: () => CreateBountyDraftSheet.show(context),
+                    child: const Text('Venue? Draft a bounty'),
                   ),
                 ],
               ),

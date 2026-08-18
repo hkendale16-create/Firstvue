@@ -81,6 +81,21 @@ class _CreatorEarningsScreenState extends State<CreatorEarningsScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
               children: [
+                Text(
+                  'Cover nights. Get paid when funding is live.',
+                  style: TextStyle(
+                    color: palette.primaryText,
+                    fontFamily: 'CormorantGaramond',
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${EarnMarketplace.splitLabel()}. Balances come from the ledger — not a wallet on your phone.',
+                  style: TextStyle(color: palette.secondaryText, height: 1.4),
+                ),
+                const SizedBox(height: 16),
                 if (data.reputation != null) ...[
                   Text(
                     '${data.reputation!.level.emoji} ${data.reputation!.level.label}',

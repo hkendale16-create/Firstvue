@@ -10,6 +10,7 @@ import '../services/monetization_products_service.dart';
 import '../services/stripe_billing_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'business_campaign_dashboard_screen.dart';
+import 'create_bounty_draft_sheet.dart';
 import 'my_businesses_screen.dart';
 
 class BusinessGrowthScreen extends StatefulWidget {
@@ -462,6 +463,22 @@ class _BusinessGrowthScreenState extends State<BusinessGrowthScreen> {
                       foregroundColor: FirstVueColors.teal,
                       side: BorderSide(
                         color: FirstVueColors.teal.withValues(alpha: 0.5),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => CreateBountyDraftSheet.show(context),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Draft a creator bounty'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: FirstVueColors.gold,
+                      side: BorderSide(
+                        color: FirstVueColors.gold.withValues(alpha: 0.5),
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
