@@ -9,8 +9,8 @@ Use this checklist on a Mac, then upload with Transporter or Xcode.
 |-------|--------|
 | Bundle ID | `com.FirstVue` |
 | Display name | FIRSTVUE |
-| Version | `1.0.2` (from `pubspec.yaml`) |
-| Build | `3` |
+| Version | `1.0.7` (from `pubspec.yaml`) |
+| Build | `8` |
 | Support email | `hkendale16@gmail.com` |
 | Privacy | `https://firstvue.app/privacy.html` |
 | Marketing URL | `https://firstvue.app` |
@@ -43,17 +43,15 @@ Developer portal → Identifiers → **+** → App IDs → App
 ```bash
 git clone https://github.com/hkendale16-create/Firstvue.git
 cd Firstvue
-git checkout cursor/google-console-setup-2f4a   # or main after merge
+git checkout cursor/store-release-1-0-7-4635   # or main after merge
 flutter pub get
 cd ios && pod install && cd ..
-flutter build ipa --release \
-  --dart-define=FIRSTVUE_OAUTH_GOOGLE=true \
-  --dart-define=FIRSTVUE_GOOGLE_WEB_CLIENT_ID=232279155211-ilegqngbve9fr34o5ajjq7396c48n877.apps.googleusercontent.com
+./scripts/build-ios-ipa.sh
 ```
 
 Output (typical):
 
-`build/ios/ipa/*.ipa`
+`build/ios/ipa/FirstVue-1.0.7+8.ipa`
 
 Or in Xcode:
 
