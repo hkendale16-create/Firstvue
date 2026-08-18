@@ -17,8 +17,18 @@ import '../widgets/smart_address_field.dart';
 import '../auth/ensure_signed_in.dart';
 import 'rentals_screen.dart';
 
-class BusinessOwnerStartScreen extends StatelessWidget {
+class BusinessOwnerStartScreen extends StatefulWidget {
   const BusinessOwnerStartScreen({super.key});
+
+  static const tabLabels = ['Claim', 'Add', 'Rental'];
+
+  @override
+  State<BusinessOwnerStartScreen> createState() =>
+      _BusinessOwnerStartScreenState();
+}
+
+class _BusinessOwnerStartScreenState extends State<BusinessOwnerStartScreen> {
+  int _tab = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -42,70 +52,126 @@ class BusinessOwnerStartScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+      body: Column(
         children: [
-          Text(
-            'Choose how you want to get on FirstVue. Nothing is public until it is approved.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: context.fv.secondaryText, height: 1.45),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+            child: Text(
+              'Choose how you want to get on FirstVue. Nothing is public until it is approved.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: context.fv.secondaryText, height: 1.45),
+            ),
           ),
-          const SizedBox(height: 20),
-          _WorkflowOption(
-            icon: Icons.storefront_outlined,
-            title: 'Claim a listed business',
-            description: 'Match your shop, then send a claim for review.',
-            accent: FirstVueColors.gold,
-            actionLabel: 'Claim',
-            filledAction: false,
-            onTap: () {
-              Navigator.push(
-                context,
-                FirstVuePageRoute(
-                  builder: (_) => const _ClaimBusinessScreen(),
-                ),
-              );
+          _BusinessToolsTabBar(
+            selectedIndex: _tab,
+            onSelected: (index) => setState(() => _tab = index),
+          ),
+          Expanded(
+            child: switch (_tab) {
+              0 => const _ClaimBusinessList(),
+              1 => _WorkflowTabPane(
+                icon: Icons.note_add_outlined,
+                title: 'Add an unlisted business',
+                description:
+                    'Submit required details for FirstVue verification.',
+                accent: FirstVueColors.teal,
+                actionLabel: 'Start',
+                filledAction: true,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    FirstVuePageRoute(
+                      builder: (_) => const _NewBusinessScreen(),
+                    ),
+                  );
+                },
+              ),
+              _ => _WorkflowTabPane(
+                icon: Icons.key_outlined,
+                title: 'Post an available rental',
+                description: 'Booth or suite with weekly or monthly pricing.',
+                accent: FirstVueColors.gold,
+                actionLabel: 'Create',
+                filledAction: false,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    FirstVuePageRoute(builder: (_) => const PostRentalScreen()),
+                  );
+                },
+              ),
             },
           ),
-          const SizedBox(height: 14),
-          _WorkflowOption(
-            icon: Icons.note_add_outlined,
-            title: 'Add an unlisted business',
-            description: 'Submit required details for FirstVue verification.',
-            accent: FirstVueColors.teal,
-            actionLabel: 'Start',
-            filledAction: true,
-            onTap: () {
-              Navigator.push(
-                context,
-                FirstVuePageRoute(builder: (_) => const _NewBusinessScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 14),
-          _WorkflowOption(
-            icon: Icons.key_outlined,
-            title: 'Post an available rental',
-            description: 'Booth or suite with weekly or monthly pricing.',
-            accent: FirstVueColors.gold,
-            actionLabel: 'Create',
-            filledAction: false,
-            onTap: () {
-              Navigator.push(
-                context,
-                FirstVuePageRoute(builder: (_) => const PostRentalScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 20),
-          const _WorkflowNotice(),
         ],
       ),
     );
   }
 }
 
-class _WorkflowOption extends StatelessWidget {
+class _BusinessToolsTabBar extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  const _BusinessToolsTabBar({
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fv = context.fv;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: Row(
+        children: [
+          for (var i = 0; i < BusinessOwnerStartScreen.tabLabels.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => onSelected(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: i == selectedIndex
+                        ? FirstVueColors.gold
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: i == selectedIndex
+                          ? FirstVueColors.gold
+                          : fv.borderSubtle,
+                    ),
+                    boxShadow: i == selectedIndex
+                        ? FirstVueColors.goldGlow(intensity: 0.45)
+                        : const [],
+                  ),
+                  child: Text(
+                    BusinessOwnerStartScreen.tabLabels[i],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: i == selectedIndex
+                          ? FirstVueColors.onGold
+                          : fv.secondaryText,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Full-width stacked pane so labels never collapse to one character on web.
+class _WorkflowTabPane extends StatelessWidget {
   final IconData icon;
   final String title;
   final String description;
@@ -114,7 +180,7 @@ class _WorkflowOption extends StatelessWidget {
   final bool filledAction;
   final VoidCallback onTap;
 
-  const _WorkflowOption({
+  const _WorkflowTabPane({
     required this.icon,
     required this.title,
     required this.description,
@@ -127,91 +193,84 @@ class _WorkflowOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fv = context.fv;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.all(16),
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      children: [
+        DecoratedBox(
           decoration: BoxDecoration(
             color: fv.surface,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: fv.borderSubtle),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: .04),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: accent,
-                  shape: BoxShape.circle,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 22),
+                  ),
                 ),
-                child: Icon(icon, color: Colors.white, size: 22),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: fv.primaryText,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        color: fv.secondaryText,
-                        height: 1.35,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 16),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: fv.primaryText,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                    height: 1.3,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              filledAction
-                  ? FilledButton(
-                      onPressed: onTap,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: accent,
-                        foregroundColor: Colors.white,
-                        visualDensity: VisualDensity.compact,
+                const SizedBox(height: 8),
+                Text(
+                  description,
+                  style: TextStyle(
+                    color: fv.secondaryText,
+                    height: 1.45,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                filledAction
+                    ? FilledButton(
+                        onPressed: onTap,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: accent,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(46),
+                        ),
+                        child: Text(actionLabel),
+                      )
+                    : OutlinedButton(
+                        onPressed: onTap,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: FirstVueColors.gold,
+                          side: const BorderSide(color: FirstVueColors.gold),
+                          minimumSize: const Size.fromHeight(46),
+                        ),
+                        child: Text(actionLabel),
                       ),
-                      child: Text(actionLabel),
-                    )
-                  : OutlinedButton(
-                      onPressed: onTap,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: FirstVueColors.gold,
-                        side: const BorderSide(color: FirstVueColors.gold),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      child: Text(actionLabel),
-                    ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
+        const SizedBox(height: 16),
+        const _WorkflowNotice(),
+      ],
     );
   }
 }
 
-class _ClaimBusinessScreen extends StatelessWidget {
-  const _ClaimBusinessScreen();
+class _ClaimBusinessList extends StatelessWidget {
+  const _ClaimBusinessList();
 
   static const _businesses = [
     ('Elite Fade Studio', 'Atlanta, GA 30303'),
@@ -221,55 +280,64 @@ class _ClaimBusinessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        surfaceTintColor: Colors.transparent,
-        title: const Text('CLAIM A BUSINESS'),
-      ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(20),
-        itemCount: _businesses.length + 1,
-        separatorBuilder: (_, _) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return const Padding(
-              padding: EdgeInsets.only(bottom: 8),
-              child: Text(
-                'Choose the prototype listing that best matches your business.',
-                style: TextStyle(height: 1.4),
+    final fv = context.fv;
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      itemCount: _businesses.length + 2,
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Claim a listed business',
+                style: TextStyle(
+                  color: fv.primaryText,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Match your shop, then send a claim for review.',
+                style: TextStyle(color: fv.secondaryText, height: 1.4),
+              ),
+            ],
+          );
+        }
+
+        if (index == _businesses.length + 1) {
+          return const _WorkflowNotice();
+        }
+
+        final business = _businesses[index - 1];
+        return ListTile(
+          tileColor: fv.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(17),
+            side: BorderSide(color: fv.borderSubtle),
+          ),
+          leading: const Icon(Icons.storefront_outlined, color: FirstVueColors.gold),
+          title: Text(
+            business.$1,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          subtitle: Text(business.$2),
+          trailing: Icon(Icons.chevron_right, color: fv.mutedIcon),
+          onTap: () {
+            Navigator.push(
+              context,
+              FirstVuePageRoute(
+                builder: (_) => _VerificationFormScreen(
+                  businessName: business.$1,
+                  isClaim: true,
+                ),
               ),
             );
-          }
-
-          final business = _businesses[index - 1];
-          return ListTile(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(17),
-              side: BorderSide(color: Colors.black12),
-            ),
-            leading: const Icon(Icons.content_cut, color: Color(0xFFD8B56A)),
-            title: Text(
-              business.$1,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text(business.$2),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                FirstVuePageRoute(
-                  builder: (_) => _VerificationFormScreen(
-                    businessName: business.$1,
-                    isClaim: true,
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
+          },
+        );
+      },
     );
   }
 }
