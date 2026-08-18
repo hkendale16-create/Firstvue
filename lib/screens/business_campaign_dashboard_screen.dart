@@ -6,6 +6,7 @@ import '../services/bounty_service.dart';
 import '../services/monetization_flags_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'bounty_detail_screen.dart';
+import 'create_bounty_draft_sheet.dart';
 
 class BusinessCampaignDashboardScreen extends StatefulWidget {
   const BusinessCampaignDashboardScreen({super.key});
@@ -48,6 +49,14 @@ class _BusinessCampaignDashboardScreenState
         title: const Text('Campaign dashboard'),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         actions: [
+          IconButton(
+            tooltip: 'Draft a bounty',
+            onPressed: () async {
+              final created = await CreateBountyDraftSheet.show(context);
+              if (created != null && mounted) await _refresh();
+            },
+            icon: const Icon(Icons.add),
+          ),
           IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
         ],
       ),
@@ -86,7 +95,19 @@ class _BusinessCampaignDashboardScreenState
                   'Create draft VUE Bounty campaigns from your business tools. Metrics only show data FirstVue actually tracks — never manufactured ROI.',
                   style: TextStyle(color: palette.secondaryText, height: 1.45),
                 ),
-                if (!data.fundingEnabled) ...[
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () async {
+                      final created = await CreateBountyDraftSheet.show(context);
+                      if (created != null && mounted) await _refresh();
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: FirstVueColors.gold,
+                      foregroundColor: Colors.black,
+                    ),
+                    child: const Text('Draft a bounty'),
+                  ),
+                  if (!data.fundingEnabled) ...[
                   const SizedBox(height: 16),
                   Text(
                     'Real funding is disabled until a payment provider is approved.',

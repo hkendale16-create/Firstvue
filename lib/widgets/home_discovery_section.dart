@@ -21,6 +21,7 @@ import 'feed_comments_sheet.dart';
 import 'firstvue_share_sheet.dart';
 import 'growth_prompt.dart';
 import 'home_communities_section.dart';
+import 'earn_on_firstvue_card.dart';
 import 'social_chrome.dart';
 import 'whats_on_near_you.dart';
 
@@ -131,6 +132,8 @@ class _HomeDiscoverySectionState extends State<HomeDiscoverySection>
           refreshToken: widget.refreshToken,
           onSetCity: widget.onSetCity,
         ),
+        const EarnOnFirstVueCard(),
+        const SizedBox(height: 16),
         SocialPillTabs(
           labels: _labels,
           selectedIndex: _tabController.index,

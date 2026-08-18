@@ -21,6 +21,7 @@ import '../services/user_preferences_service.dart';
 import '../theme/firstvue_theme.dart';
 import '../utils/new_label.dart';
 import '../utils/scroll_load_more_gate.dart';
+import '../widgets/earn_on_firstvue_card.dart';
 import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/firstvue_section_tip.dart';
 import '../widgets/growth_prompt.dart';
@@ -309,6 +310,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
               subtitle:
                   'People are personal profiles. Businesses, events, and places are entities — each tab stays separate.',
             ),
+            const SizedBox(height: 12),
+            const EarnOnFirstVueCard(),
             if (FeatureFlags.vueBountiesEnabled) ...[
               const SizedBox(height: 12),
               Align(

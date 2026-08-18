@@ -16,6 +16,7 @@ import '../screens/bounty_discovery_screen.dart';
 import '../screens/business_campaign_dashboard_screen.dart';
 import '../screens/business_growth_screen.dart';
 import '../screens/creator_earnings_screen.dart';
+import '../screens/earn_on_firstvue_screen.dart';
 import '../screens/help_build_firstvue_screen.dart';
 import '../screens/join_firstvue_screen.dart';
 import '../screens/legal_policy_screen.dart';
@@ -229,6 +230,14 @@ class _SettingsShellScreenState extends State<SettingsShellScreen> {
                 children: [
                   _SettingsTile(
                     icon: Icons.payments_outlined,
+                    title: 'Earn on FirstVue',
+                    subtitle: 'Creators cover nights · venues hire and grow',
+                    onTap: user == null
+                        ? _handleAccount
+                        : () => _open(const EarnOnFirstVueScreen()),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.workspace_premium_outlined,
                     title: 'Monetization & Plans',
                     subtitle: FeatureFlags.effectiveBusinessSubscriptions
                         ? 'Business plans, boosts & analytics'

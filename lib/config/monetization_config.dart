@@ -188,6 +188,28 @@ class MonetizationProductCatalog {
   }
 }
 
+/// Two-sided marketplace defaults. Checkout and payouts stay flag-gated.
+class EarnMarketplace {
+  EarnMarketplace._();
+
+  static const platformFeeBps = 1500;
+  static const creatorKeepPercent = 85;
+  static const platformKeepPercent = 15;
+
+  static const payoutPresetCents = <int>[2500, 5000, 10000];
+
+  static int poolCents({
+    required int perCreatorCents,
+    required int creatorsWanted,
+  }) {
+    if (perCreatorCents <= 0 || creatorsWanted <= 0) return 0;
+    return perCreatorCents * creatorsWanted;
+  }
+
+  static String splitLabel() =>
+      'Creators keep $creatorKeepPercent% · FirstVue $platformKeepPercent%';
+}
+
 /// Integer minor-unit money helpers. Never use floating-point for accounting.
 class MoneyCents {
   MoneyCents._();
