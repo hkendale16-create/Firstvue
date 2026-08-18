@@ -64,6 +64,15 @@ If you are stuck in Workflow Editor: scroll to **Publish updates to user devices
 
 Do not create a Shorebird account for this TestFlight upload.
 
+If Codemagic says **No matching profiles found for bundle identifier "com.FirstVue" and distribution type "app_store"**, the yaml workflow is running, but Codemagic has no **App Store** provisioning profile for `com.FirstVue`. Create the Apple files once (Windows browser, no Mac), then fetch them into Codemagic.
+
+1. Create the App ID: [Identifiers](https://developer.apple.com/account/resources/identifiers/add/bundleId) → App → Explicit → `com.FirstVue` → Register. Skip if it already exists: [Identifiers list](https://developer.apple.com/account/resources/identifiers/list).
+2. In Codemagic: [Teams → Code signing identities](https://codemagic.io/teams) → **iOS certificates** → **Generate certificate** → type **Apple Distribution** → API key **FirstVue** → Create. [Signing docs](https://docs.codemagic.io/yaml-code-signing/signing-ios/)
+3. Create the profile: [Profiles → +](https://developer.apple.com/account/resources/profiles/add) → **App Store Connect** → **App Store** → App ID `com.FirstVue` → select the Distribution certificate from step 2 → name `FirstVue App Store` → Generate.
+4. Back in Codemagic → **iOS provisioning profiles** → **Fetch profiles** → under **App Store profiles** select `com.FirstVue` → reference name `firstvue_app_store` → Download selected.
+5. Confirm the profile row shows bundle `com.FirstVue`, type App Store, and a green check on the certificate.
+6. Re-run workflow **iOS App Store 1.0.8**.
+
 ### D. Install on iPhone
 
 1. App Store Connect → **TestFlight** → add `hkendale16@gmail.com` as an internal tester.
