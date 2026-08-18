@@ -40,6 +40,30 @@ void main() {
       );
     });
 
+    test('professional requires city and state only', () {
+      expect(
+        EntityAddressRequirements.validate(
+          const AddressResult(city: 'Atlanta', state: 'GA'),
+          kind: EntityAddressKind.professional,
+        ),
+        isNull,
+      );
+      expect(
+        EntityAddressRequirements.validate(
+          const AddressResult(state: 'GA'),
+          kind: EntityAddressKind.professional,
+        ),
+        contains('city'),
+      );
+      expect(
+        EntityAddressRequirements.validate(
+          const AddressResult(city: 'Atlanta'),
+          kind: EntityAddressKind.professional,
+        ),
+        contains('state'),
+      );
+    });
+
     test('community requires city and state', () {
       expect(
         EntityAddressRequirements.validateCityState(

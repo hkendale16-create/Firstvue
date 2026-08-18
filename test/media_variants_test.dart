@@ -30,7 +30,7 @@ void main() {
     );
   });
 
-  test('candidatePaths prefers explicit thumb then derived then full', () {
+  test('candidatePaths tries full object before derived variants', () {
     expect(
       MediaVariants.candidatePaths(
         'user/photo.jpg',
@@ -39,9 +39,9 @@ void main() {
       ),
       [
         'user/photo_thumb.jpg',
+        'user/photo.jpg',
         'user/photo__v_feed.jpg',
         'user/photo__v_thumb.jpg',
-        'user/photo.jpg',
       ],
     );
   });

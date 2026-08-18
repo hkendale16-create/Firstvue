@@ -102,13 +102,13 @@ class MediaVariants {
     }
 
     add(explicitThumbnailPath);
+    add(full);
     if (preferred != MediaVariant.full) {
       add(pathFor(full, preferred));
       if (preferred == MediaVariant.feed) {
         add(pathFor(full, MediaVariant.thumb));
       }
     }
-    add(full);
     return out;
   }
 
