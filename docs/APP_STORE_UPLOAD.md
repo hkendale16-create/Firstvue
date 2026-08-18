@@ -45,8 +45,17 @@ Use **Codemagic** in the browser. This repo already has `codemagic.yaml`.
 2. Teams → **Integrations** → **App Store Connect** → add the API key.  
    Name the integration **FirstVue** (must match `codemagic.yaml`).
 3. Teams → **Code signing identities** → iOS → fetch/create certificates for `com.FirstVue` (App Store distribution). Codemagic can create the certs so you never need Keychain on a Mac.
-4. Start build → workflow **iOS App Store 1.0.8**.
-5. When it finishes, the `.ipa` is already uploaded to **TestFlight**.
+4. At the top of the app, switch from **Workflow Editor** to **codemagic.yaml**.
+5. Start build → workflow **iOS App Store 1.0.8**.
+6. When it finishes, the `.ipa` is already uploaded to **TestFlight**.
+
+If Codemagic says **Shorebird token is required**, you are in the visual Workflow Editor with Shorebird turned on. FirstVue does **not** use Shorebird. Do not create a Shorebird account for this upload.
+
+1. Open the app at [codemagic.io/apps](https://codemagic.io/apps).
+2. Switch configuration to **codemagic.yaml** (not Workflow Editor).
+3. Or in Workflow Editor: **Publish updates to user devices using Shorebird** → **Disabled** / leave it off, then save.
+
+Shorebird is optional code-push. This TestFlight IPA is a normal `flutter build ipa`.
 
 ### D. Install on iPhone
 
