@@ -1,12 +1,17 @@
 # FirstVue — iOS App Store / TestFlight from Windows (no Mac required).
 # Codemagic rents a Mac, signs the IPA, and uploads it to App Store Connect.
 #
+# In Codemagic: pick branch cursor/store-release-1-0-8-4635 →
+# “Check for configuration file” → start workflow “iOS App Store 1.0.8”.
+# Do NOT use the Flutter Workflow Editor. It asks for a Shorebird token;
+# this app does not use Shorebird.
+#
 # Setup (once) is in docs/APP_STORE_UPLOAD.md → “Windows (no Mac)”.
 # Name the App Store Connect integration **FirstVue** so it matches below.
 
 workflows:
   ios-app-store:
-    name: iOS App Store 1.0.7
+    name: iOS App Store 1.0.8
     instance_type: mac_mini_m2
     max_build_duration: 60
     integrations:
@@ -23,17 +28,26 @@ workflows:
         script: |
           xcode-project use-profiles \
             --custom-export-options='{"testFlightInternalTestingOnly": true}'
+      - name: Repair Xcode filenames
+        script: |
+          bash scripts/fix-xcode-filenames.sh
       - name: Flutter packages
         script: |
+          flutter config --no-enable-swift-package-manager
           flutter pub get
       - name: CocoaPods
         script: |
           find . -name Podfile -execdir pod install \;
       - name: Build App Store IPA
         script: |
+          # Disable SPM in this same step. Mapbox's iOS SDK is pulled via
+          # CocoaPods; Flutter's experimental SPM migrator needs Runner.xcscheme
+          # and fails CI if that file is missing or misnamed.
+          flutter config --no-enable-swift-package-manager
+          bash scripts/fix-xcode-filenames.sh
           flutter build ipa --release \
-            --build-name=1.0.7 \
-            --build-number=8 \
+            --build-name=1.0.8 \
+            --build-number=9 \
             --export-options-plist=/Users/builder/export_options.plist \
             --dart-define=FIRSTVUE_OAUTH_GOOGLE=true \
             --dart-define=FIRSTVUE_GOOGLE_WEB_CLIENT_ID=232279155211-ilegqngbve9fr34o5ajjq7396c48n877.apps.googleusercontent.com

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Build a signed App Store IPA for FirstVue 1.0.7 (build 8).
+# Build a signed App Store IPA for FirstVue 1.0.8 (build 9).
 # Must run on macOS with Xcode, CocoaPods, and an Apple Developer team.
 set -euo pipefail
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "This script must run on a Mac. Linux cannot produce an App Store .ipa." >&2
+  echo "From Windows, start Codemagic workflow \"iOS App Store 1.0.8\" instead." >&2
   exit 1
 fi
 
@@ -16,12 +17,14 @@ if ! command -v flutter >/dev/null 2>&1; then
   exit 1
 fi
 
+flutter config --no-enable-swift-package-manager
+bash "$ROOT_DIR/scripts/fix-xcode-filenames.sh"
 flutter pub get
 (cd ios && pod install)
 
 flutter build ipa --release \
-  --build-name=1.0.7 \
-  --build-number=8 \
+  --build-name=1.0.8 \
+  --build-number=9 \
   --dart-define=FIRSTVUE_OAUTH_GOOGLE=true \
   --dart-define=FIRSTVUE_GOOGLE_WEB_CLIENT_ID=232279155211-ilegqngbve9fr34o5ajjq7396c48n877.apps.googleusercontent.com
 
@@ -31,7 +34,7 @@ if [[ -z "$IPA" ]]; then
   exit 1
 fi
 
-DEST="$ROOT_DIR/build/ios/ipa/FirstVue-1.0.7+8.ipa"
+DEST="$ROOT_DIR/build/ios/ipa/FirstVue-1.0.8+9.ipa"
 if [[ "$IPA" != "$DEST" ]]; then
   cp "$IPA" "$DEST"
 fi

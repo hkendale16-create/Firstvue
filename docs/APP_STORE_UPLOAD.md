@@ -8,8 +8,8 @@ Use **Codemagic** in the browser. This repo already has `codemagic.yaml`.
 |-------|--------|
 | Bundle ID | `com.FirstVue` |
 | Display name | FIRSTVUE |
-| Version | `1.0.7` |
-| Build | `8` |
+| Version | `1.0.8` |
+| Build | `9` |
 | Support email | `hkendale16@gmail.com` |
 | Privacy | `https://firstvue.app/privacy.html` |
 | Marketing URL | `https://firstvue.app` |
@@ -45,8 +45,40 @@ Use **Codemagic** in the browser. This repo already has `codemagic.yaml`.
 2. Teams → **Integrations** → **App Store Connect** → add the API key.  
    Name the integration **FirstVue** (must match `codemagic.yaml`).
 3. Teams → **Code signing identities** → iOS → fetch/create certificates for `com.FirstVue` (App Store distribution). Codemagic can create the certs so you never need Keychain on a Mac.
-4. Start build → workflow **iOS App Store 1.0.7**.
-5. When it finishes, the `.ipa` is already uploaded to **TestFlight**.
+4. Open the app, pick branch **`cursor/store-release-1-0-8-4635`**, click **Check for configuration file**.
+5. Switch the page from **Workflow Editor** to **codemagic.yaml**.
+6. **Start new build** → workflow **iOS App Store 1.0.8** (this screen has no Shorebird field).
+7. When it finishes, the `.ipa` is already uploaded to **TestFlight**.
+
+If Codemagic says **Shorebird token is required**, cancel that Start dialog. You are on the Flutter **Workflow Editor**, not the yaml workflow. FirstVue does **not** use Shorebird. A Shorebird token will not help — that mode runs `shorebird release` and this repo has no `shorebird.yaml`.
+
+**Fix (do this instead of pasting a token):**
+
+1. [codemagic.io/apps](https://codemagic.io/apps) → **Firstvue**
+2. Branch dropdown → `cursor/store-release-1-0-8-4635`
+3. **Check for configuration file** (docs: [scan for yaml](https://docs.codemagic.io/yaml-quick-start/building-a-flutter-app/))
+4. Top of the page: **codemagic.yaml** (leave Workflow Editor)
+5. Start **iOS App Store 1.0.8**
+
+If you are stuck in Workflow Editor: scroll to **Publish updates to user devices using Shorebird** and set it to **disabled** (not Release, not Patch). Save. Then the token field goes away.
+
+Do not create a Shorebird account for this TestFlight upload.
+
+If Codemagic says **No matching profiles found for bundle identifier "com.FirstVue" and distribution type "app_store"**, the yaml workflow is running, but Codemagic has no **App Store** provisioning profile for `com.FirstVue`. Create the Apple files once (Windows browser, no Mac), then fetch them into Codemagic.
+
+1. Create the App ID: [Identifiers](https://developer.apple.com/account/resources/identifiers/add/bundleId) → App → Explicit → `com.FirstVue` → Register. Skip if it already exists: [Identifiers list](https://developer.apple.com/account/resources/identifiers/list).
+2. In Codemagic: [Teams → Code signing identities](https://codemagic.io/teams) → **iOS certificates** → **Generate certificate** → type **Apple Distribution** → API key **FirstVue** → Create. [Signing docs](https://docs.codemagic.io/yaml-code-signing/signing-ios/)
+3. Create the profile: [Profiles → +](https://developer.apple.com/account/resources/profiles/add) → **App Store Connect** → **App Store** → App ID `com.FirstVue` → select the Distribution certificate from step 2 → name `FirstVue App Store` → Generate.
+4. Back in Codemagic → **iOS provisioning profiles** → **Fetch profiles** → under **App Store profiles** select `com.FirstVue` → reference name `firstvue_app_store` → Download selected.
+5. Confirm the profile row shows bundle `com.FirstVue`, type App Store, and a green check on the certificate.
+6. Re-run workflow **iOS App Store 1.0.8**.
+
+If **Build App Store IPA** fails with **Unable to get scheme file for Runner** (and logs show Mapbox Swift packages fetching from GitHub), that was a repo bug: Xcode files were stored as `*.xml` (`Runner.xcscheme.xml`, `contents.xcworkspacedata.xml`, `Main.storyboard.xml`). Flutter only looks for `Runner.xcscheme`. Do **not** retry the failed build.
+
+1. Wait until GitHub branch `cursor/store-release-1-0-8-4635` shows a commit that mentions repairing Xcode filenames / Runner scheme.
+2. In Codemagic, pick that branch again → **Check for configuration file** → **codemagic.yaml**.
+3. **Start new build** → **iOS App Store 1.0.8**.
+4. The IPA step must **not** fetch `mapbox-maps-ios.git`. If it still does, the build is not on the new commit.
 
 ### D. Install on iPhone
 
@@ -59,8 +91,9 @@ Fill name, screenshots, privacy, then **Submit for Review** when you are ready. 
 
 **What’s New (paste):**
 ```
-Business Tools now uses Claim, Add, and Rental tabs.
-Settings search, Home post photos, and city / profile save fixes.
+VUE photos and videos open in a full-screen reel.
+Swipe, like, comment, share, and save without leaving the viewer.
+Business Tools tabs and Settings / Home fixes.
 ```
 
 ---
@@ -111,10 +144,10 @@ FirstVue is for users 13 and older. Payments are not enabled in this trial build
 ```bash
 git clone https://github.com/hkendale16-create/Firstvue.git
 cd Firstvue
-git checkout cursor/store-release-1-0-7-4635
+git checkout cursor/store-release-1-0-8-4635
 ./scripts/build-ios-ipa.sh
 ```
 
-Then upload `build/ios/ipa/FirstVue-1.0.7+8.ipa` with **Transporter**.
+Then upload `build/ios/ipa/FirstVue-1.0.8+9.ipa` with **Transporter**.
 
 Replace `TEAMID` in `web/.well-known/apple-app-site-association` with your Apple Team ID after you create the App ID.
