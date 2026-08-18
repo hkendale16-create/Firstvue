@@ -1059,23 +1059,29 @@ class SocialFeedCard extends StatelessWidget {
                     body,
                     style: TextStyle(color: fv.primaryText, height: 1.35),
                   ),
-                  if (imageUrl != null || assetImage != null) ...[
+                  if (imageUrl != null && imageUrl!.trim().isNotEmpty) ...[
                     const SizedBox(height: 10),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(14),
                       child: AspectRatio(
                         aspectRatio: 16 / 10,
-                        child: imageUrl != null
-                            ? NetworkPhoto(
-                                url: imageUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) => Image.asset(
-                                  assetImage ??
-                                      'assets/images/explore_salons.jpg',
-                                  fit: BoxFit.cover,
-                                ),
-                              )
-                            : Image.asset(assetImage!, fit: BoxFit.cover),
+                        child: NetworkPhoto(
+                          url: imageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Image.asset(
+                            assetImage ?? 'assets/images/explore_salons.jpg',
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ] else if (assetImage != null) ...[
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: AspectRatio(
+                        aspectRatio: 16 / 10,
+                        child: Image.asset(assetImage!, fit: BoxFit.cover),
                       ),
                     ),
                   ],

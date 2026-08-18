@@ -87,7 +87,9 @@ class CommunityNewsMediaService {
       final items = <CommunityNewsMediaItem>[];
       for (final row in entry.value) {
         try {
-          items.add(await _rowToItem(row, entry.key));
+          final item = await _rowToItem(row, entry.key);
+          if (item.signedUrl.trim().isEmpty) continue;
+          items.add(item);
         } catch (_) {
           // Skip broken media rows so text posts still load.
         }
@@ -107,30 +109,63 @@ class CommunityNewsMediaService {
     final provider = MediaStorageProvider.parse(
       row['storage_provider'] as String?,
     );
-    final bucket = MediaBucket.fromId(row['storage_bucket'] as String?);
+    final declaredBucket = MediaBucket.fromId(row['storage_bucket'] as String?);
     final mediaType = (row['media_type'] as String?) ?? 'image';
-    final signedUrl = mediaType == 'video'
-        ? await MediaStorageService.createReadUrl(
-            bucket: bucket,
-            path: path,
-            provider: provider,
-            context: {'post_id': postId},
-          )
-        : await MediaVariantUploader.createDisplayUrl(
-            bucket: bucket,
-            storagePath: path,
-            provider: provider,
-            context: {'post_id': postId},
-            preferred: MediaVariant.feed,
-          );
+    final signedUrl = await _signReadUrl(
+      bucket: declaredBucket,
+      path: path,
+      provider: provider,
+      postId: postId,
+      mediaType: mediaType,
+    );
     return CommunityNewsMediaItem(
       id: row['id'] as String,
       storagePath: path,
       storageProvider: provider,
       mediaType: mediaType,
-      storageBucket: bucket,
-      signedUrl: signedUrl,
+      storageBucket: signedUrl.bucket,
+      signedUrl: signedUrl.url,
     );
+  }
+
+  /// Sign the stored object. Uploads can land in profile-media when the
+  /// community-news bucket is unavailable, so try sibling social buckets
+  /// instead of returning an empty URL (broken tiles on Home).
+  static Future<({String url, MediaBucket bucket})> _signReadUrl({
+    required MediaBucket bucket,
+    required String path,
+    required MediaStorageProvider provider,
+    required String postId,
+    required String mediaType,
+  }) async {
+    final tried = <MediaBucket>{};
+    final candidates = <MediaBucket>[
+      bucket,
+      MediaBucket.communityNews,
+      MediaBucket.profile,
+      MediaBucket.business,
+    ];
+    for (final next in candidates) {
+      if (!tried.add(next)) continue;
+      final url = mediaType == 'video'
+          ? await MediaStorageService.createReadUrl(
+              bucket: next,
+              path: path,
+              provider: provider,
+              context: {'post_id': postId},
+            )
+          : await MediaVariantUploader.createDisplayUrl(
+              bucket: next,
+              storagePath: path,
+              provider: provider,
+              context: {'post_id': postId},
+              preferred: MediaVariant.full,
+            );
+      if (url.trim().isNotEmpty) {
+        return (url: url, bucket: next);
+      }
+    }
+    return (url: '', bucket: bucket);
   }
 
   static Future<List<CommunityNewsMediaItem>> uploadMedia({

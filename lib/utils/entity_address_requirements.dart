@@ -35,6 +35,16 @@ class EntityAddressRequirements {
   }) {
     if (!isRequired(kind)) return null;
 
+    // Individual professionals are city-based (mobile / suite renters).
+    // Street is optional — the editor labels it that way.
+    if (kind == EntityAddressKind.professional) {
+      return validateCityState(
+        city: address.city,
+        state: address.state,
+        kind: kind,
+      );
+    }
+
     final street = address.street.trim();
     final city = address.city.trim();
     final state = address.state.trim();

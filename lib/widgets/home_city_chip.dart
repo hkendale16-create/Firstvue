@@ -208,7 +208,7 @@ class HomeCityChipState extends State<HomeCityChip> {
                             labelText: 'City',
                             labelStyle: TextStyle(color: fv.secondaryText),
                             helperText: cityEnabled
-                                ? 'Select a city for $selectedState'
+                                ? 'Search or type any city in $selectedState'
                                 : 'Select a state first',
                             helperStyle: TextStyle(
                               color: fv.tertiaryText,
@@ -318,11 +318,17 @@ class HomeCityChipState extends State<HomeCityChip> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             final q = filter.trim().toLowerCase();
-            final visible = q.isEmpty
+            final catalog = q.isEmpty
                 ? cities
                 : cities
                     .where((c) => c.toLowerCase().contains(q))
                     .toList(growable: false);
+            final typed = filter.trim();
+            final hasExact = catalog.any(
+              (c) => c.toLowerCase() == q,
+            );
+            final showCustom = typed.length >= 2 && !hasExact;
+            final visibleCount = catalog.length + (showCustom ? 1 : 0);
             return SafeArea(
               child: SizedBox(
                 height: MediaQuery.of(sheetContext).size.height * 0.62,
@@ -376,17 +382,39 @@ class HomeCityChipState extends State<HomeCityChip> {
                     ),
                     const SizedBox(height: 8),
                     Expanded(
-                      child: visible.isEmpty
+                      child: visibleCount == 0
                           ? Center(
                               child: Text(
-                                'No cities match that search.',
+                                'Type a city name to use it.',
                                 style: TextStyle(color: fv.secondaryText),
                               ),
                             )
                           : ListView.builder(
-                              itemCount: visible.length,
+                              itemCount: visibleCount,
                               itemBuilder: (context, index) {
-                                final city = visible[index];
+                                if (showCustom && index == 0) {
+                                  final label = UsLocations.titleCaseCity(typed);
+                                  return ListTile(
+                                    leading: const Icon(
+                                      Icons.edit_location_alt_outlined,
+                                      color: FirstVueColors.teal,
+                                    ),
+                                    title: Text(
+                                      'Use “$label”',
+                                      style: TextStyle(color: fv.primaryText),
+                                    ),
+                                    subtitle: Text(
+                                      'Save this city even if it is not listed',
+                                      style: TextStyle(
+                                        color: fv.secondaryText,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    onTap: () =>
+                                        Navigator.pop(sheetContext, label),
+                                  );
+                                }
+                                final city = catalog[showCustom ? index - 1 : index];
                                 final selected = city == current;
                                 return ListTile(
                                   title: Text(

@@ -155,15 +155,24 @@ class ProfessionalProfilesService {
 
     final trimmedAddress = addressLine1?.trim();
     final trimmedPlaceId = placeId?.trim();
+    final now = DateTime.now().toIso8601String();
 
-    await _client.from('profiles').upsert({
-      'id': user.id,
-      'display_name': displayName,
-      'account_type': 'professional',
-      'updated_at': DateTime.now().toIso8601String(),
-    });
+    try {
+      await _client.from('profiles').upsert({
+        'id': user.id,
+        'display_name': displayName,
+        'updated_at': now,
+      });
+    } catch (_) {}
 
-    await _client.from('professional_profiles').upsert({
+    try {
+      await _client.from('profiles').update({
+        'account_type': 'professional',
+        'updated_at': now,
+      }).eq('id', user.id);
+    } catch (_) {}
+
+    final core = <String, dynamic>{
       'profile_id': user.id,
       'display_name': displayName,
       'professional_type': type.value,
@@ -176,12 +185,80 @@ class ProfessionalProfilesService {
       'availability_note': availabilityNote,
       'booking_url': bookingUrl,
       'status': 'pending',
-      'address_line_1': ?trimmedAddress,
+      'updated_at': now,
+    };
+    final withAddress = <String, dynamic>{
+      ...core,
+      if (trimmedAddress != null && trimmedAddress.isNotEmpty)
+        'address_line_1': trimmedAddress,
       'latitude': ?latitude,
       'longitude': ?longitude,
-      'place_id': ?trimmedPlaceId,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, onConflict: 'profile_id');
+      if (trimmedPlaceId != null && trimmedPlaceId.isNotEmpty)
+        'place_id': trimmedPlaceId,
+    };
+
+    try {
+      await _upsertProfessional(withAddress);
+    } on PostgrestException catch (error) {
+      if (_isUnknownColumn(error)) {
+        await _upsertProfessional(core);
+        return;
+      }
+      try {
+        final existing = await fetchMine();
+        if (existing != null) {
+          await _client
+              .from('professional_profiles')
+              .update(withAddress)
+              .eq('profile_id', user.id);
+        } else {
+          await _client.from('professional_profiles').insert(withAddress);
+        }
+      } catch (retryError) {
+        throw StateError(_friendlySaveError(retryError, fallback: error));
+      }
+    }
+  }
+
+  static Future<void> _upsertProfessional(Map<String, dynamic> row) {
+    return _client.from('professional_profiles').upsert(
+      row,
+      onConflict: 'profile_id',
+    );
+  }
+
+  static bool _isUnknownColumn(PostgrestException error) {
+    final text = '${error.message} ${error.details ?? ''}'.toLowerCase();
+    return text.contains('does not exist') ||
+        text.contains('schema cache') ||
+        (text.contains('could not find the') && text.contains('column'));
+  }
+
+  static String _friendlySaveError(
+    Object error, {
+    PostgrestException? fallback,
+  }) {
+    final source = error is PostgrestException ? error : fallback;
+    final message = (source?.message ?? error.toString()).toLowerCase();
+    if (message.contains('sign in') || message.contains('jwt')) {
+      return 'Sign in again to save your professional profile.';
+    }
+    if (message.contains('row-level security') ||
+        message.contains('violates row-level') ||
+        message.contains('42501')) {
+      return 'This profile cannot be updated right now. If it is already '
+          'approved, wait for review after resubmitting.';
+    }
+    if (message.contains('display_name') && message.contains('check')) {
+      return 'Use a display name between 2 and 120 characters.';
+    }
+    if (message.contains('duplicate') || message.contains('unique')) {
+      return 'A professional profile already exists for this account.';
+    }
+    if (source?.message != null && source!.message.trim().isNotEmpty) {
+      return 'Unable to save your profile. ${source.message}';
+    }
+    return 'Unable to save your profile. Please try again.';
   }
 
   static Future<bool> isAdmin() => AdminAuthService.isAdmin();

@@ -160,9 +160,13 @@ class _ProfessionalProfileEditorScreenState
       if (!mounted) return;
       _showMessage('Profile submitted for FIRSTVUE approval.');
       await _load();
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
-      _showMessage('Unable to save your profile. Please try again.');
+      _showMessage(
+        error is StateError
+            ? error.message
+            : 'Unable to save your profile. Please try again.',
+      );
     } finally {
       if (mounted) setState(() => _saving = false);
     }

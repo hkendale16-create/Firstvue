@@ -44,7 +44,7 @@ class UsLocations {
     'Delaware': ['Wilmington', 'Dover', 'Newark'],
     'District of Columbia': ['Washington'],
     'Florida': ['Jacksonville', 'Miami', 'Tampa', 'Orlando', 'St. Petersburg', 'Hialeah', 'Tallahassee', 'Fort Lauderdale', 'Port St. Lucie', 'Cape Coral', 'Pembroke Pines', 'Hollywood', 'Miramar', 'Gainesville', 'Coral Springs', 'Clearwater', 'Miami Gardens', 'Palm Bay', 'Pompano Beach', 'West Palm Beach', 'Lakeland', 'Davie'],
-    'Georgia': ['Atlanta', 'Augusta', 'Columbus', 'Macon', 'Savannah', 'Athens', 'Sandy Springs', 'Roswell', 'Johns Creek', 'Albany'],
+    'Georgia': ['Atlanta', 'Augusta', 'Columbus', 'Macon', 'Savannah', 'Athens', 'Sandy Springs', 'Roswell', 'Johns Creek', 'Albany', 'Decatur', 'Marietta', 'Alpharetta', 'Smyrna', 'Brookhaven', 'Dunwoody', 'East Point', 'College Park', 'Union City', 'Douglasville', 'Kennesaw', 'Acworth', 'Woodstock', 'Canton', 'Gainesville', 'Lawrenceville', 'Duluth', 'Suwanee', 'Buford', 'Snellville', 'Lilburn', 'Norcross', 'Peachtree Corners', 'Tucker', 'Stone Mountain', 'Lithonia', 'Conyers', 'Covington', 'McDonough', 'Stockbridge', 'Jonesboro', 'Fayetteville', 'Peachtree City', 'Newnan', 'Carrollton', 'Villa Rica', 'Dallas', 'Powder Springs', 'Mableton', 'Austell', 'Forest Park', 'Riverdale', 'Griffin', 'Rome', 'Dalton', 'Valdosta', 'Warner Robins', 'Hinesville', 'Statesboro', 'Chamblee', 'Doraville', 'Clarkston', 'Avondale Estates', 'Fairburn', 'Tyrone', 'Milton', 'Cumming', 'Flowery Branch', 'Braselton', 'Winder', 'Monroe', 'Loganville', 'Dacula', 'Grayson', 'Auburn', 'Hoschton', 'Jefferson', 'Commerce', 'Toccoa', 'Cornelia', 'Cleveland', 'Dahlonega', 'Blue Ridge', 'Ellijay', 'Calhoun', 'Cartersville', 'Adairsville', 'Cedartown', 'Rockmart', 'Hiram', 'Lithia Springs', 'Vinings', 'Stonecrest', 'Redan', 'Panthersville'],
     'Hawaii': ['Honolulu', 'Hilo', 'Kailua'],
     'Idaho': ['Boise', 'Meridian', 'Nampa', 'Idaho Falls'],
     'Illinois': ['Chicago', 'Aurora', 'Naperville', 'Joliet', 'Rockford', 'Elgin', 'Peoria', 'Springfield'],
@@ -113,8 +113,32 @@ class UsLocations {
         .toList();
   }
 
+  /// Title-case a typed city so custom entries look like catalog names.
+  static String titleCaseCity(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return trimmed;
+    return trimmed
+        .split(RegExp(r'\s+'))
+        .map((part) {
+          if (part.isEmpty) return part;
+          if (part.contains('-')) {
+            return part.split('-').map(_capCityWord).join('-');
+          }
+          return _capCityWord(part);
+        })
+        .join(' ');
+  }
+
+  static String _capCityWord(String word) {
+    if (word.isEmpty) return word;
+    final lower = word.toLowerCase();
+    if (lower == 'of' || lower == 'the' || lower == 'and') return lower;
+    return '${lower[0].toUpperCase()}${lower.substring(1)}';
+  }
+
   /// When [stateHint] is set, only that state's cities are searched and the
   /// 3-character minimum is waived so the dependent city dropdown can open.
+  /// Unknown typed names are appended so every US city can be saved.
   static List<String> matchingCities(String query, {String? stateHint}) {
     final pool = citiesForState(stateHint);
     final source = pool.isNotEmpty ? pool : cities;
@@ -122,12 +146,21 @@ class UsLocations {
     final scoped = pool.isNotEmpty;
     if (!scoped && normalized.length < minQueryLength) return const [];
     if (scoped && normalized.isEmpty) {
-      return source.take(60).toList(growable: false);
+      return List<String>.from(source, growable: false);
     }
-    return source
+    final matches = source
         .where((city) => city.toLowerCase().contains(normalized))
-        .take(scoped ? 40 : 8)
         .toList();
+    if (normalized.length >= 2) {
+      final exact = matches.any((city) => city.toLowerCase() == normalized);
+      if (!exact) {
+        matches.add(titleCaseCity(query));
+      }
+    }
+    if (!scoped) {
+      return matches.take(12).toList(growable: false);
+    }
+    return matches;
   }
 
   static List<String> matchingAddresses(String query) {

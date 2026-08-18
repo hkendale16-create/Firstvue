@@ -29,6 +29,8 @@ void main() {
     test('citiesForState returns only that state pool', () {
       final ga = UsLocations.citiesForState('Georgia');
       expect(ga, contains('Atlanta'));
+      expect(ga, contains('Marietta'));
+      expect(ga, contains('Decatur'));
       expect(ga, isNot(contains('Phoenix')));
     });
 
@@ -46,6 +48,31 @@ void main() {
     test('matchingCities without state still requires min length', () {
       expect(UsLocations.matchingCities('ph'), isEmpty);
       expect(UsLocations.matchingCities('pho'), isNotEmpty);
+    });
+
+    test('matchingCities does not cap an in-state catalog', () {
+      final all = UsLocations.citiesForState('California');
+      final opened = UsLocations.matchingCities('', stateHint: 'California');
+      expect(opened, hasLength(all.length));
+      expect(opened.length, greaterThan(60));
+    });
+
+    test('matchingCities includes a typed city that is not in the catalog', () {
+      final results = UsLocations.matchingCities(
+        'powder springs',
+        stateHint: 'Georgia',
+      );
+      expect(results, contains('Powder Springs'));
+
+      final custom = UsLocations.matchingCities(
+        'tybee island',
+        stateHint: 'Georgia',
+      );
+      expect(custom, contains('Tybee Island'));
+    });
+
+    test('titleCaseCity formats custom entries', () {
+      expect(UsLocations.titleCaseCity('east point'), 'East Point');
     });
 
     test('every state in UsLocations.states has a city catalog entry', () {

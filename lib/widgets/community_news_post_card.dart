@@ -826,7 +826,36 @@ class _MediaTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tileWidth = fullWidth ? double.infinity : (width ?? height);
+    final tileWidth = fullWidth ? null : (width ?? height);
+
+    Widget mediaChild = item.isVideo
+        ? FeedAutoplayVideo(
+            url: item.signedUrl,
+            width: tileWidth ?? double.infinity,
+            height: height,
+            borderRadius: BorderRadius.circular(fullWidth ? 0 : 12),
+            onTap: () => openFullScreenVideoPlayer(
+              context,
+              url: item.signedUrl,
+              title: 'VIDEO',
+              loop: true,
+            ),
+          )
+        : SignedMediaThumbnail(
+            url: item.signedUrl,
+            isVideo: false,
+            width: tileWidth,
+            height: height,
+            borderRadius: BorderRadius.circular(fullWidth ? 0 : 12),
+          );
+
+    if (fullWidth) {
+      mediaChild = SizedBox(
+        width: double.infinity,
+        height: height,
+        child: mediaChild,
+      );
+    }
 
     return GestureDetector(
       onTap: () {
@@ -870,26 +899,7 @@ class _MediaTile extends StatelessWidget {
             ],
           );
         },
-        child: item.isVideo
-            ? FeedAutoplayVideo(
-                url: item.signedUrl,
-                width: tileWidth,
-                height: height,
-                borderRadius: BorderRadius.circular(fullWidth ? 0 : 12),
-                onTap: () => openFullScreenVideoPlayer(
-                  context,
-                  url: item.signedUrl,
-                  title: 'VIDEO',
-                  loop: true,
-                ),
-              )
-            : SignedMediaThumbnail(
-                url: item.signedUrl,
-                isVideo: false,
-                width: tileWidth,
-                height: height,
-                borderRadius: BorderRadius.circular(fullWidth ? 0 : 12),
-              ),
+        child: mediaChild,
       ),
     );
   }

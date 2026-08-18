@@ -97,8 +97,9 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
     final selected = await showFvSearchablePicker(
       context: context,
       title: 'Preferred city',
-      searchHint: 'Search cities in $_state',
+      searchHint: 'Search or type any city in $_state',
       selectedId: _city,
+      allowCustom: true,
       options: [
         for (final city in cities)
           FvPickerOption(
@@ -111,7 +112,9 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
     if (!mounted) return;
     setState(() {
       _cityFocused = false;
-      if (selected != null) _city = selected.id;
+      if (selected != null) {
+        _city = UsLocations.titleCaseCity(selected.id);
+      }
     });
   }
 
@@ -211,7 +214,7 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                   value: _city,
                   hint: _state == null
                       ? 'Select a state first'
-                      : 'Select city in $_state',
+                      : 'Search or type any city in $_state',
                   icon: Icons.location_city_outlined,
                   focused: _cityFocused,
                   onTap: _pickCity,

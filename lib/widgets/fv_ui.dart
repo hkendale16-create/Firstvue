@@ -265,6 +265,7 @@ Future<FvPickerOption?> showFvSearchablePicker({
   String? selectedId,
   String searchHint = 'Search',
   String continueLabel = 'Continue',
+  bool allowCustom = false,
 }) async {
   final wide = MediaQuery.sizeOf(context).width >= 720;
   if (wide) {
@@ -285,6 +286,7 @@ Future<FvPickerOption?> showFvSearchablePicker({
             searchHint: searchHint,
             continueLabel: continueLabel,
             asSheet: false,
+            allowCustom: allowCustom,
           ),
         ),
       ),
@@ -309,6 +311,7 @@ Future<FvPickerOption?> showFvSearchablePicker({
           searchHint: searchHint,
           continueLabel: continueLabel,
           asSheet: true,
+          allowCustom: allowCustom,
         ),
       ),
     ),
@@ -322,6 +325,7 @@ class _FvSearchablePickerBody extends StatefulWidget {
   final String searchHint;
   final String continueLabel;
   final bool asSheet;
+  final bool allowCustom;
 
   const _FvSearchablePickerBody({
     required this.title,
@@ -330,6 +334,7 @@ class _FvSearchablePickerBody extends StatefulWidget {
     required this.searchHint,
     required this.continueLabel,
     required this.asSheet,
+    this.allowCustom = false,
   });
 
   @override
@@ -368,10 +373,45 @@ class _FvSearchablePickerBodyState extends State<_FvSearchablePickerBody> {
         .toList();
   }
 
+  FvPickerOption? get _customOption {
+    if (!widget.allowCustom) return null;
+    final typed = _filter.trim();
+    if (typed.length < 2) return null;
+    final exists = widget.options.any(
+      (o) =>
+          o.label.toLowerCase() == typed.toLowerCase() ||
+          o.id.toLowerCase() == typed.toLowerCase(),
+    );
+    if (exists) return null;
+    return FvPickerOption(
+      id: typed,
+      label: 'Use “$typed”',
+      subtitle: 'Save this even if it is not in the list',
+      icon: Icons.edit_location_alt_outlined,
+    );
+  }
+
+  List<FvPickerOption> get _visibleOptions {
+    final custom = _customOption;
+    if (custom == null) return _filtered;
+    return [custom, ..._filtered];
+  }
+
+  FvPickerOption? _optionById(String id) {
+    for (final option in _visibleOptions) {
+      if (option.id == id) return option;
+    }
+    for (final option in widget.options) {
+      if (option.id == id) return option;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final fv = context.fv;
-    final items = _filtered;
+    final items = _visibleOptions;
+    final custom = _customOption;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -487,7 +527,16 @@ class _FvSearchablePickerBodyState extends State<_FvSearchablePickerBody> {
                               color: FirstVueColors.gold,
                             )
                           : null,
-                      onTap: () => setState(() => _selectedId = option.id),
+                      onTap: () {
+                        if (custom != null && option.id == custom.id) {
+                          Navigator.pop(
+                            context,
+                            FvPickerOption(id: option.id, label: option.id),
+                          );
+                          return;
+                        }
+                        setState(() => _selectedId = option.id);
+                      },
                     );
                   },
                 ),
@@ -502,10 +551,12 @@ class _FvSearchablePickerBodyState extends State<_FvSearchablePickerBody> {
                 onPressed: _selectedId == null
                     ? null
                     : () {
-                        final match = widget.options.firstWhere(
-                          (o) => o.id == _selectedId,
-                        );
-                        Navigator.pop(context, match);
+                        final match = _optionById(_selectedId!);
+                        if (match == null) return;
+                        final customMatch = custom != null && match.id == custom.id
+                            ? FvPickerOption(id: match.id, label: match.id)
+                            : match;
+                        Navigator.pop(context, customMatch);
                       },
                 style: FilledButton.styleFrom(
                   backgroundColor: FirstVueColors.gold,

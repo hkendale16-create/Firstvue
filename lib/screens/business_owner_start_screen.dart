@@ -42,67 +42,64 @@ class BusinessOwnerStartScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Showcase your business. Submit for verification — nothing is public until approved.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: context.fv.secondaryText, height: 1.5),
-            ),
-            const SizedBox(height: 28),
-            _WorkflowOption(
-              icon: Icons.storefront_outlined,
-              title: 'Claim a listed business',
-              description: 'Match your shop, then send a claim for review.',
-              accent: FirstVueColors.gold,
-              actionLabel: 'Claim',
-              filledAction: false,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  FirstVuePageRoute(
-                    builder: (_) => const _ClaimBusinessScreen(),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 14),
-            _WorkflowOption(
-              icon: Icons.note_add_outlined,
-              title: 'Add an unlisted business',
-              description: 'Submit required details for FirstVue verification.',
-              accent: FirstVueColors.teal,
-              actionLabel: 'Start',
-              filledAction: true,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  FirstVuePageRoute(builder: (_) => const _NewBusinessScreen()),
-                );
-              },
-            ),
-            const SizedBox(height: 14),
-            _WorkflowOption(
-              icon: Icons.key_outlined,
-              title: 'Post an available rental',
-              description: 'Booth or suite with weekly or monthly pricing.',
-              accent: FirstVueColors.gold,
-              actionLabel: 'Create',
-              filledAction: false,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  FirstVuePageRoute(builder: (_) => const PostRentalScreen()),
-                );
-              },
-            ),
-            const Spacer(),
-            const _WorkflowNotice(),
-          ],
-        ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+        children: [
+          Text(
+            'Choose how you want to get on FirstVue. Nothing is public until it is approved.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: context.fv.secondaryText, height: 1.45),
+          ),
+          const SizedBox(height: 20),
+          _WorkflowOption(
+            icon: Icons.storefront_outlined,
+            title: 'Claim a listed business',
+            description: 'Match your shop, then send a claim for review.',
+            accent: FirstVueColors.gold,
+            actionLabel: 'Claim',
+            filledAction: false,
+            onTap: () {
+              Navigator.push(
+                context,
+                FirstVuePageRoute(
+                  builder: (_) => const _ClaimBusinessScreen(),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          _WorkflowOption(
+            icon: Icons.note_add_outlined,
+            title: 'Add an unlisted business',
+            description: 'Submit required details for FirstVue verification.',
+            accent: FirstVueColors.teal,
+            actionLabel: 'Start',
+            filledAction: true,
+            onTap: () {
+              Navigator.push(
+                context,
+                FirstVuePageRoute(builder: (_) => const _NewBusinessScreen()),
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          _WorkflowOption(
+            icon: Icons.key_outlined,
+            title: 'Post an available rental',
+            description: 'Booth or suite with weekly or monthly pricing.',
+            accent: FirstVueColors.gold,
+            actionLabel: 'Create',
+            filledAction: false,
+            onTap: () {
+              Navigator.push(
+                context,
+                FirstVuePageRoute(builder: (_) => const PostRentalScreen()),
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+          const _WorkflowNotice(),
+        ],
       ),
     );
   }
@@ -1072,7 +1069,7 @@ class _WorkflowNotice extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: const Text(
-        'New business submissions are saved as pending. Claiming a mock prototype listing remains a local demonstration until external business matching is added.',
+        'Submissions stay pending until FirstVue reviews them.',
         style: TextStyle(height: 1.4, fontSize: 12),
       ),
     );
