@@ -5,6 +5,7 @@ import '../theme/firstvue_theme.dart';
 import 'explore_grid_video.dart';
 import 'network_photo.dart';
 import 'social_chrome.dart';
+import 'vue_trending_badge.dart';
 
 /// Cover-cropped VUE mosaic tile. Photos never show a video glyph.
 /// Video tiles play a muted 3-second loop via [ExploreGridVideo].
@@ -70,6 +71,15 @@ class VueMosaicTile extends StatelessWidget {
             ),
             if (item.liveNow)
               const Positioned(top: 8, left: 8, child: _LiveNowBadge()),
+            if (item.trendingRank != null && item.trendingRank! > 0)
+              Positioned(
+                top: item.liveNow ? 32 : 8,
+                left: 8,
+                child: VueTrendingBadge(
+                  rank: item.trendingRank!,
+                  compact: !featured,
+                ),
+              ),
             if (showVideoChrome)
               Positioned(
                 top: 8,

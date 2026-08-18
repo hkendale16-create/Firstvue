@@ -46,6 +46,13 @@ class FeedComment {
   }
 }
 
+class FeedCommentPage {
+  final List<FeedComment> comments;
+  final bool hasMore;
+
+  const FeedCommentPage({required this.comments, required this.hasMore});
+}
+
 class FeedCommentsService {
   FeedCommentsService._();
 
@@ -96,15 +103,65 @@ class FeedCommentsService {
   }
 
   static Future<List<FeedComment>> fetchComments(String mediaId) async {
+    final page = await fetchCommentPage(mediaId, limit: 200);
+    return page.comments;
+  }
+
+  /// Newest top-level comments first, plus replies for that page.
+  static Future<FeedCommentPage> fetchCommentPage(
+    String mediaId, {
+    int limit = 20,
+    DateTime? before,
+  }) async {
     final me = _client.auth.currentUser?.id;
+    final pageSize = limit.clamp(1, 50);
     try {
-      final rows = await _client
+      var query = _client
           .from('feed_comments')
           .select('id, body, created_at, author_id, parent_id')
           .eq('media_id', mediaId)
-          .order('created_at', ascending: true);
+          .isFilter('parent_id', null);
+      if (before != null) {
+        query = query.lt('created_at', before.toUtc().toIso8601String());
+      }
+      final topRows = await query
+          .order('created_at', ascending: false)
+          .limit(pageSize + 1);
 
-      return await _mapCommentRows(rows, me: me);
+      final hasMore = topRows.length > pageSize;
+      final pageRows = hasMore
+          ? topRows.take(pageSize).toList()
+          : List<dynamic>.from(topRows);
+      if (pageRows.isEmpty) {
+        return const FeedCommentPage(comments: [], hasMore: false);
+      }
+
+      final topIds = pageRows.map((row) => row['id'] as String).toList();
+      List<dynamic> replyRows = const [];
+      try {
+        replyRows = await _client
+            .from('feed_comments')
+            .select('id, body, created_at, author_id, parent_id')
+            .eq('media_id', mediaId)
+            .inFilter('parent_id', topIds)
+            .order('created_at', ascending: true);
+      } catch (_) {}
+
+      final nestedIds = replyRows.map((row) => row['id'] as String).toList();
+      if (nestedIds.isNotEmpty) {
+        try {
+          final nested = await _client
+              .from('feed_comments')
+              .select('id, body, created_at, author_id, parent_id')
+              .eq('media_id', mediaId)
+              .inFilter('parent_id', nestedIds)
+              .order('created_at', ascending: true);
+          replyRows = [...replyRows, ...nested];
+        } catch (_) {}
+      }
+
+      final mapped = await _mapCommentRows([...pageRows, ...replyRows], me: me);
+      return FeedCommentPage(comments: mapped, hasMore: hasMore);
     } on PostgrestException catch (error) {
       throw FeedCommentsException(userMessageForError(error), cause: error);
     }

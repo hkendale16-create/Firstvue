@@ -11,6 +11,10 @@ DiscoveryFeedItem _item({
   bool liveNow = false,
   VueFeedSource source = VueFeedSource.business,
   String? newsPostId,
+  int likes = 0,
+  int comments = 0,
+  int recentLikes = 0,
+  DateTime? createdAt,
 }) {
   return DiscoveryFeedItem(
     mediaId: id,
@@ -30,6 +34,10 @@ DiscoveryFeedItem _item({
     liveNow: liveNow,
     source: source,
     newsPostId: newsPostId,
+    likesCount: likes,
+    commentsCount: comments,
+    recentLikesCount: recentLikes,
+    createdAt: createdAt,
   );
 }
 
@@ -82,5 +90,37 @@ void main() {
     expect(n1, n2);
     expect(n1, inInclusiveRange(0.0, 1.0));
     expect(n1, isNot(equals(n3)));
+  });
+
+  test('trending ranks prefer recent engagement over lifetime views', () {
+    final now = DateTime(2026, 8, 18);
+    final viralNew = _item(
+      id: 'new',
+      recentLikes: 40,
+      likes: 40,
+      createdAt: now.subtract(const Duration(hours: 2)),
+    );
+    final oldViews = _item(
+      id: 'old',
+      likes: 5,
+      createdAt: now.subtract(const Duration(days: 20)),
+    );
+    final ranked = assignVueTrendingRanks(
+      [oldViews, viralNew],
+      now: now,
+    );
+    expect(ranked.firstWhere((e) => e.mediaId == 'new').trendingRank, 1);
+    expect(ranked.firstWhere((e) => e.mediaId == 'old').trendingRank, 2);
+  });
+
+  test('assignVueTrendingRanks keeps original mosaic order', () {
+    final items = [
+      _item(id: 'a', likes: 1),
+      _item(id: 'b', likes: 50, recentLikes: 50),
+      _item(id: 'c', likes: 8),
+    ];
+    final ranked = assignVueTrendingRanks(items);
+    expect(ranked.map((e) => e.mediaId).toList(), ['a', 'b', 'c']);
+    expect(ranked[1].trendingRank, 1);
   });
 }

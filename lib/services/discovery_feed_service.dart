@@ -6,6 +6,7 @@ import 'media_type_helpers.dart';
 import 'media_variant_uploader.dart';
 import 'media_variants.dart';
 import 'profile_cards.dart';
+import 'vue_engagement_service.dart';
 import 'vue_feed_ranking.dart';
 
 enum VueFeedSource { business, member }
@@ -34,6 +35,23 @@ class DiscoveryFeedItem {
   final List<String> services;
   final VueFeedSource source;
   final String? newsPostId;
+  final DateTime? createdAt;
+  final int likesCount;
+  final int commentsCount;
+  final int sharesCount;
+  final int savesCount;
+  final int viewsCount;
+  final int playsCount;
+  final int recentLikesCount;
+  final int recentCommentsCount;
+  final int recentSharesCount;
+  final int recentSavesCount;
+  final int recentViewsCount;
+  final int recentPlaysCount;
+  final int? trendingRank;
+  final bool userHasLiked;
+  final bool userHasSaved;
+  final String? myReactionType;
 
   const DiscoveryFeedItem({
     required this.mediaId,
@@ -57,6 +75,23 @@ class DiscoveryFeedItem {
     required this.services,
     this.source = VueFeedSource.business,
     this.newsPostId,
+    this.createdAt,
+    this.likesCount = 0,
+    this.commentsCount = 0,
+    this.sharesCount = 0,
+    this.savesCount = 0,
+    this.viewsCount = 0,
+    this.playsCount = 0,
+    this.recentLikesCount = 0,
+    this.recentCommentsCount = 0,
+    this.recentSharesCount = 0,
+    this.recentSavesCount = 0,
+    this.recentViewsCount = 0,
+    this.recentPlaysCount = 0,
+    this.trendingRank,
+    this.userHasLiked = false,
+    this.userHasSaved = false,
+    this.myReactionType,
   });
 
   bool get isVideo =>
@@ -66,6 +101,90 @@ class DiscoveryFeedItem {
   bool get isMember => source == VueFeedSource.member;
 
   String get creatorId => ownerId.isNotEmpty ? ownerId : businessId;
+
+  String get commentsMediaId =>
+      newsPostId != null ? 'news-post:$newsPostId' : mediaId;
+
+  String get displayHandle {
+    final raw = handle?.trim();
+    if (raw != null && raw.isNotEmpty) {
+      return raw.startsWith('@') ? raw : '@$raw';
+    }
+    final name = isMember ? ownerName : businessName;
+    if (name.trim().isEmpty) return '@firstvue';
+    final slug = name
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '')
+        .clampLength(24);
+    return '@${slug.isEmpty ? 'firstvue' : slug}';
+  }
+
+  DiscoveryFeedItem copyWith({
+    String? caption,
+    int? likesCount,
+    int? commentsCount,
+    int? sharesCount,
+    int? savesCount,
+    int? viewsCount,
+    int? playsCount,
+    int? recentLikesCount,
+    int? recentCommentsCount,
+    int? recentSharesCount,
+    int? recentSavesCount,
+    int? recentViewsCount,
+    int? recentPlaysCount,
+    int? trendingRank,
+    bool? userHasLiked,
+    bool? userHasSaved,
+    String? myReactionType,
+    bool clearReaction = false,
+  }) {
+    return DiscoveryFeedItem(
+      mediaId: mediaId,
+      businessId: businessId,
+      businessName: businessName,
+      businessType: businessType,
+      ownerId: ownerId,
+      ownerName: ownerName,
+      caption: caption ?? this.caption,
+      mediaType: mediaType,
+      mediaUrl: mediaUrl,
+      thumbnailUrl: thumbnailUrl,
+      avatarUrl: avatarUrl,
+      durationLabel: durationLabel,
+      locationLabel: locationLabel,
+      handle: handle,
+      verified: verified,
+      sponsored: sponsored,
+      liveNow: liveNow,
+      rating: rating,
+      services: services,
+      source: source,
+      newsPostId: newsPostId,
+      createdAt: createdAt,
+      likesCount: likesCount ?? this.likesCount,
+      commentsCount: commentsCount ?? this.commentsCount,
+      sharesCount: sharesCount ?? this.sharesCount,
+      savesCount: savesCount ?? this.savesCount,
+      viewsCount: viewsCount ?? this.viewsCount,
+      playsCount: playsCount ?? this.playsCount,
+      recentLikesCount: recentLikesCount ?? this.recentLikesCount,
+      recentCommentsCount: recentCommentsCount ?? this.recentCommentsCount,
+      recentSharesCount: recentSharesCount ?? this.recentSharesCount,
+      recentSavesCount: recentSavesCount ?? this.recentSavesCount,
+      recentViewsCount: recentViewsCount ?? this.recentViewsCount,
+      recentPlaysCount: recentPlaysCount ?? this.recentPlaysCount,
+      trendingRank: trendingRank ?? this.trendingRank,
+      userHasLiked: userHasLiked ?? this.userHasLiked,
+      userHasSaved: userHasSaved ?? this.userHasSaved,
+      myReactionType:
+          clearReaction ? null : (myReactionType ?? this.myReactionType),
+    );
+  }
+}
+
+extension on String {
+  String clampLength(int max) => length <= max ? this : substring(0, max);
 }
 
 class DiscoveryFeedService {
@@ -129,11 +248,15 @@ class DiscoveryFeedService {
     );
 
     // `offset` kept for API compatibility; exclude set is the real cursor.
+    final List<DiscoveryFeedItem> page;
     if (offset > 0 && excludeMediaIds.isEmpty) {
       if (offset >= ranked.length) return const [];
-      return ranked.skip(offset).take(limit).toList();
+      page = ranked.skip(offset).take(limit).toList();
+    } else {
+      page = ranked.take(limit).toList();
     }
-    return ranked.take(limit).toList();
+    if (page.isEmpty) return page;
+    return VueEngagementService.hydrate(page);
   }
 
   /// Prefer first occurrence of each media id (stable across pages).
@@ -155,9 +278,9 @@ class DiscoveryFeedService {
       // Drop popularity/demand from the mosaic select — ranking uses rating /
       // verified / sponsored only; unused columns inflate every VUE page.
       const fullSelect =
-          'id, storage_path, storage_provider, thumbnail_path, media_type, caption, duration_seconds, businesses!inner(id, name, business_type, created_by, verification_status, average_rating, services, status, business_locations(city, state))';
+          'id, storage_path, storage_provider, thumbnail_path, media_type, caption, duration_seconds, created_at, businesses!inner(id, name, business_type, created_by, verification_status, average_rating, services, status, business_locations(city, state))';
       const fallbackSelect =
-          'id, storage_path, storage_provider, thumbnail_path, media_type, caption, businesses!inner(id, name, business_type, created_by, verification_status, average_rating, services, status)';
+          'id, storage_path, storage_provider, thumbnail_path, media_type, caption, created_at, businesses!inner(id, name, business_type, created_by, verification_status, average_rating, services, status)';
       List<dynamic> rows;
       final rangeEnd = offset + limit - 1;
       try {
@@ -287,6 +410,7 @@ class DiscoveryFeedService {
               services: List<String>.from(
                 (business['services'] as List?) ?? const [],
               ),
+              createdAt: DateTime.tryParse(row['created_at'] as String? ?? ''),
             );
           } catch (_) {
             return null;
@@ -307,7 +431,7 @@ class DiscoveryFeedService {
       final rows = await _client
           .from('profile_media')
           .select(
-            'id, storage_path, storage_provider, media_type, featured_for_trending, media_role, profile_id',
+            'id, storage_path, storage_provider, media_type, featured_for_trending, media_role, profile_id, caption, created_at',
           )
           .order('featured_for_trending', ascending: false)
           .order('created_at', ascending: false)
@@ -365,11 +489,14 @@ class DiscoveryFeedService {
               return null;
             }
             final role = (row['media_role'] as String?) ?? 'gallery';
-            final caption = switch (role) {
-              'avatar' => 'Profile photo',
-              'cover' => 'Cover photo',
-              _ => 'Member spotlight on Vue',
-            };
+            final storedCaption = (row['caption'] as String?)?.trim() ?? '';
+            final caption = storedCaption.isNotEmpty
+                ? storedCaption
+                : switch (role) {
+                    'avatar' => 'Profile photo',
+                    'cover' => 'Cover photo',
+                    _ => 'Member spotlight on Vue',
+                  };
 
             return DiscoveryFeedItem(
               mediaId: row['id'] as String,
@@ -388,6 +515,7 @@ class DiscoveryFeedService {
               rating: 0,
               services: const [],
               source: VueFeedSource.member,
+              createdAt: DateTime.tryParse(row['created_at'] as String? ?? ''),
             );
           } catch (_) {
             return null;
@@ -545,6 +673,7 @@ class DiscoveryFeedService {
             services: const [],
             source: VueFeedSource.member,
             newsPostId: row['id'] as String,
+            createdAt: DateTime.tryParse(row['created_at'] as String? ?? ''),
           ),
         );
       }

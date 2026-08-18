@@ -3,6 +3,7 @@ import '../theme/firstvue_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/feed_comments_service.dart';
+import '../services/profile_activity_service.dart';
 import '../auth/ensure_signed_in.dart';
 import '../utils/app_environment.dart';
 import 'social_rich_text.dart';
@@ -11,21 +12,26 @@ import 'social_text_field.dart';
 class FeedCommentsSheet extends StatefulWidget {
   final String mediaId;
   final String businessName;
+  final ValueChanged<int>? onCountDelta;
 
   const FeedCommentsSheet({
     super.key,
     required this.mediaId,
     required this.businessName,
+    this.onCountDelta,
   });
 
   static Future<void> show(
     BuildContext context, {
     required String mediaId,
     required String businessName,
+    Color? barrierColor,
+    ValueChanged<int>? onCountDelta,
   }) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      barrierColor: barrierColor,
       backgroundColor: Theme.of(context).extension<FirstVuePalette>()?.surface ?? FirstVueColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -33,6 +39,7 @@ class FeedCommentsSheet extends StatefulWidget {
       builder: (_) => FeedCommentsSheet(
         mediaId: mediaId,
         businessName: businessName,
+        onCountDelta: onCountDelta,
       ),
     );
   }
@@ -46,6 +53,8 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
   final _inputFocus = FocusNode();
   List<FeedComment> _comments = const [];
   bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
   bool _loadFailed = false;
   String? _loadErrorMessage;
   bool _posting = false;
@@ -115,25 +124,55 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
         .subscribe();
   }
 
-  Future<void> _loadComments() async {
-    setState(() {
-      _loading = true;
-      _loadFailed = false;
-      _loadErrorMessage = null;
-    });
+  Future<void> _loadComments({bool reset = true}) async {
+    if (reset) {
+      setState(() {
+        _loading = true;
+        _loadFailed = false;
+        _loadErrorMessage = null;
+      });
+    } else {
+      if (_loadingMore || !_hasMore) return;
+      _loadingMore = true;
+      setState(() {});
+    }
     try {
-      final comments = await FeedCommentsService.fetchComments(widget.mediaId);
+      DateTime? before;
+      if (!reset) {
+        final topLevel = _comments.where((c) => c.parentId == null).toList();
+        if (topLevel.isNotEmpty) {
+          topLevel.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          before = topLevel.first.createdAt;
+        }
+      }
+      final page = await FeedCommentsService.fetchCommentPage(
+        widget.mediaId,
+        before: before,
+      );
       if (!mounted) return;
       setState(() {
-        _comments = comments;
+        if (reset) {
+          _comments = page.comments;
+        } else {
+          final seen = _comments.map((c) => c.id).toSet();
+          _comments = [
+            ..._comments,
+            ...page.comments.where((c) => seen.add(c.id)),
+          ];
+        }
+        _hasMore = page.hasMore;
         _loading = false;
+        _loadingMore = false;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _loadFailed = true;
-        _loadErrorMessage = FeedCommentsService.userMessageForError(error);
+        _loadingMore = false;
+        if (reset && _comments.isEmpty) {
+          _loadFailed = true;
+          _loadErrorMessage = FeedCommentsService.userMessageForError(error);
+        }
       });
     }
   }
@@ -164,6 +203,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
           _comments = [..._comments, newComment];
         }
       });
+      widget.onCountDelta?.call(1);
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -213,7 +253,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
                 style: TextStyle(color: context.fv.secondaryText),
               ),
               const SizedBox(height: 12),
-              TextButton(onPressed: _loadComments, child: const Text('Try again')),
+              TextButton(onPressed: () => _loadComments(), child: const Text('Try again')),
             ],
           ),
         ),
@@ -242,12 +282,31 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
       );
     }
 
-    return ListView.separated(
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification.metrics.extentAfter < 240) {
+          _loadComments(reset: false);
+        }
+        return false;
+      },
+      child: ListView.separated(
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-      itemCount: topLevel.length,
+      itemCount: topLevel.length + (_loadingMore ? 1 : 0),
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
+        if (index >= topLevel.length) {
+          return const Padding(
+            padding: EdgeInsets.all(12),
+            child: Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
         final comment = topLevel[index];
         final replies = _repliesFor(_comments, comment.id);
         return _CommentBlock(
@@ -259,6 +318,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
           onReplyToReply: _startReply,
         );
       },
+    ),
     );
   }
 
@@ -454,6 +514,10 @@ class _CommentTile extends StatelessWidget {
               fontWeight: FontWeight.w600,
               fontSize: 12,
             ),
+          ),
+          Text(
+            ProfileActivityService.formatRelativeTime(comment.createdAt),
+            style: TextStyle(color: context.fv.tertiaryText, fontSize: 11),
           ),
           const SizedBox(height: 4),
           SocialRichText(

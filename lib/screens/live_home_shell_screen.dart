@@ -5,10 +5,9 @@ import 'package:flutter/material.dart';
 import '../config/feature_flags.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../screens/firstvue_business_profile_screen.dart';
-import '../screens/full_screen_media_viewer.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../screens/people_to_follow_screen.dart';
-import '../screens/post_detail_screen.dart';
+import '../screens/vue_reel_viewer.dart';
 import '../services/discovery_feed_service.dart';
 import '../services/live_home_service.dart';
 import '../services/live_realtime_service.dart';
@@ -109,34 +108,24 @@ class _LiveHomeShellScreenState extends State<LiveHomeShellScreen> {
     LiveMapScreen.open(context);
   }
 
-  void _openVue(DiscoveryFeedItem item) {
-    if (item.newsPostId != null) {
-      Navigator.push(
+  void _openVue(DiscoveryFeedItem item, [List<DiscoveryFeedItem> items = const []]) {
+    final list = items.isNotEmpty ? items : [item];
+    final hasMedia = item.mediaUrl.startsWith('http') ||
+        (item.thumbnailUrl ?? '').trim().isNotEmpty;
+    if (hasMedia) {
+      final index = list.indexWhere((entry) => entry.mediaId == item.mediaId);
+      VueReelViewer.open(
         context,
-        FirstVuePageRoute(
-          builder: (_) => PostDetailScreen(postId: item.newsPostId!),
-        ),
+        items: list,
+        initialIndex: index < 0 ? 0 : index,
+        onOpenProfile: _openVueProfile,
       );
       return;
     }
-    if (item.mediaUrl.startsWith('http')) {
-      if (item.isVideo) {
-        openFullScreenVideoPlayer(
-          context,
-          url: item.mediaUrl,
-          title: item.businessName,
-        );
-      } else {
-        openFullScreenImageViewer(
-          context,
-          items: [
-            FullScreenMediaItem(url: item.mediaUrl, isVideo: false),
-          ],
-          title: item.businessName,
-        );
-      }
-      return;
-    }
+    _openVueProfile(item);
+  }
+
+  void _openVueProfile(DiscoveryFeedItem item) {
     if (item.isMember) {
       openMemberProfile(
         context,
@@ -326,7 +315,8 @@ class _LiveHomeShellScreenState extends State<LiveHomeShellScreen> {
                   SliverToBoxAdapter(
                     child: LiveVueFeedStrip(
                       items: data?.vueItems ?? const [],
-                      onOpen: _openVue,
+                      onOpen: (item) =>
+                          _openVue(item, data?.vueItems ?? const []),
                     ),
                   ),
                 ],

@@ -99,6 +99,14 @@ void main() {
     });
   });
 
+  test('comment pages are bounded instead of downloading every row', () {
+    final src =
+        File('lib/services/feed_comments_service.dart').readAsStringSync();
+    expect(src, contains('fetchCommentPage'));
+    expect(src, contains('limit = 20'));
+    expect(src, contains("isFilter('parent_id', null)"));
+  });
+
   test('postComment syncs hashtags into the global content system', () {
     final src =
         File('lib/services/feed_comments_service.dart').readAsStringSync();
