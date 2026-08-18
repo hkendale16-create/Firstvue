@@ -181,22 +181,15 @@ class _VueCenterTab extends StatelessWidget {
               decoration: BoxDecoration(
                 color: FirstVueColors.gold,
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: FirstVueColors.gold.withValues(
-                      alpha: selected ? .42 : .28,
-                    ),
-                    blurRadius: selected ? 16 : 12,
-                    spreadRadius: selected ? 1 : 0,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                boxShadow: FirstVueColors.goldGlow(
+                  intensity: selected ? 1.15 : 0.85,
+                ),
               ),
               child: const Text(
                 'V',
                 style: TextStyle(
                   fontFamily: 'CormorantGaramond',
-                  color: Colors.white,
+                  color: FirstVueColors.onGold,
                   fontSize: 32,
                   fontWeight: FontWeight.w700,
                   height: 1,

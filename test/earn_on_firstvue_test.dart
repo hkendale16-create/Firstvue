@@ -29,7 +29,8 @@ void main() {
         home: const Scaffold(body: EarnOnFirstVueCard()),
       ),
     );
-    expect(find.text('Get paid to cover tonight'), findsOneWidget);
+    expect(find.text('Earn on FirstVue'), findsOneWidget);
+    expect(find.textContaining('85% to you'), findsOneWidget);
     await tester.tap(find.byType(EarnOnFirstVueCard));
     await tester.pumpAndSettle();
     expect(find.byType(EarnOnFirstVueScreen), findsOneWidget);

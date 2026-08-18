@@ -307,8 +307,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           children: [
             const SocialPageHeader(
               title: 'EXPLORE',
-              subtitle:
-                  'People are personal profiles. Businesses, events, and places are entities — each tab stays separate.',
+              subtitle: 'People, nights, and places nearby.',
             ),
             const SizedBox(height: 12),
             const EarnOnFirstVueCard(),

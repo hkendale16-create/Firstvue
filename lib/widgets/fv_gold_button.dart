@@ -49,23 +49,25 @@ class _FvGoldButtonState extends State<FvGoldButton> {
             width: double.infinity,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: enabled
-                  ? Color.lerp(
-                      FirstVueColors.gold,
-                      Colors.white,
-                      _pressed ? 0.14 : 0,
+              gradient: enabled
+                  ? LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color.lerp(
+                          FirstVueColors.gold,
+                          Colors.white,
+                          _pressed ? 0.18 : 0.08,
+                        )!,
+                        FirstVueColors.warmGold,
+                      ],
                     )
-                  : FirstVueColors.gold.withValues(alpha: .45),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: FirstVueColors.gold.withValues(
-                    alpha: _pressed ? .12 : .28,
-                  ),
-                  blurRadius: _pressed ? 6 : 14,
-                  offset: Offset(0, _pressed ? 1 : 4),
-                ),
-              ],
+                  : null,
+              color: enabled ? null : FirstVueColors.gold.withValues(alpha: .45),
+              borderRadius: BorderRadius.circular(26),
+              boxShadow: enabled
+                  ? FirstVueColors.goldGlow(pressed: _pressed)
+                  : const [],
             ),
             child: widget.loading
                 ? const SizedBox(
@@ -73,15 +75,16 @@ class _FvGoldButtonState extends State<FvGoldButton> {
                     height: 22,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.2,
-                      color: Color(0xFF0B1020),
+                      color: FirstVueColors.onGold,
                     ),
                   )
                 : Text(
                     widget.label,
                     style: const TextStyle(
-                      color: Color(0xFF0B1020),
+                      color: FirstVueColors.onGold,
                       fontWeight: FontWeight.w800,
                       fontSize: 16,
+                      letterSpacing: 0.2,
                     ),
                   ),
           ),

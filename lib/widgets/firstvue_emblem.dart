@@ -18,19 +18,13 @@ class FirstVueEmblem extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: FirstVueColors.gold,
-          boxShadow: [
-            BoxShadow(
-              color: FirstVueColors.gold.withValues(alpha: .28),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          boxShadow: FirstVueColors.goldGlow(),
         ),
         child: Text(
           'V',
           style: TextStyle(
             fontFamily: 'CormorantGaramond',
-            color: Colors.white,
+            color: FirstVueColors.onGold,
             fontSize: size * 0.55,
             fontWeight: FontWeight.w700,
             height: 1,
