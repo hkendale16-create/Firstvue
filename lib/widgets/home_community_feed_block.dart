@@ -6,6 +6,7 @@ import '../models/share_payload.dart';
 import '../navigation/firstvue_page_route.dart';
 import '../auth/ensure_signed_in.dart';
 import '../screens/create_post_screen.dart';
+import '../screens/edit_post_screen.dart';
 import '../screens/event_planner_screen.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../screens/story_composer_screen.dart';
@@ -633,6 +634,36 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
                       mediaId: _posts[index].commentsMediaId,
                       businessName: _posts[index].authorName,
                     ),
+                    onDelete: _posts[index].isMine
+                        ? () async {
+                            final deleted = await confirmDeleteNewsPost(
+                              context,
+                              _posts[index],
+                            );
+                            if (!deleted || !mounted) return;
+                            setState(() {
+                              _posts = [
+                                for (var i = 0; i < _posts.length; i++)
+                                  if (i != index) _posts[i],
+                              ];
+                            });
+                          }
+                        : null,
+                    onEdit: _posts[index].isMine
+                        ? () async {
+                            final updated = await EditPostScreen.open(
+                              context,
+                              post: _posts[index],
+                            );
+                            if (updated == null || !mounted) return;
+                            setState(() {
+                              _posts = [
+                                for (var i = 0; i < _posts.length; i++)
+                                  if (i == index) updated else _posts[i],
+                              ];
+                            });
+                          }
+                        : null,
                     onRepost: () => _repostPost(index),
                     onShare: () {
                       final post = _posts[index];

@@ -119,4 +119,13 @@ class FirstVueFeedbackSounds {
     }
     await _playAsset('sounds/refresh.wav', volume: 0.18);
   }
+
+  static Future<void> playShareConfirmation() async {
+    if (await InteractionPreferencesService.hapticsEnabled()) {
+      try {
+        await HapticFeedback.selectionClick();
+      } catch (_) {}
+    }
+    await _playAsset('sounds/refresh.wav', volume: 0.16);
+  }
 }

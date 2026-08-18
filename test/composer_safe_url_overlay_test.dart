@@ -24,6 +24,12 @@ void main() {
       expect(SafeUrl.classifyKind('/event/y'), 'event');
       expect(SafeUrl.classifyKind('https://example.com'), 'external');
     });
+
+    test('blocks javascript mixed-case and empty values', () {
+      expect(SafeUrl.sanitize('JavaScript:alert(1)'), isNull);
+      expect(SafeUrl.sanitize('   '), isNull);
+      expect(SafeUrl.sanitize('http://ok.example'), isNotNull);
+    });
   });
 
   group('ComposerTextOverlay', () {

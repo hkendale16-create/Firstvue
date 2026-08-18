@@ -11,6 +11,7 @@ import '../screens/communities_screen.dart';
 import '../screens/community_detail_screen.dart';
 import '../screens/community_hub_detail_screen.dart';
 import '../screens/create_post_screen.dart';
+import '../screens/edit_post_screen.dart';
 import '../screens/member_public_profile_screen.dart';
 import '../screens/people_to_follow_screen.dart';
 import '../services/community_hub_service.dart';
@@ -32,6 +33,7 @@ import '../widgets/group_circle_avatar.dart';
 import '../widgets/home_community_feed_block.dart';
 import '../widgets/social_chrome.dart';
 import '../widgets/tutorial_targets.dart';
+import '../widgets/trending_hashtags_bar.dart';
 import '../services/onboarding_store.dart';
 
 enum FeedsTab {
@@ -247,6 +249,16 @@ class _FeedsTabBody extends StatelessWidget {
           emptyTitle: 'Nothing trending yet',
           emptySubtitle: 'Engage with posts to build momentum here.',
           useCursor: true,
+          header: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TrendingHashtagsBar(title: 'Trending hashtags'),
+              TrendingHashtagsBar(
+                title: 'Near you',
+                nearYou: true,
+              ),
+            ],
+          ),
           loader: ({
             int limit = 20,
             CommunityNewsPost? cursor,
@@ -666,6 +678,16 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
                               await confirmDeleteNewsPost(context, _posts[i]);
                           if (!deleted || !mounted) return;
                           setState(() => _posts.removeAt(i));
+                        }
+                      : null,
+                  onEdit: _posts[i].isMine
+                      ? () async {
+                          final updated = await EditPostScreen.open(
+                            context,
+                            post: _posts[i],
+                          );
+                          if (updated == null || !mounted) return;
+                          setState(() => _posts[i] = updated);
                         }
                       : null,
                   onBoost: _posts[i].isMine

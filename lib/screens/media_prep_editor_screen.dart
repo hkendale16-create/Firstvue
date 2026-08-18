@@ -7,7 +7,8 @@ import 'package:image_picker/image_picker.dart';
 import '../services/media_type_helpers.dart';
 import '../theme/firstvue_theme.dart';
 
-/// Lightweight pre-publish media prep (rotate). Avoids heavy editor packages.
+/// Lightweight pre-publish media prep (rotate + square crop).
+/// Avoids heavy editor packages.
 class MediaPrepEditorScreen extends StatefulWidget {
   final XFile file;
 
@@ -31,6 +32,7 @@ class _MediaPrepEditorScreenState extends State<MediaPrepEditorScreen> {
   bool _video = false;
   bool _busy = false;
   int _rotationTurns = 0;
+  bool _squareCrop = false;
 
   @override
   void initState() {
@@ -52,7 +54,7 @@ class _MediaPrepEditorScreenState extends State<MediaPrepEditorScreen> {
     if (_busy) return;
     final source = _bytes;
     if (source == null) return;
-    if (_video || _rotationTurns % 4 == 0) {
+    if (_video || (_rotationTurns % 4 == 0 && !_squareCrop)) {
       Navigator.pop(context, widget.file);
       return;
     }
@@ -63,12 +65,18 @@ class _MediaPrepEditorScreenState extends State<MediaPrepEditorScreen> {
         Navigator.pop(context, widget.file);
         return;
       }
-      var rotated = decoded;
+      var edited = decoded;
       final turns = _rotationTurns % 4;
       for (var i = 0; i < turns; i++) {
-        rotated = img.copyRotate(rotated, angle: 90);
+        edited = img.copyRotate(edited, angle: 90);
       }
-      final encoded = Uint8List.fromList(img.encodeJpg(rotated, quality: 88));
+      if (_squareCrop) {
+        final side = edited.width < edited.height ? edited.width : edited.height;
+        final x = ((edited.width - side) / 2).round();
+        final y = ((edited.height - side) / 2).round();
+        edited = img.copyCrop(edited, x: x, y: y, width: side, height: side);
+      }
+      final encoded = Uint8List.fromList(img.encodeJpg(edited, quality: 88));
       final name = widget.file.name.toLowerCase().endsWith('.png')
           ? widget.file.name.replaceAll(RegExp(r'\.png$', caseSensitive: false), '.jpg')
           : widget.file.name;
@@ -129,10 +137,18 @@ class _MediaPrepEditorScreenState extends State<MediaPrepEditorScreen> {
                         )
                       : RotatedBox(
                           quarterTurns: _rotationTurns % 4,
-                          child: Image.memory(
-                            _bytes!,
-                            fit: BoxFit.contain,
-                          ),
+                          child: _squareCrop
+                              ? AspectRatio(
+                                  aspectRatio: 1,
+                                  child: Image.memory(
+                                    _bytes!,
+                                    fit: BoxFit.cover,
+                                  ),
+                                )
+                              : Image.memory(
+                                  _bytes!,
+                                  fit: BoxFit.contain,
+                                ),
                         ),
             ),
           ),
@@ -150,6 +166,20 @@ class _MediaPrepEditorScreenState extends State<MediaPrepEditorScreen> {
                             : () => setState(() => _rotationTurns += 1),
                         icon: const Icon(Icons.rotate_right),
                         label: const Text('Rotate'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _busy
+                            ? null
+                            : () => setState(() => _squareCrop = !_squareCrop),
+                        icon: Icon(
+                          _squareCrop
+                              ? Icons.crop_square
+                              : Icons.crop_original,
+                        ),
+                        label: Text(_squareCrop ? 'Square on' : 'Square crop'),
                       ),
                     ),
                   ],

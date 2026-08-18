@@ -6,6 +6,7 @@ import '../auth/ensure_signed_in.dart';
 import '../models/publish_destination.dart';
 import '../screens/boost_post_sheet.dart';
 import '../screens/create_post_screen.dart';
+import '../screens/edit_post_screen.dart';
 import '../services/community_news_service.dart';
 import '../theme/firstvue_theme.dart';
 import 'community_news_post_card.dart';
@@ -194,6 +195,18 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
     });
   }
 
+  Future<void> _editPost(int index) async {
+    if (index < 0 || index >= _posts.length) return;
+    final updated = await EditPostScreen.open(context, post: _posts[index]);
+    if (updated == null || !mounted) return;
+    setState(() {
+      _posts = [
+        for (var i = 0; i < _posts.length; i++)
+          if (i == index) updated else _posts[i],
+      ];
+    });
+  }
+
   ProfileActivityScope get _activityScope {
     return switch (widget.scope) {
       EntityFeedScope.business => ProfileActivityScope.business,
@@ -232,7 +245,7 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
                   vertical: 16,
                 ),
                 decoration: BoxDecoration(
-                  color: FirstVueColors.elevatedSurface,
+                  color: context.fv.elevatedSurface,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -310,6 +323,7 @@ class _EntityProfileFeedSectionState extends State<EntityProfileFeedSection> {
                       businessName: posts[index].authorName,
                     ),
                     onDelete: posts[index].isMine ? () => _deletePost(index) : null,
+                    onEdit: posts[index].isMine ? () => _editPost(index) : null,
                     onBoost: posts[index].isMine ||
                             (widget.canPost &&
                                 widget.scope == EntityFeedScope.business)

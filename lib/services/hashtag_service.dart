@@ -20,6 +20,41 @@ class TrendingHashtag {
   });
 }
 
+class HashtagQuery {
+  HashtagQuery._();
+
+  /// Tokenize a search string into indexed hashtag prefixes.
+  ///
+  /// "Atlanta nightlife" → atlanta, nightlife, atlantanightlife
+  /// "#Atlanta" → atlanta
+  static List<String> tokens(String query) {
+    final cleaned = query.trim().toLowerCase().replaceAll('#', ' ');
+    final words = cleaned
+        .split(RegExp(r'[^a-z0-9_]+'))
+        .where((part) => part.length >= 2 && part.length <= 30)
+        .take(6)
+        .toList();
+    if (words.isEmpty) return const [];
+    final out = <String>{...words};
+    if (words.length >= 2) {
+      final joined = words.join();
+      if (joined.length <= 30) out.add(joined);
+    }
+    return out.toList();
+  }
+
+  static List<CommunityNewsPost> sortTop(List<CommunityNewsPost> posts) {
+    final copy = [...posts];
+    copy.sort((a, b) {
+      final scoreA = a.sparkCount + a.repostCount * 4;
+      final scoreB = b.sparkCount + b.repostCount * 4;
+      if (scoreA != scoreB) return scoreB.compareTo(scoreA);
+      return b.createdAt.compareTo(a.createdAt);
+    });
+    return copy;
+  }
+}
+
 class HashtagService {
   HashtagService._();
 
@@ -28,6 +63,7 @@ class HashtagService {
   static Future<List<CommunityNewsPost>> fetchPostsByTag(
     String tag, {
     int limit = 30,
+    bool vueOnly = false,
   }) async {
     final normalized = tag.trim().toLowerCase();
     if (normalized.isEmpty) return const [];
@@ -41,15 +77,29 @@ class HashtagService {
 
       if (tagRow != null) {
         final hashtagId = tagRow['id'] as String;
-        final links = await _client
-            .from('post_hashtags')
-            .select('post_id')
-            .eq('hashtag_id', hashtagId)
-            .limit(limit);
-
-        final postIds = links.map((row) => row['post_id'] as String).toList();
+        final postIds = <String>{};
+        try {
+          final links = await _client
+              .from('post_hashtags')
+              .select('post_id')
+              .eq('hashtag_id', hashtagId)
+              .limit(limit);
+          postIds.addAll(links.map((row) => row['post_id'] as String));
+        } catch (_) {}
+        try {
+          final contentLinks = await _client
+              .from('content_hashtags')
+              .select('content_id')
+              .eq('hashtag_id', hashtagId)
+              .eq('content_type', 'post')
+              .limit(limit);
+          postIds.addAll(
+            contentLinks.map((row) => row['content_id'] as String),
+          );
+        } catch (_) {}
         if (postIds.isNotEmpty) {
-          return await _fetchPostsByIds(postIds);
+          final posts = await _fetchPostsByIds(postIds.take(limit).toList());
+          return _filterPosts(posts, vueOnly: vueOnly);
         }
       }
     } catch (_) {}
@@ -63,10 +113,22 @@ class HashtagService {
           .order('created_at', ascending: false)
           .limit(limit);
 
-      return await CommunityNewsService.mapPostRowsPublic(rows);
+      final posts = await CommunityNewsService.mapPostRowsPublic(rows);
+      return _filterPosts(posts, vueOnly: vueOnly);
     } catch (_) {
       return const [];
     }
+  }
+
+  static List<CommunityNewsPost> _filterPosts(
+    List<CommunityNewsPost> posts, {
+    required bool vueOnly,
+  }) {
+    if (!vueOnly) return posts;
+    return [
+      for (final post in posts)
+        if (post.publishDestination.appearsOnVue) post,
+    ];
   }
 
   /// Active Stories that include the hashtag in caption/overlays metadata.

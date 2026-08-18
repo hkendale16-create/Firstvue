@@ -1,7 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'activity_notifications_service.dart';
-import 'username_service.dart';
+import 'entity_handle_service.dart';
 
 class ParsedPostMetadata {
   final List<String> hashtags;
@@ -157,22 +157,36 @@ class PostMetadataService {
 
   static Future<void> _linkMention(String postId, String username) async {
     try {
-      final profileId = await UsernameService.lookupProfileId(username);
-      if (profileId == null) return;
+      final lookup = await EntityHandleService.lookup(username);
+      if (lookup == null) return;
 
-      await _client.from('post_mentions').insert({
+      final payload = <String, dynamic>{
         'post_id': postId,
-        'mentioned_profile_id': profileId,
-        'mention_text': '@${UsernameService.normalize(username) ?? username}',
-      });
+        'mention_text': '@${lookup.handle}',
+      };
+      if (lookup.entityType == EntityHandleType.user) {
+        payload['mentioned_profile_id'] = lookup.entityId;
+      } else if (lookup.entityType == EntityHandleType.business) {
+        payload['mentioned_business_id'] = lookup.entityId;
+      }
+      // Groups/communities/professionals stay as mention_text until
+      // dedicated columns exist. Omit profile/business ids for those types.
+
+      try {
+        await _client.from('post_mentions').insert(payload);
+      } on PostgrestException catch (error) {
+        if (error.code != '23505') rethrow;
+      }
 
       final me = _client.auth.currentUser?.id;
-      if (me != null && profileId != me) {
+      if (me != null &&
+          lookup.entityType == EntityHandleType.user &&
+          lookup.entityId != me) {
         await ActivityNotificationsService.notifyUser(
-          userId: profileId,
+          userId: lookup.entityId,
           type: 'mention',
           title: 'You were mentioned in a post',
-          body: '@${UsernameService.normalize(username) ?? username}',
+          body: '@${lookup.handle}',
           payload: {'post_id': postId, 'profile_id': me},
         );
       }
