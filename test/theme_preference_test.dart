@@ -99,6 +99,31 @@ void main() {
       expect(find.text('light'), findsOneWidget);
     });
   });
+
+  group('visual pop tokens', () {
+    test('onGold is dark ink, not white', () {
+      expect(FirstVueColors.onGold.computeLuminance(), lessThan(0.2));
+      expect(FirstVueColors.onGold, isNot(Colors.white));
+    });
+
+    test('filled buttons use dark ink on gold in both themes', () {
+      for (final theme in [
+        FirstVueTheme.elegantDark,
+        FirstVueTheme.elegantLight,
+      ]) {
+        expect(theme.colorScheme.primary, FirstVueColors.gold);
+        expect(theme.colorScheme.onPrimary, FirstVueColors.onGold);
+        expect(
+          theme.filledButtonTheme.style?.foregroundColor?.resolve({}),
+          FirstVueColors.onGold,
+        );
+        expect(
+          theme.filledButtonTheme.style?.backgroundColor?.resolve({}),
+          FirstVueColors.gold,
+        );
+      }
+    });
+  });
 }
 
 class _BrightnessProbe extends StatelessWidget {

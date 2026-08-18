@@ -991,6 +991,44 @@ class _HeroHeader extends StatelessWidget {
             ),
           ),
         ),
+        Positioned(
+          left: -36,
+          top: -48,
+          child: IgnorePointer(
+            child: Container(
+              width: 260,
+              height: 260,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    FirstVueColors.gold.withValues(alpha: 0.34),
+                    FirstVueColors.gold.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          right: -28,
+          bottom: 8,
+          child: IgnorePointer(
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    FirstVueColors.teal.withValues(alpha: 0.22),
+                    FirstVueColors.teal.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
         Padding(
           padding: EdgeInsets.fromLTRB(20, compact ? 12 : 22, 20, 42),
           child: Column(

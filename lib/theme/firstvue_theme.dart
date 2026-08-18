@@ -16,6 +16,22 @@ class FirstVueColors {
   static const mutedIcon = Color(0xFF8A9099);
   static const mutedRed = Color(0xFFE39A9A);
 
+  /// Ink on gold fills (buttons, VUE mark, selected pills). White-on-gold reads flat.
+  static const onGold = Color(0xFF0B1020);
+
+  /// Soft gold halo used on primary CTAs and the VUE tab.
+  static List<BoxShadow> goldGlow({double intensity = 1, bool pressed = false}) {
+    final alpha = pressed ? 0.14 * intensity : 0.38 * intensity;
+    return [
+      BoxShadow(
+        color: gold.withValues(alpha: alpha),
+        blurRadius: pressed ? 8 : 22,
+        spreadRadius: pressed ? 0 : 1,
+        offset: Offset(0, pressed ? 1 : 5),
+      ),
+    ];
+  }
+
   // Legacy dark defaults — prefer Theme / FirstVuePalette when possible.
   static const background = Color(0xFF0E0B1A);
   static const surface = Color(0xFF161222);
@@ -193,12 +209,12 @@ class FirstVueTheme {
       primary: FirstVueColors.gold,
       secondary: FirstVueColors.teal,
       tertiary: FirstVueColors.coral,
-      onPrimary: Color(0xFF17130B),
+      onPrimary: FirstVueColors.onGold,
       onSecondary: Color(0xFF071315),
       onSurface: FirstVueColors.ivory,
       error: Color(0xFFE39A9A),
     ),
-    buttonForeground: Colors.white,
+    buttonForeground: FirstVueColors.onGold,
     labelMuted: Colors.white60,
     hintMuted: Colors.white38,
     overlayStyle: SystemUiOverlayStyle.light.copyWith(
@@ -217,12 +233,12 @@ class FirstVueTheme {
       primary: FirstVueColors.gold,
       secondary: FirstVueColors.teal,
       tertiary: FirstVueColors.coral,
-      onPrimary: Colors.white,
+      onPrimary: FirstVueColors.onGold,
       onSecondary: Color(0xFF071315),
       onSurface: Color(0xFF16131F),
       error: Color(0xFFC04545),
     ),
-    buttonForeground: Colors.white,
+    buttonForeground: FirstVueColors.onGold,
     labelMuted: Color(0xFF5A5668),
     hintMuted: Color(0xFF8A8696),
     overlayStyle: SystemUiOverlayStyle.dark.copyWith(
@@ -370,12 +386,16 @@ class FirstVueTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: FirstVueColors.gold,
           foregroundColor: buttonForeground,
+          elevation: 0,
+          minimumSize: const Size.fromHeight(52),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
           textStyle: const TextStyle(
-            fontWeight: FontWeight.w700,
-            letterSpacing: .6,
+            fontWeight: FontWeight.w800,
+            letterSpacing: .3,
+            fontSize: 16,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(26),
           ),
         ),
       ),
@@ -383,20 +403,32 @@ class FirstVueTheme {
         style: FilledButton.styleFrom(
           backgroundColor: FirstVueColors.gold,
           foregroundColor: buttonForeground,
+          elevation: 0,
+          minimumSize: const Size.fromHeight(52),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w800,
+            letterSpacing: .3,
+            fontSize: 16,
+          ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(26),
           ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: isDark ? FirstVueColors.teal : FirstVueColors.gold,
+          minimumSize: const Size.fromHeight(48),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
           side: BorderSide(
+            width: 1.4,
             color: (isDark ? FirstVueColors.teal : FirstVueColors.gold)
-                .withValues(alpha: .7),
+                .withValues(alpha: .85),
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(24),
           ),
         ),
       ),

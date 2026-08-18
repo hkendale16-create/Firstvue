@@ -15,7 +15,7 @@ import 'firstvue_inline_search_bar.dart';
 import 'network_photo.dart';
 import 'signed_media_viewer.dart';
 
-const _goldOnWhite = Colors.white;
+const _onGold = FirstVueColors.onGold;
 const _searchHint = 'Search for people, places, or services.';
 
 String socialHandleFromName(String name) {
@@ -51,24 +51,27 @@ class SocialPillTabs extends StatelessWidget {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
+                  horizontal: 16,
+                  vertical: 10,
                 ),
                 decoration: BoxDecoration(
                   color: i == selectedIndex
                       ? FirstVueColors.gold
                       : Colors.transparent,
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(24),
                   border: Border.all(
                     color: i == selectedIndex
                         ? FirstVueColors.gold
                         : fv.borderSubtle,
                   ),
+                  boxShadow: i == selectedIndex
+                      ? FirstVueColors.goldGlow(intensity: 0.45)
+                      : const [],
                 ),
                 child: Text(
                   labels[i],
                   style: TextStyle(
-                    color: i == selectedIndex ? _goldOnWhite : fv.secondaryText,
+                    color: i == selectedIndex ? _onGold : fv.secondaryText,
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
                   ),
@@ -108,7 +111,7 @@ class SocialFollowButton extends StatelessWidget {
         onPressed: onPressed,
         style: FilledButton.styleFrom(
           backgroundColor: fillColor ?? FirstVueColors.gold,
-          foregroundColor: _goldOnWhite,
+          foregroundColor: _onGold,
           padding: padding,
           minimumSize: Size.zero,
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
