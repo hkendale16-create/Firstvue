@@ -22,12 +22,13 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.FirstVue
       flutter: stable
-      xcode: latest
+      # Xcode 26's altool 401s / cannot map com.FirstVue. 16.4 can upload.
+      xcode: 16.4
       cocoapods: default
       vars:
-        # Apple sometimes returns 401 on a valid key; retry with a fresh JWT.
         APP_STORE_CONNECT_API_UNAUTHORIZED_RETRIES: 10
         APP_STORE_CONNECT_ALTOOL_RETRIES: 10
+        APP_STORE_CONNECT_ALTOOL_ADDITIONAL_ARGUMENTS: --use-old-altool
     scripts:
       - name: Set up code signing
         script: |
@@ -68,5 +69,6 @@ workflows:
           failure: true
       app_store_connect:
         auth: integration
-        submit_to_testflight: true
+        # Upload only. Internal testers can install after Apple processes the build.
+        submit_to_testflight: false
         submit_to_app_store: false

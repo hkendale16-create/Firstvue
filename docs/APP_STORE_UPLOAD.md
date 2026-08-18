@@ -75,7 +75,11 @@ If Codemagic says **No matching profiles found for bundle identifier "com.FirstV
 
 If **Build App Store IPA** fails with **Unable to get scheme file for Runner**, that filename bug is already on `main`. Start a **new** build of **`main`**. The IPA step must **not** fetch `mapbox-maps-ios.git`.
 
-If the IPA **builds** but **Publishing failed** with `NOT_AUTHORIZED` / `401` / `failed to authenticate` / `Cannot determine the Apple ID from Bundle ID 'com.FirstVue'`, the `.ipa` is already on that Codemagic run (Artifacts → `FIRSTVUE.ipa`). Apple rejected Codemagic’s App Store Connect API token. Fix the key, then start a **new** build of **`main`**.
+If the IPA **builds** but **Publishing failed** (`Failed to upload archive`, `401`, `NOT_AUTHORIZED`, or `Cannot determine the Apple ID from Bundle ID 'com.FirstVue'`), the `.ipa` is already on that Codemagic run (Artifacts → `FIRSTVUE.ipa`). Two separate problems:
+
+**A. API key** — Apple rejected the token. Delete the Codemagic **FirstVue** integration and add it again (you cannot edit). App Manager `.p8` + matching Key ID + Issuer ID.
+
+**B. Xcode 26 altool** — Codemagic `xcode: latest` is Xcode 26, whose uploader cannot map `com.FirstVue`. The workflow now pins **Xcode 16.4** and `--use-old-altool`. Build branch **`cursor/codemagic-asc-auth-4635`** (or `main` after that PR merges). Do not retry a run that used Xcode 26.
 
 1. Confirm the app exists: [App Store Connect → My Apps](https://appstoreconnect.apple.com/apps) → **FirstVue**, bundle **`com.FirstVue`**. Create it if missing.
 2. Open [App Store Connect API keys](https://appstoreconnect.apple.com/access/integrations/api). If the old key is revoked or you are unsure, **Generate API Key**:
