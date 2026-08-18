@@ -22,6 +22,7 @@ import '../widgets/firstvue_refresh_scaffold.dart';
 import '../widgets/firstvue_share_sheet.dart';
 import '../widgets/fv_ui.dart';
 import '../widgets/growth_prompt.dart';
+import '../widgets/home_city_chip.dart';
 import '../widgets/messages_header_button.dart';
 import '../widgets/social_rich_text.dart';
 import '../widgets/tutorial_targets.dart';
@@ -380,6 +381,13 @@ class _DiscoveryFeedScreenState extends State<DiscoveryFeedScreen> {
                               letterSpacing: 2,
                             ),
                           ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: HomeCityChip(
+                            compact: true,
+                            pinOnly: true,
+                          ),
+                        ),
                         Align(
                           alignment: Alignment.centerRight,
                           child: MessagesHeaderButton(

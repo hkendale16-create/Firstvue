@@ -9,20 +9,14 @@ const _kGold = Color(0xFFD8B56A);
 const _kTeal = Color(0xFF3DD9C9);
 
 /// Compact overview of what FirstVue covers, shown on the welcome dialog.
-/// Intentionally short chips, not a long slide deck — the real depth comes
-/// from contextual section tips as each area is opened.
+/// One job for new users: see what’s going on nearby.
 class _WelcomeHighlights extends StatelessWidget {
   const _WelcomeHighlights();
 
   static const _items = <(IconData, String)>[
-    (Icons.explore_outlined, 'VUE & Nearby'),
-    (Icons.home_outlined, 'Home'),
-    (Icons.travel_explore_outlined, 'Explore'),
-    (Icons.event_outlined, 'Events'),
-    (Icons.storefront_outlined, 'Businesses'),
-    (Icons.groups_2_outlined, 'Communities & Groups'),
-    (Icons.chat_bubble_outline, 'Messaging'),
-    (Icons.person_outline, 'Profiles & Following'),
+    (Icons.place_outlined, 'Nearby'),
+    (Icons.nights_stay_outlined, 'Tonight'),
+    (Icons.person_add_alt_1_outlined, 'Follow'),
   ];
 
   @override
@@ -65,6 +59,7 @@ class _WelcomeHighlights extends StatelessWidget {
 Future<void> showFirstLaunchExperience(
   BuildContext context, {
   TutorialSection? initialSection,
+  Future<void> Function()? afterWelcome,
 }) async {
   var tipsOn = false;
 
@@ -75,9 +70,9 @@ Future<void> showFirstLaunchExperience(
     if (!context.mounted) return;
     if (takeTour != true) {
       await OnboardingStore.markAllTipsSeen();
-      return;
+    } else {
+      tipsOn = true;
     }
-    tipsOn = true;
   } else if (prompt == TutorialPromptKind.whatsNew) {
     if (!context.mounted) return;
     final takeTour = await FirstVueWhatsNewDialog.show(context);
@@ -85,15 +80,20 @@ Future<void> showFirstLaunchExperience(
     await OnboardingStore.markWhatsNewSeen();
     if (takeTour != true) {
       await OnboardingStore.markAllTipsSeen();
-      return;
+    } else {
+      tipsOn = true;
     }
-    tipsOn = true;
+  }
+
+  if (afterWelcome != null) {
+    await afterWelcome();
+    if (!context.mounted) return;
   }
 
   if (!tipsOn && !await OnboardingStore.tipsEnabled()) return;
   if (!context.mounted) return;
 
-  final section = initialSection ?? TutorialSection.vue;
+  final section = initialSection ?? TutorialSection.home;
   await maybeShowSectionTip(context, section);
 }
 
@@ -165,8 +165,8 @@ class FirstVueWelcomeDialog extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               const Text(
-                'FirstVue helps you discover what\'s nearby and stay connected '
-                'to the people, businesses, communities, and events around you.',
+                'See what\'s going on near you — happening now, tonight, '
+                'and people worth following.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white70, height: 1.45),
               ),
@@ -174,9 +174,8 @@ class FirstVueWelcomeDialog extends StatelessWidget {
               const _WelcomeHighlights(),
               const SizedBox(height: 14),
               const Text(
-                'We\'ll show short tips as you open each part of the app — '
-                'not all at once — including setting up your profile and '
-                'picking a theme.',
+                'Set your city to fill Home with nearby events and follows. '
+                'Short tips can wait until you\'ve looked around.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: _kGold, height: 1.4, fontSize: 13.5),
               ),
@@ -190,14 +189,14 @@ class FirstVueWelcomeDialog extends StatelessWidget {
                     foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: const Text('Yes — show me around'),
+                  child: const Text('See what\'s nearby'),
                 ),
               ),
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () => _finish(context, takeTour: false),
                 child: const Text(
-                  'Maybe later — I\'ll explore',
+                  'I\'ll explore on my own',
                   style: TextStyle(color: Colors.white60),
                 ),
               ),

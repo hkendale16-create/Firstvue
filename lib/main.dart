@@ -152,7 +152,7 @@ class _FirstVueHomeState extends State<FirstVueHome> {
     selectedIndex =
         widget.initialTab ??
         _consumeLandingTab() ??
-        FirstVueBottomNav.vueIndex;
+        FirstVueBottomNav.homeIndex;
     _vueTab = const DiscoveryFeedScreen();
     if (selectedIndex == FirstVueBottomNav.exploreIndex) {
       _exploreTab = ExploreScreen(
@@ -174,11 +174,14 @@ class _FirstVueHomeState extends State<FirstVueHome> {
     _showBillingResultIfNeeded();
     _refreshNotificationBadge();
     ActivityNotificationsService.listenForPushDelivery();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (mounted) {
-        showFirstLaunchExperience(
+        await showFirstLaunchExperience(
           context,
           initialSection: _tutorialSectionForTab(selectedIndex),
+          afterWelcome: () async {
+            await _cityChipKey.currentState?.promptIfUnset();
+          },
         );
       }
       // Leftover ?msg= from Messages (or a Safari crash reload) must not linger
@@ -478,7 +481,12 @@ class _FirstVueHomeState extends State<FirstVueHome> {
             const SizedBox(height: 14),
             const SocialSearchBar(iconOnly: true),
             const SizedBox(height: 16),
-            HomeDiscoverySection(refreshToken: _homeRefreshToken),
+            HomeDiscoverySection(
+              refreshToken: _homeRefreshToken,
+              onSetCity: () {
+                unawaited(_cityChipKey.currentState?.openPicker() ?? Future.value());
+              },
+            ),
             const SizedBox(height: 12),
           ],
         ),

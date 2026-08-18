@@ -132,19 +132,17 @@ class GrowthPromptService {
     }
 
     final returning = !await isNewUser();
-    // New accounts get empty-state / composer suggestions, not a sheet.
-    if (!returning) return null;
+    final candidates = returning
+        ? GrowthPromptCatalog.returningSessionTypes
+        : GrowthPromptCatalog.newUserSessionTypes;
 
-    final type = await _pickType(
-      prefs,
-      GrowthPromptCatalog.returningSessionTypes,
-    );
+    final type = await _pickType(prefs, candidates);
     if (type == null) return null;
     return GrowthPromptCatalog.specFor(
       type,
       context: GrowthPromptContext.session,
       city: city,
-      returningUser: true,
+      returningUser: returning,
     );
   }
 

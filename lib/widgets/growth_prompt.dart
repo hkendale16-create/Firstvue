@@ -27,9 +27,25 @@ class GrowthPromptActions {
     await GrowthPromptService.markClicked(spec);
     if (!context.mounted) return;
 
-    if (secondary && spec.secondaryActionLabel == 'Create Event') {
-      await openCreateEvent(context);
-      return;
+    if (secondary) {
+      if (spec.secondaryActionLabel == 'Create Event') {
+        await openCreateEvent(context);
+        return;
+      }
+      final secondaryType = spec.secondaryType;
+      if (secondaryType != null) {
+        await run(
+          context,
+          GrowthPromptSpec(
+            type: secondaryType,
+            context: spec.context,
+            title: spec.title,
+            description: spec.description,
+            actionLabel: spec.secondaryActionLabel ?? spec.actionLabel,
+          ),
+        );
+        return;
+      }
     }
 
     switch (spec.type) {

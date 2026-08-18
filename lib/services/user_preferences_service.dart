@@ -29,6 +29,12 @@ class UserPreferences {
     return parts.join(', ');
   }
 
+  /// True when Home should ask for a city instead of showing an empty metro.
+  bool get needsCityPrompt {
+    if (browseEverywhere) return false;
+    return (locationCity == null || locationCity!.trim().isEmpty);
+  }
+
   UserPreferences copyWith({
     String? locationCity,
     String? locationState,

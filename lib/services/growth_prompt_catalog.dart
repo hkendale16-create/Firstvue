@@ -5,17 +5,19 @@ class GrowthPromptCatalog {
   GrowthPromptCatalog._();
 
   static const homeTypes = <GrowthPromptType>[
-    GrowthPromptType.createPost,
-    GrowthPromptType.uploadPhoto,
-    GrowthPromptType.createStory,
+    GrowthPromptType.followPeople,
     GrowthPromptType.exploreEvents,
+    GrowthPromptType.discoverNearby,
+    GrowthPromptType.createStory,
     GrowthPromptType.inviteFriends,
+    GrowthPromptType.createPost,
   ];
 
   static const vueTypes = <GrowthPromptType>[
+    GrowthPromptType.followPeople,
+    GrowthPromptType.discoverNearby,
     GrowthPromptType.uploadVideo,
     GrowthPromptType.uploadPhoto,
-    GrowthPromptType.createPost,
   ];
 
   static const exploreTypes = <GrowthPromptType>[
@@ -45,6 +47,11 @@ class GrowthPromptCatalog {
     GrowthPromptType.uploadPhoto,
     GrowthPromptType.exploreEvents,
     GrowthPromptType.inviteFriends,
+  ];
+
+  static const newUserSessionTypes = <GrowthPromptType>[
+    GrowthPromptType.followPeople,
+    GrowthPromptType.discoverNearby,
   ];
 
   static const returningSessionTypes = <GrowthPromptType>[
@@ -187,22 +194,27 @@ class GrowthPromptCatalog {
 
   static GrowthPromptSpec emptyHome() {
     return const GrowthPromptSpec(
-      type: GrowthPromptType.createPost,
+      type: GrowthPromptType.followPeople,
       context: GrowthPromptContext.home,
       title: 'Nothing here yet.',
-      description: "Be the first to share what's happening.",
-      actionLabel: 'Create Post',
+      description:
+          'Follow people nearby or see what’s going on tonight.',
+      actionLabel: 'Find People',
+      secondaryActionLabel: 'Explore Events',
+      secondaryType: GrowthPromptType.exploreEvents,
     );
   }
 
   static GrowthPromptSpec emptyVue() {
     return const GrowthPromptSpec(
-      type: GrowthPromptType.uploadVideo,
+      type: GrowthPromptType.discoverNearby,
       context: GrowthPromptContext.vue,
-      title: 'Your VUE is just getting started.',
+      title: 'It’s quiet here right now.',
       description:
-          'Upload a photo or video and help people discover what’s happening.',
-      actionLabel: 'Upload',
+          'See what’s nearby, or follow people so your VUE fills up.',
+      actionLabel: 'Explore nearby',
+      secondaryActionLabel: 'Find People',
+      secondaryType: GrowthPromptType.followPeople,
     );
   }
 

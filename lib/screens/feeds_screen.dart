@@ -247,7 +247,18 @@ class _FeedsTabBody extends StatelessWidget {
           refreshToken: refreshToken,
           source: tab.source,
           emptyTitle: 'Nothing trending yet',
-          emptySubtitle: 'Engage with posts to build momentum here.',
+          emptySubtitle:
+              'Follow people nearby — feeds fill up before you have a long friends list.',
+          emptyActionLabel: 'Find People',
+          onEmptyAction: () {
+            Navigator.push(
+              context,
+              FirstVuePageRoute(
+                builder: (_) => const PeopleToFollowScreen(),
+              ),
+            );
+          },
+          showFollowSuggestions: true,
           useCursor: true,
           header: const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -275,7 +286,9 @@ class _FeedsTabBody extends StatelessWidget {
           refreshToken: refreshToken,
           source: tab.source,
           emptyTitle: 'No new posts',
-          emptySubtitle: 'Fresh posts will appear here in order.',
+          emptySubtitle:
+              'Follow people nearby so new posts from your city show up here.',
+          showFollowSuggestions: true,
           useCursor: true,
           loader: ({
             int limit = 20,
@@ -296,6 +309,7 @@ class _FeedsTabBody extends StatelessWidget {
           emptySubtitle:
               'Follow people, join groups, and interact to personalize this feed.',
           emptyActionLabel: 'Find People',
+          showFollowSuggestions: true,
           onEmptyAction: () {
             Navigator.of(context).push(
               FirstVuePageRoute(
@@ -335,6 +349,7 @@ class FeedsPostsList extends StatefulWidget {
   final FeedsLoader loader;
   final bool useCursor;
   final Widget? header;
+  final bool showFollowSuggestions;
 
   const FeedsPostsList({
     super.key,
@@ -347,6 +362,7 @@ class FeedsPostsList extends StatefulWidget {
     this.onEmptyAction,
     this.useCursor = false,
     this.header,
+    this.showFollowSuggestions = false,
   });
 
   @override
@@ -627,13 +643,20 @@ class _FeedsPostsListState extends State<FeedsPostsList> {
               actionLabel: 'Retry',
               onAction: _reload,
             )
-          else if (_posts.isEmpty)
+          else if (_posts.isEmpty) ...[
             _FeedStateMessage(
               title: widget.emptyTitle,
               subtitle: widget.emptySubtitle,
               actionLabel: widget.emptyActionLabel,
               onAction: widget.onEmptyAction,
-            )
+            ),
+            if (widget.showFollowSuggestions) ...[
+              const SizedBox(height: 18),
+              PeopleToFollowRow(
+                onSeeAll: widget.onEmptyAction,
+              ),
+            ],
+          ]
           else ...[
             for (var i = 0; i < _posts.length; i++) ...[
               if (i > 0) const SizedBox(height: 10),

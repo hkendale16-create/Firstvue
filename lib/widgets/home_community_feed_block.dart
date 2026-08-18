@@ -9,6 +9,7 @@ import '../screens/create_post_screen.dart';
 import '../screens/edit_post_screen.dart';
 import '../screens/event_planner_screen.dart';
 import '../screens/member_public_profile_screen.dart';
+import '../screens/people_to_follow_screen.dart';
 import '../screens/story_composer_screen.dart';
 import '../models/growth_prompt.dart';
 import '../services/community_news_service.dart';
@@ -27,6 +28,7 @@ import 'feed_comments_sheet.dart';
 import 'feed_impression_tracker.dart';
 import 'growth_prompt.dart';
 import 'profile_avatar_thumbnail.dart';
+import 'social_chrome.dart';
 import 'stories_tray.dart';
 
 /// Facebook-style composer + news feed for the Home Communities container.
@@ -599,10 +601,25 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
             onAction: () => _loadFeed(reshuffle: true),
           )
         else if (_posts.isEmpty)
-          GrowthPrompt(
-            spec: GrowthPromptCatalog.emptyHome(),
-            variant: GrowthPromptVariant.empty,
-            onAction: _openCreatePost,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GrowthPrompt(
+                spec: GrowthPromptCatalog.emptyHome(),
+                variant: GrowthPromptVariant.empty,
+              ),
+              const SizedBox(height: 16),
+              PeopleToFollowRow(
+                onSeeAll: () {
+                  Navigator.push(
+                    context,
+                    FirstVuePageRoute(
+                      builder: (_) => const PeopleToFollowScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
           )
         else
           Column(
@@ -689,7 +706,6 @@ class _HomeCommunityFeedBlockState extends State<HomeCommunityFeedBlock> {
                   GrowthPrompt(
                     spec: _inlineSpec!,
                     variant: GrowthPromptVariant.composer,
-                    onAction: _openCreatePost,
                     onDismiss: () => setState(() => _inlineSpec = null),
                   ),
                 ],

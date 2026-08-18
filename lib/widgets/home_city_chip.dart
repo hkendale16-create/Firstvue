@@ -40,6 +40,16 @@ class HomeCityChipState extends State<HomeCityChip> {
     });
   }
 
+  Future<void> openPicker() => _openPicker();
+
+  /// Opens the city sheet when the user has neither a city nor Everywhere.
+  Future<void> promptIfUnset() async {
+    final prefs = await UserPreferencesService.fetch();
+    if (!mounted) return;
+    if (!prefs.needsCityPrompt) return;
+    await _openPicker();
+  }
+
   Future<void> _openPicker() async {
     final prefs = await UserPreferencesService.fetch();
     if (!mounted) return;
