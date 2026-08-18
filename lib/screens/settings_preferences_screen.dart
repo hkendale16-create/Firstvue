@@ -367,8 +367,8 @@ class _SettingsPreferencesScreenState extends State<SettingsPreferencesScreen> {
                   ),
                   subtitle: Text(
                     _prefs.floatingBubbleVisible
-                        ? 'Visible on home screen'
-                        : 'Hidden — restore below',
+                        ? 'Extra shortcut on Home. Inbox is always in the Home header.'
+                        : 'Hidden. Inbox stays in the Home header next to notifications.',
                     style: TextStyle(color: fv.secondaryText, fontSize: 12),
                   ),
                   trailing: _prefs.floatingBubbleVisible
