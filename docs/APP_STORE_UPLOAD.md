@@ -8,8 +8,8 @@ Use **Codemagic** in the browser. This repo already has `codemagic.yaml`.
 |-------|--------|
 | Bundle ID | `com.FirstVue` |
 | Display name | FIRSTVUE |
-| Version | `1.0.7` |
-| Build | `8` |
+| Version | `1.0.8` |
+| Build | `9` |
 | Support email | `hkendale16@gmail.com` |
 | Privacy | `https://firstvue.app/privacy.html` |
 | Marketing URL | `https://firstvue.app` |
@@ -45,7 +45,7 @@ Use **Codemagic** in the browser. This repo already has `codemagic.yaml`.
 2. Teams → **Integrations** → **App Store Connect** → add the API key.  
    Name the integration **FirstVue** (must match `codemagic.yaml`).
 3. Teams → **Code signing identities** → iOS → fetch/create certificates for `com.FirstVue` (App Store distribution). Codemagic can create the certs so you never need Keychain on a Mac.
-4. Start build → workflow **iOS App Store 1.0.7**.
+4. Start build → workflow **iOS App Store 1.0.8**.
 5. When it finishes, the `.ipa` is already uploaded to **TestFlight**.
 
 ### D. Install on iPhone
@@ -59,8 +59,9 @@ Fill name, screenshots, privacy, then **Submit for Review** when you are ready. 
 
 **What’s New (paste):**
 ```
-Business Tools now uses Claim, Add, and Rental tabs.
-Settings search, Home post photos, and city / profile save fixes.
+VUE photos and videos open in a full-screen reel.
+Swipe, like, comment, share, and save without leaving the viewer.
+Business Tools tabs and Settings / Home fixes.
 ```
 
 ---
@@ -111,10 +112,10 @@ FirstVue is for users 13 and older. Payments are not enabled in this trial build
 ```bash
 git clone https://github.com/hkendale16-create/Firstvue.git
 cd Firstvue
-git checkout cursor/store-release-1-0-7-4635
+git checkout cursor/store-release-1-0-8-4635
 ./scripts/build-ios-ipa.sh
 ```
 
-Then upload `build/ios/ipa/FirstVue-1.0.7+8.ipa` with **Transporter**.
+Then upload `build/ios/ipa/FirstVue-1.0.8+9.ipa` with **Transporter**.
 
 Replace `TEAMID` in `web/.well-known/apple-app-site-association` with your Apple Team ID after you create the App ID.

@@ -6,7 +6,7 @@
 
 workflows:
   ios-app-store:
-    name: iOS App Store 1.0.7
+    name: iOS App Store 1.0.8
     instance_type: mac_mini_m2
     max_build_duration: 60
     integrations:
@@ -32,8 +32,8 @@ workflows:
       - name: Build App Store IPA
         script: |
           flutter build ipa --release \
-            --build-name=1.0.7 \
-            --build-number=8 \
+            --build-name=1.0.8 \
+            --build-number=9 \
             --export-options-plist=/Users/builder/export_options.plist \
             --dart-define=FIRSTVUE_OAUTH_GOOGLE=true \
             --dart-define=FIRSTVUE_GOOGLE_WEB_CLIENT_ID=232279155211-ilegqngbve9fr34o5ajjq7396c48n877.apps.googleusercontent.com
