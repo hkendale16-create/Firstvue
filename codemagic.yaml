@@ -1,13 +1,14 @@
 # FirstVue — iOS App Store / TestFlight from Windows (no Mac required).
 # Codemagic rents a Mac, signs the IPA, and uploads it to App Store Connect.
 #
-# In Codemagic: pick branch cursor/store-release-1-0-8-4635 →
+# In Codemagic: pick branch cursor/codemagic-asc-auth-4635 (or main after merge) →
 # “Check for configuration file” → start workflow “iOS App Store 1.0.8”.
 # Do NOT use the Flutter Workflow Editor. It asks for a Shorebird token;
 # this app does not use Shorebird.
 #
 # Setup (once) is in docs/APP_STORE_UPLOAD.md → “Windows (no Mac)”.
 # Name the App Store Connect integration **FirstVue** so it matches below.
+# That key must be App Manager; a 401 on publish means re-upload Issuer ID + Key ID + .p8.
 
 workflows:
   ios-app-store:
@@ -21,8 +22,14 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.FirstVue
       flutter: stable
+      # MapboxCommon is built with Swift 6.2.4 (Xcode 26). Xcode 16.4 cannot
+      # compile it. Xcode 26 altool 401s; upload uses iTMSTransporter instead.
       xcode: latest
       cocoapods: default
+      vars:
+        APP_STORE_CONNECT_API_UNAUTHORIZED_RETRIES: 10
+        APP_STORE_CONNECT_ALTOOL_RETRIES: 10
+        APP_STORE_CONNECT_ALTOOL_ADDITIONAL_ARGUMENTS: --use-old-altool
     scripts:
       - name: Set up code signing
         script: |
@@ -45,12 +52,16 @@ workflows:
           # and fails CI if that file is missing or misnamed.
           flutter config --no-enable-swift-package-manager
           bash scripts/fix-xcode-filenames.sh
+          xcodebuild -version
           flutter build ipa --release \
             --build-name=1.0.8 \
             --build-number=9 \
             --export-options-plist=/Users/builder/export_options.plist \
             --dart-define=FIRSTVUE_OAUTH_GOOGLE=true \
             --dart-define=FIRSTVUE_GOOGLE_WEB_CLIENT_ID=232279155211-ilegqngbve9fr34o5ajjq7396c48n877.apps.googleusercontent.com
+      - name: Upload IPA with iTMSTransporter
+        script: |
+          bash scripts/upload-ipa-transporter.sh
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
@@ -61,7 +72,3 @@ workflows:
         notify:
           success: true
           failure: true
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: true
-        submit_to_app_store: false

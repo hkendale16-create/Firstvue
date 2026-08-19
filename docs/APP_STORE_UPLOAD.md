@@ -45,7 +45,7 @@ Use **Codemagic** in the browser. This repo already has `codemagic.yaml`.
 2. Teams → **Integrations** → **App Store Connect** → add the API key.  
    Name the integration **FirstVue** (must match `codemagic.yaml`).
 3. Teams → **Code signing identities** → iOS → fetch/create certificates for `com.FirstVue` (App Store distribution). Codemagic can create the certs so you never need Keychain on a Mac.
-4. Open the app, pick branch **`cursor/store-release-1-0-8-4635`**, click **Check for configuration file**.
+4. Open the app, pick branch **`main`**, click **Check for configuration file**.
 5. Switch the page from **Workflow Editor** to **codemagic.yaml**.
 6. **Start new build** → workflow **iOS App Store 1.0.8** (this screen has no Shorebird field).
 7. When it finishes, the `.ipa` is already uploaded to **TestFlight**.
@@ -55,7 +55,7 @@ If Codemagic says **Shorebird token is required**, cancel that Start dialog. You
 **Fix (do this instead of pasting a token):**
 
 1. [codemagic.io/apps](https://codemagic.io/apps) → **Firstvue**
-2. Branch dropdown → `cursor/store-release-1-0-8-4635`
+2. Branch dropdown → `main`
 3. **Check for configuration file** (docs: [scan for yaml](https://docs.codemagic.io/yaml-quick-start/building-a-flutter-app/))
 4. Top of the page: **codemagic.yaml** (leave Workflow Editor)
 5. Start **iOS App Store 1.0.8**
@@ -73,12 +73,26 @@ If Codemagic says **No matching profiles found for bundle identifier "com.FirstV
 5. Confirm the profile row shows bundle `com.FirstVue`, type App Store, and a green check on the certificate.
 6. Re-run workflow **iOS App Store 1.0.8**.
 
-If **Build App Store IPA** fails with **Unable to get scheme file for Runner** (and logs show Mapbox Swift packages fetching from GitHub), that was a repo bug: Xcode files were stored as `*.xml` (`Runner.xcscheme.xml`, `contents.xcworkspacedata.xml`, `Main.storyboard.xml`). Flutter only looks for `Runner.xcscheme`. Do **not** retry the failed build.
+If **Build App Store IPA** fails with **Unable to get scheme file for Runner**, that filename bug is already on `main`. Start a **new** build of **`main`**. The IPA step must **not** fetch `mapbox-maps-ios.git`.
 
-1. Wait until GitHub branch `cursor/store-release-1-0-8-4635` shows a commit that mentions repairing Xcode filenames / Runner scheme.
-2. In Codemagic, pick that branch again → **Check for configuration file** → **codemagic.yaml**.
-3. **Start new build** → **iOS App Store 1.0.8**.
-4. The IPA step must **not** fetch `mapbox-maps-ios.git`. If it still does, the build is not on the new commit.
+If the IPA **builds** but **Publishing failed** (`Failed to upload archive`, `401`, `NOT_AUTHORIZED`, or `Cannot determine the Apple ID from Bundle ID 'com.FirstVue'`), the `.ipa` is already on that Codemagic run (Artifacts → `FIRSTVUE.ipa`). Two separate problems:
+
+**A. API key** — Apple rejected the token. Delete the Codemagic **FirstVue** integration and add it again (you cannot edit). App Manager `.p8` + matching Key ID + Issuer ID.
+
+**B. Mapbox vs uploader** — Mapbox needs **Xcode 26**. Xcode 26’s `altool` then fails with `-26000`. The workflow compiles with Xcode 26, installs Apple’s real **iTMSTransporter** (not the Xcode stub), and uploads with that. If the log writes `AuthKey_from Apple.p8`, the Codemagic **Key ID** field is wrong.
+
+1. Confirm the app exists: [App Store Connect → My Apps](https://appstoreconnect.apple.com/apps) → **FirstVue**, bundle **`com.FirstVue`**. Create it if missing.
+2. Open [App Store Connect API keys](https://appstoreconnect.apple.com/access/integrations/api). If the old key is revoked or you are unsure, **Generate API Key**:
+   - Name: `FirstVue`
+   - Access: **App Manager** (Developer is not enough to upload)
+3. Download the `.p8` (Apple shows it **once**). Copy **Issuer ID** (above the table) and this key’s **Key ID**.
+4. In Codemagic do **not** use `codemagic.io/teams` (404). Open [codemagic.io/apps](https://codemagic.io/apps) → left nav **Personal account** → **Integrations** → **Developer Portal**.
+5. Delete the old **FirstVue** key (you cannot edit), then **Add** it again:
+   - App Store Connect API key name: **`FirstVue`**
+   - **Issuer ID:** the UUID above the keys table
+   - **Key ID:** the 10-character value in the table (like `2X9R4HXF34`). Do **not** type `from Apple`.
+   - API key: upload the matching `.p8`
+6. Start a **new** workflow **iOS App Store 1.0.8** on **`cursor/codemagic-asc-auth-4635`**.
 
 ### D. Install on iPhone
 
@@ -144,7 +158,7 @@ FirstVue is for users 13 and older. Payments are not enabled in this trial build
 ```bash
 git clone https://github.com/hkendale16-create/Firstvue.git
 cd Firstvue
-git checkout cursor/store-release-1-0-8-4635
+git checkout main
 ./scripts/build-ios-ipa.sh
 ```
 
