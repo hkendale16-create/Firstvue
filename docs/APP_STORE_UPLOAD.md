@@ -87,8 +87,12 @@ If the IPA **builds** but **Publishing failed** (`Failed to upload archive`, `40
    - Access: **App Manager** (Developer is not enough to upload)
 3. Download the `.p8` (Apple shows it **once**). Copy **Issuer ID** (above the table) and this key’s **Key ID**.
 4. In Codemagic do **not** use `codemagic.io/teams` (404). Open [codemagic.io/apps](https://codemagic.io/apps) → left nav **Personal account** → **Integrations** → **Developer Portal**.
-5. Edit the key named exactly **`FirstVue`** (must match `codemagic.yaml`). Paste the new Issuer ID + Key ID and upload the new `.p8`. Save. Do not mix a Key ID from one key with a `.p8` from another.
-6. Start a **new** workflow **iOS App Store 1.0.8** on **`main`**.
+5. Delete the old **FirstVue** key (you cannot edit), then **Add** it again:
+   - App Store Connect API key name: **`FirstVue`**
+   - **Issuer ID:** the UUID above the keys table
+   - **Key ID:** the 10-character value in the table (like `2X9R4HXF34`). Do **not** type `from Apple`.
+   - API key: upload the matching `.p8`
+6. Start a **new** workflow **iOS App Store 1.0.8** on **`cursor/codemagic-asc-auth-4635`**.
 
 ### D. Install on iPhone
 

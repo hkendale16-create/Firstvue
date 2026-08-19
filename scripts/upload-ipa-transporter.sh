@@ -27,6 +27,21 @@ if [[ -z "$KEY_ID" || -z "$ISSUER" || -z "$P8" ]]; then
   exit 1
 fi
 
+# Codemagic's form says "Key ID from Apple". People type "from Apple" into Key ID.
+if [[ "$KEY_ID" =~ [[:space:]] || ${#KEY_ID} -ne 10 || ! "$KEY_ID" =~ ^[A-Za-z0-9]+$ ]]; then
+  echo "APP_STORE_CONNECT_KEY_IDENTIFIER is '$KEY_ID' — that is not a Key ID." >&2
+  echo "App Store Connect → Users and Access → Integrations → App Store Connect API." >&2
+  echo "Copy the Key ID (exactly 10 letters/numbers, like 2X9R4HXF34)." >&2
+  echo "In Codemagic, delete the FirstVue Developer Portal key and add it again." >&2
+  echo "Key name: FirstVue. Key ID: the 10-character value. Do not type 'from Apple'." >&2
+  exit 1
+fi
+
+if [[ ! "$ISSUER" =~ ^[0-9a-fA-F-]{36}$ ]]; then
+  echo "APP_STORE_CONNECT_ISSUER_ID is '$ISSUER' — it must be the UUID above the keys table." >&2
+  exit 1
+fi
+
 KEY_DIR="$HOME/.appstoreconnect/private_keys"
 mkdir -p "$KEY_DIR" "$HOME/private_keys" "$ROOT_DIR/private_keys"
 P8_PATH="$KEY_DIR/AuthKey_${KEY_ID}.p8"
@@ -178,29 +193,55 @@ if ! openssl pkey -in "$P8_PATH" -noout >/dev/null 2>&1; then
 fi
 echo "API key PEM validates with openssl."
 
-find_transporter() {
-  local candidate
-  for candidate in \
-    "$(xcrun --find iTMSTransporter 2>/dev/null || true)" \
-    "/usr/local/itms/bin/iTMSTransporter" \
-    "/Applications/Xcode-26.4.app/Contents/SharedFrameworks/ContentDeliveryServices.framework/Versions/A/itms/bin/iTMSTransporter" \
-    "/Applications/Xcode.app/Contents/SharedFrameworks/ContentDeliveryServices.framework/Versions/A/itms/bin/iTMSTransporter"
-  do
-    if [[ -n "$candidate" && -x "$candidate" ]]; then
-      echo "$candidate"
-      return 0
-    fi
-  done
-  local found
-  found=$(find /Applications -name iTMSTransporter -type f 2>/dev/null | head -1 || true)
-  if [[ -n "$found" && -x "$found" ]]; then
-    echo "$found"
+is_stub_transporter() {
+  local p="$1"
+  case "$p" in
+    */Developer/usr/bin/iTMSTransporter) return 0 ;;
+  esac
+  if grep -q "part of Transporter" "$p" 2>/dev/null; then
     return 0
   fi
   return 1
 }
 
+find_transporter() {
+  local candidate
+  for candidate in \
+    "/usr/local/itms/bin/iTMSTransporter" \
+    "/Applications/Transporter.app/Contents/itms/bin/iTMSTransporter" \
+    "/Applications/Xcode-26.4.app/Contents/SharedFrameworks/ContentDeliveryServices.framework/Versions/A/itms/bin/iTMSTransporter" \
+    "/Applications/Xcode.app/Contents/SharedFrameworks/ContentDeliveryServices.framework/Versions/A/itms/bin/iTMSTransporter"
+  do
+    if [[ -n "$candidate" && -x "$candidate" ]] && ! is_stub_transporter "$candidate"; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  local found
+  while IFS= read -r found; do
+    if [[ -x "$found" ]] && ! is_stub_transporter "$found"; then
+      echo "$found"
+      return 0
+    fi
+  done < <(find /usr/local/itms /Applications/Transporter.app /Applications/Xcode*.app -name iTMSTransporter -type f 2>/dev/null || true)
+  return 1
+}
+
+install_transporter() {
+  if [[ -x /usr/local/itms/bin/iTMSTransporter ]]; then
+    return 0
+  fi
+  echo "Installing Apple iTMSTransporter into /usr/local/itms"
+  local url="https://itunesconnect.apple.com/WebObjects/iTunesConnect.woa/ra/resources/download/public/Transporter__OSX/bin/"
+  curl -fL --retry 4 --retry-delay 3 "$url" -o /tmp/itmstransporter.pkg
+  sudo installer -pkg /tmp/itmstransporter.pkg -target /
+}
+
 TRANSPORTER=$(find_transporter || true)
+if [[ -z "$TRANSPORTER" ]]; then
+  install_transporter || true
+  TRANSPORTER=$(find_transporter || true)
+fi
 if [[ -z "$TRANSPORTER" ]]; then
   echo "iTMSTransporter not found; falling back to fastlane Java transporter."
   export FASTLANE_ITUNES_TRANSPORTER_USE_SHELL_SCRIPT=true
