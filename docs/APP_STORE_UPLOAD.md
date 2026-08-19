@@ -79,7 +79,7 @@ If the IPA **builds** but **Publishing failed** (`Failed to upload archive`, `40
 
 **A. API key** — Apple rejected the token. Delete the Codemagic **FirstVue** integration and add it again (you cannot edit). App Manager `.p8` + matching Key ID + Issuer ID.
 
-**B. Xcode 26 altool** — Codemagic `xcode: latest` is Xcode 26, whose uploader cannot map `com.FirstVue`. The workflow now pins **Xcode 16.4** and `--use-old-altool`. Build branch **`cursor/codemagic-asc-auth-4635`** (or `main` after that PR merges). Do not retry a run that used Xcode 26.
+**B. Mapbox vs uploader** — Mapbox’s iOS SDK needs **Xcode 26** (Swift 6.2). Xcode 16.4 fails with `_LocationEssentials` / `this SDK is not supported by the compiler`. The workflow uses **Xcode latest (26)** to compile and `--use-old-altool` to upload. Build branch **`cursor/codemagic-asc-auth-4635`**. Do not retry the Xcode 16.4 run.
 
 1. Confirm the app exists: [App Store Connect → My Apps](https://appstoreconnect.apple.com/apps) → **FirstVue**, bundle **`com.FirstVue`**. Create it if missing.
 2. Open [App Store Connect API keys](https://appstoreconnect.apple.com/access/integrations/api). If the old key is revoked or you are unsure, **Generate API Key**:

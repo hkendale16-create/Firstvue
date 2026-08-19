@@ -1,7 +1,7 @@
 # FirstVue — iOS App Store / TestFlight from Windows (no Mac required).
 # Codemagic rents a Mac, signs the IPA, and uploads it to App Store Connect.
 #
-# In Codemagic: pick branch main →
+# In Codemagic: pick branch cursor/codemagic-asc-auth-4635 (or main after merge) →
 # “Check for configuration file” → start workflow “iOS App Store 1.0.8”.
 # Do NOT use the Flutter Workflow Editor. It asks for a Shorebird token;
 # this app does not use Shorebird.
@@ -22,8 +22,9 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.FirstVue
       flutter: stable
-      # Xcode 26's altool 401s / cannot map com.FirstVue. 16.4 can upload.
-      xcode: 16.4
+      # MapboxCommon is built with Swift 6.2.4 (Xcode 26). Xcode 16.4 cannot
+      # compile it. Upload uses --use-old-altool because Xcode 26 altool 401s.
+      xcode: latest
       cocoapods: default
       vars:
         APP_STORE_CONNECT_API_UNAUTHORIZED_RETRIES: 10
