@@ -17,25 +17,43 @@ echo "Uploading $IPA"
 echo "App Store Connect env names present:"
 env | awk -F= 'BEGIN{IGNORECASE=1} $1 ~ /(APP_STORE_CONNECT|ASC_|ITMS)/ {print "  " $1}'
 
-KEY_ID="${APP_STORE_CONNECT_KEY_IDENTIFIER:-${APP_STORE_CONNECT_KEY_ID:-}}"
 ISSUER="${APP_STORE_CONNECT_ISSUER_ID:-}"
 P8="${APP_STORE_CONNECT_PRIVATE_KEY:-}"
 
-if [[ -z "$KEY_ID" || -z "$ISSUER" || -z "$P8" ]]; then
+if [[ -z "$ISSUER" || -z "$P8" ]]; then
   echo "The FirstVue Developer Portal integration did not export APP_STORE_CONNECT_* vars." >&2
   echo "In Codemagic: Personal account → Integrations → Developer Portal → key named FirstVue." >&2
   exit 1
 fi
 
-# Codemagic's form says "Key ID from Apple". People type "from Apple" into Key ID.
-if [[ "$KEY_ID" =~ [[:space:]] || ${#KEY_ID} -ne 10 || ! "$KEY_ID" =~ ^[A-Za-z0-9]+$ ]]; then
-  echo "APP_STORE_CONNECT_KEY_IDENTIFIER is '$KEY_ID' — that is not a Key ID." >&2
-  echo "App Store Connect → Users and Access → Integrations → App Store Connect API." >&2
-  echo "Copy the Key ID (exactly 10 letters/numbers, like 2X9R4HXF34)." >&2
-  echo "In Codemagic, delete the FirstVue Developer Portal key and add it again." >&2
-  echo "Key name: FirstVue. Key ID: the 10-character value. Do not type 'from Apple'." >&2
-  exit 1
-fi
+# Codemagic's form is labeled "Key ID from Apple"; the env often is the
+# placeholder "from Apple". Recover the real id from AuthKey_<id>.p8.
+KEY_ID="$(
+  python3 - "$ROOT_DIR/scripts" <<'PY'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+from pathlib import Path
+from asc_api_key import resolve_asc_key_id
+home = Path.home()
+try:
+    print(
+        resolve_asc_key_id(
+            os.environ.get("APP_STORE_CONNECT_KEY_IDENTIFIER")
+            or os.environ.get("APP_STORE_CONNECT_KEY_ID"),
+            os.environ.get("APP_STORE_CONNECT_PRIVATE_KEY"),
+            search_dirs=[
+                str(home / ".appstoreconnect" / "private_keys"),
+                str(home / "private_keys"),
+            ],
+        )
+    )
+except ValueError as exc:
+    print(exc, file=sys.stderr)
+    sys.exit(1)
+PY
+)"
+export RESOLVED_ASC_KEY_ID="$KEY_ID"
+echo "Using App Store Connect Key ID $KEY_ID"
 
 if [[ ! "$ISSUER" =~ ^[0-9a-fA-F-]{36}$ ]]; then
   echo "APP_STORE_CONNECT_ISSUER_ID is '$ISSUER' — it must be the UUID above the keys table." >&2
@@ -250,7 +268,7 @@ if [[ -z "$TRANSPORTER" ]]; then
 import json, pathlib, sys
 pem = pathlib.Path(sys.argv[2]).read_text()
 pathlib.Path(sys.argv[1]).write_text(json.dumps({
-    "key_id": __import__("os").environ.get("APP_STORE_CONNECT_KEY_IDENTIFIER") or __import__("os").environ.get("APP_STORE_CONNECT_KEY_ID"),
+    "key_id": __import__("os").environ["RESOLVED_ASC_KEY_ID"],
     "issuer_id": __import__("os").environ["APP_STORE_CONNECT_ISSUER_ID"],
     "key": pem,
     "in_house": False,

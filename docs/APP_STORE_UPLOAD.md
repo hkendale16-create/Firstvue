@@ -79,7 +79,7 @@ If the IPA **builds** but **Publishing failed** (`Failed to upload archive`, `40
 
 **A. API key** — Apple rejected the token. Delete the Codemagic **FirstVue** integration and add it again (you cannot edit). App Manager `.p8` + matching Key ID + Issuer ID.
 
-**B. Mapbox vs uploader** — Mapbox needs **Xcode 26**. Xcode 26’s `altool` then fails with `ITunesConnectionAuthenticationErrorDomain -26000`. The workflow compiles with Xcode 26 and uploads with **iTMSTransporter** (not altool). Build branch **`cursor/codemagic-asc-auth-4635`**. Do not retry a run whose publish log says `Running altool`.
+**B. Mapbox vs uploader** — Mapbox needs **Xcode 26**. Xcode 26’s `altool` then fails with `-26000`. The workflow compiles with Xcode 26, installs Apple’s real **iTMSTransporter** (not the Xcode stub), and uploads with that. If the log writes `AuthKey_from Apple.p8`, the Codemagic **Key ID** field is wrong.
 
 1. Confirm the app exists: [App Store Connect → My Apps](https://appstoreconnect.apple.com/apps) → **FirstVue**, bundle **`com.FirstVue`**. Create it if missing.
 2. Open [App Store Connect API keys](https://appstoreconnect.apple.com/access/integrations/api). If the old key is revoked or you are unsure, **Generate API Key**:

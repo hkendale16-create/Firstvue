@@ -4,7 +4,7 @@ From **Windows**, do not try to build an `.ipa` locally. Use Codemagic (cloud Ma
 
 1. Follow `docs/APP_STORE_UPLOAD.md` (Windows path).
 2. Start Codemagic workflow **iOS App Store 1.0.8** on **`cursor/codemagic-asc-auth-4635`**. Publish must use iTMSTransporter, not `altool`.
-4. Install from TestFlight on iPhone.
+3. Install from TestFlight on iPhone.
 
 | Field | Value |
 |-------|--------|
