@@ -28,21 +28,155 @@ if [[ -z "$KEY_ID" || -z "$ISSUER" || -z "$P8" ]]; then
 fi
 
 KEY_DIR="$HOME/.appstoreconnect/private_keys"
-mkdir -p "$KEY_DIR"
+mkdir -p "$KEY_DIR" "$HOME/private_keys" "$ROOT_DIR/private_keys"
 P8_PATH="$KEY_DIR/AuthKey_${KEY_ID}.p8"
 umask 077
-# Codemagic may store the .p8 with literal \n sequences.
+
 python3 - "$P8_PATH" <<'PY'
-import os, pathlib, sys
-raw = os.environ["APP_STORE_CONNECT_PRIVATE_KEY"]
-text = raw.replace("\\n", "\n").strip() + "\n"
+import base64
+import binascii
+import os
+import pathlib
+import re
+import sys
+
+raw = os.environ.get("APP_STORE_CONNECT_PRIVATE_KEY") or ""
+raw = raw.strip().strip('"').strip("'")
+raw = raw.replace("\r\n", "\n").replace("\\n", "\n").replace("\\r", "")
+
+def is_pem(text: str) -> bool:
+    t = text.lstrip()
+    return t.startswith("-----BEGIN") and "PRIVATE KEY" in t
+
+def b64decode(s: str):
+    compact = re.sub(r"\s+", "", s)
+    if not compact:
+        return None
+    pad = (-len(compact)) % 4
+    compact += "=" * pad
+    try:
+        return base64.b64decode(compact, validate=False)
+    except (binascii.Error, ValueError):
+        return None
+
+kind = "unknown"
+text = None
+raw_for_der = None
+
+if raw.startswith("@file:"):
+    path = pathlib.Path(raw[len("@file:"):])
+    blob = path.read_bytes()
+    kind = "file"
+    try:
+        decoded = blob.decode("utf-8")
+    except UnicodeDecodeError:
+        decoded = ""
+    if is_pem(decoded):
+        text = decoded
+        kind = "file-pem"
+    elif blob[:1] == b"\x30":
+        raw_for_der = blob
+    else:
+        raw = decoded or raw
+else:
+    raw_for_der = None
+
+if text is None and os.path.isfile(raw) and len(raw) < 512:
+    blob = pathlib.Path(raw).read_bytes()
+    kind = "path"
+    try:
+        decoded = blob.decode("utf-8")
+    except UnicodeDecodeError:
+        decoded = ""
+    if is_pem(decoded):
+        text = decoded
+        kind = "path-pem"
+    elif blob[:1] == b"\x30":
+        raw_for_der = blob
+
+if text is None and is_pem(raw):
+    text = raw
+    kind = "pem"
+
+if text is None and raw_for_der is not None:
+    der_path = pathlib.Path("/tmp/firstvue-asc.der")
+    der_path.write_bytes(raw_for_der)
+    import subprocess
+    text = subprocess.check_output(
+        ["openssl", "pkey", "-inform", "DER", "-in", str(der_path)],
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    kind = "der"
+
+if text is None:
+    # Codemagic's Developer Portal integration injects base64 of the .p8.
+    blob = b64decode(raw)
+    if blob:
+        try:
+            decoded = blob.decode("utf-8")
+        except UnicodeDecodeError:
+            decoded = ""
+        if is_pem(decoded):
+            text = decoded
+            kind = "b64-pem"
+        elif decoded.startswith("-----"):
+            text = decoded
+            kind = "b64-text"
+        else:
+            # Nested base64, or DER PKCS#8.
+            nested = b64decode(decoded) if decoded else None
+            if nested:
+                try:
+                    nested_text = nested.decode("utf-8")
+                except UnicodeDecodeError:
+                    nested_text = ""
+                if is_pem(nested_text):
+                    text = nested_text
+                    kind = "b64-b64-pem"
+            if text is None and blob[:1] == b"\x30":
+                der_path = pathlib.Path("/tmp/firstvue-asc.der")
+                der_path.write_bytes(blob)
+                import subprocess
+                pem = subprocess.check_output(
+                    ["openssl", "pkey", "-inform", "DER", "-in", str(der_path)],
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                )
+                text = pem
+                kind = "b64-der"
+            if text is None:
+                body = re.sub(r"\s+", "", raw)
+                wrapped = "\n".join(body[i : i + 64] for i in range(0, len(body), 64))
+                text = (
+                    "-----BEGIN PRIVATE KEY-----\n"
+                    f"{wrapped}\n"
+                    "-----END PRIVATE KEY-----\n"
+                )
+                kind = "wrapped-b64"
+
+if text is None:
+    raise SystemExit("Could not parse APP_STORE_CONNECT_PRIVATE_KEY")
+
+text = text.replace("\r\n", "\n").strip() + "\n"
+if not is_pem(text):
+    raise SystemExit(f"Normalized key is still not PEM (kind={kind}, len={len(raw)})")
+
 path = pathlib.Path(sys.argv[1])
 path.write_text(text)
 os.chmod(path, 0o600)
-if "BEGIN" not in text:
-    raise SystemExit("APP_STORE_CONNECT_PRIVATE_KEY is not a PEM .p8")
-print(f"Wrote {path}")
+print(f"Wrote {path} kind={kind} src_len={len(raw)} pem_len={len(text)}")
 PY
+
+cp "$P8_PATH" "$HOME/private_keys/AuthKey_${KEY_ID}.p8"
+cp "$P8_PATH" "$ROOT_DIR/private_keys/AuthKey_${KEY_ID}.p8"
+chmod 600 "$HOME/private_keys/AuthKey_${KEY_ID}.p8" "$ROOT_DIR/private_keys/AuthKey_${KEY_ID}.p8"
+
+if ! openssl pkey -in "$P8_PATH" -noout >/dev/null 2>&1; then
+  echo "Normalized .p8 is not a readable private key (openssl pkey failed)." >&2
+  exit 1
+fi
+echo "API key PEM validates with openssl."
 
 find_transporter() {
   local candidate
@@ -57,7 +191,6 @@ find_transporter() {
       return 0
     fi
   done
-  # Last resort: search Xcode apps.
   local found
   found=$(find /Applications -name iTMSTransporter -type f 2>/dev/null | head -1 || true)
   if [[ -n "$found" && -x "$found" ]]; then
@@ -72,13 +205,13 @@ if [[ -z "$TRANSPORTER" ]]; then
   echo "iTMSTransporter not found; falling back to fastlane Java transporter."
   export FASTLANE_ITUNES_TRANSPORTER_USE_SHELL_SCRIPT=true
   API_JSON=/tmp/firstvue-asc-api.json
-  python3 - "$API_JSON" <<'PY'
-import json, os, pathlib, sys
-key = os.environ["APP_STORE_CONNECT_PRIVATE_KEY"].replace("\\n", "\n").strip()
+  python3 - "$API_JSON" "$P8_PATH" <<'PY'
+import json, pathlib, sys
+pem = pathlib.Path(sys.argv[2]).read_text()
 pathlib.Path(sys.argv[1]).write_text(json.dumps({
-    "key_id": os.environ.get("APP_STORE_CONNECT_KEY_IDENTIFIER") or os.environ.get("APP_STORE_CONNECT_KEY_ID"),
-    "issuer_id": os.environ["APP_STORE_CONNECT_ISSUER_ID"],
-    "key": key,
+    "key_id": __import__("os").environ.get("APP_STORE_CONNECT_KEY_IDENTIFIER") or __import__("os").environ.get("APP_STORE_CONNECT_KEY_ID"),
+    "issuer_id": __import__("os").environ["APP_STORE_CONNECT_ISSUER_ID"],
+    "key": pem,
     "in_house": False,
 }))
 print(f"Wrote {sys.argv[1]}")
