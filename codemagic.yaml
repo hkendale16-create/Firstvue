@@ -23,7 +23,7 @@ workflows:
         bundle_identifier: com.FirstVue
       flutter: stable
       # MapboxCommon is built with Swift 6.2.4 (Xcode 26). Xcode 16.4 cannot
-      # compile it. Upload uses --use-old-altool because Xcode 26 altool 401s.
+      # compile it. Xcode 26 altool 401s; upload uses iTMSTransporter instead.
       xcode: latest
       cocoapods: default
       vars:
@@ -52,12 +52,16 @@ workflows:
           # and fails CI if that file is missing or misnamed.
           flutter config --no-enable-swift-package-manager
           bash scripts/fix-xcode-filenames.sh
+          xcodebuild -version
           flutter build ipa --release \
             --build-name=1.0.8 \
             --build-number=9 \
             --export-options-plist=/Users/builder/export_options.plist \
             --dart-define=FIRSTVUE_OAUTH_GOOGLE=true \
             --dart-define=FIRSTVUE_GOOGLE_WEB_CLIENT_ID=232279155211-ilegqngbve9fr34o5ajjq7396c48n877.apps.googleusercontent.com
+      - name: Upload IPA with iTMSTransporter
+        script: |
+          bash scripts/upload-ipa-transporter.sh
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
@@ -68,8 +72,3 @@ workflows:
         notify:
           success: true
           failure: true
-      app_store_connect:
-        auth: integration
-        # Upload only. Internal testers can install after Apple processes the build.
-        submit_to_testflight: false
-        submit_to_app_store: false
